@@ -71,6 +71,7 @@ class World:
         self.prices: dict[int, dict] = {}
         self.questie: QuestieDB | None = None
         self.drop_rates: dict = {}
+        self.syndicator: dict = {}
         self.source_grades: dict = {}
         self.untrusted_items = 0
         self.skillup: SkillUpData = SkillUpData()
@@ -324,10 +325,33 @@ class World:
                             counts[int(slot['itemID'])] = counts.get(int(slot['itemID']), 0) + int(slot.get('itemCount') or 1)
             inv[char] = counts
         self.inventory = inv
+        # gold, mail and your current auctions per character (Syndicator doesn't record listing prices)
+        self.syndicator = {}
+        for char, cd in (data.get('Characters') or {}).items():
+            det = cd.get('details') or {}
+            self.syndicator[char] = {
+                'name': det.get('character') or char.split('-')[0], 'realm': det.get('realm') or '',
+                'faction': det.get('faction') or '', 'money': int(cd.get('money') or 0),
+                'mail': _item_counts(cd.get('mail')),
+                'auctions': [{'item': int(a['itemID']), 'count': int(a.get('itemCount') or 1),
+                              'expires': int(a.get('expirationTime') or 0)}
+                             for a in _as_list(cd.get('auctions')) if isinstance(a, dict) and a.get('itemID')]}
+        self._merge_money()
         st.file_time, st.loaded_at, st.status = int(p.stat().st_mtime), int(time.time()), 'ok'
         st.version = self.paths.addon_version('Syndicator')
         st.note = f'{len(inv)} characters. Updates on logout or /reload.'
         self.version += 1
+
+    def _merge_money(self):
+        """Gold per character: Syndicator's figure wins over the addon's. Found 2026-11-14: ForeverMoneyBridge 1.4.0
+        saved 0 gold on logout/reload (the game can report 0 while logging out) while Syndicator had 26g 78s."""
+        chars = (getattr(self, 'profile', None) or {}).get('characters') or {}
+        for c in (getattr(self, 'syndicator', None) or {}).values():
+            for name, pc in chars.items():
+                if name.split('-')[0] == c['name'] and _same_realm(pc.get('realm') or '', c['realm']):
+                    if pc.get('money') != c['money']:
+                        pc['money_addon'] = pc.get('money')
+                    pc['money'], pc['money_source'] = c['money'], 'Syndicator'
 
     def _char_mtimes(self) -> dict[str, float]:
         out = {}
@@ -345,6 +369,7 @@ class World:
         bridge = profile_mod.read_bridge(bridge_path)
         tsm_chars = profile_mod.read_tsm_characters(tsm_path)
         self.profile = profile_mod.build_profile(bridge, tsm_chars, self._char_mtimes())
+        self._merge_money()
         st.loaded_at = int(time.time())
         st.file_time = _mtime(st.files) or None
         st.version = self.paths.addon_version(profile_mod.ADDON_NAME)
@@ -543,6 +568,27 @@ class World:
     def freshness(self) -> list[dict]:
         return [s.to_dict() for s in self.status.values()]
 
+
+
+
+def _same_realm(a: str, b: str) -> bool:
+    """The addon can record the server's internal realm name ("CAMWOW EU5 Realm 4 PvP") where Syndicator and TSM say "PvP"."""
+    a, b = a.strip(), b.strip()
+    return not a or not b or a == b or a.endswith(' ' + b) or b.endswith(' ' + a)
+
+def _item_counts(x, out: dict | None = None) -> dict[int, int]:
+    """Item counts from any nesting of Syndicator lists/tables with itemID/itemCount (mail, bags)."""
+    out = {} if out is None else out
+    if isinstance(x, dict):
+        if x.get('itemID'):
+            out[int(x['itemID'])] = out.get(int(x['itemID']), 0) + int(x.get('itemCount') or 1)
+        else:
+            for v in x.values():
+                _item_counts(v, out)
+    elif isinstance(x, list):
+        for v in x:
+            _item_counts(v, out)
+    return out
 
 def _as_list(v):
     if isinstance(v, list):

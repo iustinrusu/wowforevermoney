@@ -96,8 +96,22 @@ async function loadState() {
   const dot = $('#health-dot');
   dot.className = 'dot ' + (worst.includes('stale') || worst.includes('error') || audit.fail ? 'stale' : (worst.includes('warn') || audit.warn ? 'warn' : 'ok'));
   const tsm = (STATE.freshness || []).find((f) => f.name === 'tsm');
+  loadPurse();
   $('#status').textContent = `Prices from ${tsm && tsm.data_time ? ago(tsm.data_time) : '?'} · updated ${ago(STATE.generated_at)} · ${STATE.settings.realm}`;
 }
+
+async function loadPurse() {
+  const el = $('#purse');
+  try {
+    const p = await api('/api/purse');
+    const m = p.me;
+    if (!m) { el.innerHTML = '<span class="pill">gold: needs Syndicator or the addon</span>'; return; }
+    const extra = m.bags_bank + m.mail + m.auctions;
+    el.innerHTML = `<div class="purse-gold">${money(m.money)}</div><div class="purse-sub">+ ${esc(moneyText(extra))} in items · ≈ ${esc(moneyText(m.total))} total</div>`;
+    el.title = `${p.character}: ${moneyText(m.money)} gold\nBags + bank: ≈ ${moneyText(m.bags_bank)}\nMail: ≈ ${moneyText(m.mail)}\nOn the AH: ≈ ${moneyText(m.auctions)} (${m.auction_count} listings${m.expired_auctions ? `, ${m.expired_auctions} expired` : ''})\nAll ${p.all.characters} characters: ${moneyText(p.all.money)} gold, ≈ ${moneyText(p.all.total)} with items\n\n${p.note}\nClick for your bags.`;
+  } catch (e) { el.innerHTML = ''; }
+}
+$('#purse').onclick = () => { TAB = 'bags'; localStorage.setItem('tab', TAB); render(); };
 
 // ---------- tables ----------
 function oppTable(rows, opts = {}) {

@@ -305,6 +305,52 @@ class App:
         return market_mod.build(iid, gd.items.get(iid) if gd else None, self.world.prices.get(iid),
                                 self.history.series(iid, days=KEEP_DAYS), time.time())
 
+    def purse(self) -> dict:
+        """Your gold now, plus what your bags, bank, mail and current auctions are worth at today's prices."""
+        w = self.world
+        s = self.effective_settings()[0]
+        eng = Engine(w, s)
+        valuer = eng.valuer((self.result or {}).get('best_use') or {})
+        now = time.time()
+        syn = getattr(w, 'syndicator', {}) or {}
+        prof = w.profile or {}
+        active = prof.get('active') or ''
+        key = next((k for k, c in syn.items() if c['name'] == active.split('-')[0]), None)
+
+        def worth(counts: dict[int, int]) -> int:
+            return sum(valuer.value(i).value * n for i, n in counts.items() if i in w.gamedata.items)
+
+        def listed(auctions) -> tuple[int, int, int]:
+            value = n = expired = 0
+            for a in auctions:
+                if a['expires'] and a['expires'] < now:
+                    expired += 1            # expired: back in the mailbox, which Syndicator records as mail
+                    continue
+                q = ah_sell(w.prices.get(a['item']), s.get('sale_price_basis', 'min_buyout'))
+                value += (proceeds(q, eng.cut) or valuer.value(a['item']).value) * a['count']
+                n += 1
+            return value, n, expired
+
+        def one(k):
+            c = syn.get(k) or {}
+            money = c.get('money', 0)
+            # Syndicator's own figure (the addon's could be 0 after a logout: see World._merge_money)
+            bags = worth(w.inventory.get(k, {}))
+            mail = worth(c.get('mail') or {})
+            ah, n, expired = listed(c.get('auctions') or [])
+            return {'money': money, 'bags_bank': bags, 'mail': mail, 'auctions': ah, 'auction_count': n,
+                    'expired_auctions': expired, 'total': money + bags + mail + ah}
+
+        me = one(key) if key else None
+        faction = (syn.get(key) or {}).get('faction') if key else None
+        others = [k for k, c in syn.items() if not faction or c.get('faction') == faction]
+        everyone = [one(k) for k in others]
+        return {'character': active or None, 'found': bool(key), 'me': me,
+                'all': {'characters': len(everyone), 'money': sum(x['money'] for x in everyone),
+                        'total': sum(x['total'] for x in everyone)},
+                'note': 'Bags, bank and mail at their best value today; auctions at what they would sell for now '
+                        '(your listing prices are not recorded by Syndicator). Updates on /reload or logout.'}
+
     def inventory(self) -> list[dict]:
         w = self.world
         r = self.result or {'best_use': {}}
@@ -418,6 +464,8 @@ def make_handler(app: App):
                     return self._json(app.search(qs.get('q', [''])[0], min(60, int(qs.get('limit', ['60'])[0]))))
                 if url.path == '/api/item':
                     return self._json(app.item(int(qs.get('id', ['0'])[0])))
+                if url.path == '/api/purse':
+                    return self._json(app.purse())
                 if url.path == '/api/market':
                     return self._json(app.market(int(qs.get('id', ['0'])[0])))
                 if url.path == '/api/investments':

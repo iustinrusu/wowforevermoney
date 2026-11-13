@@ -2,7 +2,7 @@
 ## Title: |cffe8c060ForeverMoneyBridge|r
 ## Notes: Saves your level, gold, professions, real vendor prices, and what you loot where (with time spent) for the WoW Forever Money app. Written on logout or /reload.
 ## Author: WoWForeverMoney
-## Version: 1.4.0
+## Version: 1.4.1
 ## SavedVariables: ForeverMoneyBridgeDB
 
 Checks.lua

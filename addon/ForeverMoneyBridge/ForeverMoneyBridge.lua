@@ -53,7 +53,7 @@ local function professions()
   return out
 end
 
-local function snapshot()
+local function snapshot(event)
   local d = db()
   local c = d.characters[charKey()] or {}
   c.name = UnitName("player")
@@ -61,7 +61,8 @@ local function snapshot()
   c.faction = UnitFactionGroup("player")
   c.level = UnitLevel("player")
   c.class = select(2, UnitClass("player"))
-  c.money = GetMoney()
+  -- while logging out (also on /reload) the game can report 0 gold: keep the last real figure then
+  if event ~= "PLAYER_LOGOUT" or c.money == nil then c.money = GetMoney() end
   local profs = professions()
   if next(profs) ~= nil then c.professions = profs end
   c.zone = GetRealZoneText and GetRealZoneText() or nil
@@ -251,7 +252,8 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
       if ok and done then pendingInfo[arg1] = nil end
     end
   elseif event == "PLAYER_LOGIN" then
-    pcall(snapshot)
+    pcall(snapshot, event)
+    if C_Timer then C_Timer.After(5, function() pcall(snapshot, "DELAYED_LOGIN") end) end   -- gold is loaded by then
     if C_Timer then C_Timer.After(15, function() pcall(checkItems) end) end   -- after the login rush
   elseif event == "MERCHANT_SHOW" or event == "MERCHANT_UPDATE" then
     pcall(recordMerchant)
@@ -263,7 +265,7 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
       if activity then lastCast.activity, lastCast.t = activity, GetTime() end
     end
   else
-    pcall(snapshot)
+    pcall(snapshot, event)
   end
 end)
 

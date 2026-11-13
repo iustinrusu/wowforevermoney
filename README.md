@@ -41,6 +41,10 @@ Everything runs on your PC. The page is only reachable from your own computer, a
 
 ## The tabs
 
+**Your purse** (top right): your gold now, plus what your bags, bank, mail and current auctions are worth at today's
+prices (hover for the breakdown, click for My bags). From Syndicator; auctions are an estimate, since your listing
+prices aren't recorded.
+
 | Tab | What it's for |
 |---|---|
 | **Top picks** | What to do now, ranked by profit per day. Also: the best fishing and farming spots per hour, snipes (single cheap listings to check in game), things a higher profession skill unlocks, and other professions worth switching to. Only Forever-confirmed data appears here. |

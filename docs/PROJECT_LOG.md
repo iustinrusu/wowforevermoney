@@ -33,6 +33,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Gold was read wrong: the app thought the user had 3s 20c, really 26g 78s.** ForeverMoneyBridge
+  1.4.0 saved 0 gold for the active character (its snapshot on PLAYER_LOGOUT/reload can read 0), while Syndicator,
+  saved at the same moment, had 267,812c. Every affordability cap and "can't afford" flag used the wrong gold.
+  Fixes: the app takes each character's gold from Syndicator when present (`World._merge_money`; the addon's
+  value is kept as `money_addon`); realm names are matched loosely (the addon stored the server's internal name
+  "CAMWOW EU5 Realm 4 PvP" where Syndicator/TSM say "PvP"); addon 1.4.1 no longer overwrites gold on logout
+  and re-snapshots 5 s after login. Purse widget in the header (gold + bags/bank/mail/auction value).
 - **2026-11-14 Name and look: "Gold Ever After"** ("happily ever after" + WoW: Forever). Theme: serif headings
   (Palatino/Book Antiqua, already on Windows), gold trim, tab icons, Wowhead item icons (iconizeLinks via the
   tooltip script the page already loaded), zebra tables, "How to read this page" on Top picks, "How this is
@@ -291,6 +298,8 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Purse in the header; gold from Syndicator (fixes 0 gold from the addon); addon 1.4.1. Tests: 120.
 
 - **2026-11-14** UI refresh and new name (Gold Ever After); README section "Addons this tool uses" (CurseForge app).
 

@@ -53,5 +53,23 @@ class EngineIgnoresUntrustedVendorPrices(unittest.TestCase):
         self.assertEqual(e.sell_value(PRODUCT)[1], 'AH')
 
 
+
+class SyndicatorItems(unittest.TestCase):
+    def test_item_counts_from_any_nesting(self):
+        from wfm.world import _item_counts
+        mail = [{'items': [{'itemID': 4339, 'itemCount': 5}, {'itemID': 2589}]}, [{'itemID': 4339, 'itemCount': 2}], {}]
+        self.assertEqual(_item_counts(mail), {4339: 7, 2589: 1})
+        self.assertEqual(_item_counts(None), {})
+
+
+    def test_realm_names_from_different_sources_match(self):
+        from wfm.world import _same_realm
+        self.assertTrue(_same_realm('CAMWOW EU5 Realm 4 PvP', 'PvP'))
+        self.assertTrue(_same_realm('PvP', 'PvP'))
+        self.assertTrue(_same_realm('', 'PvP'))
+        self.assertFalse(_same_realm('PvE', 'PvP'))
+        self.assertFalse(_same_realm('XPvP', 'PvP'))
+
+
 if __name__ == '__main__':
     unittest.main()
