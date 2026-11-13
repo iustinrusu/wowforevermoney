@@ -51,12 +51,24 @@ class PricingTests(unittest.TestCase):
         self.assertIsNone(ah_buy({}))
 
     def test_sell_is_conservative(self):
-        q = ah_sell({'numAuctions': 5, 'minBuyout': 500, 'marketValue': 600, 'regionSoldPerDay': 3, 'regionSale': 450})
+        q = ah_sell({'numAuctions': 5, 'minBuyout': 500, 'marketValue': 600, 'regionSoldPerDay': 3, 'regionSale': 550})
         self.assertEqual(q.value, 500)       # must undercut the lowest listing
         q = ah_sell({'numAuctions': 5, 'minBuyout': 900, 'marketValue': 600, 'regionSoldPerDay': 3})
         self.assertEqual(q.value, 600)       # never more than the usual realm price
+        q = ah_sell({'numAuctions': 5, 'minBuyout': 500, 'marketValue': 600, 'regionSoldPerDay': 3, 'regionSale': 450})
+        self.assertEqual(q.value, 450)       # never more than what it actually sells for
         q = ah_sell({'numAuctions': 5, 'minBuyout': 500, 'marketValue': 600, 'regionSale': 300, 'regionSoldPerDay': 1})
         self.assertIn('sells_lower', q.flags)
+        self.assertEqual(q.value, 300)
+
+    def test_wishful_listings_are_priced_at_real_sales(self):
+        # Regression from live data (2026-11-13): Hand Axe, nothing listed, realm listing average 2.5g, but it
+        # really sells for 6.65s. It topped "Do these now" as a 2.37g vendor flip.
+        q = ah_sell({'marketValue': 25050, 'regionMarketValue': 5399, 'regionSale': 665, 'regionSoldPerDay': 1.5,
+                     'regionSalePercent': 1.0})
+        self.assertEqual(q.value, 665)
+        self.assertIn('sells_lower', q.flags)
+        self.assertIn('none_listed', q.flags)
         q = ah_sell({'numAuctions': 1, 'minBuyout': 5000, 'marketValue': 6000, 'regionMarketValue': 1000})
         self.assertIn('above_region', q.flags)
         self.assertIn('no_sales_data', q.flags)
@@ -175,6 +187,46 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(zone.profit_unit, int(190 * 40 / 90))   # value per catch
         # 200 casts/hour, all landed (90 caught + 10 got away of 100), 90% kept -> 180 catches/hour
         self.assertEqual(zone.gph, 15200)                        # 190 x 40/90 x 180 = the old per-cast 190 x 0.4 x 200
+
+    def test_values_use_recipes_you_can_make_now(self):
+        # A fish was valued by a recipe needing Cooking 300 while the user has 150: it overstated catches.
+        easy = Recipe(spell_id=500, name='Spotted Yellowtail', profession='Cooking', skill_line=185, product_id=COOKED,
+                      product_count=1, reagents=[(FISH, 1)], trivial_low=140, trivial_high=180, min_rank=1)
+        hard = Recipe(spell_id=501, name='Tasty Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                      product_count=1, reagents=[(FISH, 1)], trivial_low=320, trivial_high=360, min_rank=1)
+        prices = {FISH: {'numAuctions': 5, 'minBuyout': 80, 'marketValue': 90, 'regionSoldPerDay': 50},
+                  COOKED: {'numAuctions': 5, 'minBuyout': 200, 'marketValue': 210, 'regionSoldPerDay': 50},
+                  PRODUCT: {'numAuctions': 5, 'minBuyout': 1000, 'marketValue': 1000, 'regionSoldPerDay': 50}}
+        w = make_world(prices, [easy, hard])
+        w.skillup.thresholds[501] = [300, 320, 340, 360]
+        e = Engine(w, dict(SETTINGS))
+        best = e.best_uses()
+        self.assertEqual((best[FISH]['value'], best[FISH]['doable']), (950, False))
+        self.assertEqual((best[FISH]['doable_value'], best[FISH]['doable_recipe']), (190, 'Spotted Yellowtail'))
+        v = e.valuer(best).value(FISH)
+        self.assertEqual((v.value, v.channel), (190, 'craft'))
+        self.assertIn('more_with_skill', v.flags)
+        self.assertEqual(v.if_skilled['value'], 950)
+
+    def test_soulbound_items_only_sell_to_vendors(self):
+        w = make_world({PRODUCT: {'numAuctions': 3, 'minBuyout': 5000, 'marketValue': 5000, 'regionSale': 5000,
+                                  'regionSoldPerDay': 9}})
+        w.gamedata.items[PRODUCT].bonding = 1
+        self.assertEqual(Engine(w, dict(SETTINGS)).sell_value(PRODUCT)[:2], (20, 'vendor'))
+
+    def test_event_only_vendors_are_flagged(self):
+        # Regression from live data: Heavy Leather Ball (Flik, Darkmoon Faire) and Green Firework (holiday
+        # fireworks vendors) ranked as everyday vendor flips.
+        w = make_world({})
+        w.questie.items[ALLY_ONLY] = {'vendors': [102]}
+        w.questie.npcs[102] = {'name': 'Flik', 'friendlyToFaction': 'AH', 'zoneID': 215,
+                               'spawns': {12: [[41.0, 68.0]], 215: [[41.8, 68.1]]}}
+        w.questie.items[LIMITED] = {'vendors': [103, 100]}
+        w.questie.npcs[103] = {'name': 'Ziggle Sparks', 'subName': 'Holiday Fireworks Vendor', 'friendlyToFaction': 'AH'}
+        e = Engine(w, dict(SETTINGS))
+        self.assertIn('event_vendor', e.vendor_flags(ALLY_ONLY))
+        self.assertNotIn('event_vendor', e.vendor_flags(LIMITED), 'a regular vendor also sells it')
+        self.assertNotIn('event_vendor', e.vendor_flags(MAT_VENDOR))
 
     def test_top_picks_exclude_risky_and_unaffordable(self):
         prices = {CHEAP_SNIPE: {'numAuctions': 3, 'minBuyout': 200, 'marketValue': 1000, 'regionMarketValue': 900,

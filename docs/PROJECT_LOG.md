@@ -22,6 +22,19 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-13 Full accuracy recheck.** The user said accuracy is non-negotiable. Fixes:
+  - **Sale price is capped at the region's average actual sale price** (`pricing.ah_sell`). The #1 pick was a
+    bogus Hand Axe vendor flip (listing avg 2.5g, real sales 6.65s); 15% of actively traded items list 1.5x+
+    above real sales. This also cut the Mithril Bound Trunk from 3.74g to ~65s (rare contents were valued
+    at wishful listings).
+  - **Item values use only recipes you can make now** (`best_uses` doable_value); the higher-skill value is
+    kept as `if_skilled` / flag `more_with_skill`. Flag `craft_limited_demand` when the product's market absorbs
+    < 50 units/day at your share (e.g. Forever's Fishing Rack recipe makes trout worth 1.92s, ~11/day).
+  - **Event-only vendors** (subName holiday/festival/darkmoon..., or spawns in both Elwynn and Mulgore =
+    Darkmoon Faire, or no known spawn): flag `event_vendor`, out of Top picks; also on crafts using such mats.
+  - Soulbound/quest items sell only to vendors (`sell_value`); valuation no longer applies the AH cut twice.
+  - TSM `merged()` is order-proof; region commodity data (empty on Forever) can't overwrite realm fields.
+  - Farming list drops processed goods (cooked food, potions, cured hides, cloth bolts) but keeps leathers.
 - **2026-11-13 Own catch logs don't set drop rates (default).** Wowhead Forever counts only; the user's
   ForeverAngler/ForeverMoneyBridge logs give pace and got-away rate. Opt-in setting `own_logs_for_rates`.
   *Why (user):* their ForeverAngler log skews rates: small (612 casts), mixes pools and open water,
@@ -73,6 +86,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-13 recheck: raw TSM base-32 rows decoded by hand = parser output; 25/25 vendor sell prices (incl.
+  Mageweave, Runecloth, leathers, potions, pearls, fish) match Wowhead Forever tooltips; top picks, container
+  values, item values and fishing gold/hour for all 5 Wowhead zones match an independent recomputation (within
+  1c rounding). Forever has no region commodity AH: `AUCTIONDB_COMMODITY_HISTORICAL` is empty.
+- ForeverAngler counts: `c` = Fishing channel starts (every cast), `k` = fishing loot windows, `e` = "Your fish
+  got away!" messages; c - k - e = missed bites / early recasts. Valid for pace, not for drop rates.
 - TSM AppData.lua: item ids are decimal, every other number is base-32 (0-9, A-V). `regionSalePercent`
   and `regionSoldPerDay` are raw/1000. Checked against TSM's AuctionDBConfig.lua and an in-game tooltip
   (Raw Spotted Yellowtail: sale 45c, rate 0.631, sold/day 563.798). There's a regression test for this.
@@ -136,6 +155,10 @@ The user is firm that the data must be correct and accurate. In order:
 - Known gaps: vendors with faction '' treated as accessible; AH deposits ignored; bulk-buy cost uses only
   the lowest listing.
 - Cast pace is the 240 casts/hour setting until ForeverMoneyBridge has 10+ minutes of timed fishing.
+- No JavaScript syntax check in the tests (no Node on this PC): an unescaped apostrophe broke the page once
+  on 2026-11-13. Check the browser console after editing `web/app.js`.
+- AH deposits and the cost of unsold listings aren't modelled; recipe learn cost is shown, not subtracted.
+- Is Javnir Nashak (Green Firework vendor, Durotar) permanent or event-only? Questie gives no hint.
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
@@ -147,6 +170,8 @@ The user is firm that the data must be correct and accurate. In order:
 - **2026-11-13** Fishing rebuilt: `wfm/classicdb.py` (cMaNGOS dump extractor, update scripts, pools,
   seasons, monthly GitHub check), `wfm/fishing.py` (spots, logs, got-away/pace model), Forever-first rows,
   Wowhead Forever snapshot for 5 zones, Data health check "Classic fishing tables vs Forever data".
+- **2026-11-13** Accuracy recheck: sale prices capped at real sales, doable-recipe values, event vendors,
+  soulbound rule, double-cut fix, TSM merge order, farming filter. 57 tests.
 - **2026-11-13** Valuation engine `wfm/valuation.py` (open-it channel, contents from Wowhead Forever +
   your opens), undervaluation watch (audit + alerts), My bags shows "Open it". Addon 1.2.0 logs container
   contents. 51 tests.

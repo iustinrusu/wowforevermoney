@@ -58,10 +58,19 @@ class PriceData:
         """One dict per item with every field from the region datasets plus the chosen realm's."""
         region = self.region()
         out: dict[int, dict[str, float]] = {}
-        for d in self.datasets:
-            if d.scope == region or (realm and d.scope == realm):
-                for item_id, vals in d.rows.items():
-                    out.setdefault(item_id, {}).update(vals)
+        # Region data first, then the realm's, so realm fields always win whatever the order in the file.
+        # Region commodity data (empty on Forever so far) shares field names with realm data ("historical"),
+        # so its fields get a "commodity" prefix instead of overwriting realm values.
+        ordered = sorted((d for d in self.datasets if d.scope == region or (realm and d.scope == realm)),
+                         key=lambda d: d.scope != region)
+        for d in ordered:
+            commodity = 'COMMODITY' in d.kind and 'NON_COMMODITY' not in d.kind
+            for item_id, vals in d.rows.items():
+                row = out.setdefault(item_id, {})
+                if commodity:
+                    row.update({'commodity' + k[:1].upper() + k[1:]: v for k, v in vals.items()})
+                else:
+                    row.update(vals)
         return out
 
     def times(self) -> dict[str, int]:

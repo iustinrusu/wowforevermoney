@@ -122,7 +122,9 @@ The **Data health** tab shows every source's age and version, plus the accuracy 
 ## How the numbers work
 
 - **Buy cost** is the cheapest of a vendor you can use (your faction) and the lowest AH listing.
-- **Sale price** is the lower of the current lowest listing and the realm's 14-day market value, minus the AH cut. It's conservative: you'll have to undercut.
+- **Sale price** is the lowest of: the current lowest listing, the realm's 14-day market value, and the region's **average actual sale price**, minus the AH cut. Listings can be wishful (a Hand Axe listed around 2.5g really sells for about 6.6s), so nothing is valued above what it actually sells for. Soulbound and quest items only count at their vendor price.
+- **Crafting values** (what a material is worth when you craft it) use only recipes you can make now. A better recipe that needs more skill is shown as "more with skill". If the crafted product's market only absorbs a few a day, it's flagged "limited demand".
+- **Event vendors** (Darkmoon Faire, holiday vendors) and vendors with no known location are flagged "event vendor" and kept out of Top picks.
 - **Per day**: profit × the units you can realistically sell per day. That's TSM's region sold/day × your market share setting (default 20%), capped by your gold, vendor stock and recipe output.
 - **Gold/hour** is only shown when it's measured (ForeverMoneyBridge time logs), assumed from your settings (ForeverAngler has no timing), or from a rate you entered.
 - **What an item is worth** is the best of four ways to turn it into gold: sell on the AH, sell to a vendor, craft with it, or **open it** (trunks, clams, crates). Opening is valued at the expected value of its Forever contents at current prices, so a Mithril Bound Trunk is worth its Mageweave and Runecloth, not its 2c vendor price. The client's own item flags say which items can be opened; any openable item with unknown contents is flagged "contents unknown" (its value is a floor) and listed in the undervaluation watch on Data health.

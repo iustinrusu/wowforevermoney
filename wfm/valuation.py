@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 
 OPEN_DEPTH = 2              # a container inside a container is valued; deeper than that isn't
 WORTH_OPENING = 1.2         # flag "open it" when opening beats selling by 20%+
+CRAFT_DEMAND = 50           # flag a crafting value when its product's market absorbs fewer units/day than this
 
 
 @dataclass
@@ -31,6 +32,7 @@ class Value:
     channels: dict = field(default_factory=dict)    # every channel that applies -> copper
     contents: list = field(default_factory=list)    # for 'open': top contents [{item_id, per_open, value}]
     contents_source: str = ''
+    if_skilled: dict | None = None      # a recipe you can't make yet that would be worth more
 
 
 def merge_contents(wowhead: dict | None, own: dict | None) -> dict[int, dict]:
@@ -84,9 +86,10 @@ class Valuer:
         channels, flags = {}, []
         sell, channel, q = e.sell_value(iid)
         if channel == 'AH' and q and {'no_sales_data', 'above_region'} & set(q.flags):
-            sale = (e.price(iid) or {}).get('regionSale') or 0
-            sell = int(min(sale, sell) * (1 - e.cut))
+            # ah_sell already caps at the average sale price; with no recorded sale at all, don't count on the AH
             flags.append('ah_price_doubtful')
+            if not (e.price(iid) or {}).get('regionSale'):
+                sell = 0
         vendor = item.sell_price if item else 0
         tradeable = not (item and (item.bonding == 1 or item.class_id == 12))     # soulbound or quest item
         if channel == 'AH' and sell > 0 and tradeable:
@@ -94,8 +97,13 @@ class Valuer:
         if vendor:
             channels['vendor'] = vendor
         use = self.best_use.get(iid)
-        if use and use['value'] > 0:
-            channels['craft'] = int(use['value'])
+        if use and (use.get('doable_value') or 0) > 0:
+            channels['craft'] = int(use['doable_value'])      # only recipes you can make now
+        if_skilled = None
+        if use and use['value'] > max([0] + list(channels.values())) and not use.get('doable'):
+            if_skilled = {'value': int(use['value']), 'recipe': use['recipe'], 'profession': use['profession'],
+                          'skill': use.get('skill')}
+            flags.append('more_with_skill')
         contents, source = [], ''
         if item and item.openable:
             c = self.contents.get(iid)
@@ -114,10 +122,13 @@ class Valuer:
             if item.locked:
                 flags.append('locked')
         if not channels:
-            return Value(0, 'none', 'no known way to turn it into gold', tuple(flags + ['no_value']), {})
+            return Value(0, 'none', 'no known way to turn it into gold', tuple(flags + ['no_value']), {},
+                         if_skilled=if_skilled)
         best = max(channels, key=lambda k: channels[k])
         if best == 'open' and channels['open'] >= WORTH_OPENING * max(channels.get('AH', 0), vendor, 1):
             flags.append('open_it')
+        if best == 'craft' and use and (use.get('doable_units_per_day') or 0) < CRAFT_DEMAND:
+            flags.append('craft_limited_demand')    # beyond that many a day, it's worth its sale price
         how = {'AH': 'sell on the AH', 'vendor': 'sell to a vendor', 'open': 'open it',
-               'craft': f"{use['profession']}: {use['recipe']}" if use else 'craft'}[best]
-        return Value(channels[best], best, how, tuple(flags), channels, contents[:12], source)
+               'craft': f"{use['doable_profession']}: {use['doable_recipe']}" if use else 'craft'}[best]
+        return Value(channels[best], best, how, tuple(flags), channels, contents[:12], source, if_skilled)

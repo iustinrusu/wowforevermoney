@@ -42,8 +42,10 @@ def ah_buy(p: dict | None) -> Quote | None:
 
 
 def ah_sell(p: dict | None) -> Quote | None:
-    """A conservative realistic sale price on your realm: you have to undercut the current lowest
-    listing, and you shouldn't expect more than the realm's usual price."""
+    """A conservative realistic sale price on your realm: you have to undercut the current lowest listing,
+    you shouldn't expect more than the realm's usual price, and never more than what the item actually
+    sells for (the region's average *sale* price). Listings can be wishful: a Hand Axe listed around 2.5g
+    really sells for ~6.6s, and 15% of actively traded items list 1.5x+ above their real sale price."""
     if not p:
         return None
     flags = []
@@ -61,9 +63,11 @@ def ah_sell(p: dict | None) -> Quote | None:
     if not listed(p):
         flags.append('none_listed')
     value, source = min(candidates)
-    sale = p.get('regionSale', 0)
-    if sale and sale < 0.7 * value:
-        flags.append('sells_lower')   # actual recorded sales are well below listing prices
+    sale = int(p.get('regionSale', 0) or 0)
+    if sale and sale < value:
+        if sale < 0.7 * value:
+            flags.append('sells_lower')   # actual recorded sales are well below listing prices
+        value, source = sale, 'average sale price (region, actual sales)'
     if not p.get('regionSoldPerDay'):
         flags.append('no_sales_data')
     region = p.get('regionMarketValue', 0)

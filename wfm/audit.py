@@ -87,7 +87,17 @@ def run(world, engine) -> list[dict]:
               for i, p in prices.items()
               if p.get('numAuctions', 0) and p.get('regionMarketValue') and p.get('minBuyout', 0) > 5 * p['regionMarketValue']]
     out.append(_check('Price spikes (lowest listing > 5x region value)', 'pass' if len(spikes) < 50 else 'warn',
-                      f'{len(spikes)} items; their sell price is capped at realm market value', spikes))
+                      f'{len(spikes)} items; their sell price is capped at the realm market value and the actual '
+                      f'average sale price', spikes))
+
+    # 9b. Listings above what items actually sell for: priced at real sales instead.
+    capped = [f'{engine.name(i)}: listed {min(p.get("minBuyout") or 10**12, p.get("marketValue") or 10**12)}c, '
+              f'sells for {p["regionSale"]}c' for i, p in prices.items()
+              if p.get('regionSale') and p.get('regionSoldPerDay', 0) >= 1
+              and min(p.get('minBuyout') or 10**12, p.get('marketValue') or 10**12) > 1.5 * p['regionSale']]
+    out.append(_check('Sale prices follow actual sales', 'pass',
+                      f'{len(capped)} actively traded items are listed 1.5x+ above what they actually sell for; '
+                      f'they are valued at the real average sale price, not the listing', capped))
 
     # 10. Questie vendor items have a vendor price.
     if q:

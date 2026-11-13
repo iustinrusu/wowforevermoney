@@ -19,7 +19,7 @@ const KIND = {farm_zone: 'Farming spot', craft: 'Craft', vendor_flip: 'Vendor â†
 const FLAGS = {
   none_listed: ['warn', 'none listed now', 'No listings on your realm right now; price is the market average'],
   no_realm_data: ['warn', 'region price only', 'No realm data; using the region average'],
-  sells_lower: ['warn', 'sells for less', 'Recorded sales are well below listing prices'],
+  sells_lower: ['warn', 'sells for less', 'Actual sales are well below listing prices, so the average sale price is used'],
   no_sales_data: ['bad', 'no sales data', 'TSM has no recorded sales for this item'],
   above_region: ['warn', 'above region', 'Lowest listing is far above the region average'],
   slow_seller: ['bad', 'slow seller', 'Sells less often than your minimum'],
@@ -36,6 +36,9 @@ const FLAGS = {
   risky: ['bad', 'risky', 'Speculative: depends on prices recovering'],
   small_sample: ['warn', 'small sample', 'Not many catches/loots logged here yet'],
   vendor_price_unconfirmed: ['', 'vendor price from game files', 'Base price from the game files; open the vendor once with ForeverMoneyBridge to confirm the real price'],
+  craft_limited_demand: ['warn', 'limited demand', 'Valued by crafting it into something whose market only absorbs a limited number per day; beyond that it is worth its sale price'],
+  more_with_skill: ['', 'more with skill', "A recipe you can't make yet would make it worth more (see details); valued at what you can do now"],
+  event_vendor: ['bad', 'event vendor', 'Every vendor selling it is event-only (Darkmoon Faire, holidays) or has no known location: check it is there now. Kept out of Top picks'],
   black_market: ['bad', 'black market vendor', 'Black Market agents charge more than the game-file price (e.g. Frilled Lichen: 4s 50c, not 1s 20c). Visit once to record the real price'],
   measured: ['good', 'measured', 'Gold/hour from real time spent (ForeverMoneyBridge)'],
   not_enough_time: ['warn', 'needs more time', 'Under 5 minutes logged; gold/hour not shown yet'],

@@ -22,6 +22,9 @@ FISH_WORDS = re.compile(r'\b(Fish|Snapper|Lobster|Eel|Squid|Salmon|Sagefish|Yell
                         r'Bass|Redgill|Mudfish|Albacore|Loach|Darter|Mightfish|Clam|Mullet|Smallfish|Whisker|'
                         r'Longjaw|Firefin|Blackmouth|Stonescale|Sunscale|Nightfin|Bristle|Trout|Perch|Bluegill|'
                         r'Mud Snapper|Raw .*Fin)\b')
+EVENT_WORDS = ('holiday', 'festival', 'darkmoon', 'fireworks vendor', 'lunar', 'midsummer', 'winter veil',
+               'hallow', 'brewfest', 'love is in the air', 'noblegarden', "children's week")
+DARKMOON_ZONES = {12, 215}       # Elwynn Forest + Mulgore: where the Darkmoon Faire alternates
 MAX_UNITS_PER_DAY = 200          # sanity cap when demand is effectively unlimited (e.g. selling to vendors)
 COPPER_PER_GOLD = 10000
 
@@ -89,13 +92,19 @@ class Engine:
             zone_id = npc.get('zoneID')
             spawn = None
             spawns = npc.get('spawns')
+            spawn_zones = set(spawns) if isinstance(spawns, dict) else set()
             if isinstance(spawns, dict) and spawns:
                 z, pts = next(iter(spawns.items()))
                 zone_id = zone_id or z
                 if pts:
                     spawn = pts[0]
+            sub = str(npc.get('subName') or '').lower()
+            # Event-only vendors: holiday vendors, and the Darkmoon Faire (its NPCs spawn in both Elwynn Forest
+            # and Mulgore, where the Faire alternates). Vendors with no known spawn may not be reachable at all.
+            event = any(w in sub for w in EVENT_WORDS) or DARKMOON_ZONES <= spawn_zones
             out.append({'npc': npc_id, 'name': npc.get('name', f'NPC {npc_id}'), 'zone': self.gd.zones.get(zone_id, ''),
-                        'coords': spawn, 'friendly': friendly, 'stock': (self.su.limited_stock.get(iid) or {}).get(npc_id)})
+                        'coords': spawn, 'friendly': friendly, 'stock': (self.su.limited_stock.get(iid) or {}).get(npc_id),
+                        'event': event, 'located': bool(spawn_zones or zone_id)})
         return out
 
     def vendor_price(self, iid: int) -> tuple[int, list] | None:
@@ -121,6 +130,9 @@ class Engine:
                 black = any('black market' in str((self.q.npcs.get(v['npc']) or {}).get('subName', '')).lower()
                             for v in vendors)
                 self._vendor_flags[iid] = ('black_market',) if black else ('vendor_price_unconfirmed',)
+        if result and not any(v.get('located', True) and not v.get('event') for v in result[1]):
+            # every vendor is event-only (Darkmoon Faire, holidays) or has no known location
+            self._vendor_flags[iid] = self._vendor_flags.get(iid, ()) + ('event_vendor',)
         self._vendor_cache[iid] = result
         return result
 
@@ -153,7 +165,8 @@ class Engine:
         vp = self.vendor_price(iid)
         if vp:
             cap = self.vendor_stock_cap(iid)
-            options.append(Quote(vp[0], 'vendor', ('limited_stock',) if cap else ()))
+            flags = (('limited_stock',) if cap else ()) + tuple(f for f in self.vendor_flags(iid) if f == 'event_vendor')
+            options.append(Quote(vp[0], 'vendor', flags))
         q = ah_buy(self.price(iid))
         if q:
             options.append(q)
@@ -163,6 +176,8 @@ class Engine:
         """Best of AH (after cut) and vendor, per unit. Returns (copper, channel, ah quote)."""
         item = self.gd.items.get(iid)
         q = ah_sell(self.price(iid))
+        if item and (item.bonding == 1 or item.class_id == 12):
+            q = None          # soulbound or quest item: it can't be sold on the AH, whatever TSM lists
         ah_val = proceeds(q, self.cut)
         vendor_val = item.sell_price if item else 0
         if ah_val >= vendor_val and ah_val > 0:
@@ -260,6 +275,8 @@ class Engine:
                 flags.append('mat_not_listed')
             if any('limited_stock' in m['flags'] for m in mats):
                 flags.append('limited_mat')
+            if any('event_vendor' in m['flags'] for m in mats):
+                flags.append('event_vendor')      # an ingredient is only sold during events
             if self.affordable(cost) < 1:
                 flags.append('cant_afford')
             if have is None:
@@ -375,7 +392,11 @@ class Engine:
         return out
 
     def best_uses(self) -> dict[int, dict]:
-        """For every reagent: the most a unit is worth when crafted into something (value per unit of it)."""
+        """For every reagent: the most a unit is worth when crafted into something (value per unit of it).
+
+        'value'/'recipe' is the best recipe overall; 'doable_value'/'doable_recipe' the best one you can make
+        now. What something is worth to you today uses the doable one (a recipe needing more skill would
+        overstate it); the other shows what levelling would add."""
         best: dict[int, dict] = {}
         for r in self.gd.recipes:
             if r.profession not in PROFESSIONS or r.spell_id not in self.su.thresholds:
@@ -399,16 +420,29 @@ class Engine:
                 if self.vendor_price(mid):
                     continue   # vendor mats aren't "your" materials
                 val = (revenue - (sum(costs.values()) - costs[mid])) / cnt
+                entry = {'value': int(val), 'recipe': r.name, 'product': self.name(r.product_id),
+                         'profession': r.profession, 'doable': can, 'skill': req}
                 cur = best.get(mid)
-                if cur is None or val > cur['value']:
-                    best[mid] = {'value': int(val), 'recipe': r.name, 'product': self.name(r.product_id),
-                                 'profession': r.profession, 'doable': can}
+                if cur is None:
+                    cur = best[mid] = dict(entry, doable_value=None, doable_recipe=None, doable_profession=None)
+                elif val > cur['value']:
+                    cur.update(entry)
+                if can and (cur['doable_value'] is None or val > cur['doable_value']):
+                    cur['doable_value'], cur['doable_recipe'], cur['doable_profession'] = int(val), r.name, r.profession
+                    # how many units of this material a day the product's market can absorb at your share
+                    cur['doable_units_per_day'] = round(sold_per_day(self.price(r.product_id)) * self.share * cnt
+                                                        / max(r.product_count, 1), 1)
         return best
 
     def gathering(self, best_use: dict[int, dict]) -> list[Opportunity]:
         out = []
         rates = {int(k): float(v) for k, v in (self.s.get('farm_rates') or {}).items()}
+        made = {r.product_id for r in self.gd.recipes}
         for iid, item in self.gd.items.items():
+            # processed goods are crafted, not farmed: cooked food/potions, cured hides, cloth bolts. (Some crafted
+            # items are also gathered, e.g. Heavy Leather is skinned too, so being craftable alone isn't enough.)
+            if iid in made and (item.class_id == 0 or item.name.startswith(('Cured ', 'Bolt of '))):
+                continue
             is_fish = bool(FISH_WORDS.search(item.name)) and item.class_id in (0, 7, 15) and item.quality <= 2
             if not is_fish and not (item.class_id == 7 and item.subclass_id in GATHER_SOURCE):
                 continue
@@ -418,8 +452,8 @@ class Engine:
             sell, channel, q = self.sell_value(iid)
             use = best_use.get(iid)
             value, how = sell, f'Sell ({channel})'
-            if use and use['value'] > value:
-                value, how = use['value'], f"{use['profession']}: {use['recipe']}"
+            if use and (use.get('doable_value') or 0) > value:
+                value, how = use['doable_value'], f"{use['doable_profession']}: {use['doable_recipe']}"
             if value <= 0:
                 continue
             source = 'Fishing' if is_fish else GATHER_SOURCE.get(item.subclass_id, 'Gathering')
@@ -738,7 +772,8 @@ class Engine:
 
     def top_picks(self, opps: list[Opportunity], n: int = 15) -> dict:
         bonus = float(self.s.get('switch_bonus', 1.5))
-        bad = {'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market'}
+        bad = {'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
+               'event_vendor'}
 
         def clean(o):
             return not (set(o.flags) & bad)
