@@ -91,6 +91,22 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   Iron Bound < Mithril Bound.
 - ItemSparse `Flags_0 & 0x4` = openable (has its own loot); `LockID > 0` = needs Lockpicking/key.
 
+## Next session plan (scheduled 2026-11-14 10:00, task "wfm-review-and-wowhead")
+
+The user is firm that the data must be correct and accurate. In order:
+1. **Review and test today's work adversarially:** `wfm/classicdb.py`, `wfm/fishing.py`, `wfm/valuation.py`,
+   the engine's fishing/valuation/watch code, the loaders in `wfm/world.py`, `app.py` item/inventory, the
+   fishing UI, and addon 1.2.0 (do `GetLootSourceInfo` and the `C_Container.UseContainerItem` hook exist on
+   the Forever client?). Recompute by hand 3 fishing rows and 2 container values from the JSON snapshots
+   and TSM prices, and compare with the app.
+2. **Wowhead Forever, slowly:** zone Fishing tabs for every remaining fishing zone (Forever-only zones
+   included), then the Contains tab for every item in the "Possibly undervalued items" check. One page
+   every 8+ seconds; stop all Wowhead reading on the first 403. Read `window.g_listviews`, skip `classicEra`
+   rows. Every 5th page, screenshot the tab and check a few numbers against what was extracted.
+3. **Verify addon 1.2.0** once the user has /reloaded and opened a trunk: `containers` in SavedVariables,
+   and no trunk contents in the fishing activity.
+4. Fix the gathering list (exclude crafted products), then update this log, commit and push.
+
 ## Open items
 
 - Read more Wowhead Forever zones (Arathi, Hinterlands, Western Plaguelands, Felwood, Un'Goro, Swamp of
