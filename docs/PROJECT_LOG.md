@@ -33,6 +33,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Herbalism and mining spots + Gathering tab** (`wfm/nodes.py`, `Engine.node_spots`). Node locations:
+  QuestieDB Forever spawns per zone. Items per node: Classic loot from the cMaNGOS dump already on disk (times the
+  average number of gathers a node allows, data4/data5), flag `classic_yields`, never in Top picks. Black Lotus
+  listed but not averaged (rare spawn); zones with < 5 nodes skipped; instances flagged. Classic skill table per
+  node, labelled. The Farming tab became Gathering with a profession picker (primary/secondary explained).
+- **2026-11-14 Dungeon detection fixed:** "continent not 0/1" called Forever's new open-world zones (Zephras Isle
+  on continent 2991, Storm Cliffs 2791) dungeons. Now `gamedata.is_instance` uses the Classic instance map ids.
 - **2026-11-14 Recipe cooldowns** (user OK'd the download: SpellCooldowns.csv, 120 KB, wago.tools, build
   1.60.1.70938; now in `gamedata.TABLES`). Cooldown = max(CategoryRecoveryTime, RecoveryTime) at DifficultyID 0;
   10+ minutes caps crafts a day at 24 h / cooldown (crafts and the material best-use volume). Forever values:
@@ -275,6 +282,9 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Gathering tab (Fishing, Skinning, Herbalism, Mining, Mob farming, Materials), herb/ore spots,
+  instance detection by map id, settings for nodes per hour.
 
 - **2026-11-14** Cooldown column (shown where a row has one); shared transmute cooldown from SpellCategories.
   Tests: 118.

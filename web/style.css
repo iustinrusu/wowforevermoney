@@ -85,5 +85,15 @@ td.rk, th.rk { width: 34px; text-align: center; }
 .medal.m2 { background: radial-gradient(circle at 32% 30%, #ffffff, #c6ccd4 45%, #7f868f); }
 .medal.m3 { background: radial-gradient(circle at 32% 30%, #ffd2a8, #c58a5a 45%, #7d4e25); }
 .rank { color: var(--muted); font-size: 12px; }
+.gpills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.gpill { display: flex; align-items: center; gap: 8px; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; font: inherit; text-align: left; }
+.gpill:hover { border-color: var(--gold); }
+.gpill.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset, 0 0 12px rgba(232,192,96,.18); }
+.gpill small { display: block; color: var(--muted); font-size: 11px; }
+.gicon { font-size: 20px; }
+.gskill { background: #2b2410; color: var(--gold); border: 1px solid #5a4a1c; border-radius: 8px; padding: 1px 6px; font-size: 12px; font-weight: 700; }
+details.how { margin: 4px 0 10px; color: var(--muted); font-size: 12.5px; }
+details.how summary { cursor: pointer; color: var(--accent); width: max-content; }
+details.how div { margin-top: 6px; max-width: 900px; line-height: 1.5; }
 @media (max-width: 700px) { .tier { grid-template-columns: 1fr 60px; } .tier .bar, .tier .pill.num { display: none; } }
 @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; } main { padding: 10px; } }

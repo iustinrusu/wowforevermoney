@@ -228,6 +228,16 @@ def load(build: str) -> GameData:
     return gd
 
 
+# Classic dungeon, raid and battleground map ids (AreaTable ContinentID). Forever's new open-world zones sit on new
+# continents (Zephras Isle 2991, Storm Cliffs 2791), so "not Eastern Kingdoms or Kalimdor" is not "instance".
+INSTANCE_MAPS = {30, 33, 34, 36, 43, 47, 48, 70, 90, 109, 129, 189, 209, 229, 230, 249, 289, 309, 329, 349, 389,
+                 409, 429, 469, 489, 509, 529, 531, 533}
+
+
+def is_instance(gd: GameData, zone_id: int) -> bool:
+    return gd.zone_continent.get(zone_id, 0) in INSTANCE_MAPS
+
+
 def apply_hotfixes(gd: GameData, rows: dict[int, dict]) -> dict:
     """Overlay the server's item data (client hotfix cache, see hotfix.py) on the client tables: it is newer for
     the items it covers, and it adds items the client tables don't ship. Returns counts."""

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from . import gamedata
 from .classicdb import CONDITION_EVENT, ClassicFishing, expected_items, success_chance
 
 PRIOR_CATCHES = 30           # after this many logged catches your data weighs as much as Classic's
@@ -166,7 +167,7 @@ def build_spots(cf: ClassicFishing, gd, now: float | None = None,
         names = sorted(gd.zones.get(a) or f'Area {a}' for a in areas if a != zid)
         spots.setdefault(zid, []).append(Spot(
             zone_id=zid, zone=gd.zones.get(zid) or f'Area {zid}', areas=sorted(areas), names=names, skill=skill,
-            shares=shares, coverage=coverage, dungeon=gd.zone_continent.get(zid, 0) not in (0, 1)))
+            shares=shares, coverage=coverage, dungeon=gamedata.is_instance(gd, zid)))
     for rows in spots.values():
         rows.sort(key=lambda s: (bool(s.names), s.names))
     return spots

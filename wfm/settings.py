@@ -29,6 +29,8 @@ DEFAULTS = {
     'stale_hours': {'realm': 3, 'region': 36},
     'casts_per_hour': 240,
     'kills_per_hour': 60,           # mobs killed and skinned per hour (until the addon measures it)
+    'herb_nodes_per_hour': 40,      # herb nodes gathered per hour (until the addon measures it)
+    'ore_nodes_per_hour': 40,       # ore nodes mined per hour (until the addon measures it)
     # Drop rates come from Wowhead Forever's large samples. Your own catch logs are small, mix pools with open
     # water and can be incomplete, so they're only used for your pace and got-away rate unless you turn this on.
     'own_logs_for_rates': False,

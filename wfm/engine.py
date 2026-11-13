@@ -10,7 +10,7 @@ import re
 import time
 from dataclasses import asdict, dataclass, field
 
-from . import fishing, pricing, skinning, valuation
+from . import fishing, gamedata, nodes, pricing, skinning, valuation
 from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
@@ -30,7 +30,7 @@ DARKMOON_ZONES = {12, 215}       # Elwynn Forest + Mulgore: where the Darkmoon F
 # the numbers shown: a pick with doubtful prices ranks below an equally good one with solid prices.
 DOUBT = {'listed_far_above_sales': 0.8, 'slow_to_sell': 0.7, 'crowded': 0.7, 'sells_lower': 0.6, 'price_looks_off': 0.6, 'none_listed': 0.8, 'mat_not_listed': 0.8, 'small_sample': 0.8,
          'limited_mat': 0.9, 'limited_stock': 0.9, 'seasonal': 0.9, 'vendor_price_unconfirmed': 0.95,
-         'skill_estimated': 0.95, 'assumed_rate': 0.95, 'assumed_kill_rate': 0.9, 'skins_partial': 0.95, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
+         'skill_estimated': 0.95, 'assumed_rate': 0.95, 'assumed_kill_rate': 0.9, 'skins_partial': 0.95, 'classic_yields': 0.85, 'dungeon': 0.6, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
 
 
 def vendor_sell(item) -> int:
@@ -46,7 +46,7 @@ def confidence(flags) -> float:
 
 
 # Ranking (Engine.rank). Score = expected profit x how sure we are x risk x can-do-now x problems x preference.
-HOURLY_KINDS = ('fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot')
+HOURLY_KINDS = ('fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot')
 ONE_OFF_KINDS = ('realm_dip', 'ah_to_vendor')
 PROBLEM_FLAGS = {'hard_to_sell', 'slow_seller', 'no_sales_data', 'unverified_recipe', 'above_region', 'black_market',
                  'event_vendor', 'classic_unconfirmed'}
@@ -628,6 +628,72 @@ class Engine:
                         'source': 'Wowhead Forever "Skinned from" counts'}))
         return out
 
+    def node_spots(self, best_use: dict[int, dict]) -> list[Opportunity]:
+        """Herbalism and mining spots: Forever node locations (QuestieDB), Classic node loot (labelled)."""
+        q, gd = self.q, self.gd
+        if not q:
+            return []
+        herb_names = {it.name for it in gd.items.values() if it.class_id == 7 and it.subclass_id == 9}
+        main: dict[int, int] = {}
+        for iid, qi in q.items.items():
+            it = gd.items.get(iid)
+            if not it or it.class_id != 7 or it.subclass_id not in (7, 9):
+                continue
+            for o in qi.get('objectDrops') or []:
+                if nodes.node_kind((q.objects.get(o) or {}).get('name', ''), herb_names):
+                    main.setdefault(o, iid)
+        loot = nodes.load_or_build(set(main)) or {}
+        value_of = lambda iid: self.fish_value(iid, best_use)
+        node_list = []
+        for oid, iid in main.items():
+            ob = q.objects.get(oid) or {}
+            spawns = ob.get('spawns') or {}
+            zones = {int(z): len(c) for z, c in spawns.items()} if isinstance(spawns, dict) else {}
+            classic = (loot.get('nodes') or {}).get(str(oid))
+            items = nodes.per_node(classic, loot.get('refs') or {}) if classic else {iid: 1.0}
+            node_list.append({'id': oid, 'name': ob.get('name', ''), 'kind': nodes.node_kind(ob.get('name', ''), herb_names),
+                              'skill': nodes.node_skill(ob.get('name', '')), 'zones': zones, 'classic_loot': bool(classic),
+                              'items': items, 'value': int(sum(c * value_of(i) for i, c in items.items()))})
+        activity = (getattr(self.w, 'profile', None) or {}).get('activity')
+        out = []
+        for kind, prof, label, setting in (('herbalism', 'Herbalism', 'Gather herbs in', 'herb_nodes_per_hour'),
+                                           ('mining', 'Mining', 'Mine in', 'ore_nodes_per_hour')):
+            skill = self.profs.get(prof)
+            pace, minutes = nodes.measured_pace(activity, kind)
+            per_hour = pace or float(self.s.get(setting, 40) or 40)
+            for sp in nodes.spots([n for n in node_list if n['kind'] == kind], lambda z: gd.zones.get(z, f'zone {z}'), skill):
+                if sp['value'] <= 0:
+                    continue
+                top = [n for n in sp['nodes'] if n['can']][:3] or sp['nodes'][:3]
+                flags = ['classic_yields', 'skill_classic_rule', 'measured_pace' if pace else 'assumed_node_rate']
+                if gamedata.is_instance(gd, sp['zone_id']):
+                    flags.append('dungeon')
+                if any(n['rare'] for n in sp['nodes']):
+                    flags.append('rare_nodes_extra')
+                if skill is None:
+                    flags.append('other_profession')
+                if not all(n['classic_loot'] for n in sp['nodes']):
+                    flags.append('yield_unknown')
+                needs = '' if sp['doable'] else (f'Learn {prof}' if skill is None else
+                                                 f'{prof} {sp["skill_needed"]} (you have {skill}; Classic rule)')
+                best_item = max(top[0]['items'], key=lambda i: top[0]['items'][i] * value_of(i)) if top else 0
+                out.append(Opportunity(
+                    kind='herb_spot' if kind == 'herbalism' else 'mine_spot', key=f'{kind}:{sp["zone_id"]}',
+                    item_id=best_item, title=f'{label} {sp["zone"]}: ' + ', '.join(n['name'] for n in top),
+                    profit_unit=sp['value'], cost_unit=0, units_day=0, daily=0, gph=int(sp['value'] * per_hour),
+                    doable=sp['doable'], needs=needs, profession=prof, preferred=prof in self.preferred, flags=flags,
+                    detail={'zone': sp['zone'], 'zone_id': sp['zone_id'], 'node_count': sp['node_count'],
+                            'nodes_per_hour': round(per_hour, 1),
+                            'pace_source': f'measured ({minutes:.0f} min of your {kind})' if pace else 'your nodes-per-hour setting',
+                            'nodes': [{'name': n['name'], 'count': n['count'], 'skill': n['skill'], 'can': n['can'], 'rare': n['rare'],
+                                       'value': n['value'], 'classic_loot': n['classic_loot'],
+                                       'items': sorted(({'item_id': i, 'name': self.name(i), 'per_node': round(c, 2),
+                                                         'value': value_of(i)} for i, c in n['items'].items()),
+                                                       key=lambda x: -x['per_node'] * x['value'])[:4]}
+                                      for n in sp['nodes'][:10]],
+                            'source': 'node locations: QuestieDB (Forever); items per node: WoW Classic loot tables'}))
+        return out
+
     def valuer(self, best_use: dict[int, dict] | None = None) -> valuation.Valuer:
         """Item values through every channel (AH, vendor, crafting, opening it), built once per run."""
         if self._valuer is None or (best_use is not None and self._valuer.best_use is not best_use):
@@ -931,7 +997,7 @@ class Engine:
         measured = [o for o in self.activity_zones(best_use) if o.kind != 'fishing_zone']
         all_opps = (self.crafts() + self.vendor_flips() + self.ah_to_vendor() + self.realm_dips()
                     + self.gathering(best_use) + measured + self.fishing_spots(best_use)
-                    + self.skinning_spots(best_use))
+                    + self.skinning_spots(best_use) + self.node_spots(best_use))
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         for o in all_opps:
             # anything you'd sell on the AH: does it actually sell? (hard to sell: never suggested)
@@ -996,7 +1062,7 @@ class Engine:
         # data from another WoW version can't reach top picks until Forever data confirms it
         # (a fishing spot needs confirming Forever data and 30+ Forever catches: a few lucky trunks in a
         # small sample can make a zone look 3x better than it is)
-        hourly = [o for o in opps if o.gph and o.doable and 'classic_unconfirmed' not in o.flags
+        hourly = [o for o in opps if o.gph and o.doable and not ({'classic_unconfirmed', 'classic_yields'} & set(o.flags))
                   and (o.kind != 'fishing_spot' or (o.detail.get('confirmed_by') and 'small_sample' not in o.flags))
                   and (o.kind != 'skin_spot' or 'small_sample' not in o.flags)]
         # ranked by Engine.rank: profit x how sure we are x risk x can-do-now x problems x preference
