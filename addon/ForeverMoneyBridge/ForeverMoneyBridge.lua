@@ -200,6 +200,38 @@ local function recordMerchant()
   d.vendors[npc] = v
 end
 
+-- Item checks: the app lists item ids in Checks.lua (ForeverMoneyBridge_Checks). What your own game client says
+-- about each (sell price, quality, levels, stack size, binding) is the ground truth the app's item data is
+-- verified against. Uncached items are fetched from the server; GET_ITEM_INFO_RECEIVED fires when they arrive.
+local pendingInfo = {}
+local function storeItemInfo(id)
+  local getInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+  if not getInfo then return true end
+  local name, _, quality, ilvl, minLevel, _, _, stack, _, _, sell, classID, subclassID, bind = getInfo(id)
+  if not name then return false end
+  local d = db()
+  d.itemInfo = d.itemInfo or {}
+  d.itemInfo[id] = { n = name, q = quality, l = ilvl, r = minLevel, k = stack, s = sell, c = classID,
+                     sc = subclassID, b = bind, t = time() }
+  return true
+end
+
+local function checkItems()
+  local ids = ForeverMoneyBridge_Checks
+  if type(ids) ~= "table" or #ids == 0 or not C_Timer then return end
+  local i = 0
+  local ticker
+  ticker = C_Timer.NewTicker(0.1, function()
+    for _ = 1, 4 do                       -- ~40 items a second: gentle on the server
+      i = i + 1
+      local id = ids[i]
+      if not id then ticker:Cancel() return end
+      if not storeItemInfo(id) then pendingInfo[id] = true end
+    end
+  end)
+end
+
+f:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 f:RegisterEvent("MERCHANT_SHOW")
 f:RegisterEvent("MERCHANT_UPDATE")
 f:RegisterEvent("PLAYER_LOGIN")
@@ -213,6 +245,14 @@ f:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
   if event == "LOOT_OPENED" then
     pcall(recordLoot)
+  elseif event == "GET_ITEM_INFO_RECEIVED" then
+    if arg1 and pendingInfo[arg1] then
+      local ok, done = pcall(storeItemInfo, arg1)
+      if ok and done then pendingInfo[arg1] = nil end
+    end
+  elseif event == "PLAYER_LOGIN" then
+    pcall(snapshot)
+    if C_Timer then C_Timer.After(15, function() pcall(checkItems) end) end   -- after the login rush
   elseif event == "MERCHANT_SHOW" or event == "MERCHANT_UPDATE" then
     pcall(recordMerchant)
   elseif event == "UNIT_SPELLCAST_SUCCEEDED" then

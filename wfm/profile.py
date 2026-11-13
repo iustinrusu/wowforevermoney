@@ -72,6 +72,7 @@ def build_profile(bridge: dict, tsm_chars: dict, char_mtimes: dict[str, float]) 
         active = max(chars, key=lambda n: (skill(n), char_mtimes.get(n, 0)))
     return {'characters': chars, 'active': active, 'activity': bridge.get('activity') or {},
             'vendors': bridge.get('vendors') or {}, 'containers': bridge.get('containers') or {},
+            'item_info': bridge.get('itemInfo') or {},
             'has_bridge': bool(bridge), 'active_guessed': not last}
 
 
@@ -109,16 +110,34 @@ def apply(settings: dict, profile: dict) -> tuple[dict, dict]:
     return eff, detected
 
 
+CHECKS_FILE = 'Checks.lua'
+
+
+def write_item_checks(addons_dir: Path, ids: list[int]) -> bool:
+    """Tell the addon which items to look up in game (read on the next login or /reload). True if changed."""
+    dest = addons_dir / ADDON_NAME / CHECKS_FILE
+    if not dest.parent.exists():
+        return False
+    body = ('-- Written by the WoW Forever Money app: items whose data it wants confirmed by your game client.\n'
+            'ForeverMoneyBridge_Checks = {' + ','.join(str(int(i)) for i in ids) + '}\n')
+    if dest.exists() and dest.read_text(encoding='utf-8') == body:
+        return False
+    dest.write_text(body, encoding='utf-8')
+    return True
+
+
 def install_addon(src: Path, addons_dir: Path, log=print) -> bool:
     """Copy our addon into WoW's AddOns folder if missing or older. Returns True if copied."""
     dest = addons_dir / ADDON_NAME
     src_toc, dest_toc = src / f'{ADDON_NAME}.toc', dest / f'{ADDON_NAME}.toc'
     ver = lambda p: (re.search(r'## Version:\s*(\S+)', p.read_text(encoding='utf-8')) or [None, ''])[1] if p.exists() else ''
+    # Checks.lua is written by the app (the items to verify in game): never overwrite it with the empty default
+    files = [f for f in src.iterdir() if not (f.name == CHECKS_FILE and (dest / f.name).exists())]
     if dest_toc.exists() and ver(dest_toc) == ver(src_toc) and \
-            all((dest / f.name).exists() and (dest / f.name).read_bytes() == f.read_bytes() for f in src.iterdir()):
+            all((dest / f.name).exists() and (dest / f.name).read_bytes() == f.read_bytes() for f in files):
         return False
     dest.mkdir(parents=True, exist_ok=True)
-    for f in src.iterdir():
+    for f in files:
         shutil.copy2(f, dest / f.name)
     log(f'Installed {ADDON_NAME} {ver(src_toc)} into {dest}')
     return True

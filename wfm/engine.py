@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import re
+import time
 from dataclasses import asdict, dataclass, field
 
 from . import fishing, pricing, valuation
@@ -25,6 +26,20 @@ FISH_WORDS = re.compile(r'\b(Fish|Snapper|Lobster|Eel|Squid|Salmon|Sagefish|Yell
 EVENT_WORDS = ('holiday', 'festival', 'darkmoon', 'fireworks vendor', 'lunar', 'midsummer', 'winter veil',
                'hallow', 'brewfest', 'love is in the air', 'noblegarden', "children's week")
 DARKMOON_ZONES = {12, 215}       # Elwynn Forest + Mulgore: where the Darkmoon Faire alternates
+# How sure we are of an opportunity's numbers, from its flags (1 = no doubts). Used to rank picks, not to change
+# the numbers shown: a pick with doubtful prices ranks below an equally good one with solid prices.
+DOUBT = {'sells_lower': 0.6, 'price_looks_off': 0.6, 'none_listed': 0.8, 'mat_not_listed': 0.8, 'small_sample': 0.8,
+         'limited_mat': 0.9, 'limited_stock': 0.9, 'seasonal': 0.9, 'vendor_price_unconfirmed': 0.95,
+         'skill_estimated': 0.95, 'assumed_rate': 0.95, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
+
+
+def confidence(flags) -> float:
+    c = 1.0
+    for f in set(flags):
+        c *= DOUBT.get(f, 1.0)
+    return round(c, 3)
+
+
 MAX_UNITS_PER_DAY = 200          # sanity cap when demand is effectively unlimited (e.g. selling to vendors)
 COPPER_PER_GOLD = 10000
 
@@ -258,11 +273,18 @@ class Engine:
             if profit <= 0:
                 continue
             crafts_demand = self.demand_per_day(r.product_id, channel) / max(r.product_count, 1)
-            crafts_day = min(crafts_demand, self.affordable(cost), MAX_UNITS_PER_DAY)
+            crafts_uncapped = min(crafts_demand, MAX_UNITS_PER_DAY)          # as if you had the gold for it
+            mat_limit = None
             for m in mats:
                 if m['source'] == 'vendor' and 'limited_stock' in m['flags']:
                     cap = self.vendor_stock_cap(m['item_id']) or 0
-                    crafts_day = min(crafts_day, cap / m['count'])
+                    crafts_uncapped = min(crafts_uncapped, cap / m['count'])
+                elif m['source'] != 'vendor':
+                    # you can't buy more of an AH ingredient a day than its market trades at your share
+                    cap = sold_per_day(self.price(m['item_id'])) * self.share / m['count']
+                    if cap < crafts_uncapped:
+                        crafts_uncapped, mat_limit = cap, m['name']
+            crafts_day = min(crafts_uncapped, self.affordable(cost))
             req, exact = self.required_skill(r)
             have = self.profs.get(r.profession)
             flags = list(q.flags) if (q and channel == 'AH') else []
@@ -299,7 +321,8 @@ class Engine:
                         'product_count': r.product_count, 'skill_required': req, 'skill_exact': exact,
                         'thresholds': self.su.thresholds.get(r.spell_id), 'learn': self.learn_cost(r),
                         'req_level': product.req_level if product else 0,
-                        'sold_per_day': sold_per_day(self.price(r.product_id))}))
+                        'sold_per_day': sold_per_day(self.price(r.product_id)),
+                        'daily_if_affordable': int(profit * crafts_uncapped), 'limited_by_mat': mat_limit}))
         return out
 
     def vendor_flips(self) -> list[Opportunity]:
@@ -322,6 +345,7 @@ class Engine:
                 continue
             stock = [v['stock'] for v in vendors if v.get('stock')]
             demand = sold_per_day(self.price(iid)) * self.share
+            units_uncapped = min(demand, MAX_UNITS_PER_DAY, max(stock) if stock else MAX_UNITS_PER_DAY)
             units = min(demand, self.affordable(cost), MAX_UNITS_PER_DAY)
             flags = list(q.flags) + [f for f in self.vendor_flags(iid) if f != 'vendor_price_seen']
             if stock:
@@ -337,7 +361,8 @@ class Engine:
                 detail={'vendor_price': cost, 'ah_sell': q.value, 'ah_source': q.source, 'vendors': vendors[:8],
                         'vendor_count': len(vendors), 'limited_stock': max(stock) if stock else None,
                         'is_recipe': bool(item and item.class_id == 9),
-                        'sold_per_day': sold_per_day(self.price(iid))}))
+                        'sold_per_day': sold_per_day(self.price(iid)),
+                        'daily_if_affordable': int(profit * units_uncapped)}))
         return out
 
     def ah_to_vendor(self) -> list[Opportunity]:
@@ -350,7 +375,7 @@ class Engine:
             if mb >= item.sell_price:
                 continue
             profit = item.sell_price - mb
-            flags = ['snapshot']
+            flags = ['snapshot'] + (['cant_afford'] if self.affordable(mb) < 1 else [])
             if p.get('marketValue') and p['marketValue'] < item.sell_price:
                 flags.append('often_below_vendor')
             out.append(Opportunity(
@@ -667,6 +692,13 @@ class Engine:
             flags.append('wowhead_forever')
         if forever and fc['pool'] and not with_pools:
             flags.append('pools_extra')
+        if forever and o.wh_checked:
+            try:
+                age_days = (time.time() - time.mktime(time.strptime(o.wh_checked, '%Y-%m-%d'))) / 86400
+            except ValueError:
+                age_days = 0
+            if age_days > fishing.SNAPSHOT_MAX_DAYS:
+                flags.append('old_snapshot')
         if spot and spot.coverage < fishing.INCOMPLETE and w < 0.5:
             flags.append('classic_incomplete')
         if forever and 0 < n < fishing.PRIOR_CATCHES:
@@ -776,25 +808,35 @@ class Engine:
         bad = {'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
                'event_vendor'}
 
-        def clean(o):
-            return not (set(o.flags) & bad)
+        def clean(o, allow_unaffordable=False):
+            return not (set(o.flags) & (bad - {'cant_afford'} if allow_unaffordable else bad))
 
-        speculative = [o for o in opps if o.kind in ('realm_dip', 'ah_to_vendor') and clean(o)]
-        daily = [o for o in opps if o.kind in ('craft', 'vendor_flip') and clean(o)]
+        for o in opps:
+            o.detail['confidence'] = confidence(o.flags)
+        # "Unlock by levelling" and "switch professions" are about later: what you can afford today doesn't hide them
+        later = [o for o in opps if o.kind in ('craft', 'vendor_flip') and clean(o, allow_unaffordable=True)]
+        daily = [o for o in later if clean(o)]
         own = [o for o in daily if o.doable]
         best_own = max((o.daily for o in own), default=0)
-        stretch = [o for o in daily if not o.doable and 'other_profession' in o.flags and o.daily >= bonus * best_own]
+        stretch = [o for o in later if not o.doable and 'other_profession' in o.flags
+                   and o.detail.get('daily_if_affordable', o.daily) >= bonus * best_own]
+        # snipes you can afford first, then the rest (still shown, flagged "can't afford")
+        speculative = [o for o in opps if o.kind in ('realm_dip', 'ah_to_vendor') and clean(o, allow_unaffordable=True)]
         # data from another WoW version can't reach top picks until Forever data confirms it
         # (a fishing spot needs confirming Forever data and 30+ Forever catches: a few lucky trunks in a
         # small sample can make a zone look 3x better than it is)
         hourly = [o for o in opps if o.gph and o.doable and 'classic_unconfirmed' not in o.flags
                   and (o.kind != 'fishing_spot' or (o.detail.get('confirmed_by') and 'small_sample' not in o.flags))]
-        key = lambda o: (o.daily * (1.1 if o.preferred else 1.0))
+        # rank by expected profit x how sure we are of it (rows with doubtful prices rank lower)
+        key = lambda o: (o.daily * (1.1 if o.preferred else 1.0) * o.detail['confidence'])
+        # sections about later rank by what a pick earns once you have the gold for it
+        later_key = lambda o: (o.detail.get('daily_if_affordable', o.daily) * o.detail['confidence'])
         return {
             'now': [o.key for o in sorted(own, key=key, reverse=True)[:n]],
-            'level_up': [o.key for o in sorted((o for o in daily if not o.doable and 'other_profession' not in o.flags),
-                                               key=key, reverse=True)[:n]],
-            'switch': [o.key for o in sorted(stretch, key=lambda o: o.daily, reverse=True)[:5]],
+            'level_up': [o.key for o in sorted((o for o in later if not o.doable and 'other_profession' not in o.flags),
+                                               key=later_key, reverse=True)[:n]],
+            'switch': [o.key for o in sorted(stretch, key=later_key, reverse=True)[:5]],
             'hourly': [o.key for o in sorted(hourly, key=lambda o: o.gph or 0, reverse=True)[:n]],
-            'snipes': [o.key for o in sorted(speculative, key=lambda o: o.profit_unit, reverse=True)[:n]],
+            'snipes': [o.key for o in sorted(speculative, key=lambda o: ('cant_afford' in o.flags,
+                                                                         -o.profit_unit * o.detail['confidence']))[:n]],
         }

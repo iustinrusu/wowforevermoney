@@ -21,6 +21,7 @@ INCOMPLETE = 0.9             # a Classic table explaining less than 90% of catch
 NEW_FISH_MIN = 2             # logged this many times in a zone where Classic doesn't have it -> Forever change
 NEW_FISH_SHARE = 0.005       # ... and at least 0.5% of catches (big Wowhead samples have one-off oddities)
 WOWHEAD_CONFIRM = 30         # Wowhead Forever catches needed to count as confirmation
+SNAPSHOT_MAX_DAYS = 30       # Wowhead Forever counts older than this are flagged for re-reading
 MISSING_SHARE, MISSING_N = 0.15, 40   # Classic says >= 15% but none in your 40+ catches -> maybe removed
 MATCH_MIN = 0.5              # a spot must explain half of a zone log's (non-pool) catches to be blended with it
 

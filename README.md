@@ -67,6 +67,7 @@ Everything runs on your PC. The page is only reachable from your own computer, a
 
 ## The addon: ForeverMoneyBridge
 
+- **Item checks:** the app writes a list of items to verify (`Checks.lua` in the addon folder). In game, the addon asks your client about each one and saves the answers, which override every other source. Data health shows how often each source was right.
 - **What it saves:**
   - your level, gold, faction and professions (fills in Settings automatically);
   - what you loot, in which zone, from what (fishing, skinning, herbs, mining, mobs) and how long you spent;
@@ -109,6 +110,8 @@ Checks GitHub for a newer Classic fishing dump, and downloads and extracts it if
 |---|---|---|
 | TSM `AppData.lua` (TSM desktop app) | realm and region prices, sale rates, sold/day | re-read when the TSM app writes it (about hourly) |
 | wago.tools game tables (DB2) | items, vendor prices, recipes, zones | downloaded for your exact client build; re-downloaded when WoW patches |
+| Your client's hotfix cache (`_forever_/Cache/ADB/enUS/DBCache.bin`) | exact Forever data for ~5,200 items the client tables don't ship, and ~1,500 server updates to items they do | re-read whenever the game updates the file |
+| Your game client (ForeverMoneyBridge item checks) | the final word on sell price, quality, levels, stack size and binding for the items the app asks about | after you log in (or `/reload`), wait a minute, then `/reload` again |
 | QuestieDB addon | which NPCs sell, drop and contain each item, faction, location | re-read whenever the addon updates |
 | SkillUpForever addon | exact recipe skill levels, trainer fees, limited-stock vendors | re-read whenever the addon updates |
 | ForeverMoneyBridge (our addon, auto-installed) | your level, gold, professions, real vendor prices, loot by zone with time spent | on logout or `/reload` |

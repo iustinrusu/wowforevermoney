@@ -36,6 +36,8 @@ const FLAGS = {
   risky: ['bad', 'risky', 'Speculative: depends on prices recovering'],
   small_sample: ['warn', 'small sample', 'Not many catches/loots logged here yet'],
   vendor_price_unconfirmed: ['', 'vendor price from game files', 'Base price from the game files; open the vendor once with ForeverMoneyBridge to confirm the real price'],
+  price_looks_off: ['warn', 'price looks off', "Only a few listings, far from the realm's recent average: valued at the recent average until more listings confirm the new price"],
+  old_snapshot: ['warn', 'old Wowhead data', 'The Wowhead Forever counts for this zone are over 30 days old: re-read the zone page'],
   craft_limited_demand: ['warn', 'limited demand', 'Valued by crafting it into something whose market only absorbs a limited number per day; beyond that it is worth its sale price'],
   more_with_skill: ['', 'more with skill', "A recipe you can't make yet would make it worth more (see details); valued at what you can do now"],
   event_vendor: ['bad', 'event vendor', 'Every vendor selling it is event-only (Darkmoon Faire, holidays) or has no known location: check it is there now. Kept out of Top picks'],
@@ -81,7 +83,7 @@ async function loadState() {
 
 // ---------- tables ----------
 function oppTable(rows, opts = {}) {
-  if (!rows.length) return '<div class="empty">Nothing here right now.</div>';
+  if (!rows.length) return `<div class="empty">${esc(opts.empty || 'Nothing here right now.')}</div>`;
   const id = opts.id || 't' + Math.random().toString(36).slice(2, 7);
   const cols = opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'flags'];
   const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Per day', daily: 'Per day profit', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
@@ -127,6 +129,8 @@ function wireTable(id, rows, opts) {
 
 // gold/hour if you also fish the pools you come across (open water + pool loot; time spent finding pools not included)
 const withPools = (rows) => rows.map((o) => ({...o, gph_pools: o.detail && o.detail.forever ? (o.detail.gph_with_pools || o.gph) : null}));
+// sections about later show what a pick earns per day once you have the gold for it
+const ifAffordable = (rows) => rows.map((o) => ({...o, daily: (o.detail && o.detail.daily_if_affordable !== undefined) ? o.detail.daily_if_affordable : o.daily}));
 const POOL_HINT = '"Gold / hour with pools" adds the trunks, Stranglekelp and Rumsey Rum from the pools you come across. It doesn\'t count the time spent finding pools, so treat it as a ceiling.';
 
 // ---------- views ----------
@@ -134,16 +138,18 @@ const VIEWS = {
   async top() {
     const t = STATE.top || {};
     const e = STATE.effective, who = STATE.detected.character;
-    return `
+    const tsm = (STATE.freshness || []).find((f) => f.name === 'tsm');
+    const stale = tsm && tsm.status !== 'ok' ? `<div class="panel" style="border-color:#e8c060">⚠ Prices may be out of date: ${esc(tsm.note)}. Check that the TSM desktop app is running; picks below use the last prices it downloaded.</div>` : '';
+    return `${stale}
       <div class="hint">${who ? `Playing <b>${esc(who)}</b> (detected)` : 'Using your manual settings'}: ${num(e.gold, 2)}g to invest, level ${e.level}, realm ${esc(e.realm)}. Everything updates when TSM syncs or you log out / /reload. Click any row for details.</div>
       <div class="panel"><h2>Do these now <small>things you can do today, ranked by expected profit per day</small></h2>${oppTable(t.now || [])}</div>
-      <div class="panel"><h2>Fishing & farming spots <small>gold per hour: open water, and with the pools you come across</small></h2>${oppTable(withPools(t.hourly || []), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false})}
+      <div class="panel"><h2>Fishing & farming spots <small>gold per hour: open water, and with the pools you come across</small></h2>${oppTable(withPools(t.hourly || []), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false, heads: {profit_unit: 'Per catch / each'}})}
         <div class="hint">${POOL_HINT}</div>
         <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. "measured" uses real time from ForeverMoneyBridge; otherwise ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
       <div class="panel"><h2>Snipes <small>single cheap listings at the last scan; check them in game first</small></h2>${oppTable(t.snipes || [], {cols: ['title', 'kind', 'profit_unit', 'cost_unit', 'flags']})}</div>
       <div class="grid2">
-        <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(t.level_up || [], {cols: ['title', 'profit_unit', 'daily', 'flags']})}</div>
-        <div class="panel"><h2>Worth switching professions for <small>at least ${num(STATE.settings.switch_bonus, 1)}× your best</small></h2>${oppTable(t.switch || [], {cols: ['title', 'profession', 'daily', 'flags']})}</div>
+        <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(ifAffordable(t.level_up || []), {cols: ['title', 'profit_unit', 'daily', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: 'Nothing worth it a few skill points away right now.'})}</div>
+        <div class="panel"><h2>Worth switching professions for <small>at least ${num(STATE.settings.switch_bonus, 1)}× your best</small></h2>${oppTable(ifAffordable(t.switch || []), {cols: ['title', 'profession', 'daily', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: 'No other profession beats yours by enough right now.'})}</div>
       </div>`;
   },
   async craft() {

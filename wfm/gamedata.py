@@ -97,6 +97,8 @@ class Item:
     partial: bool = False      # not in the client's ItemSparse; filled from Wowhead tooltip / Questie
     openable: bool = False     # right-click to open (trunks, clams, lockboxes): worth its contents
     locked: bool = False       # needs Lockpicking (or a key) to open
+    source: str = 'client'     # client (game tables) | server (hotfix cache) | wowhead | questie | in-game
+    checked: dict | None = None   # once verified in game: {'against': previous source, 'differs': [fields]}
 
     @property
     def category(self) -> str:
@@ -129,6 +131,7 @@ class GameData:
     zone_parent: dict[int, int] = field(default_factory=dict)                 # area id -> parent area id (0 = top level)
     zone_continent: dict[int, int] = field(default_factory=dict)
     item_classes: dict[int, tuple[int, int]] = field(default_factory=dict)   # every item id -> (class, subclass)
+    hotfix_items: int = 0          # items taken from the server's data (client hotfix cache)
     downloaded: int = 0
 
 
@@ -195,6 +198,64 @@ def load(build: str) -> GameData:
     return gd
 
 
+def apply_hotfixes(gd: GameData, rows: dict[int, dict]) -> dict:
+    """Overlay the server's item data (client hotfix cache, see hotfix.py) on the client tables: it is newer for
+    the items it covers, and it adds items the client tables don't ship. Returns counts."""
+    added = updated = 0
+    for iid, r in rows.items():
+        stack_count = max(1, _int(r.get('VendorStackCount'), 1))
+        cls, sub = gd.item_classes.get(iid, (-1, -1))
+        old = gd.items.get(iid)
+        item = Item(
+            id=iid, name=str(r.get('Display_lang') or (old.name if old else '')), quality=_int(r.get('OverallQualityID')),
+            item_level=_int(r.get('ItemLevel')), req_level=_int(r.get('RequiredLevel')),
+            sell_price=_int(r.get('SellPrice')), buy_price=round(_int(r.get('BuyPrice')) / stack_count),
+            stack=_int(r.get('Stackable'), 1), class_id=cls, subclass_id=sub, bonding=_int(r.get('Bonding')),
+            openable=bool(_int(r.get('Flags_0')) & ITEM_FLAG_HAS_LOOT),
+            locked=(_int(r['LockID']) > 0) if 'LockID' in r else bool(old and old.locked), source='server')
+        if not item.name:
+            continue
+        if old and not old.partial:
+            updated += 1
+        else:
+            added += 1
+        gd.items[iid] = item
+    gd.hotfix_items = added + updated
+    return {'added': added, 'updated': updated}
+
+
+INGAME_FIELDS = {'s': 'sell_price', 'q': 'quality', 'l': 'item_level', 'r': 'req_level', 'k': 'stack', 'b': 'bonding'}
+
+
+def apply_ingame(gd: GameData, info: dict) -> int:
+    """Overlay what your own game client reported for items (ForeverMoneyBridge item checks): the ground truth.
+    The first time an item is verified, which fields its previous source got wrong is kept in item.checked."""
+    n = 0
+    for iid, r in (info or {}).items():
+        try:
+            iid = int(iid)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(r, dict) or not r.get('n'):
+            continue
+        it = gd.items.get(iid)
+        if it is None:
+            cls, sub = gd.item_classes.get(iid, (_int(r.get('c'), -1), _int(r.get('sc'), -1)))
+            it = gd.items[iid] = Item(id=iid, name=str(r['n']), quality=0, item_level=0, req_level=0, sell_price=0,
+                                      buy_price=0, stack=1, class_id=cls, subclass_id=sub, bonding=0, partial=True,
+                                      source='none')
+        if it.source != 'in-game':
+            differs = [attr for key, attr in INGAME_FIELDS.items() if r.get(key) is not None and getattr(it, attr) != _int(r[key])]
+            it.checked = {'against': it.source, 'differs': differs, 'at': _int(r.get('t'))}
+        for key, attr in INGAME_FIELDS.items():
+            if r.get(key) is not None:
+                setattr(it, attr, _int(r[key]))
+        it.name = str(r['n']) or it.name
+        it.source = 'in-game'
+        n += 1
+    return n
+
+
 def add_partial_item(gd: GameData, iid: int, info: dict | None, fallback_name: str | None) -> Item | None:
     """Create an Item for an id the client's ItemSparse lacks, from tooltip info or just a name."""
     if iid in gd.items:
@@ -206,6 +267,7 @@ def add_partial_item(gd: GameData, iid: int, info: dict | None, fallback_name: s
     it = Item(id=iid, name=info.get('name') or fallback_name or f'Item {iid}', quality=int(info.get('quality', 1)),
               item_level=int(info.get('item_level', 0)), req_level=int(info.get('req_level', 0)),
               sell_price=int(info.get('sell_price', 0)), buy_price=0, stack=1, class_id=cls, subclass_id=sub,
-              bonding=int(info.get('bonding', 0)), partial=True, openable=bool(info.get('openable')))
+              bonding=int(info.get('bonding', 0)), partial=True, openable=bool(info.get('openable')),
+              source='wowhead' if info.get('name') or info.get('sell_price') else 'questie')
     gd.items[iid] = it
     return it

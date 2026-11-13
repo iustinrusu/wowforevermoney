@@ -54,6 +54,16 @@ class GamePaths:
     def skillup_data(self) -> Path:
         return self.addons / 'SkillUpForever' / 'Data'
 
+    def hotfix_cache(self) -> Path | None:
+        """The client's cache of data sent by the server (Cache/ADB/<locale>/DBCache.bin)."""
+        adb = self.flavor / 'Cache' / 'ADB'
+        for loc in ('enUS', 'enGB'):
+            p = adb / loc / 'DBCache.bin'
+            if p.exists():
+                return p
+        found = sorted(adb.glob('*/DBCache.bin')) if adb.exists() else []
+        return found[0] if found else None
+
     def client_build(self) -> str | None:
         """Version of the installed Forever client, e.g. 1.60.1.70938."""
         info = self.wow / '.build.info'

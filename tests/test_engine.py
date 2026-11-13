@@ -60,6 +60,15 @@ class PricingTests(unittest.TestCase):
         self.assertEqual(q.value, 500)
         self.assertIn('sells_lower', q.flags, 'listed well above real sales: may not sell at that price')
 
+    def test_odd_lone_listing_uses_recent_average(self):
+        # one greedy listing (or a cheap dump about to be bought out) isn't the market
+        q = ah_sell({'numAuctions': 1, 'minBuyout': 5000, 'marketValue': 1000, 'regionSale': 900, 'regionSoldPerDay': 5})
+        self.assertEqual((q.value, 'price_looks_off' in q.flags), (1000, True))
+        q = ah_sell({'numAuctions': 2, 'minBuyout': 300, 'marketValue': 1000, 'regionSale': 900, 'regionSoldPerDay': 5})
+        self.assertEqual(q.value, 1000)
+        q = ah_sell({'numAuctions': 40, 'minBuyout': 300, 'marketValue': 1000, 'regionSale': 900, 'regionSoldPerDay': 5})
+        self.assertEqual(q.value, 300, 'many listings at the new price: that is the market now')
+
     def test_actual_sales_basis_is_more_conservative(self):
         q = ah_sell({'numAuctions': 5, 'minBuyout': 900, 'marketValue': 600, 'regionSoldPerDay': 3}, 'actual_sales')
         self.assertEqual(q.value, 600)       # never more than the usual realm price
@@ -196,6 +205,18 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(zone.profit_unit, int(190 * 40 / 90))   # value per catch
         # 200 casts/hour, all landed (90 caught + 10 got away of 100), 90% kept -> 180 catches/hour
         self.assertEqual(zone.gph, 15200)                        # 190 x 40/90 x 180 = the old per-cast 190 x 0.4 x 200
+
+    def test_crafts_are_capped_by_ingredient_market_volume(self):
+        # Regression: a vendor-sold craft assumed 200 crafts a day (6.36g/day for Mender's Mail Boots); you can't
+        # buy more of an AH ingredient a day than its market trades at your share.
+        recipe = Recipe(spell_id=500, name='Tasty Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                        product_count=1, reagents=[(MAT_AH, 1)], trivial_low=140, trivial_high=180, min_rank=1)
+        prices = {MAT_AH: {'numAuctions': 5, 'minBuyout': 5, 'marketValue': 5, 'regionSoldPerDay': 10}}
+        o = Engine(make_world(prices, [recipe]), dict(SETTINGS)).crafts()[0]
+        self.assertEqual(o.profit_unit, 15)                      # vendor 20 - 5
+        self.assertEqual(o.units_day, 2.0)                       # 10 sold/day x 20% share / 1 per craft
+        self.assertEqual(o.detail['daily_if_affordable'], 30)
+        self.assertEqual(o.detail['limited_by_mat'], 'Raw Meat')
 
     def test_values_use_recipes_you_can_make_now(self):
         # A fish was valued by a recipe needing Cooking 300 while the user has 150: it overstated catches.

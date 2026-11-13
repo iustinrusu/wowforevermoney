@@ -22,6 +22,19 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-13 Item database = Forever server data first; your game client is the referee.** Source priority:
+  in-game (addon item checks) > server data (client hotfix cache DBCache.bin, `wfm/hotfix.py`) > client tables
+  (wago) > Wowhead tooltip > Questie name. Hotfix layout inferred from 1,523 overlapping items and graded per
+  field; LanguageID, LockID, PageID, RequiredHoliday are untrusted (binary order differs). Result: 5,238 items
+  added, 1,523 updated; all 7,304 priced items fully covered. Addon 1.4.0 checks up to 800 items per login
+  (disagreements, items behind current picks, Wowhead-only items, a daily-rotating sample of 100).
+- **2026-11-13 Prices self-correct:** few listings (<= 3) outside 0.5-2x the realm's recent average ->
+  `price_looks_off`, valued at the recent average; stale-price banner on Top picks; Wowhead snapshots flagged
+  after 30 days; Top picks ranked by profit x confidence (`engine.DOUBT` factors per flag).
+- **2026-11-13 Crafts capped by ingredient market volume** (AH mats: sold/day x share / count per craft):
+  vendor-sold crafts assumed 200/day (Mender's Mail Boots 6.36g/day). Future sections (levelling, switching)
+  rank by `daily_if_affordable` instead of being emptied by today's gold.
+- **2026-11-13 Review and strategy brainstorm:** `docs/REVIEW_2026-11-13.md` (UI/UX, strategies, next steps).
 - **2026-11-13 Sale price = current lowest buyout (user's decision; supersedes the sales cap below).** The user:
   "prices should be based on minimum buyout... that the user would also list the item at". Setting
   `sale_price_basis` = `min_buyout` (default) or `actual_sales` (the conservative cap). Either way: nothing
@@ -93,6 +106,11 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- DBCache.bin v9: header 44 bytes ("XFTH", version, build, 32-byte hash); entries "XFTH" + push, unique, ?, table
+  hash, record id, size, status (1 = valid) + data. ItemSparse hash 0x919BE54E, Item 0x50238EC2. Strings
+  inline, null-terminated; no padding. 303 server-vs-Wowhead sell price disagreements on new items (awaiting
+  in-game checks). wago's CSV export doesn't include hotfix rows (tried `&hotfixes=1`).
+- The preview launcher may move the app to port 8766 if 8765 is busy; start.bat always uses 8765.
 - 2026-11-13 recheck: raw TSM base-32 rows decoded by hand = parser output; 25/25 vendor sell prices (incl.
   Mageweave, Runecloth, leathers, potions, pearls, fish) match Wowhead Forever tooltips; top picks, container
   values, item values and fishing gold/hour for all 5 Wowhead zones match an independent recomputation (within
@@ -169,6 +187,10 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-13** Item database from the server's hotfix cache + in-game item checks (addon 1.4.0); price safeguards
+  (odd listings, stale banner, snapshot age, confidence ranking); crafts capped by ingredient volume; UI fixes;
+  review doc. Tests: 66 (incl. module imports and page-script label check).
 
 - **2026-11-13** v1 built: TSM parser, wago game data, Questie, SkillUpForever, engine (crafts, vendor
   flips, AH→vendor, snipes, gathering, measured zones), price history, alerts, audit, web UI with tabs, our

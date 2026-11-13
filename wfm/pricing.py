@@ -42,6 +42,7 @@ def ah_buy(p: dict | None) -> Quote | None:
 
 
 SALE_BASES = ('min_buyout', 'actual_sales')
+ODD_LISTINGS, ODD_LOW, ODD_HIGH = 3, 0.5, 2.0    # few listings outside half..double the recent average: looks off
 
 
 def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
@@ -60,8 +61,14 @@ def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
     sale = int(p.get('regionSale', 0) or 0)
     if listed(p):
         value, source = int(p['minBuyout']), 'lowest listing'
-        if basis == 'actual_sales' and p.get('marketValue') and p['marketValue'] < value:
-            value, source = int(p['marketValue']), 'realm market value'
+        mv = int(p.get('marketValue') or 0)
+        if mv and p.get('numAuctions', 0) <= ODD_LISTINGS and not (ODD_LOW * mv <= value <= ODD_HIGH * mv):
+            # one or two odd listings (a cheap dump that will be bought out, or a greedy price) aren't the market:
+            # use the realm's recent average until more listings confirm the new price
+            value, source = mv, 'realm market value (lowest listing looks off)'
+            flags.append('price_looks_off')
+        if basis == 'actual_sales' and mv and mv < value:
+            value, source = mv, 'realm market value'
     else:
         flags.append('none_listed')
         options = [(int(v), s) for v, s in ((sale, 'average sale price (region, actual sales)'),

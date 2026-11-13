@@ -13,7 +13,7 @@ from pathlib import Path
 
 import json
 
-from . import classicdb, gamedata
+from . import classicdb, gamedata, hotfix
 from .lua import parse_assignments
 from .paths import DATA, GamePaths
 
@@ -76,6 +76,7 @@ class World:
         self.forever_fishing: dict = {}      # zone name -> Wowhead Forever counts (read by hand)
         self.forever_containers: dict = {}   # item id -> what it contains in Forever (Wowhead, read by hand)
         self.inventory: dict = {}
+        self.hotfix_info: dict = {}
         self.profile: dict = {'characters': {}, 'active': None, 'activity': {}}
         self.status: dict[str, SourceStatus] = {}
         self._mtimes: dict[str, int] = {}
@@ -194,6 +195,33 @@ class World:
         st.version = self.paths.addon_version('ForeverAngler')
         zones = self.angler.get('zones') or {}
         st.note = f'{len(zones)} zones, {sum(int(z.get("c") or 0) for z in zones.values())} casts. Updates on logout or /reload.'
+        self.version += 1
+
+    def _load_hotfix(self):
+        """Overlay the server's item data from your client's hotfix cache (exact Forever data, see hotfix.py)."""
+        st = self.status.setdefault('hotfix', SourceStatus('hotfix', "Server item data (your client's hotfix cache)"))
+        p = self.paths.hotfix_cache()
+        st.files = [str(p)] if p else []
+        if not p or not self.gamedata:
+            st.status = 'missing'
+            st.note = ('No hotfix cache found (Cache/ADB/<locale>/DBCache.bin): items the client tables lack come '
+                       'from Wowhead tooltips instead.')
+            return
+        folder = gamedata.build_dir(self.gamedata.build)
+        if not self.gamedata.build.endswith(str(hotfix.read_cache_build(p))):
+            st.status = 'warn'
+            st.note = 'The hotfix cache is from another client build; start the game once to refresh it.'
+            return
+        h = hotfix.load_item_hotfixes(p, folder / 'ItemSparse.csv', folder / 'itemsparse_hotfix_layout.json')
+        counts = gamedata.apply_hotfixes(self.gamedata, h.rows)
+        self.hotfix_info = {'added': counts['added'], 'updated': counts['updated'], 'agreement': h.agreement,
+                            'unreliable': h.unreliable, 'changed_fields': h.changed_fields, 'inferred': h.inferred}
+        st.file_time, st.loaded_at, st.version = int(p.stat().st_mtime), int(time.time()), f'build {h.cache_build}'
+        st.status = 'ok' if h.agreement >= 0.95 else 'warn'
+        st.note = (f'{counts["added"]:,} items added and {counts["updated"]:,} updated from the data the Forever '
+                   f'server sent your client. Check: {h.agreement:.1%} of items in both decode exactly to the client '
+                   f'tables (the rest differ only where the server changed them). Fields not trusted: '
+                   f'{", ".join(h.unreliable) or "none"}.')
         self.version += 1
 
     def _load_classic(self):
@@ -324,6 +352,7 @@ class World:
         self.version += 1
 
     LOADERS = {
+        'hotfix': ('_load_hotfix', lambda self: [self.paths.hotfix_cache() or '']),
         'tsm': ('_load_tsm', lambda self: [self.paths.tsm_appdata]),
         'questie': ('_load_questie', lambda self: [self.paths.questie_toc, self.paths.questie_drops]),
         'skillup': ('_load_skillup', lambda self: [self.paths.skillup_data]),
@@ -346,7 +375,8 @@ class World:
             info = self.tooltips.get(iid)
             qname = (self.questie.items.get(iid) or {}).get('name') if self.questie else None
             existing = self.gamedata.items.get(iid)
-            if existing and existing.partial and info and existing.sell_price == 0 and info.get('sell_price'):
+            if (existing and existing.partial and existing.source != 'in-game' and info
+                    and existing.sell_price == 0 and info.get('sell_price')):
                 del self.gamedata.items[iid]       # upgrade a name-only item with tooltip info
             gamedata.add_partial_item(self.gamedata, iid, info, qname)
             if not info:
@@ -360,6 +390,54 @@ class World:
         st.loaded_at = int(time.time())
         if need_fetch and self.fetch_tooltips:
             self.tooltips.want(sorted(need_fetch))
+        # what your own game client reported (ForeverMoneyBridge item checks) overrides every other source
+        gamedata.apply_ingame(self.gamedata, (self.profile or {}).get('item_info'))
+
+    def source_disagreements(self) -> list[int]:
+        """Items whose server data (hotfix cache) and Wowhead Forever tooltip disagree on the sell price."""
+        gd = self.gamedata
+        out = []
+        for iid, it in (gd.items.items() if gd else ()):
+            if it.source == 'server':
+                t = self.tooltips.get(iid)
+                if t and t.get('sell_price') is not None and t['sell_price'] != it.sell_price:
+                    out.append(iid)
+        return out
+
+    def item_checks_wanted(self, important: set[int], limit: int = 800) -> list[int]:
+        """Items for the addon to look up in game, most useful first: where sources disagree, items behind the
+        current recommendations, items known only from Wowhead/Questie, then a sample that rotates daily. Items
+        verified in the last week are skipped."""
+        gd = self.gamedata
+        if not gd:
+            return []
+        import random
+        now = time.time()
+        info = (self.profile or {}).get('item_info') or {}
+        fresh = set()
+        for k, v in info.items():
+            try:
+                if isinstance(v, dict) and now - float(v.get('t') or 0) < 7 * 86400:
+                    fresh.add(int(k))
+            except (TypeError, ValueError):
+                continue
+        out, seen = [], set(fresh)
+
+        def add(ids):
+            for i in ids:
+                if len(out) >= limit:
+                    return
+                if i not in seen and i in gd.items:
+                    seen.add(i)
+                    out.append(i)
+
+        add(sorted(self.source_disagreements()))
+        add(sorted(important))
+        add(sorted(i for i, it in gd.items.items() if it.source in ('wowhead', 'questie') and i in self.prices))
+        rnd = random.Random(int(now // 86400))
+        ids = sorted(gd.items)
+        add(rnd.sample(ids, min(100, len(ids))))
+        return out
 
     def load_all(self):
         with self.lock:
@@ -380,6 +458,7 @@ class World:
                 self._safe('gamedata', self._load_gamedata)
                 if (self.gamedata.build if self.gamedata else None) != before:
                     changed.append('gamedata')
+                    self._safe('hotfix', self._load_hotfix)      # fresh tables: overlay the server data again
             for name, (fn, files) in self.LOADERS.items():
                 m = _mtime(files(self))
                 if m != self._mtimes.get(name):

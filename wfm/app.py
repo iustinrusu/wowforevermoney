@@ -78,6 +78,7 @@ class App:
             events = diff_runs(self.result, result, settings, self.name) if reason.startswith('data changed') else []
             self.result, self.generated_at = result, int(time.time())
             self.audit = audit.run(self.world, Engine(self.world, settings))
+            self._write_item_checks(result)
             self.tips = self._load_tips()
         log(f'Recomputed ({reason}) in {time.time() - t:.1f}s: {len(result["opportunities"])} opportunities')
         if events:
@@ -126,6 +127,28 @@ class App:
             except Exception:
                 log('Watcher error:\n' + traceback.format_exc())
             self._settings_dirty.wait(POLL_SECONDS)
+
+    def _write_item_checks(self, result):
+        """Ask the addon to verify, in game, the items behind the current recommendations (and disagreements)."""
+        try:
+            important = set()
+            by = {o.key: o for o in result['opportunities']}
+            for keys in result['top'].values():
+                for k in keys:
+                    o = by.get(k)
+                    if not o:
+                        continue
+                    important.add(o.item_id)
+                    important.update(m['item_id'] for m in o.detail.get('mats', []))
+                    important.update(f['item_id'] for f in o.detail.get('fish', [])[:15])
+            for c in (self.world.forever_containers or {}).values():
+                important.update(int(r[0]) for r in c.get('items', [])[:10])
+            ids = self.world.item_checks_wanted(important)
+            if profile_mod.write_item_checks(self.world.paths.addons, ids):
+                log(f'Asked ForeverMoneyBridge to verify {len(ids)} items in game (on your next login or /reload)')
+            self.checks_requested = len(ids)
+        except Exception as e:      # never let this break a recompute
+            log(f'Could not write item checks: {e}')
 
     def start(self):
         try:

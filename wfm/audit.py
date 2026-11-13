@@ -90,6 +90,14 @@ def run(world, engine) -> list[dict]:
                       f'{len(spikes)} items; their sell price is capped at the realm market value and the actual '
                       f'average sale price', spikes))
 
+    # 9a. Price health: odd lowest listings (valued at the recent average instead).
+    from .pricing import ah_sell
+    odd = [f'{engine.name(i)}: lowest {p.get("minBuyout")}c with {p.get("numAuctions")} listed, recent average '
+           f'{p.get("marketValue")}c' for i, p in prices.items() if 'price_looks_off' in (ah_sell(p).flags if ah_sell(p) else ())]
+    out.append(_check('Odd lowest listings', 'pass',
+                      f'{len(odd)} items have only a few listings far from their recent average; they are valued at '
+                      f'the recent average until more listings confirm the new price', odd))
+
     # 9b. Listings above what items actually sell for: priced at real sales instead.
     capped = [f'{engine.name(i)}: listed {min(p.get("minBuyout") or 10**12, p.get("marketValue") or 10**12)}c, '
               f'sells for {p["regionSale"]}c' for i, p in prices.items()
@@ -134,6 +142,27 @@ def run(world, engine) -> list[dict]:
                           f'{len(rows)} zones with 100+ Forever catches: {len(agree)} match Classic, {len(differ)} differ. '
                           f'{classic_only} fishing rows are Classic-only (unconfirmed, kept out of Top picks).',
                           differ + agree))
+
+    # 11b. Item data verified by your own game client (ForeverMoneyBridge item checks): which sources were right.
+    checked = [it for it in gd.items.values() if it.checked]
+    by_src: dict[str, list] = {}
+    for it in checked:
+        by_src.setdefault(it.checked['against'], []).append(it)
+    rows, worst = [], 0.0
+    for src, its in sorted(by_src.items()):
+        bad = [it for it in its if it.checked['differs']]
+        rate = len(bad) / len(its)
+        if src in ('client', 'server', 'wowhead') and len(its) >= 20:
+            worst = max(worst, rate)
+        rows.append(f'{src}: {len(its)} checked, {len(bad)} differed ({rate:.0%})')
+    examples = [f"{it.name} ({it.id}): {', '.join(it.checked['differs'])} differed from {it.checked['against']} data"
+                for it in checked if it.checked['differs']][:10]
+    disagree = world.source_disagreements() if hasattr(world, 'source_disagreements') else []
+    out.append(_check('Item data checked in your game', 'warn' if worst > 0.05 or not checked else 'pass',
+                      (f'{len(checked)} items verified by your game client; ' + '; '.join(rows) if checked else
+                       'No items verified in game yet: log in (or /reload) with ForeverMoneyBridge 1.4+, then /reload '
+                       'again a minute later.') + f' {len(disagree)} items where the server data and Wowhead disagree '
+                      f'are queued for checking.', examples))
 
     # 12. Undervaluation watch: what you loot, carry or catch, valued through every channel.
     engine.valuer(engine.best_uses())
