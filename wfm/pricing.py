@@ -41,32 +41,40 @@ def ah_buy(p: dict | None) -> Quote | None:
     return None
 
 
-def ah_sell(p: dict | None) -> Quote | None:
-    """A conservative realistic sale price on your realm: you have to undercut the current lowest listing,
-    you shouldn't expect more than the realm's usual price, and never more than what the item actually
-    sells for (the region's average *sale* price). Listings can be wishful: a Hand Axe listed around 2.5g
-    really sells for ~6.6s, and 15% of actively traded items list 1.5x+ above their real sale price."""
+SALE_BASES = ('min_buyout', 'actual_sales')
+
+
+def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
+    """The price you'd sell one unit for on your realm's AH (before the AH cut).
+
+    basis 'min_buyout' (default, the user's choice): the current lowest buyout, which is what you'd list at.
+    basis 'actual_sales' (more conservative): never above the realm's usual listing price or the region's
+    average *sale* price, since listings can sit unsold (Raw Winter Squid: lowest 3.80s, sells for ~2.50s).
+
+    Nothing listed: there's no lowest buyout to match, so the average sale price is used, never the realm's
+    listing average alone (a Hand Axe "worth" 2.5g by listings really sells for ~6.65s).
+    """
     if not p:
         return None
     flags = []
-    candidates = []
-    if listed(p):
-        candidates.append((int(p['minBuyout']), 'lowest listing'))
-    if p.get('marketValue'):
-        candidates.append((int(p['marketValue']), 'realm market value'))
-    if not candidates:
-        if p.get('regionMarketValue'):
-            candidates.append((int(p['regionMarketValue']), 'region market value'))
-            flags.append('no_realm_data')
-        else:
-            return None
-    if not listed(p):
-        flags.append('none_listed')
-    value, source = min(candidates)
     sale = int(p.get('regionSale', 0) or 0)
-    if sale and sale < value:
-        if sale < 0.7 * value:
-            flags.append('sells_lower')   # actual recorded sales are well below listing prices
+    if listed(p):
+        value, source = int(p['minBuyout']), 'lowest listing'
+        if basis == 'actual_sales' and p.get('marketValue') and p['marketValue'] < value:
+            value, source = int(p['marketValue']), 'realm market value'
+    else:
+        flags.append('none_listed')
+        options = [(int(v), s) for v, s in ((sale, 'average sale price (region, actual sales)'),
+                                            (p.get('marketValue'), 'realm market value'),
+                                            (p.get('regionMarketValue'), 'region market value')) if v]
+        if not options:
+            return None
+        if not sale and not p.get('marketValue'):
+            flags.append('no_realm_data')
+        value, source = options[0] if sale else min(options)
+    if sale and sale < 0.7 * value:
+        flags.append('sells_lower')       # listed well above what it actually sells for: it may sit unsold
+    if basis == 'actual_sales' and sale and sale < value:
         value, source = sale, 'average sale price (region, actual sales)'
     if not p.get('regionSoldPerDay'):
         flags.append('no_sales_data')

@@ -19,7 +19,7 @@ const KIND = {farm_zone: 'Farming spot', craft: 'Craft', vendor_flip: 'Vendor â†
 const FLAGS = {
   none_listed: ['warn', 'none listed now', 'No listings on your realm right now; price is the market average'],
   no_realm_data: ['warn', 'region price only', 'No realm data; using the region average'],
-  sells_lower: ['warn', 'sells for less', 'Actual sales are well below listing prices, so the average sale price is used'],
+  sells_lower: ['warn', 'sells for less', 'Listed well above what it actually sells for (region average sale price): at the lowest buyout it may not sell. Settings can value it at actual sales instead'],
   no_sales_data: ['bad', 'no sales data', 'TSM has no recorded sales for this item'],
   above_region: ['warn', 'above region', 'Lowest listing is far above the region average'],
   slow_seller: ['bad', 'slow seller', 'Sells less often than your minimum'],
@@ -235,6 +235,7 @@ const VIEWS = {
       <div>Hide items selling under</div><div><input type="number" step="0.5" id="s-minspd" value="${s.min_sold_per_day}"> per day</div>
       <div>Switch factor</div><div><input type="number" step="0.1" id="s-switch" value="${s.switch_bonus}"></div>
       <div>Fishing casts per hour</div><div><input type="number" id="s-casts" value="${s.casts_per_hour || 240}"></div>
+      <div>AH sale price</div><div><select id="s-basis"><option value="min_buyout" ${s.sale_price_basis !== 'actual_sales' ? 'selected' : ''}>current lowest buyout (what you'd list at)</option><option value="actual_sales" ${s.sale_price_basis === 'actual_sales' ? 'selected' : ''}>what items actually sell for (more conservative)</option></select> <span class="pill">nothing listed: the average sale price either way</span></div>
       <div>Fishing drop rates</div><div><label class="chk"><input type="checkbox" id="s-ownrates" ${s.own_logs_for_rates ? 'checked' : ''}> also use my own catch logs</label> <span class="pill">off: Wowhead Forever's big samples only; your logs still give your pace and got-away rate</span></div>
       <div>Fishing pools</div><div><label class="chk"><input type="checkbox" id="s-pools" ${s.fishing_pools ? 'checked' : ''}> count pool loot in gold/hour</label> <span class="pill">off: open water only; trunks, Stranglekelp and Rumsey Rum from pools shown as a bonus, since pools have to be found first</span></div>
       <div>Unverified recipes</div><div><label class="chk"><input type="checkbox" id="s-unver" ${s.include_unverified_recipes ? 'checked' : ''}> include</label></div>
@@ -266,7 +267,7 @@ function wireView() {
       document.querySelectorAll('.s-prof').forEach((i) => { if (i.value !== '') professions[i.dataset.p] = +i.value; });
       const body = {auto_detect: $('#s-auto').checked, character: $('#s-char').value || null, gold_scope: $('#s-gscope').value, gold: +$('#s-gold').value, level: +$('#s-level').value, realm: $('#s-realm').value, faction: $('#s-faction').value, professions,
         ah_cut: +$('#s-cut').value, market_share: +$('#s-share').value, min_sold_per_day: +$('#s-minspd').value, switch_bonus: +$('#s-switch').value,
-        casts_per_hour: +$('#s-casts').value, own_logs_for_rates: $('#s-ownrates').checked, fishing_pools: $('#s-pools').checked,
+        casts_per_hour: +$('#s-casts').value, own_logs_for_rates: $('#s-ownrates').checked, sale_price_basis: $('#s-basis').value, fishing_pools: $('#s-pools').checked,
         include_unverified_recipes: $('#s-unver').checked,
         alerts: {enabled: $('#s-alerts').checked, min_daily_profit_gold: +$('#s-alertmin').value},
         stale_hours: {realm: +$('#s-stale-r').value, region: +$('#s-stale-g').value}};

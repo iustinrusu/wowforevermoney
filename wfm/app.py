@@ -250,7 +250,7 @@ class App:
                                   'observed_share': f['observed_share'], 'count': f['count'],
                                   'zone_skill': o.detail.get('zone_skill'), 'flags': o.flags, 'pools': f['pools']})
         fished_in.sort(key=lambda x: ('classic_unconfirmed' in x['flags'], -x['share']))     # Forever data first
-        q = ah_sell(w.prices.get(iid))
+        q = ah_sell(w.prices.get(iid), self.effective_settings()[0].get('sale_price_basis', 'min_buyout'))
         return {
             'id': iid, 'name': it.name if it else self.name(iid), 'quality': it.quality if it else 1,
             'category': it.category if it else '', 'item_level': it.item_level if it else None,
@@ -321,7 +321,7 @@ class App:
         allowed = {'auto_detect', 'character', 'gold_scope', 'realm', 'faction', 'gold', 'level', 'professions', 'preferred', 'switch_bonus', 'ah_cut',
                    'market_share', 'min_sold_per_day', 'show_other_professions', 'include_unverified_recipes',
                    'farm_rates', 'watchlist', 'alerts', 'stale_hours', 'casts_per_hour',
-                   'own_logs_for_rates', 'fishing_pools'}
+                   'own_logs_for_rates', 'fishing_pools', 'sale_price_basis'}
         clean = {k: v for k, v in changes.items() if k in allowed}
         new = self.settings.update(clean)
         if 'realm' in clean:

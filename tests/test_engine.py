@@ -50,25 +50,34 @@ class PricingTests(unittest.TestCase):
         self.assertEqual(ah_buy({'regionMarketValue': 90}).flags, ('no_realm_data',))
         self.assertIsNone(ah_buy({}))
 
-    def test_sell_is_conservative(self):
+    def test_sell_at_lowest_buyout_by_default(self):
+        # The user's rule: you list at the current lowest buyout, so that's the sale price.
         q = ah_sell({'numAuctions': 5, 'minBuyout': 500, 'marketValue': 600, 'regionSoldPerDay': 3, 'regionSale': 550})
-        self.assertEqual(q.value, 500)       # must undercut the lowest listing
+        self.assertEqual((q.value, q.source), (500, 'lowest listing'))
         q = ah_sell({'numAuctions': 5, 'minBuyout': 900, 'marketValue': 600, 'regionSoldPerDay': 3})
-        self.assertEqual(q.value, 600)       # never more than the usual realm price
-        q = ah_sell({'numAuctions': 5, 'minBuyout': 500, 'marketValue': 600, 'regionSoldPerDay': 3, 'regionSale': 450})
-        self.assertEqual(q.value, 450)       # never more than what it actually sells for
+        self.assertEqual(q.value, 900)
         q = ah_sell({'numAuctions': 5, 'minBuyout': 500, 'marketValue': 600, 'regionSale': 300, 'regionSoldPerDay': 1})
-        self.assertIn('sells_lower', q.flags)
-        self.assertEqual(q.value, 300)
+        self.assertEqual(q.value, 500)
+        self.assertIn('sells_lower', q.flags, 'listed well above real sales: may not sell at that price')
 
-    def test_wishful_listings_are_priced_at_real_sales(self):
+    def test_actual_sales_basis_is_more_conservative(self):
+        q = ah_sell({'numAuctions': 5, 'minBuyout': 900, 'marketValue': 600, 'regionSoldPerDay': 3}, 'actual_sales')
+        self.assertEqual(q.value, 600)       # never more than the usual realm price
+        q = ah_sell({'numAuctions': 5, 'minBuyout': 500, 'marketValue': 600, 'regionSoldPerDay': 3, 'regionSale': 450},
+                    'actual_sales')
+        self.assertEqual(q.value, 450)       # never more than what it actually sells for
+
+    def test_nothing_listed_uses_the_actual_sale_price(self):
         # Regression from live data (2026-11-13): Hand Axe, nothing listed, realm listing average 2.5g, but it
-        # really sells for 6.65s. It topped "Do these now" as a 2.37g vendor flip.
-        q = ah_sell({'marketValue': 25050, 'regionMarketValue': 5399, 'regionSale': 665, 'regionSoldPerDay': 1.5,
-                     'regionSalePercent': 1.0})
-        self.assertEqual(q.value, 665)
-        self.assertIn('sells_lower', q.flags)
-        self.assertIn('none_listed', q.flags)
+        # really sells for 6.65s. It topped "Do these now" as a 2.37g vendor flip. Same under either basis.
+        for basis in ('min_buyout', 'actual_sales'):
+            q = ah_sell({'marketValue': 25050, 'regionMarketValue': 5399, 'regionSale': 665, 'regionSoldPerDay': 1.5,
+                         'regionSalePercent': 1.0}, basis)
+            self.assertEqual(q.value, 665)
+            self.assertIn('none_listed', q.flags)
+        self.assertEqual(ah_sell({'marketValue': 800, 'regionMarketValue': 600}).value, 600, 'no sales: lower listing average')
+
+    def test_sell_flags(self):
         q = ah_sell({'numAuctions': 1, 'minBuyout': 5000, 'marketValue': 6000, 'regionMarketValue': 1000})
         self.assertIn('above_region', q.flags)
         self.assertIn('no_sales_data', q.flags)

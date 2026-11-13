@@ -86,10 +86,11 @@ class Valuer:
         channels, flags = {}, []
         sell, channel, q = e.sell_value(iid)
         if channel == 'AH' and q and {'no_sales_data', 'above_region'} & set(q.flags):
-            # ah_sell already caps at the average sale price; with no recorded sale at all, don't count on the AH
+            # a lone listing far above the region (or no recorded sale at all) isn't a price you'd get: value
+            # contents and catches at the actual sale price, or not on the AH at all if it never sold
             flags.append('ah_price_doubtful')
-            if not (e.price(iid) or {}).get('regionSale'):
-                sell = 0
+            sale = (e.price(iid) or {}).get('regionSale') or 0
+            sell = min(sell, int(sale * (1 - e.cut))) if sale else 0
         vendor = item.sell_price if item else 0
         tradeable = not (item and (item.bonding == 1 or item.class_id == 12))     # soulbound or quest item
         if channel == 'AH' and sell > 0 and tradeable:

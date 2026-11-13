@@ -22,6 +22,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-13 Sale price = current lowest buyout (user's decision; supersedes the sales cap below).** The user:
+  "prices should be based on minimum buyout... that the user would also list the item at". Setting
+  `sale_price_basis` = `min_buyout` (default) or `actual_sales` (the conservative cap). Either way: nothing
+  listed -> region average sale price (never the realm listing average alone: Hand Axe); `sells_lower` flag
+  when listed 1.43x+ above real sales; contents/catch values ignore a lone outlier listing (`above_region`)
+  and use its sale price. Live examples: Raw Winter Squid lowest 3.80s vs sales 2.50s (sale rate 0.47),
+  Sunscale 3.98s vs 2.65s; Mageweave 26.49s lowest vs 31.35s sales (no difference: min of both).
 - **2026-11-13 Full accuracy recheck.** The user said accuracy is non-negotiable. Fixes:
   - **Sale price is capped at the region's average actual sale price** (`pricing.ah_sell`). The #1 pick was a
     bogus Hand Axe vendor flip (listing avg 2.5g, real sales 6.65s); 15% of actively traded items list 1.5x+

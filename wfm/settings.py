@@ -33,6 +33,9 @@ DEFAULTS = {
     # Drop rates come from Wowhead Forever's large samples. Your own catch logs are small, mix pools with open
     # water and can be incomplete, so they're only used for your pace and got-away rate unless you turn this on.
     'own_logs_for_rates': False,
+    # Sale price on the AH: 'min_buyout' = the current lowest buyout, what you'd list at (the user's choice);
+    # 'actual_sales' = never above what the item actually sells for (more conservative).
+    'sale_price_basis': 'min_buyout',
     # Pools (Floating Wreckage/Debris, schools) have to be found first, so gold/hour counts open water only;
     # pool loot (trunks, Stranglekelp, Rumsey Rum) is shown as a bonus unless you turn this on.
     'fishing_pools': False,

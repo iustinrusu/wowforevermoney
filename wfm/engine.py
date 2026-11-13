@@ -60,6 +60,7 @@ class Engine:
         self.q = world.questie
         self.su = world.skillup
         self.cut = float(settings.get('ah_cut', 0.05))
+        self.sale_basis = settings.get('sale_price_basis', 'min_buyout')   # see pricing.ah_sell
         self.share = float(settings.get('market_share', 0.2))
         self.gold = float(settings.get('gold', 0)) * COPPER_PER_GOLD
         self.profs = {k: int(v) for k, v in (settings.get('professions') or {}).items()}
@@ -175,7 +176,7 @@ class Engine:
     def sell_value(self, iid: int) -> tuple[int, str, Quote | None]:
         """Best of AH (after cut) and vendor, per unit. Returns (copper, channel, ah quote)."""
         item = self.gd.items.get(iid)
-        q = ah_sell(self.price(iid))
+        q = ah_sell(self.price(iid), self.sale_basis)
         if item and (item.bonding == 1 or item.class_id == 12):
             q = None          # soulbound or quest item: it can't be sold on the AH, whatever TSM lists
         ah_val = proceeds(q, self.cut)
@@ -312,7 +313,7 @@ class Engine:
             cost, vendors = vp
             if cost <= 0 or not vendors:
                 continue
-            q = ah_sell(self.price(iid))
+            q = ah_sell(self.price(iid), self.sale_basis)
             if not q:
                 continue
             value = proceeds(q, self.cut)
