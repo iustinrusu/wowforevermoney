@@ -260,6 +260,11 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Open items
 
+- **Next plan: `docs/plans/forever-data-next.md`** (reminder 2026-11-14 10:00): own per-mob/per-node loot
+  logging in the addon, remaining Wowhead reads, mob farming, Forever loot addons (user installs via CurseForge),
+  GatherLite node locations, review. Forever data sources checked 2026-11-14: Wowhead Forever (best, rate
+  limited), GatherLite (Forever node locations from Wowhead), DungeonMaster (built from Classic data),
+  QuestieTrace (raw events for Questie devs, nothing usable saved), and several CurseForge loot addons.
 - **Wowhead Forever reads left** (blocked by 403 on 2026-11-14): skinning items 4235 Heavy Hide, 8169 Thick Hide,
   8171 Rugged Hide, 15417 Devilsaur Leather, 8368 Thick Wolfhide, scales 8167/8154/7286/8165, 15412/15419/15423;
   then the "Dropped by" tabs for mob farming (cloth 2589/2592/4306/4338/14047/14256, elementals 7067-7070, 7075,

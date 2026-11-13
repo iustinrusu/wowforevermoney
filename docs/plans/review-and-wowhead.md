@@ -1,5 +1,7 @@
 # Plan: review, tests, Wowhead Forever data
 
+**Superseded by docs/plans/forever-data-next.md (2026-11-14).**
+
 Postponed on 2026-11-13. Nothing runs by itself: a reminder points here. To start, open a Claude Code session
 in this folder and say "Do the plan in docs/plans/review-and-wowhead.md".
 
