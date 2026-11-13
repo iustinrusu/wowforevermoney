@@ -71,6 +71,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/pricing.py` | buy/sell quotes and flags; money formatting |
 | `wfm/engine.py` | all opportunity calculations and top-pick sections |
 | `wfm/history.py` | SQLite price history (one snapshot per realm scan, 45 days) |
+| `wfm/market.py` | Market tab: one item's history, trends and market signals (sentiment) |
 | `wfm/investments.py` | Investments tab: curated list (`data/investments.json`), trends, vendor floor, progression gauge |
 | `wfm/alerts.py` | change events and Windows toasts |
 | `wfm/tooltips.py` | slow cached Wowhead tooltip fetch for items missing from the game tables |

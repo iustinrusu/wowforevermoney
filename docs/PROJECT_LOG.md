@@ -223,6 +223,10 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Change log
 
+- **2026-11-14** Market tab (`wfm/market.py`, `/api/market`): autocomplete search, SVG price chart (line or daily
+  candles, listings as volume, hover crosshair, 24h/7d/30d/all), and five signals summed into a sentiment label
+  (+-2 thresholds; no data = no vote). Hand-drawn SVG, no chart library (no new third-party script). Tests: 96.
+
 - **2026-11-14** Selling check (`pricing.liquidity`): "barely sells" / "slow to sell" / "crowded" flags, Sells
   column, "How well it sells" in details, filter on Crafting and Flips. Tests: 90.
 

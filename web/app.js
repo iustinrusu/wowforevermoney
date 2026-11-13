@@ -134,6 +134,148 @@ function wireTable(id, rows, opts) {
   refreshTooltips();
 }
 
+// ---------- market tab ----------
+const moneyText = (c) => { if (c === null || c === undefined || isNaN(c)) return '–'; c = Math.round(c); const g = Math.floor(c / 10000), s = Math.floor(c / 100) % 100, cc = c % 100; return g ? `${g.toLocaleString()}g ${s}s` : (s ? `${s}s ${cc}c` : `${cc}c`); };
+const MK = {pts: [], W: 900};
+const RANGES = {'24h': 86400, '7d': 7 * 86400, '30d': 30 * 86400, all: Infinity};
+
+function dailyCandles(pts) {
+  const days = new Map();
+  for (const s of pts) {
+    if (!(s.min_buyout > 0)) continue;
+    const d = new Date(s.ts * 1000); const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const c = days.get(k);
+    if (!c) days.set(k, {t0: s.ts, t1: s.ts, o: s.min_buyout, h: s.min_buyout, l: s.min_buyout, c: s.min_buyout});
+    else { c.t1 = s.ts; c.h = Math.max(c.h, s.min_buyout); c.l = Math.min(c.l, s.min_buyout); c.c = s.min_buyout; }
+  }
+  return [...days.values()];
+}
+
+function marketChart(series, range, mode) {
+  const now = Date.now() / 1000;
+  const pts = series.filter((s) => now - s.ts <= RANGES[range]);
+  MK.pts = [];
+  if (pts.length < 2) return '<div class="empty">Not enough snapshots in this range yet. The app saves one per TSM realm scan (about hourly) while it is running.</div>';
+  const W = MK.W, padL = 8, padR = 74, top = 12, priceH = 240, volTop = 280, volH = 56, H = 360;
+  const t0 = pts[0].ts, t1 = pts[pts.length - 1].ts;
+  const candles = mode === 'candles' ? dailyCandles(pts) : [];
+  const useCandles = candles.length >= 2;
+  const vals = pts.flatMap((s) => [s.min_buyout, s.market, s.region_sale]).filter((v) => v > 0);
+  if (!vals.length) return '<div class="empty">No prices recorded in this range.</div>';
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi === lo) { hi *= 1.05; lo *= 0.95; }
+  const pad = (hi - lo) * 0.08; lo = Math.max(0, lo - pad); hi += pad;
+  const x = (ts) => padL + (ts - t0) / ((t1 - t0) || 1) * (W - padL - padR);
+  const y = (v) => top + (1 - (v - lo) / (hi - lo)) * priceH;
+  const path = (k) => { let d = '', pen = false; for (const s of pts) { if (s[k] > 0) { d += `${pen ? 'L' : 'M'}${x(s.ts).toFixed(1)},${y(s[k]).toFixed(1)}`; pen = true; } else pen = false; } return d; };
+  let g = '';
+  for (let i = 0; i <= 4; i++) {
+    const v = lo + (hi - lo) * i / 4, yy = y(v).toFixed(1);
+    g += `<line x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}" stroke="#2a2f3a"/><text x="${W - padR + 6}" y="${(+yy + 4).toFixed(1)}" fill="#9aa3b2" font-size="11">${esc(moneyText(v))}</text>`;
+  }
+  const spanS = t1 - t0;
+  for (let i = 0; i <= 4; i++) {
+    const ts = t0 + spanS * i / 4, xx = x(ts).toFixed(1), d = new Date(ts * 1000);
+    const label = spanS < 2 * 86400 ? d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : d.toLocaleDateString([], {month: 'short', day: 'numeric'});
+    g += `<line x1="${xx}" x2="${xx}" y1="${top}" y2="${volTop + volH}" stroke="#20242c"/><text x="${xx}" y="${H - 4}" fill="#9aa3b2" font-size="11" text-anchor="middle">${esc(label)}</text>`;
+  }
+  const maxL = Math.max(1, ...pts.map((s) => s.num_auctions || 0));
+  const bw = Math.max(1.5, (W - padL - padR) / pts.length * 0.7);
+  let vol = '';
+  for (const s of pts) { const hgt = (s.num_auctions || 0) / maxL * volH; vol += `<rect x="${(x(s.ts) - bw / 2).toFixed(1)}" y="${(volTop + volH - hgt).toFixed(1)}" width="${bw.toFixed(1)}" height="${hgt.toFixed(1)}" fill="#3a4150"/>`; }
+  vol += `<text x="${W - padR + 6}" y="${volTop + 10}" fill="#9aa3b2" font-size="11">${maxL} listed</text>`;
+  let main = '';
+  if (useCandles) {
+    const cw = Math.max(3, (W - padL - padR) / Math.max(candles.length, 1) * 0.55);
+    for (const c of candles) {
+      const cx = x((c.t0 + c.t1) / 2), col = c.c >= c.o ? '#5fcf80' : '#ef6b6b';
+      main += `<line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${y(c.h).toFixed(1)}" y2="${y(c.l).toFixed(1)}" stroke="${col}"/>`;
+      main += `<rect x="${(cx - cw / 2).toFixed(1)}" y="${y(Math.max(c.o, c.c)).toFixed(1)}" width="${cw.toFixed(1)}" height="${Math.max(1, Math.abs(y(c.o) - y(c.c))).toFixed(1)}" fill="${col}"/>`;
+    }
+  } else {
+    main += `<path d="${path('min_buyout')}" fill="none" stroke="#e8c060" stroke-width="2"/>`;
+  }
+  main += `<path d="${path('market')}" fill="none" stroke="#6ea8fe" stroke-width="1.5"/><path d="${path('region_sale')}" fill="none" stroke="#9aa3b2" stroke-width="1.2" stroke-dasharray="5 4"/>`;
+  MK.pts = pts.map((s) => ({...s, x: x(s.ts)}));
+  const note = mode === 'candles' && !useCandles ? '<div class="hint">Candles need at least 2 days of history; showing the line for now.</div>' : '';
+  return `${note}<div class="chartwrap"><svg id="mk-svg" class="mk" viewBox="0 0 ${W} ${H}" role="img" aria-label="Price history chart">${g}${vol}${main}
+    <line id="mk-cross" x1="0" x2="0" y1="${top}" y2="${volTop + volH}" stroke="#e6e6e6" stroke-opacity=".5" visibility="hidden"/>
+    <rect x="${padL}" y="0" width="${W - padL - padR}" height="${H}" fill="transparent" id="mk-hit"/></svg><div id="mk-tip" class="mk-tip hidden"></div></div>
+    <div class="legend"><span><b style="color:#e8c060">━</b> lowest listing${useCandles ? ' (daily candles: open, high, low, close)' : ''}</span><span><b style="color:#6ea8fe">━</b> realm 14-day average (TSM market value)</span><span><b style="color:#9aa3b2">╌</b> region average sale price</span><span><b style="color:#3a4150">█</b> listed on your realm</span></div>`;
+}
+
+function marketBody(d) {
+  const p = d.prices || {}, s = d.sentiment, liq = d.liquidity || {};
+  const range = localStorage.getItem('mkRange') || '7d', mode = localStorage.getItem('mkMode') || 'line';
+  const watching = (STATE.settings.watchlist || []).includes(d.id);
+  const cls = s.label === 'Bullish' ? 'up' : (s.label === 'Bearish' ? 'down' : 'flat');
+  const icon = (sc) => sc === null || sc === undefined ? '<span class="pill">·</span>' : (sc > 0 ? '<span class="up">▲</span>' : (sc < 0 ? '<span class="down">▼</span>' : '<span class="pill">●</span>'));
+  const stat = (label, val, sub) => `<div class="stat"><span class="pill">${label}</span><b>${val}</b>${sub ? `<span class="pill">${sub}</span>` : ''}</div>`;
+  const tr = (t) => t && t.change !== null && t.change !== undefined ? chg(t.change, 1) : '<span class="pill">–</span>';
+  return `<div class="panel"><h2>${itemLink(d.id, d.name, d.quality)} <button class="btn" id="mk-watch">${watching ? 'Watching' : 'Watch price'}</button> <button class="btn" id="mk-details">Full details</button></h2>
+      <div class="stats">${stat('Lowest listing', money(p.numAuctions ? p.minBuyout : null), `${num(p.numAuctions || 0, 0)} listed on your realm`)}${stat('Realm 14-day average', money(p.marketValue))}${stat('Region average sale', money(p.regionSale))}
+      ${stat('Sold per day (region)', num(liq.sold_per_day, 1), liq.sale_rate !== null && liq.sale_rate !== undefined ? `${(liq.sale_rate * 100).toFixed(0)}% of listings sell` : '')}${stat('Vendor pays', money(d.vendor_sell))}
+      ${stat('Change', tr(d.trend_24h), `24 h · 7 d ${tr(d.trend_7d)} · all ${tr(d.trend_all)}`)}</div></div>
+    <div class="grid2"><div class="panel"><h2>Price history <small>lowest listing on your realm, one snapshot per TSM scan</small></h2>
+      <div class="controls seg">${Object.keys(RANGES).map((r) => `<button class="btn ${r === range ? 'active' : ''}" data-range="${r}">${r === 'all' ? 'All' : r}</button>`).join('')}
+      <span style="width:12px"></span>${['line', 'candles'].map((m) => `<button class="btn ${m === mode ? 'active' : ''}" data-mode="${m}">${m === 'line' ? 'Line' : 'Candles'}</button>`).join('')}</div>
+      ${marketChart(d.series || [], range, mode)}</div>
+    <div class="panel"><h2>Market sentiment <span class="sent ${cls}">${esc(s.label)}</span></h2>
+      <table><tbody>${d.signals.map((g) => `<tr><td>${icon(g.score)}</td><td><b>${esc(g.name)}</b></td><td>${esc(g.reading)}</td></tr>`).join('')}</tbody></table>
+      <div class="hint">Signals from Forever data only: TSM's numbers now and this app's own price history. ▲ points up, ▼ down, ● steady, · not enough data. Overall: Bullish at +2 or more, Bearish at −2 or less (${s.signals_with_data} of ${s.signals} signals have data). It describes the market now; it is not a forecast.</div></div></div>`;
+}
+
+function wireMarket() {
+  const inp = $('#mq'), list = $('#ac-list');
+  let items = [], sel = -1, timer, seq = 0;
+  const show = () => {
+    list.innerHTML = items.map((r, i) => `<div class="ac-item ${i === sel ? 'sel' : ''}" data-i="${i}"><span class="q${r.quality}">${esc(r.name)}</span> <span class="pill">${esc(r.category || '')}${r.min_buyout ? ' · ' + esc(moneyText(r.min_buyout)) : ''}${r.sold_per_day ? ' · ' + num(r.sold_per_day, 0) + '/day' : ''}</span></div>`).join('');
+    list.classList.toggle('hidden', !items.length);
+    list.querySelectorAll('.ac-item').forEach((el) => el.onmousedown = (e) => { e.preventDefault(); pick(items[+el.dataset.i]); });
+  };
+  const pick = (r) => { sessionStorage.setItem('marketItem', r.id); render(); };
+  inp.oninput = () => {
+    clearTimeout(timer);
+    const q = inp.value.trim();
+    if (q.length < 2) { items = []; show(); return; }
+    timer = setTimeout(async () => { const mine = ++seq; const res = await api('/api/search?limit=12&q=' + encodeURIComponent(q)); if (mine !== seq) return; items = res; sel = items.length ? 0 : -1; show(); }, 150);
+  };
+  inp.onkeydown = (e) => {
+    if (e.key === 'ArrowDown') { sel = Math.min(items.length - 1, sel + 1); show(); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { sel = Math.max(0, sel - 1); show(); e.preventDefault(); }
+    else if (e.key === 'Enter' && items[sel]) pick(items[sel]);
+    else if (e.key === 'Escape') { items = []; show(); }
+  };
+  inp.onblur = () => setTimeout(() => list.classList.add('hidden'), 150);
+  inp.onfocus = () => { inp.select(); if (items.length) list.classList.remove('hidden'); };
+  if (!sessionStorage.getItem('marketItem')) inp.focus();
+  document.querySelectorAll('[data-range]').forEach((b) => b.onclick = () => { localStorage.setItem('mkRange', b.dataset.range); render(); });
+  document.querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => { localStorage.setItem('mkMode', b.dataset.mode); render(); });
+  const id = +sessionStorage.getItem('marketItem');
+  if ($('#mk-details')) $('#mk-details').onclick = () => openItem(id);
+  if ($('#mk-watch')) $('#mk-watch').onclick = async () => {
+    const wl = new Set(STATE.settings.watchlist || []), on = !wl.has(id);
+    if (on) wl.add(id); else wl.delete(id);
+    await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({watchlist: [...wl]})});
+    await loadState(); toast(on ? "Watching: you'll get an alert on big price moves" : 'No longer watching'); render();
+  };
+  const svg = $('#mk-svg'), tip = $('#mk-tip'), cross = $('#mk-cross');
+  if (svg && MK.pts.length) {
+    svg.onmousemove = (e) => {
+      const r = svg.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * MK.W;
+      let best = MK.pts[0];
+      for (const pt of MK.pts) if (Math.abs(pt.x - vx) < Math.abs(best.x - vx)) best = pt;
+      cross.setAttribute('x1', best.x); cross.setAttribute('x2', best.x); cross.setAttribute('visibility', 'visible');
+      tip.innerHTML = `<b>${new Date(best.ts * 1000).toLocaleString()}</b><br>Lowest listing: ${esc(moneyText(best.min_buyout || null))}<br>Realm 14-day avg: ${esc(moneyText(best.market))}<br>Region avg sale: ${esc(moneyText(best.region_sale))}<br>Listed: ${best.num_auctions ?? '–'}`;
+      tip.classList.remove('hidden');
+      const px = best.x / MK.W * r.width;
+      tip.style.left = (px > r.width / 2 ? px - tip.offsetWidth - 12 : px + 12) + 'px';
+      tip.style.top = '10px';
+    };
+    svg.onmouseleave = () => { tip.classList.add('hidden'); cross.setAttribute('visibility', 'hidden'); };
+  }
+}
+
 // gold/hour if you also fish the pools you come across (open water + pool loot; time spent finding pools not included)
 const withPools = (rows) => rows.map((o) => ({...o, gph_pools: o.detail && o.detail.forever ? (o.detail.gph_with_pools || o.gph) : null}));
 // sections about later show what a pick earns per day once you have the gold for it
@@ -233,6 +375,14 @@ const VIEWS = {
       <div class="tablewrap"><table><thead><tr><th>Item and idea</th><th class="num">Buy now</th><th class="num">vs 14-day avg</th><th class="num">Trend</th><th class="num">7 days</th><th class="num">Sold/day (region)</th><th class="num">Worst case</th><th>Risk</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
       <div class="hint">Trend: our own price snapshots (lowest listing); with a day or more of history each end is a 12-hour median, so one odd listing can't swing it. 7 days appears after a week. Worst case: what you'd lose if the price fell to what a vendor pays. Click a row for the item's details and price chart; Watch alerts you on big price moves.</div>${dropped}</div>`;
   },
+  async market() {
+    const id = +(sessionStorage.getItem('marketItem') || 0);
+    let d = null;
+    if (id) { try { d = await api('/api/market?id=' + id); } catch (e) { sessionStorage.removeItem('marketItem'); } }
+    return `<div class="panel"><h2>Market <small>search any item: price history, trend and market signals</small></h2>
+      <div class="ac"><input id="mq" placeholder="Type an item name…" autocomplete="off" spellcheck="false" value="${d ? esc(d.name) : ''}"><div id="ac-list" class="ac-list hidden"></div></div></div>
+      ${d ? marketBody(d) : '<div class="empty">Start typing an item name, then pick it from the list (arrow keys and Enter work too).</div>'}`;
+  },
   async search() {
     const q = sessionStorage.getItem('search') || '';
     const rows = q ? await api('/api/search?q=' + encodeURIComponent(q)) : [];
@@ -306,6 +456,7 @@ function wireView() {
   document.querySelectorAll('#view tr.row[data-item]').forEach((tr) => { if (!tr.dataset.key) tr.onclick = (e) => { if (!e.target.closest('a') && tr.dataset.item) openItem(+tr.dataset.item); }; });
   if (TAB === 'craft') { $('#cp').onchange = (e) => { sessionStorage.setItem('craftProf', e.target.value); render(); }; $('#cd').onchange = (e) => { sessionStorage.setItem('craftDoable', e.target.checked ? '1' : ''); render(); }; }
   document.querySelectorAll('.sells-only').forEach((c) => c.onchange = (e) => { sessionStorage.setItem('sellsOnly', e.target.checked ? '1' : '0'); render(); });
+  if (TAB === 'market') wireMarket();
   if (TAB === 'search') { const go = () => { sessionStorage.setItem('search', $('#sq').value); render(); }; $('#sb').onclick = go; $('#sq').onkeydown = (e) => { if (e.key === 'Enter') go(); }; $('#sq').focus(); }
   if (TAB === 'gather') { $('#fd').onchange = (e) => { sessionStorage.setItem('fishDoable', e.target.checked ? '1' : ''); render(); }; $('#fc').onchange = (e) => { sessionStorage.setItem('fishConfirmed', e.target.checked ? '1' : ''); render(); }; }
   if (TAB === 'invest') document.querySelectorAll('[data-watch]').forEach((b) => b.onclick = async (e) => {
@@ -420,7 +571,7 @@ async function openItem(id, opp) {
   const watching = (STATE.settings.watchlist || []).includes(id);
   let html = `<h2>${itemLink(it.id, it.name, it.quality)} <small>${esc(it.category)} · item ${it.id}</small></h2>
     <div class="controls"><a class="btn" href="${it.wowhead}" target="_blank" rel="noopener">Open on Wowhead (comments, tips)</a>
-    <button class="btn" id="watch">${watching ? 'Stop watching' : 'Watch price'}</button>
+    <button class="btn" id="watch">${watching ? 'Stop watching' : 'Watch price'}</button> <button class="btn" id="to-market">Market chart</button>
     <label class="chk">I gather <input type="number" id="farmrate" value="${farm}" placeholder="—"> per hour</label> <button class="btn" id="saverate">Save</button></div>
     ${it.tip ? `<div class="panel">💡 ${esc(it.tip.summary || '')}${it.tip.source ? `<div class="pill">from ${esc(it.tip.source)}</div>` : ''}</div>` : ''}
     ${opp ? oppDetail(opp) : ''}
@@ -445,6 +596,7 @@ async function openItem(id, opp) {
   if (it.made_by.length) html += `<h3>Made by</h3><table><tbody>${it.made_by.map((r) => `<tr><td>${esc(r.profession)}</td><td>${esc(r.name)}${r.count !== 1 ? ' ×' + r.count : ''}</td><td>${r.mats.map((m) => `${m.count}× ${itemLink(m.item_id, m.name)}`).join(', ')}</td><td class="pill">${r.thresholds ? r.thresholds.join('/') : ''}</td></tr>`).join('')}</tbody></table>`;
   if (it.used_in.length) html += `<h3>Used in <small>${it.used_in.length} recipes</small></h3><table><tbody>${it.used_in.slice(0, 30).map((r) => `<tr class="row" data-item="${r.product_id}"><td>${esc(r.profession)}</td><td>${r.count}× → ${itemLink(r.product_id, r.product)}</td></tr>`).join('')}</tbody></table>`;
   openDrawer(html);
+  $('#to-market').onclick = () => { sessionStorage.setItem('marketItem', id); TAB = 'market'; localStorage.setItem('tab', TAB); $('#drawer').classList.add('hidden'); render(); };
   $('#watch').onclick = async () => {
     const wl = new Set(STATE.settings.watchlist || []); watching ? wl.delete(id) : wl.add(id);
     await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({watchlist: [...wl]})});

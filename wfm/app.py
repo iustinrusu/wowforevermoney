@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import audit
 from . import investments as investments_mod
+from . import market as market_mod
 from . import profile as profile_mod
 from .alerts import EventLog, desktop_notify, diff_runs
 from .engine import Engine
@@ -299,6 +300,11 @@ class App:
             lambda iid: self.history.series(iid, days=KEEP_DAYS), s.get('watchlist'), float(s.get('ah_cut', 0.05)),
             s.get('sale_price_basis', 'min_buyout'))
 
+    def market(self, iid: int) -> dict:
+        gd = self.world.gamedata
+        return market_mod.build(iid, gd.items.get(iid) if gd else None, self.world.prices.get(iid),
+                                self.history.series(iid, days=KEEP_DAYS), time.time())
+
     def inventory(self) -> list[dict]:
         w = self.world
         r = self.result or {'best_use': {}}
@@ -409,9 +415,11 @@ def make_handler(app: App):
                 if url.path == '/api/opps':
                     return self._json(app.opps(qs))
                 if url.path == '/api/search':
-                    return self._json(app.search(qs.get('q', [''])[0]))
+                    return self._json(app.search(qs.get('q', [''])[0], min(60, int(qs.get('limit', ['60'])[0]))))
                 if url.path == '/api/item':
                     return self._json(app.item(int(qs.get('id', ['0'])[0])))
+                if url.path == '/api/market':
+                    return self._json(app.market(int(qs.get('id', ['0'])[0])))
                 if url.path == '/api/investments':
                     return self._json(app.investments())
                 if url.path == '/api/inventory':
