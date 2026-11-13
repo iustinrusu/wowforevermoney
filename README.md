@@ -46,6 +46,7 @@ Everything runs on your PC. The page is only reachable from your own computer, a
 | **Flips** | Buy from a vendor and sell on the AH; buy on the AH and sell to a vendor; cheap listings to relist. |
 | **Farming** | Every fishing spot, Forever data first. "Fish in …" rows are Forever data (your catches plus Wowhead Forever). "Classic table: …" rows are WoW Classic data, often wrong for Forever. Below that: what every farmed material is worth. |
 | **My bags** | Everything your characters carry (from Syndicator) and the best thing to do with each: sell on the AH, sell to a vendor, craft with it, or **open it**. |
+| **Investments** | Items that may rise in value as the server matures, with a **server progression gauge** (how much of each cloth tier sells: more Runecloth = more players near 60). The ideas are speculation from WoW Classic patterns; the prices, trends and recipes beside them are Forever data. |
 | **Item search** | Look up any of the ~32,000 items: prices, price history, who sells or drops it, recipes, where to fish it. |
 | **Changes** | A history of new top picks, snipes, watched price moves and newly spotted undervalued items. |
 | **Data health** | How old each data source is, and accuracy checks. Includes Classic fishing vs Forever, and "possibly undervalued items". The dot on the tab turns yellow or red when something needs attention. |
@@ -136,6 +137,8 @@ The **Data health** tab shows every source's age and version, plus the accuracy 
 - **Fishing** is Forever data first: your catches plus Wowhead Forever zone counts, one row per zone ("Fish in ..."). Classic tables appear only as "Classic table: ..." rows, are often wrong for Forever (Data health shows how far), and never reach Top picks. Gold/hour for fishing = worth per catch x catches per hour (casts/hour setting x your landed rate x fish kept).
 - **Fishing drop rates** come from Wowhead Forever's large samples. Your own catch logs are small, mix pools with open water and can be incomplete, so by default they only give your pace and got-away rate (Settings: "also use my own catch logs").
 - **Pools** (Floating Wreckage/Debris, schools) have to be found first, so fishing gold/hour is open water only. What pool loot (trunks, Stranglekelp, Rumsey Rum) adds is shown in each row's details (Settings: "count pool loot"). The addon records which catches came from pools, so your real pool share can be measured.
+
+- **Investments:** the candidate list and its reasons are hand-written in `data/investments.json` from how these items went in WoW Classic, so treat them as ideas, not Forever facts. Each id is checked against the item database; a mismatch is left out and listed. Shown per item: what buying one costs now, how that compares with TSM's 14-day realm average, the trend in this app's own price snapshots (first vs latest scan until there's a day of history; after that each end is a 12-hour median, so one odd listing can't swing it; a 7-day change after a week), region sold/day and sale rate, the worst case if the price fell to what a vendor pays, and how many Forever recipes use it. Reselling must beat the AH cut: with 5% the price has to rise 5.3% just to break even (deposits not counted).
 
 ## Known limits (read these)
 

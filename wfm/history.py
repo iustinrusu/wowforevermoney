@@ -57,10 +57,9 @@ class History:
     def series(self, item: int, days: int = 30) -> list[dict]:
         since = int(time.time()) - days * 86400
         with self._conn() as c:
-            cur = c.execute('SELECT ts, min_buyout, num_auctions, market, region_market, region_sale FROM prices '
-                            'WHERE item=? AND ts>=? ORDER BY ts', (item, since))
-            return [dict(zip(('ts', 'min_buyout', 'num_auctions', 'market', 'region_market', 'region_sale'), r))
-                    for r in cur.fetchall()]
+            cols = ('ts', 'min_buyout', 'num_auctions', 'market', 'region_market', 'region_sale', 'sold_per_day')
+            cur = c.execute(f'SELECT {", ".join(cols)} FROM prices WHERE item=? AND ts>=? ORDER BY ts', (item, since))
+            return [dict(zip(cols, r)) for r in cur.fetchall()]
 
     def previous(self, before_ts: int) -> dict[int, dict]:
         """The snapshot just before the given scan time."""

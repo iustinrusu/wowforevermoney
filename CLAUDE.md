@@ -35,7 +35,7 @@ memory of the project, not the chat.
   the generic User-Agent `WoWForeverMoney/0.1 (personal gold tool)`.
 - **Git:** remote is https://github.com/iustinrusu/wowforevermoney.git (branch `main`). Commit or push
   only when the user asks. Never commit `data/` (caches, price history, logs, settings) except the
-  hand-curated `data/tips.json` and `data/wowhead_forever_*.json`, and never commit the WoW account folder
+  hand-curated `data/tips.json`, `data/investments.json` and `data/wowhead_forever_*.json`, and never commit the WoW account folder
   number or other account identifiers.
 
 ## Run, test, audit
@@ -71,10 +71,11 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/pricing.py` | buy/sell quotes and flags; money formatting |
 | `wfm/engine.py` | all opportunity calculations and top-pick sections |
 | `wfm/history.py` | SQLite price history (one snapshot per realm scan, 45 days) |
+| `wfm/investments.py` | Investments tab: curated list (`data/investments.json`), trends, vendor floor, progression gauge |
 | `wfm/alerts.py` | change events and Windows toasts |
 | `wfm/tooltips.py` | slow cached Wowhead tooltip fetch for items missing from the game tables |
 | `wfm/audit.py` | cross-source accuracy checks (shown on the Data health tab) |
 | `wfm/app.py` | HTTP server, JSON API, SSE live updates, watcher loop |
 | `web/` | the page (index.html, app.js, style.css) |
 | `addon/ForeverMoneyBridge/` | our WoW addon; copied into AddOns when the app starts |
-| `data/` | caches and user state (not versioned, except the hand-curated `data/tips.json` and `data/wowhead_forever_*.json`) |
+| `data/` | caches and user state (not versioned, except the hand-curated `data/tips.json`, `data/investments.json` and `data/wowhead_forever_*.json`) |

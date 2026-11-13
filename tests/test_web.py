@@ -17,6 +17,12 @@ class WebTests(unittest.TestCase):
             if line.strip():
                 self.assertRegex(line, entry, 'a flag label is not a valid quoted string (unescaped quote?)')
 
+    def test_no_top_level_name_declared_twice(self):
+        # a second `const pct` broke the whole page on 2026-11-13 (SyntaxError: already declared)
+        names = re.findall(r'^(?:const|let|var|function|async function)\s+(\w+)', JS.read_text(encoding='utf-8'), re.M)
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        self.assertEqual(dupes, [], 'declared more than once at the top level')
+
 
 if __name__ == '__main__':
     unittest.main()

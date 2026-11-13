@@ -44,7 +44,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
    - Rows "Kill <mob> in <zone>" with value per kill, gold/hour (kills_per_hour) and level range, flagged when the user (level 42) is under-levelled.
    - Mention that rogue pickpocketing and coin drops aren't counted yet.
 
-3. **Investments tab**: items that may rise in value as WoW: Forever matures (it launched about a week before 2026-11-13).
+3. **DONE on 2026-11-13, skip this step.** **Investments tab**: items that may rise in value as WoW: Forever matures (it launched about a week before 2026-11-13).
    - **Curated list** data/investments.json (tracked in git). For each item: id, name, category, thesis (why it may rise, from how it went in WoW Classic and from player progression: raiding consumables, Fire Resistance, endgame enchanting, flasks), horizon, risk.
    - **Candidates** (check each id's name in the item database and drop any mismatch):
      - Black Lotus 13468; Elemental Fire/Earth/Water/Air 7068/7067/7070/7069

@@ -33,6 +33,15 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-13 Investments tab.** Curated list `data/investments.json` (34 items, Classic-informed theses,
+  labelled speculation); every id is checked against the item database and mismatches are dropped and shown.
+  Forever data beside it: buy cost now, vs TSM 14-day realm average, our own snapshot trend (first vs latest
+  under a day; 12-hour medians at each end after that; 7-day change after a week), region sold/day and sale
+  rate, vendor-floor worst case, Forever recipes that use it. Server progression gauge = each cloth tier's
+  share of region sold/day; the "then" comparison waits for a day of history because region sold/day only
+  changes about daily. Recipe claims in the theses were checked against Forever's recipe table (Major Healing
+  Potion doesn't use Mountain Silversage; Runecloth Bag uses bolts); enchants aren't in that table, so the
+  Crusader claims are worded as Classic.
 - **2026-11-13 Scheduled tasks are reminders only (user):** no scheduled task runs work by itself. Postponed
   work goes into a plan file in `docs/plans/`; a one-time reminder points to it and the user starts it.
 - **2026-11-13 Item database = Forever server data first; your game client is the referee.** Source priority:
@@ -165,8 +174,7 @@ Postponed by the usage rule; the plan file has the full brief. Nothing runs by i
    zones; gold/hour from a kills_per_hour setting, measured when the addon has data.
 2. **Mob farming:** Wowhead Forever "Dropped by" tabs for cloth, elementals and the best BoE drops; value per
    kill, plus skinning.
-3. **Investments tab:** a curated Classic-informed list with Forever prices, our price trends, the vendor
-   floor, and a server progression gauge from cloth-tier volumes. Clearly labelled speculation.
+3. ~~Investments tab~~: done 2026-11-13 (see Decisions).
 
 ## Next session plan (plan `docs/plans/review-and-wowhead.md`; reminder 2026-11-14 10:00)
 
@@ -209,6 +217,9 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-13** Investments tab (`wfm/investments.py`, `/api/investments`, `data/investments.json`), price
+  history series now include region sold/day; page-script test for names declared twice. Tests: 81.
 
 - **2026-11-13** Scheduled tasks turned into reminders only (user's request). Both postponed briefs saved as
   `docs/plans/skinning-mobs-investments.md` and `docs/plans/review-and-wowhead.md`; usage rule updated.

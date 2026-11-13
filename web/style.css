@@ -58,4 +58,11 @@ label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--mu
 .examples { color: var(--muted); font-size: 12px; margin: 4px 0 0 0; padding-left: 18px; }
 svg.spark { width: 100%; height: 120px; background: var(--panel2); border-radius: 8px; }
 .legend span { margin-right: 12px; font-size: 12px; }
+.banner { border-left: 3px solid var(--warn); }
+.thesis { font-size: 12.5px; margin: 2px 0; max-width: 560px; }
+.up { color: var(--good); } .down { color: var(--bad); }
+.tier { display: grid; grid-template-columns: 230px 1fr 60px 170px; gap: 10px; align-items: center; padding: 3px 0; }
+.bar { background: var(--panel2); border-radius: 4px; height: 10px; overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--gold); }
+@media (max-width: 700px) { .tier { grid-template-columns: 1fr 60px; } .tier .bar, .tier .pill.num { display: none; } }
 @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; } main { padding: 10px; } }

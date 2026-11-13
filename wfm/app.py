@@ -12,10 +12,11 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import audit
+from . import investments as investments_mod
 from . import profile as profile_mod
 from .alerts import EventLog, desktop_notify, diff_runs
 from .engine import Engine
-from .history import History
+from .history import KEEP_DAYS, History
 from .paths import DATA, ROOT, WEB, GamePaths, find_wow_dir
 from .pricing import ah_sell, fmt_money, proceeds
 from .settings import Settings
@@ -289,6 +290,14 @@ class App:
             'tip': self.tips.get(str(iid)),
         }
 
+    def investments(self) -> dict:
+        s = self.effective_settings()[0]
+        gd = self.world.gamedata
+        return investments_mod.build(
+            investments_mod.load_list(), gd.items if gd else {}, gd.recipes if gd else [], self.world.prices,
+            lambda iid: self.history.series(iid, days=KEEP_DAYS), s.get('watchlist'), float(s.get('ah_cut', 0.05)),
+            s.get('sale_price_basis', 'min_buyout'))
+
     def inventory(self) -> list[dict]:
         w = self.world
         r = self.result or {'best_use': {}}
@@ -402,6 +411,8 @@ def make_handler(app: App):
                     return self._json(app.search(qs.get('q', [''])[0]))
                 if url.path == '/api/item':
                     return self._json(app.item(int(qs.get('id', ['0'])[0])))
+                if url.path == '/api/investments':
+                    return self._json(app.investments())
                 if url.path == '/api/inventory':
                     return self._json(app.inventory())
                 if url.path == '/api/events':

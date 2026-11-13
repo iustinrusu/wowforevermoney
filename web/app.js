@@ -14,6 +14,7 @@ function money(c) {
   return `<span class="money${neg ? ' neg' : ''}">${neg ? '-' : ''}${out.trim()}</span>`;
 }
 const num = (v, d = 1) => (v === null || v === undefined) ? '–' : Number(v).toLocaleString(undefined, {maximumFractionDigits: d});
+const chg = (v, d = 0, color = true) => (v === null || v === undefined) ? '<span class="pill">–</span>' : `<span class="${color ? (v > 0.005 ? 'up' : (v < -0.005 ? 'down' : '')) : ''}">${v > 0 && color ? '+' : ''}${(v * 100).toFixed(d)}%</span>`;
 const ago = (ts) => { if (!ts) return 'never'; const s = Date.now() / 1000 - ts; if (s < 90) return `${Math.round(s)}s ago`; if (s < 5400) return `${Math.round(s / 60)} min ago`; if (s < 172800) return `${(s / 3600).toFixed(1)} h ago`; return `${(s / 86400).toFixed(1)} days ago`; };
 const KIND = {farm_zone: 'Farming spot', craft: 'Craft', vendor_flip: 'Vendor → AH', ah_to_vendor: 'AH → vendor', realm_dip: 'Cheap relist', gather: 'Farm', fishing_zone: 'Fishing spot', fishing_spot: 'Fishing spot'};
 const FLAGS = {
@@ -59,6 +60,8 @@ const FLAGS = {
   open_it: ['good', 'open it', 'Worth more opened than sold (expected value of its Forever contents at current prices)'],
   locked: ['', 'locked', 'Needs Lockpicking or a key to open'],
   no_value: ['bad', 'no known value', 'No AH price, vendor price, recipe or contents known'],
+  short_history: ['', 'short history', 'Under a day of our own price snapshots: the trend is first vs latest scan and can swing a lot'],
+  slow_sale_rate: ['warn', 'slow to sell', 'Under 10% of listings sell (TSM region sale rate): you may wait a long time to sell'],
   ah_price_doubtful: ['warn', 'AH price doubtful', 'Listed with no recorded sales or far above the region: counted at its sale price instead'],
 };
 const flagHtml = (flags) => (flags || []).map((f) => { const d = FLAGS[f] || ['', f, f]; return `<span class="flag ${d[0]}" title="${esc(d[2])}">${esc(d[1])}</span>`; }).join('');
@@ -191,6 +194,36 @@ const VIEWS = {
       ${c.items.map((i) => `<tr class="row" data-item="${i.item_id}"><td>${itemLink(i.item_id, i.name, i.quality)}</td><td class="num">${i.count}</td><td>${esc(i.action)}</td><td class="num">${money(i.unit_value)}</td><td class="num">${money(i.total)}</td><td>${flagHtml(i.flags)}</td></tr>`).join('')}
       </tbody></table></div></div>`).join('');
   },
+  async invest() {
+    const d = await api('/api/investments');
+    const p = d.progression || {tiers: []};
+    const tiers = p.tiers.map((t) => `<div class="tier"><div>${itemLink(t.id, t.name, 1)} <span class="pill">levels ${esc(t.levels)}</span></div>
+      <div class="bar"><span style="width:${(t.share * 100).toFixed(1)}%"></span></div><div class="num">${chg(t.share, 1, false)}</div>
+      <div class="num pill">${num(t.sold_per_day, 0)}/day${t.share_then !== null && t.share_then !== undefined ? ` · was ${(t.share_then * 100).toFixed(1)}%` : ''}</div></div>`).join('');
+    const risk = {low: 'good', medium: 'warn', high: 'bad'};
+    const rows = d.items.map((r) => {
+      const t = r.trend || {};
+      const span = t.scans ? `${t.scans} snapshots, ${new Date(t.from_ts * 1000).toLocaleString()} to ${new Date(t.to_ts * 1000).toLocaleString()}` : 'not enough snapshots yet';
+      return `<tr class="row" data-item="${r.item_id}"><td>${itemLink(r.item_id, r.name, r.quality)} <span class="pill">${esc(r.category)}</span>
+        <div class="thesis">${esc(r.thesis)}</div><div class="pill">When: ${esc(r.horizon)} · Risk: ${esc(r.risk_note)}</div>
+        ${r.used_in_count ? `<div class="pill" title="${esc(r.used_in.join(', '))}">Used in ${r.used_in_count} Forever recipes</div>` : ''}</td>
+        <td class="num">${money(r.buy)}<div class="pill">${num(r.listings, 0)} listed</div></td>
+        <td class="num" title="Lowest listing compared with TSM's 14-day realm market value">${chg(r.vs_market)}<div class="pill">avg ${money(r.market)}</div></td>
+        <td class="num" title="${esc(span)}">${chg(t.change)}</td>
+        <td class="num">${chg(t.change_7d)}</td>
+        <td class="num">${num(r.sold_per_day, 0)}<div class="pill">${r.sale_rate !== null && r.sale_rate !== undefined ? (r.sale_rate * 100).toFixed(0) + '% sell' : ''}</div></td>
+        <td class="num" title="What you'd lose if the price fell to what a vendor pays">${chg(r.downside)}<div class="pill">vendor ${money(r.vendor_sell)}</div></td>
+        <td><span class="flag ${risk[r.risk] || ''}">${esc(r.risk)} risk</span>${flagHtml(r.flags)}</td>
+        <td><button class="btn" data-watch="${r.item_id}">${r.watching ? 'Watching' : 'Watch'}</button></td></tr>`;
+    }).join('');
+    const dropped = d.dropped.length ? `<div class="hint">Left out because the item id no longer matches its name: ${d.dropped.map((x) => `${x.id} (expected ${esc(x.expected)}, found ${esc(x.found || 'nothing')})`).join(', ')}</div>` : '';
+    return `<div class="panel banner"><b>Speculation, not advice.</b> The ideas below come from how these items went in WoW Classic and from how players progress, not from Forever data, and nothing here promises a return. The prices, trends, sales and recipes shown are Forever data (TSM, this app's own price history, Forever's recipe table). Buying to resell must beat the ${num(STATE.settings.ah_cut * 100, 0)}% AH cut: the price has to rise ${(d.break_even * 100).toFixed(1)}% just to break even, before deposits.</div>
+      <div class="panel"><h2>How far the server has levelled <small>each cloth tier's share of the region's cloth sales per day</small></h2>${tiers}
+      <div class="hint">More Runecloth traded means more players near level 60, when raid and endgame demand starts. A rough sign only: sales mix supply and demand. ${p.then_ts ? `"was" = at the first price snapshot, ${new Date(p.then_ts * 1000).toLocaleDateString()}.` : 'A comparison over time appears after a day of price history.'}</div></div>
+      <div class="panel"><h2>Candidates <small>list checked ${esc(d.checked || '?')} · price history since ${d.history_from ? new Date(d.history_from * 1000).toLocaleString() : 'none yet'}</small></h2>
+      <div class="tablewrap"><table><thead><tr><th>Item and idea</th><th class="num">Buy now</th><th class="num">vs 14-day avg</th><th class="num">Trend</th><th class="num">7 days</th><th class="num">Sold/day (region)</th><th class="num">Worst case</th><th>Risk</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="hint">Trend: our own price snapshots (lowest listing); with a day or more of history each end is a 12-hour median, so one odd listing can't swing it. 7 days appears after a week. Worst case: what you'd lose if the price fell to what a vendor pays. Click a row for the item's details and price chart; Watch alerts you on big price moves.</div>${dropped}</div>`;
+  },
   async search() {
     const q = sessionStorage.getItem('search') || '';
     const rows = q ? await api('/api/search?q=' + encodeURIComponent(q)) : [];
@@ -265,6 +298,13 @@ function wireView() {
   if (TAB === 'craft') { $('#cp').onchange = (e) => { sessionStorage.setItem('craftProf', e.target.value); render(); }; $('#cd').onchange = (e) => { sessionStorage.setItem('craftDoable', e.target.checked ? '1' : ''); render(); }; }
   if (TAB === 'search') { const go = () => { sessionStorage.setItem('search', $('#sq').value); render(); }; $('#sb').onclick = go; $('#sq').onkeydown = (e) => { if (e.key === 'Enter') go(); }; $('#sq').focus(); }
   if (TAB === 'gather') { $('#fd').onchange = (e) => { sessionStorage.setItem('fishDoable', e.target.checked ? '1' : ''); render(); }; $('#fc').onchange = (e) => { sessionStorage.setItem('fishConfirmed', e.target.checked ? '1' : ''); render(); }; }
+  if (TAB === 'invest') document.querySelectorAll('[data-watch]').forEach((b) => b.onclick = async (e) => {
+    e.stopPropagation();
+    const id = +b.dataset.watch, wl = new Set(STATE.settings.watchlist || []), on = !wl.has(id);
+    if (on) wl.add(id); else wl.delete(id);
+    await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({watchlist: [...wl]})});
+    await loadState(); toast(on ? "Watching: you'll get an alert on big price moves" : 'No longer watching'); render();
+  });
   if (TAB === 'health') $('#refresh').onclick = async () => { await api('/api/refresh', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}); toast('Checking for updates…'); };
   if (TAB === 'settings') {
     $('#notif').onclick = () => Notification.requestPermission().then((p) => toast('Notifications: ' + p));
