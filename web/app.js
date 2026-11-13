@@ -81,10 +81,10 @@ function oppTable(rows, opts = {}) {
   if (!rows.length) return '<div class="empty">Nothing here right now.</div>';
   const id = opts.id || 't' + Math.random().toString(36).slice(2, 7);
   const cols = opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'flags'];
-  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Per day', daily: 'Per day profit', gph: 'Gold / hour', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
+  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Per day', daily: 'Per day profit', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
   const st = sortState[id];
   if (st) rows = [...rows].sort((a, b) => ((a[st.k] ?? -1e18) < (b[st.k] ?? -1e18) ? -1 : 1) * (st.dir));
-  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph']);
+  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools']);
   const head = cols.map((c) => `<th data-k="${c}" class="${numeric.has(c) ? 'num' : ''}">${H[c] || c}</th>`).join('');
   const body = rows.map((o) => {
     const cells = cols.map((c) => {
@@ -122,6 +122,10 @@ function wireTable(id, rows, opts) {
   refreshTooltips();
 }
 
+// gold/hour if you also fish the pools you come across (open water + pool loot; time spent finding pools not included)
+const withPools = (rows) => rows.map((o) => ({...o, gph_pools: o.detail && o.detail.forever ? (o.detail.gph_with_pools || o.gph) : null}));
+const POOL_HINT = '"Gold / hour with pools" adds the trunks, Stranglekelp and Rumsey Rum from the pools you come across. It doesn\'t count the time spent finding pools, so treat it as a ceiling.';
+
 // ---------- views ----------
 const VIEWS = {
   async top() {
@@ -130,7 +134,8 @@ const VIEWS = {
     return `
       <div class="hint">${who ? `Playing <b>${esc(who)}</b> (detected)` : 'Using your manual settings'}: ${num(e.gold, 2)}g to invest, level ${e.level}, realm ${esc(e.realm)}. Everything updates when TSM syncs or you log out / /reload. Click any row for details.</div>
       <div class="panel"><h2>Do these now <small>things you can do today, ranked by expected profit per day</small></h2>${oppTable(t.now || [])}</div>
-      <div class="panel"><h2>Fishing & farming spots <small>gold per hour, from your own catch log and rates</small></h2>${oppTable(t.hourly || [], {cols: ['title', 'profit_unit', 'gph', 'flags'], export: false})}
+      <div class="panel"><h2>Fishing & farming spots <small>gold per hour: open water, and with the pools you come across</small></h2>${oppTable(withPools(t.hourly || []), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false})}
+        <div class="hint">${POOL_HINT}</div>
         <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. "measured" uses real time from ForeverMoneyBridge; otherwise ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
       <div class="panel"><h2>Snipes <small>single cheap listings at the last scan; check them in game first</small></h2>${oppTable(t.snipes || [], {cols: ['title', 'kind', 'profit_unit', 'cost_unit', 'flags']})}</div>
       <div class="grid2">
@@ -164,7 +169,8 @@ const VIEWS = {
       <div class="hint">"Fish in …" rows are Forever data: your own catches (ForeverAngler, ForeverMoneyBridge) and Wowhead Forever counts. "Classic table: …" rows are WoW Classic 1.12 tables (cMaNGOS): <b>not Forever data</b>, often wrong for Forever (Data health shows how far off), and never in Top picks. Click a row for the fish list and every source.</div>
       <div class="controls"><label class="chk"><input type="checkbox" id="fd" ${fishDoable ? 'checked' : ''}> only spots I can fish now</label>
       <label class="chk"><input type="checkbox" id="fc" ${fishConfirmed ? 'checked' : ''}> hide Classic tables</label></div>
-      ${oppTable(fz, {cols: ['title', 'profit_unit', 'gph', 'flags'], export: false, heads: {profit_unit: 'Per catch'}})}</div>
+      ${oppTable(withPools(fz), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false, heads: {profit_unit: 'Per catch'}})}
+      <div class="hint">${POOL_HINT}</div></div>
       <div class="panel"><h2>What farmed materials are worth <small>per unit: best of selling on AH, to a vendor, or crafting it</small></h2>
       <div class="hint">Set how many you gather per hour in an item's details to get gold/hour.</div>${oppTable(g, {cols: ['title', 'profession', 'profit_unit', 'units_day', 'gph', 'flags']})}</div>`;
   },

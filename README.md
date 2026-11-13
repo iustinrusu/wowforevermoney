@@ -62,7 +62,7 @@ Everything runs on your PC. The page is only reachable from your own computer, a
 - **small sample**: not many catches or loots logged yet.
 - **assumed casts/hour**: fishing pace from your setting. It becomes **measured** after about 10 minutes of fishing with the addon on.
 - **vendor price from game files** / **black market vendor**: open that vendor once with the addon on to record the real price.
-- **pool loot extra**: this gold/hour is open water only. The details show what pools would add.
+- **pool loot extra**: "Gold / hour" is open water only. The "Gold / hour with pools" column adds the pools you come across (not counting the time spent finding them, so it's a ceiling).
 - **slow seller**, **can't afford**, **snapshot**: check before acting.
 
 ## The addon: ForeverMoneyBridge
