@@ -9,13 +9,11 @@ characters' data. About 15 minutes the first time.
 - **Windows** with **WoW: Forever** installed.
 - **TradeSkillMaster (TSM):** the TSM addon in game *and* the TSM desktop app (tradeskillmaster.com),
   logged in and running. The app gets auction prices from it, about once an hour.
-- **Python 3.13.** Open PowerShell and run:
-
-  ```bash
-  winget install Python.Python.3.13
-  ```
-
-  (Or install it from python.org and tick "Add python.exe to PATH".)
+- **Python 3.13 or newer.** No need to install it first: if `start.bat` doesn't find it, it offers to install
+  it for you (type Y). That uses winget, Windows' own app installer, and takes a minute or two. Then close the
+  window and double-click `start.bat` again. Without winget, install it from python.org and tick
+  "Add python.exe to PATH". (Typing `python` in a fresh Windows opens the Microsoft Store: that's only a
+  shortcut, not Python.)
 
 ## 2. Get the app
 
@@ -72,7 +70,7 @@ The app reads these if you have them (all on CurseForge):
 - **The page says "Lost connection":** the black window was closed. Start `start.bat` again.
 - **Prices are old:** make sure the TSM desktop app is running and logged in.
 - **Your character isn't detected:** check ForeverMoneyBridge is ticked in AddOns, then `/reload`.
-- **`start.bat` closes immediately:** Python isn't installed or isn't on PATH; redo step 1.
+- **`start.bat` says Python isn't installed right after installing it:** close the window and start it again.
 - **Optional extra:** Classic fishing tables for zones with no Forever data yet. Run this once in the app
   folder (downloads ~13 MB):
 

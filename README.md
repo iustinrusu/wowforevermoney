@@ -9,7 +9,7 @@ Everything runs on your PC. The page is only reachable from your own computer, a
 ## First-time setup
 
 1. **You need:**
-   - **Python 3.13.** If it's missing, install it with `winget install Python.Python.3.13`.
+   - **Python 3.13 or newer.** If it's missing, `start.bat` offers to install it with winget (type Y).
    - **The TSM desktop app**, running and logged in. It downloads auction prices about once an hour.
    - **WoW: Forever.** The app finds the install through TSM's settings or the usual install folders.
 2. **Start the app:** double-click `start.bat`.

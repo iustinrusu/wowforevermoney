@@ -218,6 +218,11 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Change log
 
+- **2026-11-13** `start.bat` finds Python 3.13+ (per-user and all-users installs, the `py` launcher, PATH;
+  skips the Microsoft Store "python" shortcut) and, if missing, offers `winget install --id Python.Python.3.13`.
+  Tested: found here; missing + No; missing + Yes (winget stubbed). The `py` launcher branch is untested (no
+  launcher on this PC), and the real winget install wasn't run.
+
 - **2026-11-13** `install_addon.bat`: installs ForeverMoneyBridge without Python or the app (finds WoW via
   TSM.cfg, the Battle.net registry entry, common folders, or asks; keeps the app-written Checks.lua).
   Tested: spaces and "(x86)" in paths (this broke cmd blocks at first; paths are now kept out of blocks),
