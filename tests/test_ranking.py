@@ -49,6 +49,14 @@ class Ranking(unittest.TestCase):
         self.assertEqual(self.e.rank(opp(kind='fishing_spot', gph=50000, daily=0, cost_unit=0))[1]['base'], 50000)
         self.assertEqual(self.e.rank(opp(kind='realm_dip', profit_unit=700, daily=700))[1]['base'], 700)
 
+    def test_one_pick_per_shared_cooldown(self):
+        # every Forever transmute shares "Transmute - Alchemy": doing one blocks the others
+        a = opp(key='a', detail={'cooldown_group': 'Transmute - Alchemy'})
+        b = opp(key='b', detail={'cooldown_group': 'Transmute - Alchemy'})
+        c = opp(key='c', detail={'cooldown_group': None})
+        d = opp(key='d', detail={'cooldown_group': 'Other'})
+        self.assertEqual([o.key for o in Engine._one_per_cooldown([a, c, b, d])], ['a', 'c', 'd'])
+
     def test_preferred_profession_bonus(self):
         self.assertAlmostEqual(self.score(preferred=True), self.score() * 1.1)
 

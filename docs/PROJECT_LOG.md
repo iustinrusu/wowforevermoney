@@ -38,8 +38,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   10+ minutes caps crafts a day at 24 h / cooldown (crafts and the material best-use volume). Forever values:
   Transmute: Arcanite and Legionite 47 h, elemental transmutes 23 h, Mooncloth 95 h, Refined Scale of Onyxia 2 h,
   Iron to Gold and Mithril to Truesilver 1 h, Transmute: Elemental Fire 10 min. Arcanite potential 38.8g/day ->
-  20.3g/day (#1 -> #5 on Crafting). Shared transmute cooldowns (SpellCategories) aren't modelled: each
-  transmute is capped on its own.
+  20.3g/day (#1 -> #5 on Crafting).
+- **2026-11-14 Transmutes share one cooldown in Forever** (user asked to check; SpellCategories 345 KB +
+  SpellCategory 9 KB from wago.tools): category 310 "Transmute - Alchemy" holds Arcanite, Legionite, the eight
+  elemental transmutes, Elemental Fire and Refined Scale of Onyxia; each starts the shared cooldown for its own
+  duration. Iron to Gold, Mithril to Truesilver and Mooncloth have their own cooldowns. Rows get a "shared
+  cooldown" flag and a Cooldown column; Top picks keep only the best recipe per shared cooldown.
 - **2026-11-14 Sources graded by in-game checks.** The audit showed the hotfix cache's sell price for items only
   it has (new Forever items) was wrong for 310 of 342 checked (91%; all other fields matched; no consistent
   ratio, not explained by PriceVariance/PriceRandomValue, one version per record), while hotfix updates to
@@ -271,6 +275,9 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Cooldown column (shown where a row has one); shared transmute cooldown from SpellCategories.
+  Tests: 118.
 
 - **2026-11-14** Recipe cooldowns from SpellCooldowns cap crafts per day ("cooldown" flag, shown in details).
   Tests: 117.

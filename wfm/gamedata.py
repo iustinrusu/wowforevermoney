@@ -11,7 +11,7 @@ from pathlib import Path
 from .paths import DATA
 
 TABLES = ['ItemSparse', 'Item', 'SkillLine', 'SkillLineAbility', 'SpellEffect', 'SpellReagents', 'SpellName',
-          'AreaTable', 'SpellCooldowns']
+          'AreaTable', 'SpellCooldowns', 'SpellCategories', 'SpellCategory']
 USER_AGENT = 'WoWForeverMoney/0.1 (personal gold tool)'
 CREATE_ITEM = '24'
 ITEM_FLAG_HAS_LOOT = 0x4   # ItemSparse Flags_0: the item can be opened (has its own loot)
@@ -121,6 +121,7 @@ class Recipe:
     trivial_high: int                    # grey
     min_rank: int
     cooldown_ms: int = 0                 # SpellCooldowns (e.g. Transmute: Arcanite 47 h, Mooncloth 95 h)
+    cooldown_group: str = ''             # shared cooldown (SpellCategories), e.g. 'Transmute - Alchemy'
 
 
 @dataclass
@@ -191,6 +192,16 @@ def load(build: str) -> GameData:
                     sid = _int(r.get('SpellID'))
                     cooldowns[sid] = max(cooldowns.get(sid, 0), ms)
 
+    # a category cooldown is shared: casting one spell of the category starts the cooldown for all of them
+    # (verified 2026-11-14: every Forever transmute is in category 310 'Transmute - Alchemy')
+    groups: dict[int, str] = {}
+    if (folder / 'SpellCategories.csv').exists() and (folder / 'SpellCategory.csv').exists():
+        cat_names = {_int(r['ID']): r.get('Name_lang', '') for r in _rows(folder, 'SpellCategory')}
+        for r in _rows(folder, 'SpellCategories'):
+            cat = _int(r.get('Category'))
+            if cat and _int(r.get('DifficultyID')) == 0:
+                groups[_int(r.get('SpellID'))] = cat_names.get(cat) or f'category {cat}'
+
     seen = set()
     for r in _rows(folder, 'SkillLineAbility'):
         line = _int(r.get('SkillLine'))
@@ -205,7 +216,15 @@ def load(build: str) -> GameData:
             spell_id=spell, name=names.get(spell, ''), profession=gd.professions[line], skill_line=line,
             product_id=product, product_count=count, reagents=reagents.get(spell, []),
             trivial_low=_int(r.get('TrivialSkillLineRankLow')), trivial_high=_int(r.get('TrivialSkillLineRankHigh')),
-            min_rank=_int(r.get('MinSkillLineRank')), cooldown_ms=cooldowns.get(spell, 0)))
+            min_rank=_int(r.get('MinSkillLineRank')), cooldown_ms=cooldowns.get(spell, 0),
+            cooldown_group=groups.get(spell, '') if cooldowns.get(spell, 0) else ''))
+    shared: dict[str, int] = {}
+    for rec in gd.recipes:
+        if rec.cooldown_group:
+            shared[rec.cooldown_group] = shared.get(rec.cooldown_group, 0) + 1
+    for rec in gd.recipes:      # a category used by a single recipe isn't shared with anything
+        if rec.cooldown_group and shared[rec.cooldown_group] < 2:
+            rec.cooldown_group = ''
     return gd
 
 

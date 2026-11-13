@@ -329,6 +329,8 @@ class Engine:
                 flags.append('unverified_recipe')
             if per_cooldown is not None:
                 flags.append('cooldown')
+                if getattr(r, 'cooldown_group', ''):
+                    flags.append('shared_cooldown')
             if not exact:
                 flags.append('skill_estimated')
             if channel == 'vendor':
@@ -362,7 +364,10 @@ class Engine:
                         'req_level': product.req_level if product else 0,
                         'sold_per_day': sold_per_day(self.price(r.product_id)),
                         'daily_if_affordable': int(profit * crafts_uncapped), 'limited_by_mat': mat_limit,
-                        'cooldown_hours': round(r.cooldown_ms / 3_600_000, 2) if per_cooldown is not None else None}))
+                        'cooldown_hours': round(r.cooldown_ms / 3_600_000, 2) if per_cooldown is not None else None,
+                        'cooldown_group': getattr(r, 'cooldown_group', '') or None,
+                        'cooldown_shared_with': sum(1 for x in self.gd.recipes if x is not r and getattr(r, 'cooldown_group', '')
+                                                    and getattr(x, 'cooldown_group', '') == r.cooldown_group)}))
         return out
 
     def vendor_flips(self) -> list[Opportunity]:
@@ -942,6 +947,19 @@ class Engine:
                 'undervalued': self.undervaluation_watch()}
 
     @staticmethod
+    def _one_per_cooldown(ranked: list[Opportunity]) -> list[Opportunity]:
+        """Keep only the best pick of each shared cooldown: doing one transmute blocks the others."""
+        seen, out = set(), []
+        for o in ranked:
+            g = o.detail.get('cooldown_group')
+            if g:
+                if g in seen:
+                    continue
+                seen.add(g)
+            out.append(o)
+        return out
+
+    @staticmethod
     def _varied(ranked: list[Opportunity], n: int, per_kind: int) -> list[str]:
         """The best n keys, at most per_kind of each kind (so one activity can't fill a section)."""
         seen: dict[str, int] = {}
@@ -986,10 +1004,10 @@ class Engine:
         # sections about later rank by what a pick earns once you have the gold and skill for it
         later_key = lambda o: self.rank(o, later=True)[0]
         return {
-            'now': [o.key for o in sorted(own, key=key, reverse=True)[:n]],
-            'level_up': [o.key for o in sorted((o for o in later if not o.doable and 'other_profession' not in o.flags),
-                                               key=later_key, reverse=True)[:n]],
-            'switch': [o.key for o in sorted(stretch, key=later_key, reverse=True)[:5]],
+            'now': [o.key for o in self._one_per_cooldown(sorted(own, key=key, reverse=True))[:n]],
+            'level_up': [o.key for o in self._one_per_cooldown(sorted(
+                (o for o in later if not o.doable and 'other_profession' not in o.flags), key=later_key, reverse=True))[:n]],
+            'switch': [o.key for o in self._one_per_cooldown(sorted(stretch, key=later_key, reverse=True))[:5]],
             'hourly': self._varied(sorted(hourly, key=key, reverse=True), n, per_kind=5),
             'snipes': [o.key for o in sorted(speculative, key=lambda o: ('cant_afford' in o.flags, -o.score))[:n]],
         }

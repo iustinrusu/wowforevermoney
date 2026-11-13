@@ -70,6 +70,7 @@ const FLAGS = {
   skill_classic_rule: ['', 'skill: Classic rule', 'Skinning skill per mob level uses the WoW Classic rule (level x 5 above level 20); Forever may differ'],
   assumed_kill_rate: ['warn', 'assumed skins/hour', 'No timed skinning logs yet (ForeverMoneyBridge); uses your skins-per-hour setting'],
   cooldown: ['', 'cooldown', 'The recipe has a cooldown in the game data (Transmute: Arcanite 47 hours, Mooncloth 95 hours): per day counts only the crafts it allows'],
+  shared_cooldown: ['warn', 'shared cooldown', 'Shares one cooldown with other recipes (all Forever transmutes share Transmute - Alchemy): doing one blocks the rest, so Top picks only suggest the best of them'],
   ah_price_doubtful: ['warn', 'AH price doubtful', 'Listed with no recorded sales or far above the region: counted at its sale price instead'],
 };
 const rankCell = (r) => `<td class="rk">${r <= 3 ? `<span class="medal m${r}" title="${['', 'Gold', 'Silver', 'Bronze'][r]}: #${r}">${r}</span>` : `<span class="rank">${r}</span>`}</td>`;
@@ -98,13 +99,14 @@ async function loadState() {
 function oppTable(rows, opts = {}) {
   if (!rows.length) return `<div class="empty">${esc(opts.empty || 'Nothing here right now.')}</div>`;
   const id = opts.id || 't' + Math.random().toString(36).slice(2, 7);
-  const cols = (opts.rank === false ? [] : ['rank']).concat(opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'flags']);
+  const cols = (opts.rank === false ? [] : ['rank']).concat(opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'cooldown', 'flags'])
+    .filter((c) => c !== 'cooldown' || rows.some((o) => (o.detail || {}).cooldown_hours));   // only where a row has one
   const ranks = opts.ranks || new Map(rows.map((o, i) => [o.key, i + 1]));
-  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Per day', daily: 'Per day profit', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', sells: 'Sells (region)', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
+  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Per day', daily: 'Per day profit', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', sells: 'Sells (region)', cooldown: 'Cooldown', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
   const st = sortState[id];
-  const sortVal = (o) => st.k === 'rank' ? -ranks.get(o.key) : (st.k === 'sells' ? ((o.detail || {}).liquidity || {}).sold_per_day : o[st.k]);
+  const sortVal = (o) => st.k === 'rank' ? -ranks.get(o.key) : (st.k === 'sells' ? ((o.detail || {}).liquidity || {}).sold_per_day : (st.k === 'cooldown' ? (o.detail || {}).cooldown_hours : o[st.k]));
   if (st) rows = [...rows].sort((a, b) => ((sortVal(a) ?? -1e18) < (sortVal(b) ?? -1e18) ? -1 : 1) * (st.dir));
-  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells']);
+  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells', 'cooldown']);
   const head = cols.map((c) => c === 'rank' ? `<th data-k="rank" class="rk" title="${esc(RANK_TIP)}">#</th>` : `<th data-k="${c}" class="${numeric.has(c) ? 'num' : ''}">${H[c] || c}</th>`).join('');
   const body = rows.map((o) => {
     const cells = cols.map((c) => {
@@ -114,6 +116,7 @@ function oppTable(rows, opts = {}) {
         return `<td>${label}${o.needs ? `<div class="needs">needs ${esc(o.needs)}</div>` : ''}${o.tip ? `<div class="pill">💡 ${esc(o.tip)}</div>` : ''}</td>`;
       }
       if (c === 'rank') return rankCell(ranks.get(o.key));
+      if (c === 'cooldown') { const dd = o.detail || {}, h = dd.cooldown_hours; return h ? `<td class="num" title="${esc(dd.cooldown_group ? 'Shared cooldown: ' + dd.cooldown_group : 'Recipe cooldown from the game data')}">${h >= 1 ? num(h, 0) + ' h' : num(h * 60, 0) + ' min'}${dd.cooldown_group ? ' 🔗' : ''}<div class="pill">max ${num(24 / h, h > 12 ? 2 : 0)}/day</div></td>` : '<td class="num pill">–</td>'; }
       if (c === 'flags') return `<td>${flagHtml(o.flags)}</td>`;
       if (c === 'units_day') return `<td class="num">${num(o.units_day)}</td>`;
       if (c === 'sells') { const l = (o.detail || {}).liquidity; return l ? `<td class="num" title="${esc(l.why || 'sells well')}">${num(l.sold_per_day, 0)}/day<div class="pill">${l.sale_rate === null || l.sale_rate === undefined ? '' : (l.sale_rate * 100).toFixed(0) + '% sell · '}${l.listed} listed</div></td>` : '<td class="num pill">–</td>'; }
@@ -313,8 +316,8 @@ const VIEWS = {
         <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. "measured" uses real time from ForeverMoneyBridge; otherwise ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
       <div class="panel"><h2>Snipes <small>single cheap listings at the last scan; check them in game first</small></h2>${oppTable(t.snipes || [], {cols: ['title', 'kind', 'profit_unit', 'cost_unit', 'sells', 'flags']})}</div>
       <div class="grid2">
-        <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(ifAffordable(t.level_up || []), {cols: ['title', 'profit_unit', 'daily', 'sells', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: noProfs ? 'No professions known yet: see the note at the top.' : 'Nothing worth it a few skill points away right now.'})}</div>
-        <div class="panel"><h2>Worth switching professions for <small>at least ${num(STATE.settings.switch_bonus, 1)}× your best</small></h2>${oppTable(ifAffordable(t.switch || []), {cols: ['title', 'profession', 'daily', 'sells', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: 'No other profession beats yours by enough right now.'})}</div>
+        <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(ifAffordable(t.level_up || []), {cols: ['title', 'profit_unit', 'daily', 'sells', 'cooldown', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: noProfs ? 'No professions known yet: see the note at the top.' : 'Nothing worth it a few skill points away right now.'})}</div>
+        <div class="panel"><h2>Worth switching professions for <small>at least ${num(STATE.settings.switch_bonus, 1)}× your best</small></h2>${oppTable(ifAffordable(t.switch || []), {cols: ['title', 'profession', 'daily', 'sells', 'cooldown', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: 'No other profession beats yours by enough right now.'})}</div>
       </div>`;
   },
   async craft() {
@@ -327,7 +330,7 @@ const VIEWS = {
       <div class="controls"><select id="cp"><option value="">All professions</option>${[...new Set(profs)].map((p) => `<option ${p === sel ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
       <label class="chk"><input type="checkbox" id="cd" ${doable ? 'checked' : ''}> only what I can craft now</label>
       <label class="chk" title="Hides items that barely sell: under 1 a day in the whole region, under 1 in 10 listings selling, or over 10 days of sales already listed on your realm"><input type="checkbox" class="sells-only" ${sellsOnly ? 'checked' : ''}> hide items that barely sell</label></div>
-      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'flags']})}</div>`;
+      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'cooldown', 'flags']})}</div>`;
   },
   async flips() {
     const sellsOnly = sessionStorage.getItem('sellsOnly') !== '0', hide = sellsOnly ? '&hide=hard_to_sell,no_sales_data' : '';
@@ -536,7 +539,7 @@ function oppDetail(o) {
       <div>Skill needed</div><div>${d.skill_required}${d.skill_exact ? '' : ' (estimated)'} ${d.thresholds ? `<span class="pill">orange/yellow/green/grey: ${d.thresholds.join(' / ')}</span>` : ''}</div>
       <div>Learn it</div><div>${d.learn ? (d.learn.how === 'trainer' ? `Trainer, ${money(d.learn.cost)}` : `${esc(d.learn.name || 'recipe')}: ${d.learn.cost !== null ? money(d.learn.cost) : 'not on AH / vendor'} (${esc(d.learn.source || '')})`) : 'unknown / already known'}</div>
       <div>Region sold/day</div><div>${num(d.sold_per_day)}</div>
-      ${d.cooldown_hours ? `<div>Cooldown</div><div>${num(d.cooldown_hours, 1)} hours (game data): at most ${num(24 / d.cooldown_hours, 2)} a day</div>` : ''}</div>`;
+      ${d.cooldown_hours ? `<div>Cooldown</div><div>${num(d.cooldown_hours, 1)} hours (game data): at most ${num(24 / d.cooldown_hours, 2)} a day${d.cooldown_group ? `<div class="needs">Shared with ${d.cooldown_shared_with} other recipes (${esc(d.cooldown_group)}): doing any of them starts this cooldown too</div>` : ''}</div>` : ''}</div>`;
   }
   if (o.kind === 'vendor_flip') {
     html += `<h3>Where to buy</h3><table><tbody>${(d.vendors || []).map((v) => `<tr><td>${esc(v.name)}</td><td>${esc(v.zone)}</td><td>${v.coords ? v.coords.map((c) => (+c).toFixed(1)).join(', ') : ''}</td><td>${v.stock ? 'stock ' + v.stock : ''}</td></tr>`).join('')}</tbody></table>
