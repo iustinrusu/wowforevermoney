@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WoW Forever Money</title>
+<link rel="stylesheet" href="/static/style.css">
+<script>const whTooltips = {colorLinks: false, iconizeLinks: false, renameLinks: false};</script>
+<script src="https://wow.zamimg.com/js/tooltips.js" async></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">WoW Forever Money</div>
+  <nav id="tabs">
+    <button data-tab="top" class="active">Top picks</button>
+    <button data-tab="craft">Crafting</button>
+    <button data-tab="flips">Flips</button>
+    <button data-tab="gather">Farming</button>
+    <button data-tab="bags">My bags</button>
+    <button data-tab="search">Item search</button>
+    <button data-tab="changes">Changes</button>
+    <button data-tab="health">Data health <span id="health-dot" class="dot"></span></button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+  <div id="status" class="status"></div>
+  <button class="btn" id="refresh-now" title="Re-read TSM prices, your addons and game data now, then recalculate">Refresh now</button>
+</header>
+<main id="view"></main>
+<div id="drawer" class="drawer hidden"><div class="drawer-inner"><button class="close" id="drawer-close" aria-label="Close">×</button><div id="drawer-body"></div></div></div>
+<div id="toasts"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

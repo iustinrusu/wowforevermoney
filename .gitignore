@@ -1,0 +1,7 @@
+data/*
+!data/tips.json
+!data/wowhead_forever_*.json
+__pycache__/
+*.pyc
+.pytest_cache/
+*.part

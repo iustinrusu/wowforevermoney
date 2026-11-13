@@ -1,0 +1,411 @@
+'use strict';
+// ---------- helpers ----------
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const api = async (path, opts) => { const r = await fetch(path, opts); if (!r.ok) throw new Error(await r.text()); return r.json(); };
+function money(c) {
+  if (c === null || c === undefined || isNaN(c)) return '<span class="pill">–</span>';
+  const neg = c < 0; c = Math.round(Math.abs(c));
+  const g = Math.floor(c / 10000), s = Math.floor(c / 100) % 100, cc = c % 100;
+  let out = '';
+  if (g) out += `<span class="g">${g.toLocaleString()}g</span> `;
+  if (g || s) out += `<span class="s">${s}s</span> `;
+  if (!g) out += `<span class="c">${cc}c</span>`;
+  return `<span class="money${neg ? ' neg' : ''}">${neg ? '-' : ''}${out.trim()}</span>`;
+}
+const num = (v, d = 1) => (v === null || v === undefined) ? '–' : Number(v).toLocaleString(undefined, {maximumFractionDigits: d});
+const ago = (ts) => { if (!ts) return 'never'; const s = Date.now() / 1000 - ts; if (s < 90) return `${Math.round(s)}s ago`; if (s < 5400) return `${Math.round(s / 60)} min ago`; if (s < 172800) return `${(s / 3600).toFixed(1)} h ago`; return `${(s / 86400).toFixed(1)} days ago`; };
+const KIND = {farm_zone: 'Farming spot', craft: 'Craft', vendor_flip: 'Vendor → AH', ah_to_vendor: 'AH → vendor', realm_dip: 'Cheap relist', gather: 'Farm', fishing_zone: 'Fishing spot', fishing_spot: 'Fishing spot'};
+const FLAGS = {
+  none_listed: ['warn', 'none listed now', 'No listings on your realm right now; price is the market average'],
+  no_realm_data: ['warn', 'region price only', 'No realm data; using the region average'],
+  sells_lower: ['warn', 'sells for less', 'Recorded sales are well below listing prices'],
+  no_sales_data: ['bad', 'no sales data', 'TSM has no recorded sales for this item'],
+  above_region: ['warn', 'above region', 'Lowest listing is far above the region average'],
+  slow_seller: ['bad', 'slow seller', 'Sells less often than your minimum'],
+  cant_afford: ['bad', "can't afford", 'Costs more than the gold you have set'],
+  unverified_recipe: ['bad', 'unverified recipe', 'Not in SkillUpForever\'s list of obtainable recipes'],
+  skill_estimated: ['', 'skill ~', 'Exact skill requirement unknown; estimated'],
+  sell_to_vendor: ['good', 'vendor sale', 'Selling to a vendor beats the AH'],
+  mat_not_listed: ['warn', 'mat not listed', 'An ingredient has no listings right now'],
+  limited_mat: ['warn', 'limited mat', 'An ingredient comes from a limited-stock vendor'],
+  limited_stock: ['warn', 'limited stock', 'Vendor has limited stock that restocks over time'],
+  other_profession: ['', 'other profession', 'You don\'t have this profession'],
+  snapshot: ['warn', 'snapshot', 'Based on one listing at the last scan; check in game'],
+  often_below_vendor: ['good', 'often', 'Usually listed below vendor price'],
+  risky: ['bad', 'risky', 'Speculative: depends on prices recovering'],
+  small_sample: ['warn', 'small sample', 'Not many catches/loots logged here yet'],
+  vendor_price_unconfirmed: ['', 'vendor price from game files', 'Base price from the game files; open the vendor once with ForeverMoneyBridge to confirm the real price'],
+  black_market: ['bad', 'black market vendor', 'Black Market agents charge more than the game-file price (e.g. Frilled Lichen: 4s 50c, not 1s 20c). Visit once to record the real price'],
+  measured: ['good', 'measured', 'Gold/hour from real time spent (ForeverMoneyBridge)'],
+  not_enough_time: ['warn', 'needs more time', 'Under 5 minutes logged; gold/hour not shown yet'],
+  assumed_rate: ['warn', 'assumed casts/hour', 'No timed fishing logs yet (ForeverMoneyBridge); uses your casts-per-hour setting'],
+  measured_pace: ['', 'your pace', 'Catches per hour from your timed fishing in other zones'],
+  classic_unconfirmed: ['bad', 'Classic, unconfirmed', 'A Classic WoW 1.12 table (cMaNGOS), not Forever data. Forever often differs (see Data health). Never used in Top picks.'],
+  classic_incomplete: ['warn', 'Classic table incomplete', 'The Classic table explains under 90% of catches here; the rest is unknown'],
+  forever_only: ['good', 'Forever only', 'A zone Classic does not have; entirely from Forever data'],
+  wowhead_forever: ['good', 'Wowhead Forever', 'Includes Forever catch counts read by hand from Wowhead Forever'],
+  forever_change: ['warn', 'differs from Classic', 'Your Forever catches include fish Classic does not list here, or lack a common Classic fish'],
+  seasonal: ['', 'seasonal', 'Part of the value is a seasonal fish (Classic schedule; Forever may differ)'],
+  classic_getaway: ['warn', 'got-away rate: Classic formula', 'No logs at this zone skill yet; Classic formula used, which your Forever logs suggest is too harsh'],
+  dungeon: ['', 'dungeon', 'Inside a dungeon'],
+  contents_unknown: ['warn', 'contents unknown', 'Can be opened, but what it contains in Forever is unknown: valued as a floor. Open one with ForeverMoneyBridge enabled, or read its Wowhead Forever page'],
+  open_it: ['good', 'open it', 'Worth more opened than sold (expected value of its Forever contents at current prices)'],
+  locked: ['', 'locked', 'Needs Lockpicking or a key to open'],
+  no_value: ['bad', 'no known value', 'No AH price, vendor price, recipe or contents known'],
+  ah_price_doubtful: ['warn', 'AH price doubtful', 'Listed with no recorded sales or far above the region: counted at its sale price instead'],
+};
+const flagHtml = (flags) => (flags || []).map((f) => { const d = FLAGS[f] || ['', f, f]; return `<span class="flag ${d[0]}" title="${esc(d[2])}">${esc(d[1])}</span>`; }).join('');
+const itemLink = (id, name, q) => `<a class="q${q ?? 1}" href="https://www.wowhead.com/forever/item=${id}" target="_blank" rel="noopener" data-wowhead="item=${id}&domain=forever">${esc(name)}</a>`;
+function toast(text) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; $('#toasts').appendChild(t); setTimeout(() => t.remove(), 9000); }
+function refreshTooltips() { try { window.$WowheadPower && window.$WowheadPower.refreshLinks(); } catch (e) { /* optional */ } }
+
+// ---------- state ----------
+let STATE = null;
+let TAB = localStorage.getItem('tab') || 'top';
+const sortState = {};
+
+async function loadState() {
+  STATE = await api('/api/state');
+  const worst = (STATE.freshness || []).map((f) => f.status);
+  const audit = STATE.audit_summary || {};
+  const dot = $('#health-dot');
+  dot.className = 'dot ' + (worst.includes('stale') || worst.includes('error') || audit.fail ? 'stale' : (worst.includes('warn') || audit.warn ? 'warn' : 'ok'));
+  const tsm = (STATE.freshness || []).find((f) => f.name === 'tsm');
+  $('#status').textContent = `Prices from ${tsm && tsm.data_time ? ago(tsm.data_time) : '?'} · updated ${ago(STATE.generated_at)} · ${STATE.settings.realm}`;
+}
+
+// ---------- tables ----------
+function oppTable(rows, opts = {}) {
+  if (!rows.length) return '<div class="empty">Nothing here right now.</div>';
+  const id = opts.id || 't' + Math.random().toString(36).slice(2, 7);
+  const cols = opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'flags'];
+  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Per day', daily: 'Per day profit', gph: 'Gold / hour', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
+  const st = sortState[id];
+  if (st) rows = [...rows].sort((a, b) => ((a[st.k] ?? -1e18) < (b[st.k] ?? -1e18) ? -1 : 1) * (st.dir));
+  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph']);
+  const head = cols.map((c) => `<th data-k="${c}" class="${numeric.has(c) ? 'num' : ''}">${H[c] || c}</th>`).join('');
+  const body = rows.map((o) => {
+    const cells = cols.map((c) => {
+      if (c === 'title') {
+        const name = o.name || o.title;
+        const label = (o.kind === 'fishing_zone' || o.kind === 'fishing_spot') ? esc(o.title) : esc(o.title).replace(esc(name), itemLink(o.item_id, name, o.quality));
+        return `<td>${label}${o.needs ? `<div class="needs">needs ${esc(o.needs)}</div>` : ''}${o.tip ? `<div class="pill">💡 ${esc(o.tip)}</div>` : ''}</td>`;
+      }
+      if (c === 'flags') return `<td>${flagHtml(o.flags)}</td>`;
+      if (c === 'units_day') return `<td class="num">${num(o.units_day)}</td>`;
+      if (c === 'kind') return `<td>${esc(KIND[o.kind] || o.kind)}</td>`;
+      if (c === 'profession') return `<td>${esc(o.profession || '')}</td>`;
+      return `<td class="num">${money(o[c])}</td>`;
+    }).join('');
+    return `<tr class="row ${o.doable ? '' : 'notdoable'}" data-key="${esc(o.key)}" data-item="${o.item_id}">${cells}</tr>`;
+  }).join('');
+  const exp = opts.export !== false ? `<button class="btn" data-export="${id}">Copy item list for TSM</button>` : '';
+  setTimeout(() => wireTable(id, rows, opts), 0);
+  const inner = `<div class="tablewrap"><table id="${id}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div><div class="controls" style="margin-top:6px">${exp}<span class="pill">${rows.length} rows</span></div>`;
+  return opts.inner ? inner : `<div id="wrap-${id}">${inner}</div>`;
+}
+function wireTable(id, rows, opts) {
+  const t = document.getElementById(id); if (!t) return;
+  t.querySelectorAll('th').forEach((th) => th.onclick = () => {
+    const k = th.dataset.k; const cur = sortState[id];
+    sortState[id] = {k, dir: cur && cur.k === k ? -cur.dir : -1};
+    document.getElementById('wrap-' + id).innerHTML = oppTable(rows, {...opts, id, inner: true});
+  });
+  t.querySelectorAll('tr.row').forEach((tr) => tr.onclick = (e) => { if (e.target.closest('a')) return; const o = rows.find((r) => r.key === tr.dataset.key); openOpp(o); });
+  const b = document.querySelector(`[data-export="${id}"]`);
+  if (b) b.onclick = async () => {
+    const res = await api('/api/export?keys=' + encodeURIComponent(rows.slice(0, 200).map((r) => r.key).join('|')));
+    try { await navigator.clipboard.writeText(res.tsm); toast('Copied. In TSM: Groups → Import → paste.'); } catch (e) { prompt('Copy this into TSM (Groups → Import):', res.tsm); }
+  };
+  refreshTooltips();
+}
+
+// ---------- views ----------
+const VIEWS = {
+  async top() {
+    const t = STATE.top || {};
+    const e = STATE.effective, who = STATE.detected.character;
+    return `
+      <div class="hint">${who ? `Playing <b>${esc(who)}</b> (detected)` : 'Using your manual settings'}: ${num(e.gold, 2)}g to invest, level ${e.level}, realm ${esc(e.realm)}. Everything updates when TSM syncs or you log out / /reload. Click any row for details.</div>
+      <div class="panel"><h2>Do these now <small>things you can do today, ranked by expected profit per day</small></h2>${oppTable(t.now || [])}</div>
+      <div class="panel"><h2>Fishing & farming spots <small>gold per hour, from your own catch log and rates</small></h2>${oppTable(t.hourly || [], {cols: ['title', 'profit_unit', 'gph', 'flags'], export: false})}
+        <div class="hint">Only spots confirmed by Forever data (your catches or a Wowhead Forever check) appear here. "measured" uses real time from ForeverMoneyBridge; otherwise ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
+      <div class="panel"><h2>Snipes <small>single cheap listings at the last scan; check them in game first</small></h2>${oppTable(t.snipes || [], {cols: ['title', 'kind', 'profit_unit', 'cost_unit', 'flags']})}</div>
+      <div class="grid2">
+        <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(t.level_up || [], {cols: ['title', 'profit_unit', 'daily', 'flags']})}</div>
+        <div class="panel"><h2>Worth switching professions for <small>at least ${num(STATE.settings.switch_bonus, 1)}× your best</small></h2>${oppTable(t.switch || [], {cols: ['title', 'profession', 'daily', 'flags']})}</div>
+      </div>`;
+  },
+  async craft() {
+    const profs = STATE.professions_available.filter((p) => !/Racial|Riding|Test|Poison|Swim|Lockpick|Compreh|Survival|Horseman|Piloting/.test(p));
+    const sel = sessionStorage.getItem('craftProf') || '';
+    const doable = sessionStorage.getItem('craftDoable') === '1';
+    const rows = await api(`/api/opps?kind=craft&profession=${encodeURIComponent(sel)}&doable=${doable ? 1 : ''}&limit=800`);
+    return `<div class="panel"><h2>Crafting profit <small>ingredients bought at the cheapest of vendor / AH; product sold at the better of AH (after cut) / vendor</small></h2>
+      <div class="controls"><select id="cp"><option value="">All professions</option>${[...new Set(profs)].map((p) => `<option ${p === sel ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
+      <label class="chk"><input type="checkbox" id="cd" ${doable ? 'checked' : ''}> only what I can craft now</label></div>
+      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'flags']})}</div>`;
+  },
+  async flips() {
+    const [vf, av, dip] = await Promise.all([api('/api/opps?kind=vendor_flip'), api('/api/opps?kind=ah_to_vendor&sort=profit_unit'), api('/api/opps?kind=realm_dip&sort=profit_unit')]);
+    return `<div class="panel"><h2>Buy from a vendor, sell on the AH</h2><div class="hint">Vendors are checked against Questie's Forever database and filtered to your faction. Limited-stock vendors restock over time.</div>${oppTable(vf)}</div>
+      <div class="panel"><h2>Buy on the AH, sell to a vendor</h2><div class="hint">Listings below what a vendor pays, at the last scan. TSM's Sniper catches these live in game.</div>${oppTable(av, {cols: ['title', 'profit_unit', 'cost_unit', 'flags']})}</div>
+      <div class="panel"><h2>Cheap listings to relist</h2><div class="hint">Lowest listing under 60% of the lowest of realm market value, region market value and region average sale price. Speculative.</div>${oppTable(dip, {cols: ['title', 'profit_unit', 'cost_unit', 'flags']})}</div>`;
+  },
+  async gather() {
+    const [zones, g] = await Promise.all([api('/api/opps?kind=fishing_spot&sort=gph&limit=600'), api('/api/opps?kind=gather&sort=profit_unit&limit=600')]);
+    const fishDoable = sessionStorage.getItem('fishDoable') === '1', fishConfirmed = sessionStorage.getItem('fishConfirmed') === '1';
+    const isClassic = (o) => o.flags.includes('classic_unconfirmed') ? 1 : 0;
+    const fz = zones.filter((o) => (!fishDoable || o.doable) && (!fishConfirmed || !isClassic(o)))
+      .sort((a, b) => (isClassic(a) - isClassic(b)) || ((b.gph || 0) - (a.gph || 0)));   // Forever data first
+    return `<div class="panel"><h2>Fishing spots <small>Forever data first; Classic tables only where there is none yet</small></h2>
+      <div class="hint">"Fish in …" rows are Forever data: your own catches (ForeverAngler, ForeverMoneyBridge) and Wowhead Forever counts. "Classic table: …" rows are WoW Classic 1.12 tables (cMaNGOS): <b>not Forever data</b>, often wrong for Forever (Data health shows how far off), and never in Top picks. Click a row for the fish list and every source.</div>
+      <div class="controls"><label class="chk"><input type="checkbox" id="fd" ${fishDoable ? 'checked' : ''}> only spots I can fish now</label>
+      <label class="chk"><input type="checkbox" id="fc" ${fishConfirmed ? 'checked' : ''}> hide Classic tables</label></div>
+      ${oppTable(fz, {cols: ['title', 'profit_unit', 'gph', 'flags'], export: false, heads: {profit_unit: 'Per catch'}})}</div>
+      <div class="panel"><h2>What farmed materials are worth <small>per unit: best of selling on AH, to a vendor, or crafting it</small></h2>
+      <div class="hint">Set how many you gather per hour in an item's details to get gold/hour.</div>${oppTable(g, {cols: ['title', 'profession', 'profit_unit', 'units_day', 'gph', 'flags']})}</div>`;
+  },
+  async bags() {
+    const inv = await api('/api/inventory');
+    if (!inv.length) return '<div class="panel empty">No bag data yet. Syndicator saves it when you log out or /reload.</div>';
+    return inv.map((c) => `<div class="panel"><h2>${esc(c.character)} <small>bags + bank worth ${money(c.total)}</small></h2>
+      <div class="tablewrap"><table><thead><tr><th>Item</th><th class="num">Count</th><th>Best thing to do</th><th class="num">Each</th><th class="num">Total</th><th>Notes</th></tr></thead><tbody>
+      ${c.items.map((i) => `<tr class="row" data-item="${i.item_id}"><td>${itemLink(i.item_id, i.name, i.quality)}</td><td class="num">${i.count}</td><td>${esc(i.action)}</td><td class="num">${money(i.unit_value)}</td><td class="num">${money(i.total)}</td><td>${flagHtml(i.flags)}</td></tr>`).join('')}
+      </tbody></table></div></div>`).join('');
+  },
+  async search() {
+    const q = sessionStorage.getItem('search') || '';
+    const rows = q ? await api('/api/search?q=' + encodeURIComponent(q)) : [];
+    return `<div class="panel"><h2>Every item in the game</h2><div class="controls"><input id="sq" placeholder="Item name or id…" value="${esc(q)}" style="width:320px"><button class="btn primary" id="sb">Search</button></div>
+      ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>Item</th><th>Type</th><th class="num">Lowest</th><th class="num">Market</th><th class="num">Listings</th><th class="num">Sold/day (region)</th><th class="num">Vendor pays</th></tr></thead><tbody>
+      ${rows.map((r) => `<tr class="row" data-item="${r.id}"><td>${itemLink(r.id, r.name, r.quality)}</td><td>${esc(r.category)}</td><td class="num">${money(r.min_buyout)}</td><td class="num">${money(r.market)}</td><td class="num">${num(r.listings, 0)}</td><td class="num">${num(r.sold_per_day)}</td><td class="num">${money(r.vendor_sell)}</td></tr>`).join('')}
+      </tbody></table></div>` : (q ? '<div class="empty">No items found.</div>' : '<div class="hint">Search any of the ~32,000 items. Click one to see everything about it.</div>')}</div>`;
+  },
+  async changes() {
+    const ev = await api('/api/events');
+    return `<div class="panel"><h2>What changed <small>new top picks, snipes and watchlist moves, newest first</small></h2>
+      ${ev.length ? `<table><tbody>${ev.map((e) => `<tr class="row" data-item="${e.item_id || ''}"><td class="pill" style="white-space:nowrap">${new Date(e.ts * 1000).toLocaleString()}</td><td>${esc(e.text)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nothing yet. Changes appear after the next TSM price update.</div>'}</div>`;
+  },
+  async health() {
+    const [audit, scans] = await Promise.all([api('/api/audit'), api('/api/scans')]);
+    const fr = STATE.freshness.map((f) => `<div class="check"><div class="st ${f.status}">${esc(f.status.toUpperCase())}</div><div><b>${esc(f.label)}</b> ${f.version ? `<span class="pill">v${esc(String(f.version).replace(/^v/, ''))}</span>` : ''}<div class="pill">${esc(f.note)}</div>
+      <div class="pill">${f.data_time ? 'data from ' + ago(f.data_time) + ' · ' : ''}${f.file_time ? 'file changed ' + ago(f.file_time) + ' · ' : ''}loaded ${ago(f.loaded_at)}</div></div></div>`).join('');
+    const au = audit.map((a) => `<div class="check"><div class="st ${a.status}">${esc(a.status.toUpperCase())}</div><div><b>${esc(a.name)}</b><div class="pill">${esc(a.detail)}</div>${a.examples.length ? `<ul class="examples">${a.examples.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div></div>`).join('');
+    return `<div class="grid2"><div class="panel"><h2>Data sources <small>re-read automatically when files change</small></h2>${fr}
+      <div class="controls" style="margin-top:10px"><button class="btn" id="refresh">Check for game data updates now</button></div></div>
+      <div class="panel"><h2>Accuracy checks <small>cross-checks between sources</small></h2>${au}</div></div>
+      <div class="panel"><h2>Price history <small>one snapshot per TSM realm scan</small></h2>${scans.length ? scans.slice(0, 30).map((s) => `<span class="flag">${new Date(s.ts * 1000).toLocaleString()}</span>`).join('') : '<div class="empty">No snapshots yet.</div>'}
+      <div class="hint">How TSM numbers are used: "market value" is a 14-day average of realm <i>listings</i>; "region sold/day" and "region sale price" come from TSM users' sales records, so treat sold/day as a liquidity indicator, not an exact count.</div></div>`;
+  },
+  async settings() {
+    const s = STATE.settings, det = STATE.detected || {}, chars = STATE.characters || {};
+    const profs = ['First Aid', 'Cooking', 'Fishing', 'Skinning', 'Leatherworking', 'Herbalism', 'Mining', 'Tailoring', 'Alchemy', 'Blacksmithing', 'Engineering', 'Enchanting'];
+    const auto = (k) => det[k] !== undefined ? `<span class="flag good" title="Detected from your saved addon data; your manual value is the fallback">auto: ${esc(k === 'gold' ? num(det[k], 2) + 'g' : (k === 'faction' ? (det[k] === 'H' ? 'Horde' : 'Alliance') : det[k]))}</span>` : '';
+    const detProfs = det.professions || {};
+    return `<div class="panel"><h2>Detected from your game <small>read from ForeverMoneyBridge and TSM when you log out or /reload</small></h2>
+      <div class="controls"><label class="chk"><input type="checkbox" id="s-auto" ${s.auto_detect !== false ? 'checked' : ''}> fill in my settings automatically</label>
+      <label class="chk">character <select id="s-char"><option value="">last played (${esc(STATE.active_character || 'unknown')})</option>${Object.keys(chars).map((n) => `<option ${n === s.character ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
+      <label class="chk">gold counts <select id="s-gscope"><option value="faction" ${s.gold_scope !== 'character' ? 'selected' : ''}>all my characters on this faction</option><option value="character" ${s.gold_scope === 'character' ? 'selected' : ''}>only this character</option></select></label></div>
+      ${Object.keys(chars).length ? `<table><thead><tr><th>Character</th><th>Level</th><th class="num">Gold</th><th>Professions</th><th>From</th></tr></thead><tbody>${Object.entries(chars).map(([n, c]) => `<tr><td>${esc(n)}</td><td>${c.level ?? '<span class="pill">needs addon</span>'}</td><td class="num">${money(c.money)}</td><td>${Object.entries(c.professions || {}).map(([p, v]) => `${esc(p)} ${v.rank}`).join(', ')}</td><td class="pill">${esc(c.source)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No characters detected yet.</div>'}
+      <div class="hint">The ForeverMoneyBridge addon was installed into your AddOns folder. Enable it at the character screen; it saves level, gold, professions and what you loot where (with time spent). The values below are only used when nothing is detected.</div></div>
+      <div class="panel"><h2>Your situation <small>manual fallback</small></h2><div class="kv">
+      <div>Gold available</div><div><input type="number" step="0.01" id="s-gold" value="${s.gold}"> g ${auto('gold')}</div>
+      <div>Character level</div><div><input type="number" id="s-level" value="${s.level}"> ${auto('level')}</div>
+      <div>Realm (from TSM)</div><div><select id="s-realm">${(STATE.realms.length ? STATE.realms : [s.realm]).map((r) => `<option ${r === s.realm ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></div>
+      <div>Faction</div><div><select id="s-faction"><option value="H" ${s.faction === 'H' ? 'selected' : ''}>Horde</option><option value="A" ${s.faction === 'A' ? 'selected' : ''}>Alliance</option></select> ${auto('faction')}</div>
+      </div></div>
+      <div class="panel"><h2>Professions <small>leave blank if you don't have it</small></h2><div class="kv">
+      ${profs.map((p) => `<div>${p}${(s.preferred || []).includes(p) ? ' ★' : ''}</div><div><input type="number" class="s-prof" data-p="${p}" value="${s.professions[p] ?? ''}" placeholder="—"> ${det.professions ? (detProfs[p] !== undefined ? `<span class="flag good">auto: ${detProfs[p]}</span>` : (det.source === 'ForeverMoneyBridge' ? '<span class="flag">auto: not learned</span>' : '<span class="pill">not tracked by TSM; using your value</span>')) : ''}</div>`).join('')}
+      </div><div class="hint">★ = preferred. Other professions only show as "worth switching" when they earn at least the switch factor more.</div></div>
+      <div class="panel"><h2>Assumptions <small>change these if the numbers feel off</small></h2><div class="kv">
+      <div>AH cut</div><div><input type="number" step="0.01" id="s-cut" value="${s.ah_cut}"></div>
+      <div>Your share of daily sales</div><div><input type="number" step="0.05" id="s-share" value="${s.market_share}"> <span class="pill">0.2 = you expect to sell 20% of the region's tracked daily volume</span></div>
+      <div>Hide items selling under</div><div><input type="number" step="0.5" id="s-minspd" value="${s.min_sold_per_day}"> per day</div>
+      <div>Switch factor</div><div><input type="number" step="0.1" id="s-switch" value="${s.switch_bonus}"></div>
+      <div>Fishing casts per hour</div><div><input type="number" id="s-casts" value="${s.casts_per_hour || 240}"></div>
+      <div>Unverified recipes</div><div><label class="chk"><input type="checkbox" id="s-unver" ${s.include_unverified_recipes ? 'checked' : ''}> include</label></div>
+      <div>Desktop alerts</div><div><label class="chk"><input type="checkbox" id="s-alerts" ${s.alerts.enabled ? 'checked' : ''}> on</label> when a new pick makes at least <input type="number" id="s-alertmin" value="${s.alerts.min_daily_profit_gold}"> g/day</div>
+      <div>Stale after</div><div>realm prices <input type="number" id="s-stale-r" value="${s.stale_hours.realm}"> h, region <input type="number" id="s-stale-g" value="${s.stale_hours.region}"> h</div>
+      </div><div class="controls" style="margin-top:12px"><button class="btn primary" id="save">Save and recalculate</button>
+      <button class="btn" id="notif">Allow browser notifications</button></div></div>`;
+  },
+};
+
+async function render() {
+  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === TAB));
+  const view = $('#view');
+  try { view.innerHTML = await VIEWS[TAB](); } catch (e) { view.innerHTML = `<div class="panel">Could not load: ${esc(e.message)}</div>`; }
+  wireView();
+  refreshTooltips();
+}
+
+function wireView() {
+  document.querySelectorAll('#view tr.row[data-item]').forEach((tr) => { if (!tr.dataset.key) tr.onclick = (e) => { if (!e.target.closest('a') && tr.dataset.item) openItem(+tr.dataset.item); }; });
+  if (TAB === 'craft') { $('#cp').onchange = (e) => { sessionStorage.setItem('craftProf', e.target.value); render(); }; $('#cd').onchange = (e) => { sessionStorage.setItem('craftDoable', e.target.checked ? '1' : ''); render(); }; }
+  if (TAB === 'search') { const go = () => { sessionStorage.setItem('search', $('#sq').value); render(); }; $('#sb').onclick = go; $('#sq').onkeydown = (e) => { if (e.key === 'Enter') go(); }; $('#sq').focus(); }
+  if (TAB === 'gather') { $('#fd').onchange = (e) => { sessionStorage.setItem('fishDoable', e.target.checked ? '1' : ''); render(); }; $('#fc').onchange = (e) => { sessionStorage.setItem('fishConfirmed', e.target.checked ? '1' : ''); render(); }; }
+  if (TAB === 'health') $('#refresh').onclick = async () => { await api('/api/refresh', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}); toast('Checking for updates…'); };
+  if (TAB === 'settings') {
+    $('#notif').onclick = () => Notification.requestPermission().then((p) => toast('Notifications: ' + p));
+    $('#save').onclick = async () => {
+      const professions = {};
+      document.querySelectorAll('.s-prof').forEach((i) => { if (i.value !== '') professions[i.dataset.p] = +i.value; });
+      const body = {auto_detect: $('#s-auto').checked, character: $('#s-char').value || null, gold_scope: $('#s-gscope').value, gold: +$('#s-gold').value, level: +$('#s-level').value, realm: $('#s-realm').value, faction: $('#s-faction').value, professions,
+        ah_cut: +$('#s-cut').value, market_share: +$('#s-share').value, min_sold_per_day: +$('#s-minspd').value, switch_bonus: +$('#s-switch').value,
+        casts_per_hour: +$('#s-casts').value, include_unverified_recipes: $('#s-unver').checked,
+        alerts: {enabled: $('#s-alerts').checked, min_daily_profit_gold: +$('#s-alertmin').value},
+        stale_hours: {realm: +$('#s-stale-r').value, region: +$('#s-stale-g').value}};
+      await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+      toast('Saved. Recalculating…');
+    };
+  }
+}
+
+// ---------- details drawer ----------
+function openDrawer(html) { $('#drawer-body').innerHTML = html; $('#drawer').classList.remove('hidden'); refreshTooltips(); }
+$('#drawer-close').onclick = () => $('#drawer').classList.add('hidden');
+$('#drawer').onclick = (e) => { if (e.target.id === 'drawer') $('#drawer').classList.add('hidden'); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#drawer').classList.add('hidden'); });
+
+function oppDetail(o) {
+  const d = o.detail || {};
+  let html = `<h3>${esc(o.title)} <small>${esc(KIND[o.kind] || o.kind)}</small></h3><div>${flagHtml(o.flags)}</div>
+    <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
+    <div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
+    ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>`;
+  if (o.kind === 'craft') {
+    html += `<h3>Ingredients <small>per craft</small></h3><table><tbody>${d.mats.map((m) => `<tr><td>${m.count}×</td><td>${itemLink(m.item_id, m.name)}</td><td class="num">${money(m.unit)}</td><td>${esc(m.source)} ${flagHtml(m.flags)}</td></tr>`).join('')}</tbody></table>
+      <div class="kv" style="margin-top:8px"><div>Sells for (total)</div><div>${money(d.revenue)} via ${esc(d.sell_channel)} (${esc(d.sell_source)})</div>
+      <div>Skill needed</div><div>${d.skill_required}${d.skill_exact ? '' : ' (estimated)'} ${d.thresholds ? `<span class="pill">orange/yellow/green/grey: ${d.thresholds.join(' / ')}</span>` : ''}</div>
+      <div>Learn it</div><div>${d.learn ? (d.learn.how === 'trainer' ? `Trainer, ${money(d.learn.cost)}` : `${esc(d.learn.name || 'recipe')}: ${d.learn.cost !== null ? money(d.learn.cost) : 'not on AH / vendor'} (${esc(d.learn.source || '')})`) : 'unknown / already known'}</div>
+      <div>Region sold/day</div><div>${num(d.sold_per_day)}</div></div>`;
+  }
+  if (o.kind === 'vendor_flip') {
+    html += `<h3>Where to buy</h3><table><tbody>${(d.vendors || []).map((v) => `<tr><td>${esc(v.name)}</td><td>${esc(v.zone)}</td><td>${v.coords ? v.coords.map((c) => (+c).toFixed(1)).join(', ') : ''}</td><td>${v.stock ? 'stock ' + v.stock : ''}</td></tr>`).join('')}</tbody></table>
+      <div class="pill">${d.vendor_count > (d.vendors || []).length ? `+${d.vendor_count - d.vendors.length} more vendors` : ''}</div>`;
+  }
+  if (o.kind === 'fishing_zone') {
+    html += `<h3>Your catches here <small>${d.casts} casts, ${d.caught} caught, ${d.got_away} got away</small></h3><table><thead><tr><th>Fish</th><th class="num">Caught</th><th class="num">Per cast</th><th class="num">Worth each</th></tr></thead><tbody>
+      ${d.fish.map((f) => `<tr class="row" data-item="${f.item_id}"><td>${itemLink(f.item_id, f.name)}</td><td class="num">${f.count}</td><td class="num">${(f.share * 100).toFixed(1)}%</td><td class="num">${money(f.value)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  if (o.kind === 'fishing_spot') html += fishingDetail(o);
+  if (o.kind === 'realm_dip') {
+    html += `<div class="kv" style="margin-top:8px"><div>Lowest listing</div><div>${money(d.min_buyout)}</div><div>Realm market</div><div>${money(d.realm_market)}</div><div>Region market</div><div>${money(d.region_market)}</div><div>Region avg sale</div><div>${money(d.region_sale)}</div><div>Relist at</div><div>${money(d.relist_at)}</div></div>`;
+  }
+  return html;
+}
+const pct = (v) => (v === null || v === undefined) ? '–' : (v * 100).toFixed(v < 0.01 ? 2 : 1) + '%';
+function fishingDetail(o) {
+  const d = o.detail || {};
+  const has = (v) => v !== null && v !== undefined;
+  const src = (d.confirmed_by || []).length ? `<span class="flag good">confirmed in Forever by ${esc(d.confirmed_by.join(' and '))}</span>`
+    : (d.forever ? '<span class="flag warn">Forever data, small sample</span>' : '<span class="flag bad">Classic WoW 1.12 table, not confirmed in Forever</span>');
+  let h = `<div class="kv" style="margin-top:8px">
+    <div>Sources</div><div>${esc((d.sources || []).join(' + '))} ${src}</div>
+    ${d.forever ? `<div>Classic table used</div><div>${d.classic_spot ? `${esc(d.classic_spot)} <span class="pill">only while Forever data is thin: weighs ${(100 - d.weight * 100).toFixed(0)}%</span>` : '<span class="pill">none (no Classic table matches what is caught here in Forever)</span>'}</div>` : ''}
+    ${d.subzones && d.subzones.length ? `<div>Where</div><div>${esc(d.subzones.join(', '))}</div>` : ''}
+    <div>Worth per catch</div><div>${money(d.value_per_catch)} ${has(d.classic_value) ? `<span class="pill">Classic table: ${money(d.classic_value)}</span>` : ''} ${has(d.observed_value) ? `<span class="pill">Forever catches: ${money(d.observed_value)}</span>` : ''}</div>
+    <div>Your catches here</div><div>${d.casts ? `${d.casts} casts, ${d.caught} caught, ${d.got_away} got away` : (d.caught ? `${d.caught} caught` : 'none logged yet')}</div>
+    ${d.wowhead_fished ? `<div>Wowhead Forever</div><div>${num(d.wowhead_fished, 0)} catches in this zone <span class="pill">read by hand ${esc(d.wowhead_checked)}</span> <a href="${esc(d.wowhead_url)}" target="_blank" rel="noopener">source</a></div>` : ''}
+    <div>Zone skill (Classic)</div><div>${d.zone_skill ?? 'unknown'} · you: ${d.your_skill}</div>
+    <div>Fish kept when hooked</div><div>${pct(d.keep)} <span class="pill">${esc(d.keep_source)}</span></div>
+    <div>Catches per hour</div><div>${num(d.catches_per_hour, 0)} <span class="pill">${esc(d.pace_source === 'setting' ? `${d.casts_per_hour} casts/hour setting` : d.pace_source)}${d.landed_share ? ` · you land ${pct(d.landed_share)} of casts` : ''}</span></div>
+    ${has(d.coverage) && d.coverage < 0.9 ? `<div>Classic table</div><div class="needs">explains only ${pct(d.coverage)} of catches here; the rest is unknown</div>` : ''}
+    ${!o.doable ? `<div>If you had the skill</div><div>${money(d.gph_if_skilled)}/hour</div>` : ''}
+  </div>`;
+  if ((d.new_in_forever || []).length) h += `<div class="panel">New in Forever here (not in the Classic tables or pools): ${d.new_in_forever.map((f) => `${itemLink(f.item_id, f.name)} ×${f.count}`).join(', ')}</div>`;
+  if ((d.classic_missing || []).length) h += `<div class="panel">Classic says these are common here, but you haven't caught any: ${d.classic_missing.map((f) => `${itemLink(f.item_id, f.name)} (${pct(f.classic_share)})`).join(', ')}</div>`;
+  if (d.wowhead_check) h += `<div class="pill">Wowhead Forever check ${esc(d.wowhead_check.checked || '')}: ${esc((d.wowhead_check.zones || []).join(', '))}${d.wowhead_check.note ? ' · ' + esc(d.wowhead_check.note) : ''}</div>`;
+  h += `<h3>Fish <small>share per catch</small></h3><table><thead><tr><th>Fish</th><th class="num">Classic</th><th class="num">Forever</th><th class="num">Used</th><th class="num">Worth each</th><th>Notes</th></tr></thead><tbody>
+    ${(d.fish || []).map((f) => `<tr class="row" data-item="${f.item_id}"><td>${itemLink(f.item_id, f.name)}</td><td class="num">${pct(f.classic_share)}</td><td class="num">${has(f.observed_share) ? `${pct(f.observed_share)} <span class="pill" title="your catches / Wowhead Forever">${f.count}${f.wowhead_count ? ' / ' + num(f.wowhead_count, 0) : ''}</span>` : '–'}</td><td class="num">${pct(f.share)}</td><td class="num">${money(f.value)}</td>
+      <td>${f.quest ? '<span class="flag">quest item</span>' : ''}${f.seasonal ? `<span class="flag" title="Classic season schedule">${esc(f.seasonal)}${f.in_season === false ? ' (out of season)' : (f.in_season ? ' (in season)' : '')}</span>` : ''}${(f.pools || []).length ? `<span class="flag" title="${esc(f.pools.join(', '))}">from pools</span>` : ''}</td></tr>`).join('')}</tbody></table>`;
+  return h;
+}
+function openOpp(o) { if (!o) return; if (o.kind === 'fishing_zone' || o.kind === 'fishing_spot') { openDrawer(oppDetail(o)); wireDrawer(); return; } openItem(o.item_id, o); }
+
+function spark(hist) {
+  const pts = hist.filter((h) => h.min_buyout || h.market);
+  if (pts.length < 2) return '<div class="hint">Price history builds up with every TSM scan (about hourly).</div>';
+  const W = 700, H = 120, t0 = pts[0].ts, t1 = pts[pts.length - 1].ts;
+  const vals = pts.flatMap((p) => [p.min_buyout, p.market, p.region_market].filter(Boolean));
+  const lo = Math.min(...vals), hi = Math.max(...vals) || 1;
+  const x = (t) => 6 + (W - 12) * (t - t0) / Math.max(1, t1 - t0), y = (v) => H - 8 - (H - 16) * (v - lo) / Math.max(1, hi - lo);
+  const line = (k, color) => `<polyline fill="none" stroke="${color}" stroke-width="2" points="${pts.filter((p) => p[k]).map((p) => `${x(p.ts).toFixed(1)},${y(p[k]).toFixed(1)}`).join(' ')}"/>`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${line('region_market', '#6b7280')}${line('market', '#6ea8fe')}${line('min_buyout', '#e8c060')}</svg>
+    <div class="legend"><span style="color:#e8c060">● lowest listing</span><span style="color:#6ea8fe">● realm market</span><span style="color:#9ca3af">● region market</span><span class="pill">${money(lo)} – ${money(hi)}</span></div>`;
+}
+
+async function openItem(id, opp) {
+  openDrawer('<div class="empty">Loading…</div>');
+  const it = await api('/api/item?id=' + id);
+  const p = it.prices || {};
+  const farm = (STATE.settings.farm_rates || {})[id] ?? '';
+  const watching = (STATE.settings.watchlist || []).includes(id);
+  let html = `<h2>${itemLink(it.id, it.name, it.quality)} <small>${esc(it.category)} · item ${it.id}</small></h2>
+    <div class="controls"><a class="btn" href="${it.wowhead}" target="_blank" rel="noopener">Open on Wowhead (comments, tips)</a>
+    <button class="btn" id="watch">${watching ? 'Stop watching' : 'Watch price'}</button>
+    <label class="chk">I gather <input type="number" id="farmrate" value="${farm}" placeholder="—"> per hour</label> <button class="btn" id="saverate">Save</button></div>
+    ${it.tip ? `<div class="panel">💡 ${esc(it.tip.summary || '')}${it.tip.source ? `<div class="pill">from ${esc(it.tip.source)}</div>` : ''}</div>` : ''}
+    ${opp ? oppDetail(opp) : ''}
+    <h3>Prices on your realm</h3><div class="kv">
+      <div>Realistic sale price</div><div>${money(it.ah_sell)} <span class="pill">${esc(it.ah_sell_source || '')}</span> ${flagHtml(it.ah_sell_flags)}</div>
+      <div>Lowest listing</div><div>${money(p.minBuyout)} (${num(p.numAuctions || 0, 0)} listings)</div>
+      <div>Realm market value</div><div>${money(p.marketValue)} <span class="pill">14-day listing average</span></div>
+      <div>Realm 60-day</div><div>${money(p.historical)}</div>
+      <div>Region market / 60-day</div><div>${money(p.regionMarketValue)} / ${money(p.regionHistorical)}</div>
+      <div>Region avg sale price</div><div>${money(p.regionSale)} <span class="pill">TSM users' sales</span></div>
+      <div>Region sold/day · sale rate</div><div>${num(p.regionSoldPerDay)} · ${p.regionSalePercent !== undefined ? (p.regionSalePercent * 100).toFixed(1) + '%' : '–'}</div>
+      <div>Vendor pays</div><div>${money(it.vendor_sell)}</div>
+      ${it.vendor_price ? `<div>Vendor sells for</div><div>${money(it.vendor_price)}</div>` : ''}
+      ${it.best_use ? `<div>Best crafting use</div><div>${money(it.best_use.value)} each via ${esc(it.best_use.profession)}: ${esc(it.best_use.recipe)}${it.best_use.doable ? '' : ' <span class="pill">(you can\'t yet)</span>'}</div>` : ''}
+      <div>Required level · item level</div><div>${it.req_level ?? '–'} · ${it.item_level ?? '–'}</div>
+    </div>${spark(it.history)}`;
+  if (it.opportunities.length && !opp) html += `<h3>Ways to make money with it</h3>${oppTable(it.opportunities, {cols: ['title', 'profit_unit', 'daily', 'flags'], export: false})}`;
+  if (it.vendors.length) html += `<h3>Sold by <small>your faction</small></h3><table><tbody>${it.vendors.slice(0, 15).map((v) => `<tr><td>${esc(v.name)}</td><td>${esc(v.zone)}</td><td>${v.coords ? v.coords.map((c) => (+c).toFixed(1)).join(', ') : ''}</td><td>${v.stock ? 'limited: ' + v.stock : ''}</td></tr>`).join('')}</tbody></table>`;
+  if ((it.fished_in || []).length) html += `<h3>Where to catch it <small>share per catch; Classic rows are unconfirmed in Forever</small></h3><table><tbody>${it.fished_in.map((f) => `<tr><td>${esc(f.title)}</td><td class="num">${pct(f.share)}</td><td>${f.count ? `<span class="pill">you caught ${f.count}</span>` : ''}${flagHtml(f.flags.filter((x) => ['classic_unconfirmed', 'wowhead_forever', 'forever_only', 'seasonal', 'forever_change'].includes(x)))}</td><td class="pill">zone skill ${f.zone_skill ?? '?'}</td></tr>`).join('')}</tbody></table>`;
+  if (it.drops.length) html += `<h3>Dropped by <small>NPCs from QuestieDB Forever; drop % is Wowhead <b>Classic</b> data bundled with QuestieDB, Forever may differ</small></h3><table><tbody>${it.drops.slice(0, 20).map((d) => `<tr><td>${esc(d.name)}</td><td>${esc(d.zone)}</td><td>lvl ${esc(d.level)}</td><td class="num">${d.rate ? d.rate.toFixed(1) + '%' : ''}</td></tr>`).join('')}</tbody></table>`;
+  if (it.objects.length) html += `<h3>Found in</h3><table><tbody>${it.objects.map((o) => `<tr><td>${esc(o.name)}</td><td>${esc(o.zone)}</td></tr>`).join('')}</tbody></table>`;
+  if (it.made_by.length) html += `<h3>Made by</h3><table><tbody>${it.made_by.map((r) => `<tr><td>${esc(r.profession)}</td><td>${esc(r.name)}${r.count !== 1 ? ' ×' + r.count : ''}</td><td>${r.mats.map((m) => `${m.count}× ${itemLink(m.item_id, m.name)}`).join(', ')}</td><td class="pill">${r.thresholds ? r.thresholds.join('/') : ''}</td></tr>`).join('')}</tbody></table>`;
+  if (it.used_in.length) html += `<h3>Used in <small>${it.used_in.length} recipes</small></h3><table><tbody>${it.used_in.slice(0, 30).map((r) => `<tr class="row" data-item="${r.product_id}"><td>${esc(r.profession)}</td><td>${r.count}× → ${itemLink(r.product_id, r.product)}</td></tr>`).join('')}</tbody></table>`;
+  openDrawer(html);
+  $('#watch').onclick = async () => {
+    const wl = new Set(STATE.settings.watchlist || []); watching ? wl.delete(id) : wl.add(id);
+    await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({watchlist: [...wl]})});
+    await loadState(); toast(watching ? 'No longer watching' : 'Watching: you\'ll get an alert on big price moves'); openItem(id, opp);
+  };
+  $('#saverate').onclick = async () => {
+    const rates = {...(STATE.settings.farm_rates || {})}; const v = $('#farmrate').value;
+    if (v === '') delete rates[id]; else rates[id] = +v;
+    await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({farm_rates: rates})});
+    toast('Saved your gather rate; gold/hour will update');
+  };
+  wireDrawer();
+}
+function wireDrawer() { document.querySelectorAll('#drawer-body tr.row[data-item]').forEach((tr) => tr.onclick = (e) => { if (!e.target.closest('a')) openItem(+tr.dataset.item); }); }
+
+// ---------- live updates ----------
+function connect() {
+  const es = new EventSource('/api/stream');
+  es.addEventListener('update', async (e) => {
+    const data = JSON.parse(e.data);
+    const rb = $('#refresh-now'); if (rb.disabled) { rb.disabled = false; rb.textContent = 'Refresh now'; toast('Refreshed. Prices are from the latest TSM download.'); }
+    await loadState();
+    if (!['settings', 'search'].includes(TAB)) render();
+    (data.events || []).forEach((ev) => {
+      toast(ev.text);
+      if (ev.important && window.Notification && Notification.permission === 'granted') new Notification('WoW Forever Money', {body: ev.text});
+    });
+  });
+  es.addEventListener('tick', async () => { await loadState(); });
+  es.onerror = () => { $('#status').textContent = 'Lost connection to the app. Is it still running?'; };
+}
+
+$('#refresh-now').onclick = async () => {
+  const b = $('#refresh-now'); b.disabled = true; b.textContent = 'Refreshing...';
+  try { await api('/api/refresh', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}); } catch (e) { toast('Refresh failed: ' + e.message); }
+  setTimeout(() => { b.disabled = false; b.textContent = 'Refresh now'; }, 4000);
+};
+document.querySelectorAll('#tabs button').forEach((b) => b.onclick = () => { TAB = b.dataset.tab; localStorage.setItem('tab', TAB); render(); });
+(async () => { await loadState(); await render(); connect(); })();
