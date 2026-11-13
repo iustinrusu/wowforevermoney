@@ -37,6 +37,10 @@ Unzip it somewhere simple, for example `Documents\WoWForeverMoney`.
 ## 4. Turn on the addon in WoW
 
 The app copies its addon, **ForeverMoneyBridge**, into your WoW AddOns folder every time it starts.
+To install it without starting the app, double-click **`install_addon.bat`** in the app folder. It finds
+WoW: Forever by itself; if it can't, it asks you to paste your "World of Warcraft" folder (the one with
+`_forever_` inside, often `C:\Program Files (x86)\World of Warcraft`). You can also drag that folder onto
+`install_addon.bat`. If WoW was open, restart it once so the new addon shows up.
 1. At the character screen click **AddOns** and tick **ForeverMoneyBridge**. If it says "out of date", tick
    "Load out of date AddOns".
 2. Log in and type `/reload`. Wait about a minute (the addon checks some item data with the game), then

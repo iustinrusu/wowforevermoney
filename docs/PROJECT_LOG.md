@@ -218,6 +218,12 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Change log
 
+- **2026-11-13** `install_addon.bat`: installs ForeverMoneyBridge without Python or the app (finds WoW via
+  TSM.cfg, the Battle.net registry entry, common folders, or asks; keeps the app-written Checks.lua).
+  Tested: spaces and "(x86)" in paths (this broke cmd blocks at first; paths are now kept out of blocks),
+  drag-and-drop, the prompt, TSM.cfg only, rerun. The registry fallback is untested (no entry on this PC).
+  `.gitattributes` keeps .bat files CRLF, also in GitHub ZIP downloads.
+
 - **2026-11-13** Investments tab (`wfm/investments.py`, `/api/investments`, `data/investments.json`), price
   history series now include region sold/day; page-script test for names declared twice. Tests: 81.
 

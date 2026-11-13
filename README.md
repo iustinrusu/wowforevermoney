@@ -78,6 +78,9 @@ Everything runs on your PC. The page is only reachable from your own computer, a
   - what each trunk, clam or crate gave you.
 - **When:** only on `/reload` or logout, because WoW doesn't let addons write files any other time.
 - **`/fmb`** takes a snapshot right away (then `/reload` to write it).
+- **Install without the app:** double-click `install_addon.bat`. It finds WoW: Forever (TSM desktop app
+  settings, the Battle.net install entry, then the usual folders on drives C to H), or asks for the folder.
+  It never overwrites the item-check list (`Checks.lua`) the app wrote.
 - **Updates:** the app copies the latest version into your AddOns folder each time it starts. Do a `/reload` in game to load it.
 - **Privacy:** nothing leaves your PC. It only writes WoW's normal saved-variables file, which this app reads.
 
