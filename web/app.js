@@ -141,9 +141,11 @@ const VIEWS = {
   async top() {
     const t = STATE.top || {};
     const e = STATE.effective, who = STATE.detected.character;
+    const noProfs = !Object.keys(e.professions || {}).length;
     const tsm = (STATE.freshness || []).find((f) => f.name === 'tsm');
     const stale = tsm && tsm.status !== 'ok' ? `<div class="panel" style="border-color:#e8c060">⚠ Prices may be out of date: ${esc(tsm.note)}. Check that the TSM desktop app is running; picks below use the last prices it downloaded.</div>` : '';
-    return `${stale}
+    const unknown = (!who || noProfs) ? `<div class="panel" style="border-color:#e8c060">⚠ ${!who ? "Your character isn't detected yet" : 'No professions are known for your character'}, so the profession picks below are empty or incomplete. In WoW: at the character screen click <b>AddOns</b>, tick <b>ForeverMoneyBridge</b> (and "Load out of date AddOns" if it says out of date), log in and type <b>/reload</b>. The app picks it up within seconds. Or type your professions in <b>Settings</b>.</div>` : '';
+    return `${stale}${unknown}
       <div class="hint">${who ? `Playing <b>${esc(who)}</b> (detected)` : 'Using your manual settings'}: ${num(e.gold, 2)}g to invest, level ${e.level}, realm ${esc(e.realm)}. Everything updates when TSM syncs or you log out / /reload. Click any row for details.</div>
       <div class="panel"><h2>Do these now <small>things you can do today, ranked by expected profit per day</small></h2>${oppTable(t.now || [])}</div>
       <div class="panel"><h2>Fishing & farming spots <small>gold per hour: open water, and with the pools you come across</small></h2>${oppTable(withPools(t.hourly || []), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false, heads: {profit_unit: 'Per catch / each'}})}
@@ -151,7 +153,7 @@ const VIEWS = {
         <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. "measured" uses real time from ForeverMoneyBridge; otherwise ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
       <div class="panel"><h2>Snipes <small>single cheap listings at the last scan; check them in game first</small></h2>${oppTable(t.snipes || [], {cols: ['title', 'kind', 'profit_unit', 'cost_unit', 'flags']})}</div>
       <div class="grid2">
-        <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(ifAffordable(t.level_up || []), {cols: ['title', 'profit_unit', 'daily', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: 'Nothing worth it a few skill points away right now.'})}</div>
+        <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(ifAffordable(t.level_up || []), {cols: ['title', 'profit_unit', 'daily', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: noProfs ? 'No professions known yet: see the note at the top.' : 'Nothing worth it a few skill points away right now.'})}</div>
         <div class="panel"><h2>Worth switching professions for <small>at least ${num(STATE.settings.switch_bonus, 1)}× your best</small></h2>${oppTable(ifAffordable(t.switch || []), {cols: ['title', 'profession', 'daily', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: 'No other profession beats yours by enough right now.'})}</div>
       </div>`;
   },
