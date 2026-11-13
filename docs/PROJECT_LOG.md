@@ -33,6 +33,11 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Only suggest items that actually sell (user).** `pricing.liquidity`: hard to sell = region
+  sold/day < max(1, setting) or sale rate < 10% or realm listings > 10 days of region sales (realm sales <= region
+  sales, so days of supply is a floor); never in Top picks, hidden by default on Crafting/Flips. Slow (rate < 25%)
+  and crowded (> 3 days) rank lower (x0.7 each). Realm share of region sales is unknown (TSM data has only
+  PvP-Horde), so no finer realm estimate. On 2026-11-14 it hid 333 of 684 crafts.
 - **2026-11-13 Investments tab.** Curated list `data/investments.json` (34 items, Classic-informed theses,
   labelled speculation); every id is checked against the item database and mismatches are dropped and shown.
   Forever data beside it: buy cost now, vs TSM 14-day realm average, our own snapshot trend (first vs latest
@@ -217,6 +222,9 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Selling check (`pricing.liquidity`): "barely sells" / "slow to sell" / "crowded" flags, Sells
+  column, "How well it sells" in details, filter on Crafting and Flips. Tests: 90.
 
 - **2026-11-13** Items sold only by Black Market agents get no vendor price until ForeverMoneyBridge sees the
   real one (user's choice): no vendor flips or ingredient costs from the game-file price. Affected now:

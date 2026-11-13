@@ -24,6 +24,9 @@ const FLAGS = {
   no_sales_data: ['bad', 'no sales data', 'TSM has no recorded sales for this item'],
   above_region: ['warn', 'above region', 'Lowest listing is far above the region average'],
   slow_seller: ['bad', 'slow seller', 'Sells less often than your minimum'],
+  hard_to_sell: ['bad', 'barely sells', 'Under 1 sold a day in the whole region, under 1 in 10 listings sells, or your realm already has over 10 days of the region\'s sales listed. Never suggested; open the row for the numbers'],
+  slow_to_sell: ['warn', 'slow to sell', 'Under 1 in 4 listings sells: expect to relist (and pay the deposit) a few times. Ranked lower'],
+  crowded: ['warn', 'crowded', 'Your realm already has over 3 days of the whole region\'s sales listed: expect undercutting and waiting. Ranked lower'],
   cant_afford: ['bad', "can't afford", 'Costs more than the gold you have set'],
   unverified_recipe: ['bad', 'unverified recipe', 'Not in SkillUpForever\'s list of obtainable recipes'],
   skill_estimated: ['', 'skill ~', 'Exact skill requirement unknown; estimated'],
@@ -88,11 +91,11 @@ async function loadState() {
 function oppTable(rows, opts = {}) {
   if (!rows.length) return `<div class="empty">${esc(opts.empty || 'Nothing here right now.')}</div>`;
   const id = opts.id || 't' + Math.random().toString(36).slice(2, 7);
-  const cols = opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'flags'];
-  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Per day', daily: 'Per day profit', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
+  const cols = opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'flags'];
+  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Per day', daily: 'Per day profit', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', sells: 'Sells (region)', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
   const st = sortState[id];
   if (st) rows = [...rows].sort((a, b) => ((a[st.k] ?? -1e18) < (b[st.k] ?? -1e18) ? -1 : 1) * (st.dir));
-  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools']);
+  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells']);
   const head = cols.map((c) => `<th data-k="${c}" class="${numeric.has(c) ? 'num' : ''}">${H[c] || c}</th>`).join('');
   const body = rows.map((o) => {
     const cells = cols.map((c) => {
@@ -103,6 +106,7 @@ function oppTable(rows, opts = {}) {
       }
       if (c === 'flags') return `<td>${flagHtml(o.flags)}</td>`;
       if (c === 'units_day') return `<td class="num">${num(o.units_day)}</td>`;
+      if (c === 'sells') { const l = (o.detail || {}).liquidity; return l ? `<td class="num" title="${esc(l.why || 'sells well')}">${num(l.sold_per_day, 0)}/day<div class="pill">${l.sale_rate === null || l.sale_rate === undefined ? '' : (l.sale_rate * 100).toFixed(0) + '% sell · '}${l.listed} listed</div></td>` : '<td class="num pill">–</td>'; }
       if (c === 'kind') return `<td>${esc(KIND[o.kind] || o.kind)}</td>`;
       if (c === 'profession') return `<td>${esc(o.profession || '')}</td>`;
       return `<td class="num">${money(o[c])}</td>`;
@@ -151,25 +155,28 @@ const VIEWS = {
       <div class="panel"><h2>Fishing & farming spots <small>gold per hour: open water, and with the pools you come across</small></h2>${oppTable(withPools(t.hourly || []), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false, heads: {profit_unit: 'Per catch / each'}})}
         <div class="hint">${POOL_HINT}</div>
         <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. "measured" uses real time from ForeverMoneyBridge; otherwise ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
-      <div class="panel"><h2>Snipes <small>single cheap listings at the last scan; check them in game first</small></h2>${oppTable(t.snipes || [], {cols: ['title', 'kind', 'profit_unit', 'cost_unit', 'flags']})}</div>
+      <div class="panel"><h2>Snipes <small>single cheap listings at the last scan; check them in game first</small></h2>${oppTable(t.snipes || [], {cols: ['title', 'kind', 'profit_unit', 'cost_unit', 'sells', 'flags']})}</div>
       <div class="grid2">
-        <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(ifAffordable(t.level_up || []), {cols: ['title', 'profit_unit', 'daily', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: noProfs ? 'No professions known yet: see the note at the top.' : 'Nothing worth it a few skill points away right now.'})}</div>
-        <div class="panel"><h2>Worth switching professions for <small>at least ${num(STATE.settings.switch_bonus, 1)}× your best</small></h2>${oppTable(ifAffordable(t.switch || []), {cols: ['title', 'profession', 'daily', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: 'No other profession beats yours by enough right now.'})}</div>
+        <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(ifAffordable(t.level_up || []), {cols: ['title', 'profit_unit', 'daily', 'sells', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: noProfs ? 'No professions known yet: see the note at the top.' : 'Nothing worth it a few skill points away right now.'})}</div>
+        <div class="panel"><h2>Worth switching professions for <small>at least ${num(STATE.settings.switch_bonus, 1)}× your best</small></h2>${oppTable(ifAffordable(t.switch || []), {cols: ['title', 'profession', 'daily', 'sells', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: 'No other profession beats yours by enough right now.'})}</div>
       </div>`;
   },
   async craft() {
     const profs = STATE.professions_available.filter((p) => !/Racial|Riding|Test|Poison|Swim|Lockpick|Compreh|Survival|Horseman|Piloting/.test(p));
     const sel = sessionStorage.getItem('craftProf') || '';
     const doable = sessionStorage.getItem('craftDoable') === '1';
-    const rows = await api(`/api/opps?kind=craft&profession=${encodeURIComponent(sel)}&doable=${doable ? 1 : ''}&limit=800`);
+    const sellsOnly = sessionStorage.getItem('sellsOnly') !== '0';
+    const rows = await api(`/api/opps?kind=craft&profession=${encodeURIComponent(sel)}&doable=${doable ? 1 : ''}&hide=${sellsOnly ? 'hard_to_sell,no_sales_data' : ''}&limit=800`);
     return `<div class="panel"><h2>Crafting profit <small>ingredients bought at the cheapest of vendor / AH; product sold at the better of AH (after cut) / vendor</small></h2>
       <div class="controls"><select id="cp"><option value="">All professions</option>${[...new Set(profs)].map((p) => `<option ${p === sel ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
-      <label class="chk"><input type="checkbox" id="cd" ${doable ? 'checked' : ''}> only what I can craft now</label></div>
-      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'flags']})}</div>`;
+      <label class="chk"><input type="checkbox" id="cd" ${doable ? 'checked' : ''}> only what I can craft now</label>
+      <label class="chk" title="Hides items that barely sell: under 1 a day in the whole region, under 1 in 10 listings selling, or over 10 days of sales already listed on your realm"><input type="checkbox" class="sells-only" ${sellsOnly ? 'checked' : ''}> hide items that barely sell</label></div>
+      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'flags']})}</div>`;
   },
   async flips() {
-    const [vf, av, dip] = await Promise.all([api('/api/opps?kind=vendor_flip'), api('/api/opps?kind=ah_to_vendor&sort=profit_unit'), api('/api/opps?kind=realm_dip&sort=profit_unit')]);
-    return `<div class="panel"><h2>Buy from a vendor, sell on the AH</h2><div class="hint">Vendors are checked against Questie's Forever database and filtered to your faction. Limited-stock vendors restock over time.</div>${oppTable(vf)}</div>
+    const sellsOnly = sessionStorage.getItem('sellsOnly') !== '0', hide = sellsOnly ? '&hide=hard_to_sell,no_sales_data' : '';
+    const [vf, av, dip] = await Promise.all([api('/api/opps?kind=vendor_flip' + hide), api('/api/opps?kind=ah_to_vendor&sort=profit_unit'), api('/api/opps?kind=realm_dip&sort=profit_unit' + hide)]);
+    return `<div class="controls"><label class="chk"><input type="checkbox" class="sells-only" ${sellsOnly ? 'checked' : ''}> hide items that barely sell</label></div><div class="panel"><h2>Buy from a vendor, sell on the AH</h2><div class="hint">Vendors are checked against Questie's Forever database and filtered to your faction. Limited-stock vendors restock over time.</div>${oppTable(vf)}</div>
       <div class="panel"><h2>Buy on the AH, sell to a vendor</h2><div class="hint">Listings below what a vendor pays, at the last scan. TSM's Sniper catches these live in game.</div>${oppTable(av, {cols: ['title', 'profit_unit', 'cost_unit', 'flags']})}</div>
       <div class="panel"><h2>Cheap listings to relist</h2><div class="hint">Lowest listing under 60% of the lowest of realm market value, region market value and region average sale price. Speculative.</div>${oppTable(dip, {cols: ['title', 'profit_unit', 'cost_unit', 'flags']})}</div>`;
   },
@@ -273,7 +280,7 @@ const VIEWS = {
       <div class="panel"><h2>Assumptions <small>change these if the numbers feel off</small></h2><div class="kv">
       <div>AH cut</div><div><input type="number" step="0.01" id="s-cut" value="${s.ah_cut}"></div>
       <div>Your share of daily sales</div><div><input type="number" step="0.05" id="s-share" value="${s.market_share}"> <span class="pill">0.2 = you expect to sell 20% of the region's tracked daily volume</span></div>
-      <div>Hide items selling under</div><div><input type="number" step="0.5" id="s-minspd" value="${s.min_sold_per_day}"> per day</div>
+      <div>Hide items selling under</div><div><input type="number" step="0.5" id="s-minspd" value="${s.min_sold_per_day}"> per day <span class="pill">in the whole region; never below 1. Items where under 1 in 10 listings sells, or with over 10 days of sales already listed on your realm, are never suggested either</span></div>
       <div>Switch factor</div><div><input type="number" step="0.1" id="s-switch" value="${s.switch_bonus}"></div>
       <div>Fishing casts per hour</div><div><input type="number" id="s-casts" value="${s.casts_per_hour || 240}"></div>
       <div>AH sale price</div><div><select id="s-basis"><option value="min_buyout" ${s.sale_price_basis !== 'actual_sales' ? 'selected' : ''}>current lowest buyout (what you'd list at)</option><option value="actual_sales" ${s.sale_price_basis === 'actual_sales' ? 'selected' : ''}>what items actually sell for (more conservative)</option></select> <span class="pill">nothing listed: the average sale price either way</span></div>
@@ -298,6 +305,7 @@ async function render() {
 function wireView() {
   document.querySelectorAll('#view tr.row[data-item]').forEach((tr) => { if (!tr.dataset.key) tr.onclick = (e) => { if (!e.target.closest('a') && tr.dataset.item) openItem(+tr.dataset.item); }; });
   if (TAB === 'craft') { $('#cp').onchange = (e) => { sessionStorage.setItem('craftProf', e.target.value); render(); }; $('#cd').onchange = (e) => { sessionStorage.setItem('craftDoable', e.target.checked ? '1' : ''); render(); }; }
+  document.querySelectorAll('.sells-only').forEach((c) => c.onchange = (e) => { sessionStorage.setItem('sellsOnly', e.target.checked ? '1' : '0'); render(); });
   if (TAB === 'search') { const go = () => { sessionStorage.setItem('search', $('#sq').value); render(); }; $('#sb').onclick = go; $('#sq').onkeydown = (e) => { if (e.key === 'Enter') go(); }; $('#sq').focus(); }
   if (TAB === 'gather') { $('#fd').onchange = (e) => { sessionStorage.setItem('fishDoable', e.target.checked ? '1' : ''); render(); }; $('#fc').onchange = (e) => { sessionStorage.setItem('fishConfirmed', e.target.checked ? '1' : ''); render(); }; }
   if (TAB === 'invest') document.querySelectorAll('[data-watch]').forEach((b) => b.onclick = async (e) => {
@@ -337,6 +345,10 @@ function oppDetail(o) {
     <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
     <div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
     ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>`;
+  const liq = d.liquidity;
+  if (liq) html += `<h3>How well it sells <small>TSM, whole Forever EU region</small></h3><div class="kv"><div>Sold per day</div><div>${num(liq.sold_per_day, 1)}</div>
+    <div>Listings that sell</div><div>${liq.sale_rate === null || liq.sale_rate === undefined ? '–' : (liq.sale_rate * 100).toFixed(0) + '%'}</div>
+    <div>Listed on your realm</div><div>${liq.listed}${liq.days_of_supply !== null && liq.days_of_supply !== undefined ? ` (${num(liq.days_of_supply, 1)} days of the region's sales)` : ''}</div></div>${liq.why ? `<div class="hint">${esc(liq.why)}</div>` : ''}`;
   if (o.kind === 'craft') {
     html += `<h3>Ingredients <small>per craft</small></h3><table><tbody>${d.mats.map((m) => `<tr><td>${m.count}×</td><td>${itemLink(m.item_id, m.name)}</td><td class="num">${money(m.unit)}</td><td>${esc(m.source)} ${flagHtml(m.flags)}</td></tr>`).join('')}</tbody></table>
       <div class="kv" style="margin-top:8px"><div>Sells for (total)</div><div>${money(d.revenue)} via ${esc(d.sell_channel)} (${esc(d.sell_source)})</div>

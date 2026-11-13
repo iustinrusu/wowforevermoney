@@ -103,6 +103,50 @@ def sale_rate(p: dict | None) -> float:
     return float(p.get('regionSalePercent', 0)) if p else 0.0
 
 
+# How easily something sells on the AH. TSM gives region-wide sales (all Forever EU realms), the share of listings
+# that sell, and how many are listed on your realm. Your realm sells at most the region's volume, so
+# "days of supply" = realm listings / region sold per day is a floor on how long the stock already listed takes to go.
+HARD_SOLD_PER_DAY = 1.0     # under 1 sold a day in the whole region
+HARD_SALE_RATE = 0.10       # under 1 in 10 listings sells (Poached Sunscale Salmon: 6%)
+HARD_DAYS = 10.0            # over 10 days of the region's sales already listed on your realm (Turtle Scale Breastplate: 12)
+SLOW_SALE_RATE = 0.25       # under 1 in 4 listings sells: expect to relist and pay deposits again
+CROWDED_DAYS = 3.0          # over 3 days of the region's sales listed on your realm: expect undercutting and waiting
+
+
+def liquidity(p: dict | None, min_sold_per_day: float = 0.0) -> dict:
+    """How well an item sells: region sold/day, sale rate, realm listings, days of supply, and flags.
+
+    'hard_to_sell' (kept out of suggestions), 'slow_to_sell' and 'crowded' (ranked lower), 'no_sales_data'.
+    """
+    p = p or {}
+    spd = float(p.get('regionSoldPerDay') or 0)
+    rate = p.get('regionSalePercent')
+    listed_now = int(p.get('numAuctions') or 0)
+    days = listed_now / spd if spd > 0 else None
+    flags, why = [], []
+    if spd <= 0:
+        flags.append('no_sales_data')
+        why.append('no recorded sales')
+    else:
+        if spd < max(HARD_SOLD_PER_DAY, min_sold_per_day):
+            why.append(f'only {spd:.1f} sold a day in the whole region')
+        if rate is not None and rate < HARD_SALE_RATE:
+            why.append(f'only {rate:.0%} of listings sell')
+        if days is not None and days > HARD_DAYS:
+            why.append(f'{listed_now} listed on your realm, {days:.0f} days of the region\'s sales')
+        if why:
+            flags.append('hard_to_sell')
+        else:
+            if rate is not None and rate < SLOW_SALE_RATE:
+                flags.append('slow_to_sell')
+                why.append(f'{rate:.0%} of listings sell')
+            if days is not None and days > CROWDED_DAYS:
+                flags.append('crowded')
+                why.append(f'{listed_now} listed on your realm, {days:.1f} days of the region\'s sales')
+    return {'sold_per_day': spd, 'sale_rate': rate, 'listed': listed_now, 'days_of_supply': days,
+            'flags': flags, 'why': '; '.join(why)}
+
+
 def fmt_money(copper: float) -> str:
     sign = '-' if copper < 0 else ''
     c = int(round(abs(copper)))

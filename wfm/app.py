@@ -174,6 +174,7 @@ class App:
         d['quality'] = it.quality if it else 1
         d['wowhead'] = WOWHEAD.format(o.item_id)
         d['tip'] = (self.tips.get(str(o.item_id)) or {}).get('summary')
+        d['sells'] = (o.detail.get('liquidity') or {}).get('sold_per_day')
         return d
 
     def state(self) -> dict:

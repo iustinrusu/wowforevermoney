@@ -11,7 +11,7 @@ import time
 from dataclasses import asdict, dataclass, field
 
 from . import fishing, pricing, valuation
-from .pricing import Quote, ah_buy, ah_sell, proceeds, sold_per_day
+from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
 PROFESSIONS = {'Alchemy', 'Blacksmithing', 'Cooking', 'Enchanting', 'Engineering', 'First Aid', 'Fishing',
@@ -28,7 +28,7 @@ EVENT_WORDS = ('holiday', 'festival', 'darkmoon', 'fireworks vendor', 'lunar', '
 DARKMOON_ZONES = {12, 215}       # Elwynn Forest + Mulgore: where the Darkmoon Faire alternates
 # How sure we are of an opportunity's numbers, from its flags (1 = no doubts). Used to rank picks, not to change
 # the numbers shown: a pick with doubtful prices ranks below an equally good one with solid prices.
-DOUBT = {'sells_lower': 0.6, 'price_looks_off': 0.6, 'none_listed': 0.8, 'mat_not_listed': 0.8, 'small_sample': 0.8,
+DOUBT = {'slow_to_sell': 0.7, 'crowded': 0.7, 'sells_lower': 0.6, 'price_looks_off': 0.6, 'none_listed': 0.8, 'mat_not_listed': 0.8, 'small_sample': 0.8,
          'limited_mat': 0.9, 'limited_stock': 0.9, 'seasonal': 0.9, 'vendor_price_unconfirmed': 0.95,
          'skill_estimated': 0.95, 'assumed_rate': 0.95, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
 
@@ -501,6 +501,7 @@ class Engine:
                 needs='' if doable else f'Learn {prof}', profession=prof, preferred=prof in self.preferred,
                 flags=list(q.flags) if q else [],
                 detail={'source': source, 'best_use': how, 'sell_value': sell, 'craft_use': use,
+                        'sell_channel': channel if value == sell else 'craft',
                         'sold_per_day': sold_per_day(p), 'your_rate_per_hour': rate,
                         'drops_from': len((self.q.items.get(iid) or {}).get('npcDrops') or []) if self.q else 0}))
         return out
@@ -813,16 +814,18 @@ class Engine:
                     + self.gathering(best_use) + measured + self.fishing_spots(best_use))
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         for o in all_opps:
-            spd = o.detail.get('sold_per_day')
-            if spd is not None and spd < min_spd and o.kind in ('craft', 'vendor_flip', 'gather') \
-                    and o.detail.get('sell_channel') != 'vendor':
-                o.flags.append('slow_seller')
+            # anything you'd sell on the AH: does it actually sell? (hard to sell: never suggested)
+            if (o.kind in ('craft', 'vendor_flip', 'gather', 'realm_dip')
+                    and o.detail.get('sell_channel') not in ('vendor', 'craft')):
+                liq = liquidity(self.price(o.item_id), min_spd)
+                o.detail['liquidity'] = liq
+                o.flags.extend(f for f in liq['flags'] if f not in o.flags)
         return {'opportunities': all_opps, 'best_use': best_use, 'top': self.top_picks(all_opps),
                 'undervalued': self.undervaluation_watch()}
 
     def top_picks(self, opps: list[Opportunity], n: int = 15) -> dict:
         bonus = float(self.s.get('switch_bonus', 1.5))
-        bad = {'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
+        bad = {'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
                'event_vendor'}
 
         def clean(o, allow_unaffordable=False):
