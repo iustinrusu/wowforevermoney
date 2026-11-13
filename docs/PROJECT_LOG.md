@@ -33,6 +33,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 A wall of overpriced listings is not a price.** Root cause of a 9g "Short Staff" flip: `ah_sell`
+  trusted the lowest listing whenever more than 3 were listed (10 listings at 10g; sells for 1s 90c). Now, if
+  the lowest listing is over 3x the region average sale price, the value is that sale price (flag
+  `listed_far_above_sales`). Fixed in the one price function, so crafts, flips, farming, container and fish
+  values all follow. 745 of 6,203 listed items were over 2x; 3x (not 2x) keeps real realm premiums such as
+  Arcanite Bar (lowest 50g, realm avg 42g, sells 24g), which stays flagged "sells for less".
 - **2026-11-14 Only suggest items that actually sell (user).** `pricing.liquidity`: hard to sell = region
   sold/day < max(1, setting) or sale rate < 10% or realm listings > 10 days of region sales (realm sales <= region
   sales, so days of supply is a floor); never in Top picks, hidden by default on Crafting/Flips. Slow (rate < 25%)
@@ -222,6 +228,9 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Overpriced listing walls valued at actual sales (`pricing.WALL = 3`). Short Staff flip: 9g 49s
+  -> 78c. Tests: 98.
 
 - **2026-11-14** Market tab (`wfm/market.py`, `/api/market`): autocomplete search, SVG price chart (line or daily
   candles, listings as volume, hover crosshair, 24h/7d/30d/all), and five signals summed into a sentiment label

@@ -40,6 +40,7 @@ const FLAGS = {
   risky: ['bad', 'risky', 'Speculative: depends on prices recovering'],
   small_sample: ['warn', 'small sample', 'Not many catches/loots logged here yet'],
   vendor_price_unconfirmed: ['', 'vendor price from game files', 'Base price from the game files; open the vendor once with ForeverMoneyBridge to confirm the real price'],
+  listed_far_above_sales: ['warn', 'listings far above sales', 'Every listing on your realm is over 3x what it actually sells for across the region (a wall of wishful prices): valued at the region average sale price instead of the lowest listing'],
   price_looks_off: ['warn', 'price looks off', "Only a few listings, far from the realm's recent average: valued at the recent average until more listings confirm the new price"],
   old_snapshot: ['warn', 'old Wowhead data', 'The Wowhead Forever counts for this zone are over 30 days old: re-read the zone page'],
   craft_limited_demand: ['warn', 'limited demand', 'Valued by crafting it into something whose market only absorbs a limited number per day; beyond that it is worth its sale price'],

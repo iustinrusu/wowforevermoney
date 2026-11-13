@@ -43,6 +43,7 @@ def ah_buy(p: dict | None) -> Quote | None:
 
 SALE_BASES = ('min_buyout', 'actual_sales')
 ODD_LISTINGS, ODD_LOW, ODD_HIGH = 3, 0.5, 2.0    # few listings outside half..double the recent average: looks off
+WALL = 3.0       # lowest listing over 3x the region's average sale price: nobody pays it, value at actual sales
 
 
 def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
@@ -69,6 +70,11 @@ def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
             flags.append('price_looks_off')
         if basis == 'actual_sales' and mv and mv < value:
             value, source = mv, 'realm market value'
+        if sale and value > WALL * sale:
+            # A wall of listings far above anything that sells is not a price (Short Staff: 10 listings at 10g,
+            # sells for 1s 90c, which made a 9g "flip"). The lowest listing is only a sale price if things sell near it.
+            value, source = sale, 'average sale price (region): every listing is far above what it sells for'
+            flags.append('listed_far_above_sales')
     else:
         flags.append('none_listed')
         options = [(int(v), s) for v, s in ((sale, 'average sale price (region, actual sales)'),

@@ -50,6 +50,29 @@ class PricingTests(unittest.TestCase):
         self.assertEqual(ah_buy({'regionMarketValue': 90}).flags, ('no_realm_data',))
         self.assertIsNone(ah_buy({}))
 
+    def test_wall_of_overpriced_listings_is_not_a_price(self):
+        # Short Staff, 2026-11-14: 10 listings at 10g, sells for 1s 90c -> the app showed a 9g vendor flip
+        staff = {'numAuctions': 10, 'minBuyout': 100000, 'marketValue': 286, 'marketValueRecent': 100000,
+                 'regionSale': 190, 'regionSoldPerDay': 2.0, 'regionSalePercent': 1.0, 'regionMarketValue': 900}
+        q = ah_sell(staff)
+        self.assertEqual(q.value, 190)
+        self.assertIn('listed_far_above_sales', q.flags)
+        self.assertNotIn('sells_lower', q.flags)
+        # a realm premium under 3x the sale price is kept (Arcanite Bar: lowest 50g, realm avg 42g, sells 24g)
+        arcanite = {'numAuctions': 39, 'minBuyout': 500000, 'marketValue': 422597, 'regionSale': 239897,
+                    'regionSoldPerDay': 5.25}
+        q = ah_sell(arcanite)
+        self.assertEqual(q.value, 500000)
+        self.assertIn('sells_lower', q.flags)
+        self.assertNotIn('listed_far_above_sales', q.flags)
+
+    def test_wall_makes_the_short_staff_flip_realistic(self):
+        w = make_world({LIMITED: {'numAuctions': 10, 'minBuyout': 100000, 'marketValue': 286, 'regionSale': 1900,
+                                  'regionSoldPerDay': 20, 'regionSalePercent': 1.0}})
+        o = next(o for o in Engine(w, dict(SETTINGS)).vendor_flips() if o.item_id == LIMITED)
+        self.assertEqual(o.profit_unit, int(1900 * 0.95) - 1000)     # vendor price 10s: 8s 5c, not 9g
+        self.assertIn('listed_far_above_sales', o.flags)
+
     def test_sell_at_lowest_buyout_by_default(self):
         # The user's rule: you list at the current lowest buyout, so that's the sale price.
         q = ah_sell({'numAuctions': 5, 'minBuyout': 500, 'marketValue': 600, 'regionSoldPerDay': 3, 'regionSale': 550})
