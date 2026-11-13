@@ -97,8 +97,9 @@ class Item:
     partial: bool = False      # not in the client's ItemSparse; filled from Wowhead tooltip / Questie
     openable: bool = False     # right-click to open (trunks, clams, lockboxes): worth its contents
     locked: bool = False       # needs Lockpicking (or a key) to open
-    source: str = 'client'     # client (game tables) | server (hotfix cache) | wowhead | questie | in-game
+    source: str = 'client'     # client (game tables) | server / server-new (hotfix cache: update / item only it has) | wowhead | questie | in-game
     checked: dict | None = None   # once verified in game: {'against': previous source, 'differs': [fields]}
+    untrusted: tuple = ()      # fields of this item's source that in-game checks show are often wrong
 
     @property
     def category(self) -> str:
@@ -212,7 +213,9 @@ def apply_hotfixes(gd: GameData, rows: dict[int, dict]) -> dict:
             sell_price=_int(r.get('SellPrice')), buy_price=round(_int(r.get('BuyPrice')) / stack_count),
             stack=_int(r.get('Stackable'), 1), class_id=cls, subclass_id=sub, bonding=_int(r.get('Bonding')),
             openable=bool(_int(r.get('Flags_0')) & ITEM_FLAG_HAS_LOOT),
-            locked=(_int(r['LockID']) > 0) if 'LockID' in r else bool(old and old.locked), source='server')
+            locked=(_int(r['LockID']) > 0) if 'LockID' in r else bool(old and old.locked),
+            # graded separately by in-game checks: new items' sell prices proved unreliable, updates' didn't
+            source='server' if (old and not old.partial) else 'server-new')
         if not item.name:
             continue
         if old and not old.partial:
@@ -253,6 +256,46 @@ def apply_ingame(gd: GameData, info: dict) -> int:
         it.name = str(r['n']) or it.name
         it.source = 'in-game'
         n += 1
+    return n
+
+
+TRUST_MIN_CHECKS = 30     # grade a source's field once the game has checked this many of its items
+TRUST_MAX_WRONG = 0.2      # wrong more often than this: not trusted for that source's unchecked items
+
+
+def grade_sources(gd: GameData) -> dict[tuple[str, str], dict]:
+    """How often each source's fields matched your game client (ForeverMoneyBridge item checks).
+
+    (source, field) -> {'checked', 'wrong', 'rate', 'trusted'}. Found 2026-11-14: the hotfix cache's sell price
+    for new Forever items was wrong for 310 of 356 checked items, while every other field matched.
+    """
+    counts: dict[tuple[str, str], list] = {}
+    for it in gd.items.values():
+        c = it.checked
+        if not c:
+            continue
+        for attr in INGAME_FIELDS.values():
+            k = counts.setdefault((c['against'], attr), [0, 0])
+            k[0] += 1
+            k[1] += attr in c.get('differs', ())
+    out = {}
+    for (src, attr), (n, wrong) in counts.items():
+        rate = wrong / n if n else 0.0
+        out[(src, attr)] = {'checked': n, 'wrong': wrong, 'rate': rate,
+                            'trusted': not (n >= TRUST_MIN_CHECKS and rate > TRUST_MAX_WRONG)}
+    return out
+
+
+def mark_untrusted(gd: GameData, grades: dict[tuple[str, str], dict]) -> int:
+    """Mark unchecked items whose source is unreliable for a field. Returns how many items were marked."""
+    bad: dict[str, tuple] = {}
+    for (src, attr), g in grades.items():
+        if not g['trusted']:
+            bad[src] = bad.get(src, ()) + (attr,)
+    n = 0
+    for it in gd.items.values():
+        it.untrusted = () if it.source == 'in-game' else bad.get(it.source, ())
+        n += bool(it.untrusted)
     return n
 
 

@@ -33,6 +33,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Sources graded by in-game checks.** The audit showed the hotfix cache's sell price for items only
+  it has (new Forever items) was wrong for 310 of 342 checked (91%; all other fields matched; no consistent
+  ratio, not explained by PriceVariance/PriceRandomValue, one version per record), while hotfix updates to
+  shipped items were right (14/14). Now: source 'server-new' vs 'server'; `gamedata.grade_sources` grades every
+  (source, field) against in-game checks, and a field wrong > 20% with 30+ checks is not trusted for that
+  source's unchecked items (`Item.untrusted`): their vendor price counts as unknown (no AH-to-vendor flips, no
+  vendor value or salvage), and they go first in the in-game check queue. 4,908 items affected on 2026-11-14.
 - **2026-11-14 Skinning spots** (`wfm/skinning.py`, `Engine.skinning_spots`, `data/wowhead_forever_skinning.json`):
   Wowhead Forever "Skinned from" counts per mob (count/outof, levels, zones; Classic Era rows skipped, flag is
   `classicEra: true` on this tab), mobs skinned 50+ times, top 40 per item. Zone value per skin = average over mobs
@@ -157,6 +164,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-14: ForeverMoneyBridge 1.4.0 records containers on the Forever client (Big-mouth Clam x7, Mithril
+  Bound Trunk x4, Iron Bound Trunk x4 with contents); no trunk-only items (Bolts) appear in mob or skinning logs.
+  Fishing exclusion not verifiable yet (no fishing logged since 1.4.0).
+- 2026-11-14: Mithril Bound Trunk recomputed by hand: the 12 listed contents match to the copper (54s 47c of
+  68s 50c; the rest is rarer contents).
+- 2026-11-14: Questie has no mob lists for cloth (Linen to Runecloth); its elemental drop rates are Classic.
 - DBCache.bin v9: header 44 bytes ("XFTH", version, build, 32-byte hash); entries "XFTH" + push, unique, ?, table
   hash, record id, size, status (1 = valid) + data. ItemSparse hash 0x919BE54E, Item 0x50238EC2. Strings
   inline, null-terminated; no padding. 303 server-vs-Wowhead sell price disagreements on new items (awaiting
@@ -254,6 +267,9 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Item sources graded by in-game checks; new hotfix items' vendor prices untrusted until checked;
+  audit says which (source, field) is untrusted. Tests: 116.
 
 - **2026-11-14** Skinning spots on the Farming tab and in hourly Top picks; skins-per-hour setting; Wowhead
   Forever skinning snapshot (7 items). Tests: 113.

@@ -16,7 +16,8 @@ Start by reading CLAUDE.md and docs/PROJECT_LOG.md in that folder, especially "S
 
 The user is firm that the data must be correct and accurate. Do these steps in order. Use the task list and keep the user informed.
 
-1. Review and test (most important)
+1. Review and test (most important). PARTLY DONE 2026-11-14: audit run (found and fixed the new-item sell price
+   problem), addon containers verified, Mithril Bound Trunk recomputed. Still to do: the adversarial code review.
 - Run `python -m unittest discover -s tests -t .` and `python -m wfm.audit`. Python is at %LOCALAPPDATA%\Programs\Python\Python313\python.exe.
 - Do an adversarial review of the code written on 2026-11-13: wfm/classicdb.py, wfm/fishing.py, wfm/valuation.py, the fishing, valuation and undervaluation-watch code in wfm/engine.py, the loaders in wfm/world.py, item() and inventory() in wfm/app.py, the fishing UI in web/app.js, and addon/ForeverMoneyBridge/ForeverMoneyBridge.lua (now version 1.4.0).
 - For the addon, check whether GetLootSourceInfo and a hooksecurefunc on C_Container.UseContainerItem work on the Forever client (interface 16001). Use the addon's own code and Forever addons in C:\Games\World of Warcraft\_forever_\Interface\AddOns as references.

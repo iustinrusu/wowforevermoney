@@ -71,6 +71,8 @@ class World:
         self.prices: dict[int, dict] = {}
         self.questie: QuestieDB | None = None
         self.drop_rates: dict = {}
+        self.source_grades: dict = {}
+        self.untrusted_items = 0
         self.skillup: SkillUpData = SkillUpData()
         self.angler: dict | None = None
         self.classic_fishing: classicdb.ClassicFishing | None = None
@@ -399,13 +401,16 @@ class World:
             self.tooltips.want(sorted(need_fetch))
         # what your own game client reported (ForeverMoneyBridge item checks) overrides every other source
         gamedata.apply_ingame(self.gamedata, (self.profile or {}).get('item_info'))
+        # stop trusting a source's field for unchecked items once the game shows it is often wrong
+        self.source_grades = gamedata.grade_sources(self.gamedata)
+        self.untrusted_items = gamedata.mark_untrusted(self.gamedata, self.source_grades)
 
     def source_disagreements(self) -> list[int]:
         """Items whose server data (hotfix cache) and Wowhead Forever tooltip disagree on the sell price."""
         gd = self.gamedata
         out = []
         for iid, it in (gd.items.items() if gd else ()):
-            if it.source == 'server':
+            if it.source in ('server', 'server-new'):
                 t = self.tooltips.get(iid)
                 if t and t.get('sell_price') is not None and t['sell_price'] != it.sell_price:
                     out.append(iid)
@@ -440,6 +445,8 @@ class World:
 
         add(sorted(self.source_disagreements()))
         add(sorted(important))
+        # items whose source is unreliable for a field, the ones with prices first
+        add(sorted(i for i, it in gd.items.items() if it.untrusted and i in self.prices))
         add(sorted(i for i, it in gd.items.items() if it.source in ('wowhead', 'questie') and i in self.prices))
         rnd = random.Random(int(now // 86400))
         ids = sorted(gd.items)

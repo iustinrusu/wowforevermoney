@@ -91,7 +91,7 @@ class Valuer:
             flags.append('ah_price_doubtful')
             sale = (e.price(iid) or {}).get('regionSale') or 0
             sell = min(sell, int(sale * (1 - e.cut))) if sale else 0
-        vendor = item.sell_price if item else 0
+        vendor = 0 if not item or 'sell_price' in getattr(item, 'untrusted', ()) else item.sell_price
         tradeable = not (item and (item.bonding == 1 or item.class_id == 12))     # soulbound or quest item
         if channel == 'AH' and sell > 0 and tradeable:
             channels['AH'] = sell

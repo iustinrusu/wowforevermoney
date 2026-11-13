@@ -143,6 +143,15 @@ def run(world, engine) -> list[dict]:
                           f'{classic_only} fishing rows are Classic-only (unconfirmed, kept out of Top picks).',
                           differ + agree))
 
+    def untrusted_note(w):
+        bad = [(s, a, g) for (s, a), g in (getattr(w, 'source_grades', None) or {}).items() if not g['trusted']]
+        if not bad:
+            return ''
+        parts = [f"{a.replace('_', ' ')} from {s} data was wrong in {g['rate']:.0%} of {g['checked']} checks" for s, a, g in bad]
+        return (' Not trusted until checked in game: ' + '; '.join(parts) +
+                f' ({getattr(w, "untrusted_items", 0):,} unchecked items affected; their vendor price is treated as unknown'
+                ' and they are first in line for checks).')
+
     # 11b. Item data verified by your own game client (ForeverMoneyBridge item checks): which sources were right.
     checked = [it for it in gd.items.values() if it.checked]
     by_src: dict[str, list] = {}
@@ -152,7 +161,7 @@ def run(world, engine) -> list[dict]:
     for src, its in sorted(by_src.items()):
         bad = [it for it in its if it.checked['differs']]
         rate = len(bad) / len(its)
-        if src in ('client', 'server', 'wowhead') and len(its) >= 20:
+        if src in ('client', 'server', 'server-new', 'wowhead') and len(its) >= 20:
             worst = max(worst, rate)
         rows.append(f'{src}: {len(its)} checked, {len(bad)} differed ({rate:.0%})')
     examples = [f"{it.name} ({it.id}): {', '.join(it.checked['differs'])} differed from {it.checked['against']} data"
@@ -162,7 +171,7 @@ def run(world, engine) -> list[dict]:
                       (f'{len(checked)} items verified by your game client; ' + '; '.join(rows) if checked else
                        'No items verified in game yet: log in (or /reload) with ForeverMoneyBridge 1.4+, then /reload '
                        'again a minute later.') + f' {len(disagree)} items where the server data and Wowhead disagree '
-                      f'are queued for checking.', examples))
+                      f'are queued for checking.' + untrusted_note(world), examples))
 
     # 12. Undervaluation watch: what you loot, carry or catch, valued through every channel.
     engine.valuer(engine.best_uses())

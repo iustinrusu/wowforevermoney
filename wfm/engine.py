@@ -33,6 +33,11 @@ DOUBT = {'listed_far_above_sales': 0.8, 'slow_to_sell': 0.7, 'crowded': 0.7, 'se
          'skill_estimated': 0.95, 'assumed_rate': 0.95, 'assumed_kill_rate': 0.9, 'skins_partial': 0.95, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
 
 
+def vendor_sell(item) -> int:
+    """What a vendor pays for one, or 0 if unknown or from a source the game showed is often wrong."""
+    return 0 if not item or 'sell_price' in getattr(item, 'untrusted', ()) else item.sell_price
+
+
 def confidence(flags) -> float:
     c = 1.0
     for f in set(flags):
@@ -213,7 +218,7 @@ class Engine:
         if item and (item.bonding == 1 or item.class_id == 12):
             q = None          # soulbound or quest item: it can't be sold on the AH, whatever TSM lists
         ah_val = proceeds(q, self.cut)
-        vendor_val = item.sell_price if item else 0
+        vendor_val = vendor_sell(item)
         if ah_val >= vendor_val and ah_val > 0:
             return ah_val, 'AH', q
         return vendor_val, 'vendor', q
@@ -389,7 +394,7 @@ class Engine:
         out = []
         for iid, p in self.prices.items():
             item = self.gd.items.get(iid)
-            if not item or item.sell_price <= 0 or not pricing.listed(p):
+            if not item or vendor_sell(item) <= 0 or not pricing.listed(p):     # unconfirmed vendor prices: no flip
                 continue
             mb = int(p['minBuyout'])
             if mb >= item.sell_price:
@@ -883,7 +888,7 @@ class Engine:
                 base = o.daily + UNAFFORDABLE_SHARE * (potential - o.daily)
                 basis = 'profit per day' + (' (+ 10% of what more gold would add)' if potential > o.daily else '')
         item = self.gd.items.get(o.item_id)
-        salvage = (item.sell_price if item else 0) * (o.detail.get('product_count') or 1)
+        salvage = vendor_sell(item) * (o.detail.get('product_count') or 1)
         downside = max(0, o.cost_unit - salvage) if o.kind not in HOURLY_KINDS else 0
         risk = 1 / (1 + RISK_WEIGHT * downside / max(o.profit_unit, 1)) if downside else 1.0
         doable = 1.0 if (o.doable or later) else (
