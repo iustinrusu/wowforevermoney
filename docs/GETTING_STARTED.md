@@ -51,7 +51,8 @@ WoW: Forever by itself; if it can't, it asks you to paste your "World of Warcraf
 
 The app reads these if you have them (all on CurseForge):
 - **QuestieDB:** which vendors sell what, and who drops what.
-- **SkillUpForever:** exact recipe skill levels.
+- **SkillUpForever:** confirms which recipes can really be learned in Forever, with exact skill levels.
+  Strongly recommended: without it, crafts are marked "unverified recipe" and never reach Top picks.
 - **Syndicator:** your bags and bank (enables the My bags tab).
 - **ForeverAngler:** your fishing log.
 

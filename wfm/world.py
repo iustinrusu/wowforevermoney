@@ -168,7 +168,9 @@ class World:
         d = self.paths.skillup_data
         st.files = [str(d)]
         if not d.exists():
-            st.status, st.note = 'missing', 'Recipe skill levels will be estimated.'
+            st.status, st.note = 'missing', ('Not installed: recipes can\'t be checked as learnable in Forever, so crafts '
+                                             'are marked "unverified recipe" and kept out of Top picks, and recipe skill '
+                                             'levels are estimated. Install the SkillUpForever addon.')
             self.skillup = SkillUpData()
             return
         self.skillup = load_skillup(d)

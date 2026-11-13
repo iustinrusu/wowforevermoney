@@ -238,6 +238,21 @@ class EngineTests(unittest.TestCase):
         self.assertIn('more_with_skill', v.flags)
         self.assertEqual(v.if_skilled['value'], 950)
 
+    def test_without_skillup_crafts_show_flagged_not_vanish(self):
+        # a friend without SkillUpForever saw an empty Crafting tab: every recipe was dropped as unverified
+        hard = Recipe(spell_id=501, name='Tasty Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                      product_count=1, reagents=[(FISH, 1)], trivial_low=120, trivial_high=160, min_rank=1)
+        prices = {FISH: {'numAuctions': 5, 'minBuyout': 80, 'marketValue': 90, 'regionSoldPerDay': 50},
+                  PRODUCT: {'numAuctions': 5, 'minBuyout': 1000, 'marketValue': 1000, 'regionSoldPerDay': 50}}
+        w = make_world(prices, [hard])
+        self.assertEqual([o for o in Engine(w, dict(SETTINGS)).crafts()], [])     # SkillUp present, 501 unknown: hidden
+        w.skillup.thresholds.clear()                                                 # SkillUp not installed
+        e = Engine(w, dict(SETTINGS))
+        crafts = e.crafts()
+        self.assertEqual([o.title for o in crafts], ['Craft Tasty Dish'])
+        self.assertIn('unverified_recipe', crafts[0].flags)
+        self.assertNotIn(crafts[0].key, sum(e.top_picks(crafts).values(), []))     # never a top pick
+
     def test_soulbound_items_only_sell_to_vendors(self):
         w = make_world({PRODUCT: {'numAuctions': 3, 'minBuyout': 5000, 'marketValue': 5000, 'regionSale': 5000,
                                   'regionSoldPerDay': 9}})

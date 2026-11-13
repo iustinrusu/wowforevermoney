@@ -218,6 +218,10 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Change log
 
+- **2026-11-13** Friend's Crafting tab was empty: without SkillUpForever every recipe was dropped as unverified.
+  Now, when SkillUpForever is missing, crafts are shown flagged "unverified recipe" (still never Top picks);
+  Data health says what is lost. Top picks warns when the character/professions aren't detected. Tests: 82.
+
 - **2026-11-13** `start.bat` finds Python 3.13+ (per-user and all-users installs, the `py` launcher, PATH;
   skips the Microsoft Store "python" shortcut) and, if missing, offers `winget install --id Python.Python.3.13`.
   Tested: found here; missing + No; missing + Yes (winget stubbed). The `py` launcher branch is untested (no

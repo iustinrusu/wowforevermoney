@@ -249,7 +249,9 @@ class Engine:
     # ---------- opportunity builders ----------
     def crafts(self) -> list[Opportunity]:
         out = []
-        include_unverified = self.s.get('include_unverified_recipes', False)
+        # Without SkillUpForever nothing can be verified: show every craft flagged "unverified recipe" (kept out of
+        # Top picks) rather than an empty Crafting tab (a friend's install showed nothing at all, 2026-11-13).
+        include_unverified = self.s.get('include_unverified_recipes', False) or not self.su.thresholds
         for r in self.gd.recipes:
             if r.profession not in PROFESSIONS or not r.reagents:
                 continue
