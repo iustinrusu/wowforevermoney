@@ -14,6 +14,7 @@ local ACTIVITY_SPELLS = {
 }
 local IDLE_GAP = 120      -- seconds; longer gaps between loots don't count as active time
 local CAST_WINDOW = 15    -- loot within this many seconds of a gathering cast belongs to it
+local FISHING_BOBBER = 35591   -- gameobject id of the fishing bobber (open-water catches)
 
 local lastCast = { activity = nil, t = 0 }
 local lastLoot = {}       -- activity -> time of previous loot (for active time)
@@ -138,11 +139,29 @@ local function recordLoot()
   end
   lastLoot[activity] = now
   a.lastSeen = time()
+  -- Fishing: which object the catch came from. The bobber = open water; another object = a pool (Floating
+  -- Wreckage, a school...). Lets the app measure how much of your fishing is pools instead of assuming it.
+  local pool
+  if activity == "fishing" and GetLootSourceInfo then
+    local guid = GetLootSourceInfo(1)
+    local gkind, _, _, _, _, oid = strsplit("-", guid or "")
+    oid = (gkind == "GameObject") and tonumber(oid) or 0
+    a.sources = a.sources or {}
+    a.sources[oid] = (a.sources[oid] or 0) + 1
+    if oid ~= 0 and oid ~= FISHING_BOBBER then
+      a.pools = a.pools or {}
+      pool = a.pools[oid] or { loots = 0, items = {}, firstSeen = time() }
+      a.pools[oid] = pool
+      pool.loots = pool.loots + 1
+      pool.lastSeen = time()
+    end
+  end
   for slot = 1, (GetNumLootItems and GetNumLootItems() or 0) do
     local id = itemIdFromLink(GetLootSlotLink and GetLootSlotLink(slot))
     local _, _, quantity = GetLootSlotInfo(slot)
     if id then
       a.items[id] = (a.items[id] or 0) + (quantity or 1)
+      if pool then pool.items[id] = (pool.items[id] or 0) + (quantity or 1) end
     end
   end
 end

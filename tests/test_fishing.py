@@ -131,7 +131,10 @@ def world(angler=None, activity=None, wowhead=None):
 
 
 SETTINGS = {'gold': 1, 'ah_cut': 0.05, 'market_share': 0.2, 'faction': 'H', 'min_sold_per_day': 0.5,
-            'professions': {'Fishing': 225}, 'preferred': ['Fishing'], 'casts_per_hour': 200}
+            'professions': {'Fishing': 225}, 'preferred': ['Fishing'], 'casts_per_hour': 200,
+            # most tests below exercise blending your own logs and counting pools; the defaults are tested separately
+            'own_logs_for_rates': True, 'fishing_pools': True}
+DEFAULTS = dict(SETTINGS, own_logs_for_rates=False, fishing_pools=False)
 TANARIS_LOG = {'zones': {'Tanaris': {'c': 100, 'k': 60, 'e': 20, 'fish': {B: 30, A: 25, N: 3, P: 2}},
                          'Mulgore': {'c': 0, 'k': 0, 'e': 0, 'fish': []}}}
 
@@ -183,6 +186,28 @@ class SpotTests(unittest.TestCase):
         self.assertEqual(inland.profit_unit, 64)                 # 60% x 100 + 40% x 10
         self.assertIn('fish:zone:440', r['top']['hourly'])
         self.assertNotIn('fish:440:440', r['top']['hourly'])
+
+    def test_by_default_your_logs_give_pace_not_drop_rates(self):
+        # The user's catch log is small, mixes pools and open water and is incomplete: by default it must not
+        # set drop rates. It still gives the got-away rate (about you, not the zone).
+        opps = spots_by_key(Engine(world(TANARIS_LOG), dict(DEFAULTS)).fishing_spots({}))
+        self.assertNotIn('fish:zone:440', opps, 'no Wowhead data and own logs off: no Forever row')
+        inland = opps['fish:440:440']
+        self.assertIn('classic_unconfirmed', inland.flags)
+        self.assertAlmostEqual(inland.detail['keep'], 0.75, msg='got-away rate still from your log (60 kept of 80)')
+
+    def test_pool_loot_is_a_bonus_by_default(self):
+        # Floating Wreckage etc. have to be found first: gold/hour counts open water; pool loot is shown apart.
+        wh = {'Tanaris': {'fished': 100, 'items': {A: 60, J: 30, P: 10}, 'checked': '2026-11-13', 'url': 'u'}}
+        row = spots_by_key(Engine(world(wowhead=wh), dict(DEFAULTS)).fishing_spots({}))['fish:zone:440']
+        self.assertEqual(row.detail['forever_catches'], 90, '10 trunk catches set aside')
+        self.assertNotIn(P, [f['item_id'] for f in row.detail['fish']])
+        self.assertIn('pools_extra', row.flags)
+        self.assertAlmostEqual(row.detail['pool_share'], 0.10)
+        self.assertEqual(row.detail['value_with_pools'], int(0.6 * 100 + 0.3 * 10 + 0.1 * 300))
+        counted = spots_by_key(Engine(world(wowhead=wh), dict(DEFAULTS, fishing_pools=True)).fishing_spots({}))
+        self.assertEqual(counted['fish:zone:440'].detail['forever_catches'], 100)
+        self.assertNotIn('pools_extra', counted['fish:zone:440'].flags)
 
     def test_small_samples_stay_out_of_top_picks(self):
         # A dozen catches with a couple of lucky trunks can make a zone look 3x better than it is.

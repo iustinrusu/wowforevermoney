@@ -22,6 +22,16 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-13 Own catch logs don't set drop rates (default).** Wowhead Forever counts only; the user's
+  ForeverAngler/ForeverMoneyBridge logs give pace and got-away rate. Opt-in setting `own_logs_for_rates`.
+  *Why (user):* their ForeverAngler log skews rates: small (612 casts), mixes pools and open water,
+  incomplete.
+- **2026-11-13 Fishing gold/hour = open water (default).** Pool-only loot (trunks, Stranglekelp, Rumsey Rum,
+  Sagefish) is set aside and shown as a bonus (`value_with_pools`, `gph_with_pools`). Opt-in setting
+  `fishing_pools`. *Why (user):* pools have to be found first, which takes running around. Result: Tanaris
+  8.4g/h (20.5 with pools), Feralas 6.4 (14.0), Azshara 6.1 (7.6), Dustwallow 1.75 (9.2), Stranglethorn 1.6
+  (27.3): Stranglethorn's value is almost all pools. Addon 1.3.0 records each fishing loot's source object
+  (bobber 35591 = open water, else a pool), to measure the real pool share and search time.
 - **2026-11-13 Item value = best of every channel** (`wfm/valuation.py`): AH, vendor, crafting, and *open it*
   (expected value of Forever contents at current prices, containers in containers included). Openable
   items come from the client's ItemSparse `Flags_0 & 0x4` (522 items). Openable without contents data =
@@ -103,8 +113,10 @@ The user is firm that the data must be correct and accurate. In order:
    included), then the Contains tab for every item in the "Possibly undervalued items" check. One page
    every 8+ seconds; stop all Wowhead reading on the first 403. Read `window.g_listviews`, skip `classicEra`
    rows. Every 5th page, screenshot the tab and check a few numbers against what was extracted.
-3. **Verify addon 1.2.0** once the user has /reloaded and opened a trunk: `containers` in SavedVariables,
-   and no trunk contents in the fishing activity.
+3. **Verify addon 1.3.0** once the user has /reloaded, fished and opened a trunk: `containers` in
+   SavedVariables, no trunk contents in the fishing activity, and `activity[zone].fishing.sources/pools`
+   (does GetLootSourceInfo give the pool's object id when fishing a pool, or the bobber's?). Then use the
+   measured pool share/search time in the pool bonus instead of "every pool you pass".
 4. Fix the gathering list (exclude crafted products), then update this log, commit and push.
 
 ## Open items

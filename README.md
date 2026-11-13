@@ -62,6 +62,7 @@ Everything runs on your PC. The page is only reachable from your own computer, a
 - **small sample**: not many catches or loots logged yet.
 - **assumed casts/hour**: fishing pace from your setting. It becomes **measured** after about 10 minutes of fishing with the addon on.
 - **vendor price from game files** / **black market vendor**: open that vendor once with the addon on to record the real price.
+- **pool loot extra**: this gold/hour is open water only. The details show what pools would add.
 - **slow seller**, **can't afford**, **snapshot**: check before acting.
 
 ## The addon: ForeverMoneyBridge
@@ -126,6 +127,8 @@ The **Data health** tab shows every source's age and version, plus the accuracy 
 - **Gold/hour** is only shown when it's measured (ForeverMoneyBridge time logs), assumed from your settings (ForeverAngler has no timing), or from a rate you entered.
 - **What an item is worth** is the best of four ways to turn it into gold: sell on the AH, sell to a vendor, craft with it, or **open it** (trunks, clams, crates). Opening is valued at the expected value of its Forever contents at current prices, so a Mithril Bound Trunk is worth its Mageweave and Runecloth, not its 2c vendor price. The client's own item flags say which items can be opened; any openable item with unknown contents is flagged "contents unknown" (its value is a floor) and listed in the undervaluation watch on Data health.
 - **Fishing** is Forever data first: your catches plus Wowhead Forever zone counts, one row per zone ("Fish in ..."). Classic tables appear only as "Classic table: ..." rows, are often wrong for Forever (Data health shows how far), and never reach Top picks. Gold/hour for fishing = worth per catch x catches per hour (casts/hour setting x your landed rate x fish kept).
+- **Fishing drop rates** come from Wowhead Forever's large samples. Your own catch logs are small, mix pools with open water and can be incomplete, so by default they only give your pace and got-away rate (Settings: "also use my own catch logs").
+- **Pools** (Floating Wreckage/Debris, schools) have to be found first, so fishing gold/hour is open water only. What pool loot (trunks, Stranglekelp, Rumsey Rum) adds is shown in each row's details (Settings: "count pool loot"). The addon records which catches came from pools, so your real pool share can be measured.
 
 ## Known limits (read these)
 
@@ -135,7 +138,7 @@ The **Data health** tab shows every source's age and version, plus the accuracy 
 - About a third of recipe skill requirements are estimated (yellow − 40). They're marked `~`.
 - "Cheap relist" and "AH → vendor" rows come from one scan snapshot. Check them in game, or use TSM's Sniper.
 - AH deposits for listings that don't sell are not included.
-- Wowhead Forever zone counts mix open water and pools. If you only fish open water, you'll catch fewer trunks than those numbers suggest.
+- Wowhead Forever zone counts mix open water and pools. Pool-only loot is set aside, but school fish that are also caught in open water (Oily Blackmouth, Firefin Snapper, Stonescale Eel) stay in, so open-water shares of those fish are slightly high.
 - Coins inside containers aren't counted (Wowhead doesn't list them). Disenchanting and quest rewards aren't valued yet.
 
 ## Tests and audits

@@ -166,7 +166,7 @@ class EngineTests(unittest.TestCase):
                   COOKED: {'numAuctions': 5, 'minBuyout': 200, 'marketValue': 210, 'regionSoldPerDay': 50}}
         angler = {'zones': {'Tanaris': {'c': 100, 'k': 90, 'e': 10, 'fish': {FISH: 40}}}}
         w = make_world(prices, [recipe], angler)
-        e = Engine(w, dict(SETTINGS))
+        e = Engine(w, dict(SETTINGS, own_logs_for_rates=True))   # opt-in
         best = e.best_uses()
         self.assertEqual(best[FISH]['value'], 190)              # cooked: 200 x 0.95 = 190 beats raw 76
         zone = e.fishing_spots(best)[0]                          # no Classic data: your log only

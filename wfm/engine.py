@@ -502,11 +502,30 @@ class Engine:
             zone_by_name.setdefault(rows[0].zone, zid)
         table_items = {i for rows in spots.values() for s in rows for i in s.shares}
         pool_only = set(pools) - table_items
+        use_own = bool(self.s.get('own_logs_for_rates', False))
+        with_pools = bool(self.s.get('fishing_pools', False))
+
+        def counts(o) -> dict:
+            """Forever catches used for drop rates: Wowhead Forever, plus your own logs only if you opted in.
+            Pool-only loot (trunks, Stranglekelp, Rumsey Rum) is set aside unless you count pools: pools have to
+            be found first, so open water is the honest default. Each pool-only item ~ one pool catch."""
+            items = dict(o.items) if use_own else {}
+            for i, c in o.wh_items.items():
+                items[i] = items.get(i, 0) + c
+            n_all = (o.caught if use_own else 0) + o.wh_fished
+            pool = {i: c for i, c in items.items() if i in pool_only}
+            if with_pools:
+                return {'n': n_all, 'items': items, 'n_all': n_all, 'items_all': items, 'pool': pool}
+            n = max(0, n_all - sum(pool.values()))
+            return {'n': n, 'items': {i: c for i, c in items.items() if i not in pool}, 'n_all': n_all,
+                    'items_all': items, 'pool': pool}
+
+        fc = {name: counts(o) for name, o in obs.items()}
 
         def match(zid, o):
             """The zone's Classic table explaining at least half of the Forever catches (pool-only loot such as
             trunks doesn't count either way), among the tables your skill can fish."""
-            relevant = {i: c for i, c in o.all_items().items() if i not in pool_only}
+            relevant = {i: c for i, c in fc[o.zone]['items'].items() if i not in pool_only}
             total = sum(relevant.values())
 
             def explained(s):
@@ -516,7 +535,7 @@ class Engine:
             best = max(cands, key=lambda s: (explained(s), not s.names), default=None)
             return best if best and total and explained(best) / total >= fishing.MATCH_MIN else None
 
-        matched = {name: match(zone_by_name.get(name), o) for name, o in obs.items() if o.total()}
+        matched = {name: match(zone_by_name.get(name), o) for name, o in obs.items() if fc[name]['n']}
 
         def zone_skill_of(name):
             zid = zone_by_name.get(name)
@@ -532,25 +551,27 @@ class Engine:
 
         out = []
         for name, o in obs.items():
-            if o.total():
+            if fc[name]['n']:
                 zid = zone_by_name.get(name)
                 out.append(self._fishing_row(name, zid, matched.get(name), o, model, skill, val, spots.get(zid, []),
-                                             pools, zone_skill_of(name)))
+                                             pools, zone_skill_of(name), fc[name], use_own, with_pools))
         for zid, zone_spots in spots.items():
             name = zone_spots[0].zone
             for spot in zone_spots:
                 if spot is not matched.get(name):
-                    out.append(self._fishing_row(name, zid, spot, None, model, skill, val, zone_spots, pools, spot.skill))
+                    out.append(self._fishing_row(name, zid, spot, None, model, skill, val, zone_spots, pools, spot.skill,
+                                                 None, use_own, with_pools))
         return out
 
-    def _fishing_row(self, zone, zid, spot, o, model, skill, val, zone_spots, pools, zone_skill) -> Opportunity:
+    def _fishing_row(self, zone, zid, spot, o, model, skill, val, zone_spots, pools, zone_skill, fc=None,
+                     use_own=False, with_pools=False) -> Opportunity:
         """One row. o = Forever data for the zone (a Forever row), or None (a Classic-only row for spot)."""
         forever = o is not None
-        n = o.total() if forever else 0
+        n = fc['n'] if forever else 0
         w = (1.0 if spot is None else n / (n + fishing.PRIOR_CATCHES)) if forever else 0.0
         classic = {i: s['share'] for i, s in (spot.shares.items() if spot else ())}
         quest = {i for i, s in (spot.shares.items() if spot else ()) if s['quest']}
-        items = o.all_items() if forever else {}
+        items = fc['items'] if forever else {}
         observed = {i: c / n for i, c in items.items()} if n else {}
         rows, value, classic_value, observed_value, seasonal_value = [], 0.0, 0.0, 0.0, 0.0
         for iid in set(classic) | set(observed):
@@ -565,7 +586,7 @@ class Engine:
             rows.append({'item_id': iid, 'name': self.name(iid), 'value': v, 'share': round(share, 4),
                          'classic_share': round(classic[iid], 4) if iid in classic else None,
                          'observed_share': round(observed[iid], 4) if iid in observed else None,
-                         'count': o.items.get(iid, 0) if forever else 0,
+                         'count': o.items.get(iid, 0) if forever and use_own else 0,
                          'wowhead_count': o.wh_items.get(iid, 0) if forever else 0, 'quest': iid in quest,
                          'seasonal': info.get('seasonal'), 'in_season': info.get('in_season'),
                          'pools': pools.get(iid, []) if iid not in classic else [],
@@ -588,8 +609,17 @@ class Engine:
                    if s['share'] >= fishing.MISSING_SHARE and not s['quest'] and not items.get(i)]
         top = rows[0]['item_id'] if rows else 0
         confirmed_by = []
-        if forever and o.caught >= 10:
+        if forever and use_own and o.caught >= 10:
             confirmed_by.append('your catches')
+        # pool loot: what the Forever data says it adds per catch, kept out of the headline unless counted
+        pool_rows, pool_value, value_with_pools = [], 0.0, None
+        if forever and fc['pool'] and fc['n_all']:
+            for i, c in sorted(fc['pool'].items(), key=lambda kv: -kv[1] * val(kv[0])):
+                pool_rows.append({'item_id': i, 'name': self.name(i), 'count': c, 'share': round(c / fc['n_all'], 4),
+                                  'value': val(i)})
+                pool_value += c / fc['n_all'] * val(i)
+            open_part = sum(c / fc['n_all'] * val(i) for i, c in fc['items_all'].items() if i not in fc['pool'])
+            value_with_pools = int(open_part + pool_value)
         if forever and o.wh_fished >= fishing.WOWHEAD_CONFIRM:
             confirmed_by.append('Wowhead Forever')
 
@@ -600,6 +630,8 @@ class Engine:
             flags.append('forever_only')
         if forever and o.wh_fished:
             flags.append('wowhead_forever')
+        if forever and fc['pool'] and not with_pools:
+            flags.append('pools_extra')
         if spot and spot.coverage < fishing.INCOMPLETE and w < 0.5:
             flags.append('classic_incomplete')
         if forever and 0 < n < fishing.PRIOR_CATCHES:
@@ -641,6 +673,11 @@ class Engine:
                     'got_away': o.escaped if forever else 0, 'forever_catches': n,
                     'wowhead_fished': o.wh_fished if forever else 0, 'wowhead_checked': o.wh_checked if forever else '',
                     'wowhead_url': o.wh_url if forever else '',
+                    'own_logs_used': use_own, 'pools_counted': with_pools,
+                    'pool_loot': pool_rows[:8], 'pool_share': round(sum(fc['pool'].values()) / fc['n_all'], 4)
+                    if forever and fc['n_all'] else 0,
+                    'value_with_pools': value_with_pools,
+                    'gph_with_pools': round(value_with_pools * cph) if value_with_pools and doable else None,
                     'sources': (o.sources if forever else []) + (['Classic (cMaNGOS classic-db)'] if spot else []),
                     'new_in_forever': new_fish, 'classic_missing': missing, 'confirmed_by': confirmed_by,
                     'dungeon': bool(spot and spot.dungeon)})

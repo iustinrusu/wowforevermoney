@@ -49,6 +49,7 @@ const FLAGS = {
   seasonal: ['', 'seasonal', 'Part of the value is a seasonal fish (Classic schedule; Forever may differ)'],
   classic_getaway: ['warn', 'got-away rate: Classic formula', 'No logs at this zone skill yet; Classic formula used, which your Forever logs suggest is too harsh'],
   dungeon: ['', 'dungeon', 'Inside a dungeon'],
+  pools_extra: ['', 'pool loot extra', 'Pool loot (trunks, Stranglekelp, Rumsey Rum) is not in this gold/hour, because pools have to be found first. Open the row to see what pools add, or count them in Settings.'],
   contents_unknown: ['warn', 'contents unknown', 'Can be opened, but what it contains in Forever is unknown: valued as a floor. Open one with ForeverMoneyBridge enabled, or read its Wowhead Forever page'],
   open_it: ['good', 'open it', 'Worth more opened than sold (expected value of its Forever contents at current prices)'],
   locked: ['', 'locked', 'Needs Lockpicking or a key to open'],
@@ -130,7 +131,7 @@ const VIEWS = {
       <div class="hint">${who ? `Playing <b>${esc(who)}</b> (detected)` : 'Using your manual settings'}: ${num(e.gold, 2)}g to invest, level ${e.level}, realm ${esc(e.realm)}. Everything updates when TSM syncs or you log out / /reload. Click any row for details.</div>
       <div class="panel"><h2>Do these now <small>things you can do today, ranked by expected profit per day</small></h2>${oppTable(t.now || [])}</div>
       <div class="panel"><h2>Fishing & farming spots <small>gold per hour, from your own catch log and rates</small></h2>${oppTable(t.hourly || [], {cols: ['title', 'profit_unit', 'gph', 'flags'], export: false})}
-        <div class="hint">Only spots confirmed by Forever data (your catches or a Wowhead Forever check) appear here. "measured" uses real time from ForeverMoneyBridge; otherwise ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
+        <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. "measured" uses real time from ForeverMoneyBridge; otherwise ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
       <div class="panel"><h2>Snipes <small>single cheap listings at the last scan; check them in game first</small></h2>${oppTable(t.snipes || [], {cols: ['title', 'kind', 'profit_unit', 'cost_unit', 'flags']})}</div>
       <div class="grid2">
         <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(t.level_up || [], {cols: ['title', 'profit_unit', 'daily', 'flags']})}</div>
@@ -225,6 +226,8 @@ const VIEWS = {
       <div>Hide items selling under</div><div><input type="number" step="0.5" id="s-minspd" value="${s.min_sold_per_day}"> per day</div>
       <div>Switch factor</div><div><input type="number" step="0.1" id="s-switch" value="${s.switch_bonus}"></div>
       <div>Fishing casts per hour</div><div><input type="number" id="s-casts" value="${s.casts_per_hour || 240}"></div>
+      <div>Fishing drop rates</div><div><label class="chk"><input type="checkbox" id="s-ownrates" ${s.own_logs_for_rates ? 'checked' : ''}> also use my own catch logs</label> <span class="pill">off: Wowhead Forever's big samples only; your logs still give your pace and got-away rate</span></div>
+      <div>Fishing pools</div><div><label class="chk"><input type="checkbox" id="s-pools" ${s.fishing_pools ? 'checked' : ''}> count pool loot in gold/hour</label> <span class="pill">off: open water only; trunks, Stranglekelp and Rumsey Rum from pools shown as a bonus, since pools have to be found first</span></div>
       <div>Unverified recipes</div><div><label class="chk"><input type="checkbox" id="s-unver" ${s.include_unverified_recipes ? 'checked' : ''}> include</label></div>
       <div>Desktop alerts</div><div><label class="chk"><input type="checkbox" id="s-alerts" ${s.alerts.enabled ? 'checked' : ''}> on</label> when a new pick makes at least <input type="number" id="s-alertmin" value="${s.alerts.min_daily_profit_gold}"> g/day</div>
       <div>Stale after</div><div>realm prices <input type="number" id="s-stale-r" value="${s.stale_hours.realm}"> h, region <input type="number" id="s-stale-g" value="${s.stale_hours.region}"> h</div>
@@ -254,7 +257,8 @@ function wireView() {
       document.querySelectorAll('.s-prof').forEach((i) => { if (i.value !== '') professions[i.dataset.p] = +i.value; });
       const body = {auto_detect: $('#s-auto').checked, character: $('#s-char').value || null, gold_scope: $('#s-gscope').value, gold: +$('#s-gold').value, level: +$('#s-level').value, realm: $('#s-realm').value, faction: $('#s-faction').value, professions,
         ah_cut: +$('#s-cut').value, market_share: +$('#s-share').value, min_sold_per_day: +$('#s-minspd').value, switch_bonus: +$('#s-switch').value,
-        casts_per_hour: +$('#s-casts').value, include_unverified_recipes: $('#s-unver').checked,
+        casts_per_hour: +$('#s-casts').value, own_logs_for_rates: $('#s-ownrates').checked, fishing_pools: $('#s-pools').checked,
+        include_unverified_recipes: $('#s-unver').checked,
         alerts: {enabled: $('#s-alerts').checked, min_daily_profit_gold: +$('#s-alertmin').value},
         stale_hours: {realm: +$('#s-stale-r').value, region: +$('#s-stale-g').value}};
       await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
@@ -307,7 +311,8 @@ function fishingDetail(o) {
     ${d.forever ? `<div>Classic table used</div><div>${d.classic_spot ? `${esc(d.classic_spot)} <span class="pill">only while Forever data is thin: weighs ${(100 - d.weight * 100).toFixed(0)}%</span>` : '<span class="pill">none (no Classic table matches what is caught here in Forever)</span>'}</div>` : ''}
     ${d.subzones && d.subzones.length ? `<div>Where</div><div>${esc(d.subzones.join(', '))}</div>` : ''}
     <div>Worth per catch</div><div>${money(d.value_per_catch)} ${has(d.classic_value) ? `<span class="pill">Classic table: ${money(d.classic_value)}</span>` : ''} ${has(d.observed_value) ? `<span class="pill">Forever catches: ${money(d.observed_value)}</span>` : ''}</div>
-    <div>Your catches here</div><div>${d.casts ? `${d.casts} casts, ${d.caught} caught, ${d.got_away} got away` : (d.caught ? `${d.caught} caught` : 'none logged yet')}</div>
+    <div>Your catches here</div><div>${d.casts ? `${d.casts} casts, ${d.caught} caught, ${d.got_away} got away` : (d.caught ? `${d.caught} caught` : 'none logged yet')}${d.forever && !d.own_logs_used ? ' <span class="pill">used for your pace and got-away rate, not drop rates (Settings)</span>' : ''}</div>
+    ${(d.pool_loot || []).length ? `<div>Pool loot</div><div>${pct(d.pool_share)} of Forever catches here were pool loot (${d.pool_loot.slice(0, 4).map((f) => esc(f.name)).join(', ')}). ${d.pools_counted ? 'Counted in gold/hour (Settings).' : `Not counted, because pools have to be found first. If you fish every pool you pass: ${money(d.value_with_pools)} per catch${d.gph_with_pools ? `, about ${money(d.gph_with_pools)}/hour before the time spent finding them` : ''}.`}</div>` : ''}
     ${d.wowhead_fished ? `<div>Wowhead Forever</div><div>${num(d.wowhead_fished, 0)} catches in this zone <span class="pill">read by hand ${esc(d.wowhead_checked)}</span> <a href="${esc(d.wowhead_url)}" target="_blank" rel="noopener">source</a></div>` : ''}
     <div>Zone skill (Classic)</div><div>${d.zone_skill ?? 'unknown'} · you: ${d.your_skill}</div>
     <div>Fish kept when hooked</div><div>${pct(d.keep)} <span class="pill">${esc(d.keep_source)}</span></div>

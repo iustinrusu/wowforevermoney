@@ -30,6 +30,12 @@ DEFAULTS = {
     'alerts': {'enabled': True, 'min_daily_profit_gold': 5.0, 'desktop': True},
     'stale_hours': {'realm': 3, 'region': 36},
     'casts_per_hour': 240,
+    # Drop rates come from Wowhead Forever's large samples. Your own catch logs are small, mix pools with open
+    # water and can be incomplete, so they're only used for your pace and got-away rate unless you turn this on.
+    'own_logs_for_rates': False,
+    # Pools (Floating Wreckage/Debris, schools) have to be found first, so gold/hour counts open water only;
+    # pool loot (trunks, Stranglekelp, Rumsey Rum) is shown as a bonus unless you turn this on.
+    'fishing_pools': False,
 }
 
 
