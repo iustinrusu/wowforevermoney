@@ -218,6 +218,10 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Change log
 
+- **2026-11-13** Frilled Lichen (249399) costs **4g 50s** at Mister Graphed (Black Market), seen in game by the
+  user; the tip and the black-market flag text said 4s 50c (coin icons misread on Wowhead). Corrected. Lesson:
+  hand-written prices must say which coin they mean and be checked in game.
+
 - **2026-11-13** Friend's Crafting tab was empty: without SkillUpForever every recipe was dropped as unverified.
   Now, when SkillUpForever is missing, crafts are shown flagged "unverified recipe" (still never Top picks);
   Data health says what is lost. Top picks warns when the character/professions aren't detected. Tests: 82.

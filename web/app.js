@@ -42,7 +42,7 @@ const FLAGS = {
   craft_limited_demand: ['warn', 'limited demand', 'Valued by crafting it into something whose market only absorbs a limited number per day; beyond that it is worth its sale price'],
   more_with_skill: ['', 'more with skill', "A recipe you can't make yet would make it worth more (see details); valued at what you can do now"],
   event_vendor: ['bad', 'event vendor', 'Every vendor selling it is event-only (Darkmoon Faire, holidays) or has no known location: check it is there now. Kept out of Top picks'],
-  black_market: ['bad', 'black market vendor', 'Black Market agents charge more than the game-file price (e.g. Frilled Lichen: 4s 50c, not 1s 20c). Visit once to record the real price'],
+  black_market: ['bad', 'black market vendor', 'Black Market agents charge more than the game-file price (e.g. Frilled Lichen: 4g 50s, not 1s 20c). Visit once to record the real price'],
   measured: ['good', 'measured', 'Gold/hour from real time spent (ForeverMoneyBridge)'],
   not_enough_time: ['warn', 'needs more time', 'Under 5 minutes logged; gold/hour not shown yet'],
   assumed_rate: ['warn', 'assumed casts/hour', 'No timed fishing logs yet (ForeverMoneyBridge); uses your casts-per-hour setting'],
