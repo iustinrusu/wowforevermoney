@@ -33,6 +33,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Recipe cooldowns** (user OK'd the download: SpellCooldowns.csv, 120 KB, wago.tools, build
+  1.60.1.70938; now in `gamedata.TABLES`). Cooldown = max(CategoryRecoveryTime, RecoveryTime) at DifficultyID 0;
+  10+ minutes caps crafts a day at 24 h / cooldown (crafts and the material best-use volume). Forever values:
+  Transmute: Arcanite and Legionite 47 h, elemental transmutes 23 h, Mooncloth 95 h, Refined Scale of Onyxia 2 h,
+  Iron to Gold and Mithril to Truesilver 1 h, Transmute: Elemental Fire 10 min. Arcanite potential 38.8g/day ->
+  20.3g/day (#1 -> #5 on Crafting). Shared transmute cooldowns (SpellCategories) aren't modelled: each
+  transmute is capped on its own.
 - **2026-11-14 Sources graded by in-game checks.** The audit showed the hotfix cache's sell price for items only
   it has (new Forever items) was wrong for 310 of 342 checked (91%; all other fields matched; no consistent
   ratio, not explained by PriceVariance/PriceRandomValue, one version per record), while hotfix updates to
@@ -243,9 +250,6 @@ The user is firm that the data must be correct and accurate. In order:
   then the "Dropped by" tabs for mob farming (cloth 2589/2592/4306/4338/14047/14256, elementals 7067-7070, 7075,
   7077, 7079, 7081, 12803, 12808, 7972, Righteous Orb 12811). Same compact extract (see docs/plans), stop by
   throwing on a non-Forever page.
-- **Recipe cooldowns aren't modelled** (found 2026-11-14): Transmute: Arcanite shows ~38.8g/day potential as if
-  ~10 crafts a day were possible; Mooncloth, transmutes and salt are overstated too. Needs the SpellCooldowns
-  table from wago.tools (Forever build), waiting for the user's OK to download it.
 - Read more Wowhead Forever zones (Arathi, Hinterlands, Western Plaguelands, Felwood, Un'Goro, Swamp of
   Sorrows, Desolace, Thousand Needles, Alterac, Hillsbrad, Wetlands, Moonglade, Winterspring, Eastern
   Plaguelands, Burning Steppes, Silithus, and Forever-only zones) and containers (Bloated fish, Sealed/Heavy
@@ -267,6 +271,9 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Recipe cooldowns from SpellCooldowns cap crafts per day ("cooldown" flag, shown in details).
+  Tests: 117.
 
 - **2026-11-14** Item sources graded by in-game checks; new hotfix items' vendor prices untrusted until checked;
   audit says which (source, field) is untrusted. Tests: 116.

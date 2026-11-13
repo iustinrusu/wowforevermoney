@@ -57,6 +57,15 @@ UNAFFORDABLE_SHARE = 0.1    # what more gold would add counts 10%: what you can 
 RISK_WEIGHT = 0.05          # risking 20x the profit (if it doesn't sell) halves the score
 PREFERRED_BONUS = 1.1
 
+COOLDOWN_MIN_MS = 10 * 60 * 1000   # a recipe cooldown of 10+ minutes limits how many you can make a day
+
+
+def cooldown_per_day(recipe) -> float | None:
+    """Most crafts a day a recipe's cooldown allows (Transmute: Arcanite 47 h: 0.51), or None if no cooldown."""
+    ms = getattr(recipe, 'cooldown_ms', 0) or 0
+    return 86_400_000 / ms if ms >= COOLDOWN_MIN_MS else None
+
+
 MAX_UNITS_PER_DAY = 200          # sanity cap when demand is effectively unlimited (e.g. selling to vendors)
 COPPER_PER_GOLD = 10000
 
@@ -309,12 +318,17 @@ class Engine:
                     cap = sold_per_day(self.price(m['item_id'])) * self.share / m['count']
                     if cap < crafts_uncapped:
                         crafts_uncapped, mat_limit = cap, m['name']
+            per_cooldown = cooldown_per_day(r)
+            if per_cooldown is not None and per_cooldown < crafts_uncapped:
+                crafts_uncapped, mat_limit = per_cooldown, None
             crafts_day = min(crafts_uncapped, self.affordable(cost))
             req, exact = self.required_skill(r)
             have = self.profs.get(r.profession)
             flags = list(q.flags) if (q and channel == 'AH') else []
             if not verified:
                 flags.append('unverified_recipe')
+            if per_cooldown is not None:
+                flags.append('cooldown')
             if not exact:
                 flags.append('skill_estimated')
             if channel == 'vendor':
@@ -347,7 +361,8 @@ class Engine:
                         'thresholds': self.su.thresholds.get(r.spell_id), 'learn': self.learn_cost(r),
                         'req_level': product.req_level if product else 0,
                         'sold_per_day': sold_per_day(self.price(r.product_id)),
-                        'daily_if_affordable': int(profit * crafts_uncapped), 'limited_by_mat': mat_limit}))
+                        'daily_if_affordable': int(profit * crafts_uncapped), 'limited_by_mat': mat_limit,
+                        'cooldown_hours': round(r.cooldown_ms / 3_600_000, 2) if per_cooldown is not None else None}))
         return out
 
     def vendor_flips(self) -> list[Opportunity]:
@@ -481,8 +496,11 @@ class Engine:
                 if can and (cur['doable_value'] is None or val > cur['doable_value']):
                     cur['doable_value'], cur['doable_recipe'], cur['doable_profession'] = int(val), r.name, r.profession
                     # how many units of this material a day the product's market can absorb at your share
-                    cur['doable_units_per_day'] = round(sold_per_day(self.price(r.product_id)) * self.share * cnt
-                                                        / max(r.product_count, 1), 1)
+                    crafts = sold_per_day(self.price(r.product_id)) * self.share / max(r.product_count, 1)
+                    per_cooldown = cooldown_per_day(r)
+                    if per_cooldown is not None:
+                        crafts = min(crafts, per_cooldown)          # a cooldown limits how much it can use
+                    cur['doable_units_per_day'] = round(crafts * cnt, 1)
         return best
 
     def gathering(self, best_use: dict[int, dict]) -> list[Opportunity]:

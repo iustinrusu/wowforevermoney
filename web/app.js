@@ -69,6 +69,7 @@ const FLAGS = {
   skins_partial: ['warn', 'some skins not counted', 'Counts leathers and Light/Medium Hide only: heavier hides, scales and special leathers were not read from Wowhead Forever yet, so this is a floor'],
   skill_classic_rule: ['', 'skill: Classic rule', 'Skinning skill per mob level uses the WoW Classic rule (level x 5 above level 20); Forever may differ'],
   assumed_kill_rate: ['warn', 'assumed skins/hour', 'No timed skinning logs yet (ForeverMoneyBridge); uses your skins-per-hour setting'],
+  cooldown: ['', 'cooldown', 'The recipe has a cooldown in the game data (Transmute: Arcanite 47 hours, Mooncloth 95 hours): per day counts only the crafts it allows'],
   ah_price_doubtful: ['warn', 'AH price doubtful', 'Listed with no recorded sales or far above the region: counted at its sale price instead'],
 };
 const rankCell = (r) => `<td class="rk">${r <= 3 ? `<span class="medal m${r}" title="${['', 'Gold', 'Silver', 'Bronze'][r]}: #${r}">${r}</span>` : `<span class="rank">${r}</span>`}</td>`;
@@ -534,7 +535,8 @@ function oppDetail(o) {
       <div class="kv" style="margin-top:8px"><div>Sells for (total)</div><div>${money(d.revenue)} via ${esc(d.sell_channel)} (${esc(d.sell_source)})</div>
       <div>Skill needed</div><div>${d.skill_required}${d.skill_exact ? '' : ' (estimated)'} ${d.thresholds ? `<span class="pill">orange/yellow/green/grey: ${d.thresholds.join(' / ')}</span>` : ''}</div>
       <div>Learn it</div><div>${d.learn ? (d.learn.how === 'trainer' ? `Trainer, ${money(d.learn.cost)}` : `${esc(d.learn.name || 'recipe')}: ${d.learn.cost !== null ? money(d.learn.cost) : 'not on AH / vendor'} (${esc(d.learn.source || '')})`) : 'unknown / already known'}</div>
-      <div>Region sold/day</div><div>${num(d.sold_per_day)}</div></div>`;
+      <div>Region sold/day</div><div>${num(d.sold_per_day)}</div>
+      ${d.cooldown_hours ? `<div>Cooldown</div><div>${num(d.cooldown_hours, 1)} hours (game data): at most ${num(24 / d.cooldown_hours, 2)} a day</div>` : ''}</div>`;
   }
   if (o.kind === 'vendor_flip') {
     html += `<h3>Where to buy</h3><table><tbody>${(d.vendors || []).map((v) => `<tr><td>${esc(v.name)}</td><td>${esc(v.zone)}</td><td>${v.coords ? v.coords.map((c) => (+c).toFixed(1)).join(', ') : ''}</td><td>${v.stock ? 'stock ' + v.stock : ''}</td></tr>`).join('')}</tbody></table>

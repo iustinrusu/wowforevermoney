@@ -151,6 +151,8 @@ The **Data health** tab shows every source's age and version, plus the accuracy 
   Crafting and Flips): under 1 sold a day (or your Settings minimum, if higher), under 1 in 10 listings selling,
   or over 10 days of sales already listed. **Slow to sell** (under 1 in 4 listings sells) and **crowded** (over 3
   days listed) are shown but ranked lower. The "Sells" column and each row's details show the numbers.
+- **Recipe cooldowns** (from the game's SpellCooldowns table) cap how many a day you can make: Transmute:
+  Arcanite 47 hours, so about 0.5 a day; Mooncloth 95 hours. Rows say "cooldown".
 - **Per day**: profit × the units you can realistically sell per day. That's TSM's region sold/day × your market share setting (default 20%), capped by your gold, vendor stock and recipe output.
 - **Gold/hour** is only shown when it's measured (ForeverMoneyBridge time logs), assumed from your settings (ForeverAngler has no timing), or from a rate you entered.
 - **What an item is worth** is the best of four ways to turn it into gold: sell on the AH, sell to a vendor, craft with it, or **open it** (trunks, clams, crates). Opening is valued at the expected value of its Forever contents at current prices, so a Mithril Bound Trunk is worth its Mageweave and Runecloth, not its 2c vendor price. The client's own item flags say which items can be opened; any openable item with unknown contents is flagged "contents unknown" (its value is a floor) and listed in the undervaluation watch on Data health.

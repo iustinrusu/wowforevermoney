@@ -11,7 +11,7 @@ from pathlib import Path
 from .paths import DATA
 
 TABLES = ['ItemSparse', 'Item', 'SkillLine', 'SkillLineAbility', 'SpellEffect', 'SpellReagents', 'SpellName',
-          'AreaTable']
+          'AreaTable', 'SpellCooldowns']
 USER_AGENT = 'WoWForeverMoney/0.1 (personal gold tool)'
 CREATE_ITEM = '24'
 ITEM_FLAG_HAS_LOOT = 0x4   # ItemSparse Flags_0: the item can be opened (has its own loot)
@@ -120,6 +120,7 @@ class Recipe:
     trivial_low: int                     # yellow
     trivial_high: int                    # grey
     min_rank: int
+    cooldown_ms: int = 0                 # SpellCooldowns (e.g. Transmute: Arcanite 47 h, Mooncloth 95 h)
 
 
 @dataclass
@@ -181,6 +182,15 @@ def load(build: str) -> GameData:
                 mats.append((rid, cnt))
         reagents[_int(r['SpellID'])] = mats
 
+    cooldowns: dict[int, int] = {}
+    if (folder / 'SpellCooldowns.csv').exists():          # older caches get it on the next start
+        for r in _rows(folder, 'SpellCooldowns'):
+            if _int(r.get('DifficultyID')) == 0:
+                ms = max(_int(r.get('CategoryRecoveryTime')), _int(r.get('RecoveryTime')))
+                if ms:
+                    sid = _int(r.get('SpellID'))
+                    cooldowns[sid] = max(cooldowns.get(sid, 0), ms)
+
     seen = set()
     for r in _rows(folder, 'SkillLineAbility'):
         line = _int(r.get('SkillLine'))
@@ -195,7 +205,7 @@ def load(build: str) -> GameData:
             spell_id=spell, name=names.get(spell, ''), profession=gd.professions[line], skill_line=line,
             product_id=product, product_count=count, reagents=reagents.get(spell, []),
             trivial_low=_int(r.get('TrivialSkillLineRankLow')), trivial_high=_int(r.get('TrivialSkillLineRankHigh')),
-            min_rank=_int(r.get('MinSkillLineRank'))))
+            min_rank=_int(r.get('MinSkillLineRank')), cooldown_ms=cooldowns.get(spell, 0)))
     return gd
 
 

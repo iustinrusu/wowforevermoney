@@ -267,6 +267,23 @@ class EngineTests(unittest.TestCase):
         self.assertIn('more_with_skill', v.flags)
         self.assertEqual(v.if_skilled['value'], 950)
 
+    def test_recipe_cooldown_caps_crafts_per_day(self):
+        # Transmute: Arcanite has a 47-hour cooldown in Forever's SpellCooldowns: about 0.51 a day, not ~10
+        arcanite = Recipe(spell_id=500, name='Transmute', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                          product_count=1, reagents=[(FISH, 1)], trivial_low=140, trivial_high=180, min_rank=1,
+                          cooldown_ms=47 * 3600 * 1000)
+        prices = {FISH: {'numAuctions': 5, 'minBuyout': 80, 'marketValue': 90, 'regionSoldPerDay': 500},
+                  PRODUCT: {'numAuctions': 5, 'minBuyout': 1000, 'marketValue': 1000, 'regionSoldPerDay': 500,
+                            'regionSalePercent': 0.6}}
+        o = Engine(make_world(prices, [arcanite]), dict(SETTINGS, gold=100)).crafts()[0]
+        self.assertAlmostEqual(o.units_day, round(24 / 47, 2))
+        self.assertIn('cooldown', o.flags)
+        self.assertEqual(o.detail['cooldown_hours'], 47.0)
+        arcanite.cooldown_ms = 1500                                   # a global cooldown is not a limit
+        o = Engine(make_world(prices, [arcanite]), dict(SETTINGS, gold=100)).crafts()[0]
+        self.assertNotIn('cooldown', o.flags)
+        self.assertGreater(o.units_day, 1)
+
     def test_without_skillup_crafts_show_flagged_not_vanish(self):
         # a friend without SkillUpForever saw an empty Crafting tab: every recipe was dropped as unverified
         hard = Recipe(spell_id=501, name='Tasty Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
