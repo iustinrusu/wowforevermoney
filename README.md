@@ -137,6 +137,14 @@ The **Data health** tab shows every source's age and version, plus the accuracy 
 - **Sale price** is the **current lowest buyout** on your realm (what you'd list at), minus the AH cut. With nothing listed there's no buyout to match, so the region's **average actual sale price** is used (a Hand Axe whose listings average 2.5g really sells for about 6.6s). If even the lowest listing is over 3x what the item actually sells for across the region (a wall of wishful prices: Short Staff had 10 listings at 10g and sells for 1s 90c), nobody pays it, so the item is valued at its region average sale price and flagged "listings far above sales". Items listed well above what they actually sell for get a "sells for less" flag: at that price they may sit unsold. Settings can switch to "what items actually sell for", which never values anything above its real sale price. Soulbound and quest items only count at their vendor price. A lone listing far above the region's usual price is never used for trunk contents or catches.
 - **Crafting values** (what a material is worth when you craft it) use only recipes you can make now. A better recipe that needs more skill is shown as "more with skill". If the crafted product's market only absorbs a few a day, it's flagged "limited demand".
 - **Event vendors** (Darkmoon Faire, holiday vendors) and vendors with no known location are flagged "event vendor" and kept out of Top picks.
+- **Ranking (the # column, medals for 1-3):** every row gets a score = expected profit (per day; per hour for
+  activities; per purchase for snipes) x how sure we are (data quality and how well it sells) x risk (what you'd
+  lose if it doesn't sell, vs the profit: risking 20x the profit halves it) x can you do it now (x0.5 for a skill
+  gap, x0.25 for a profession you don't have) x problems (x0.2 for "barely sells", event or Black Market vendors,
+  unverified recipes, Classic-only data) x 1.1 for preferred professions. What more gold would add counts 10%, so
+  what you can afford now comes first. The number stays with the row when you sort by another column; each row's
+  details show the breakdown. Investments rank by how cheap the item is vs its TSM long-term average x how well
+  it sells x risk.
 - **Does it actually sell?** Before suggesting anything you'd sell on the AH, the app checks three TSM numbers:
   how many sell per day in the whole Forever EU region, what share of listings sell, and how many are already
   listed on your realm (as days of the region's sales). **Barely sells** (never suggested; hidden by default on

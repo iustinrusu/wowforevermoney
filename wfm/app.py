@@ -220,7 +220,7 @@ class App:
             if text and text not in o.title.lower():
                 continue
             out.append(o)
-        sort = qs.get('sort', ['daily'])[0]
+        sort = qs.get('sort', ['score'])[0]
         out.sort(key=lambda o: (getattr(o, sort, 0) or 0), reverse=True)
         limit = int(qs.get('limit', ['400'])[0])
         return [self.opp_view(o) for o in out[:limit]]

@@ -91,6 +91,17 @@ class Progression(unittest.TestCase):
         self.assertIsNone(g['tiers'][0]['share_then'])
 
 
+class Score(unittest.TestCase):
+    def test_cheap_vs_long_term_well_selling_low_risk_ranks_first(self):
+        good = {'regionSoldPerDay': 50, 'regionSalePercent': 0.6, 'numAuctions': 10}
+        self.assertAlmostEqual(inv.invest_score(700, 1000, good, 'low'), 1.3)          # 30% under long-term
+        self.assertAlmostEqual(inv.invest_score(1300, 1000, good, 'low'), 0.7)         # 30% over
+        self.assertAlmostEqual(inv.invest_score(700, 1000, good, 'high'), 0.65)
+        slow = {'regionSoldPerDay': 4, 'regionSalePercent': 0.07, 'numAuctions': 30}  # Black Lotus-like
+        self.assertAlmostEqual(inv.invest_score(1000, 1000, slow, 'low'), 0.3)
+        self.assertAlmostEqual(inv.invest_score(100, 1000, good, 'low'), 1.75)         # capped at +75%
+
+
 class Build(unittest.TestCase):
     def setUp(self):
         self.items = {10: NS(name='Black Lotus', quality=2, sell_price=1000),
@@ -117,7 +128,9 @@ class Build(unittest.TestCase):
     def test_rows(self):
         r = self.run_build()
         self.assertEqual(r['dropped'], [{'id': 99, 'expected': 'Gone Item', 'found': None}])
-        lotus, icecap = r['items']
+        by = {x['name']: x for x in r['items']}
+        lotus, icecap = by['Black Lotus'], by['Icecap']
+        self.assertEqual([x['name'] for x in r['items']], ['Icecap', 'Black Lotus'])   # Lotus barely sells (7%)
         self.assertEqual(lotus['buy'], 100000)
         self.assertAlmostEqual(lotus['vs_market'], -0.2)
         self.assertAlmostEqual(lotus['downside'], -0.99)

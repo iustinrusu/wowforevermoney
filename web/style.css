@@ -79,5 +79,11 @@ svg.mk { width: 100%; height: auto; display: block; background: var(--panel2); b
 .sent { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 12px; margin-left: 6px; }
 .sent.up { background: #213628; color: #9de0b0; } .sent.down { background: #3a2226; color: #f3a0a0; } .sent.flat { background: #2b2f39; color: var(--muted); }
 .seg button.active { border-color: var(--accent); color: var(--text); }
+td.rk, th.rk { width: 34px; text-align: center; }
+.medal { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 12px; font-weight: 800; color: #1b1b1b; box-shadow: inset 0 -2px 0 rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.12); }
+.medal.m1 { background: radial-gradient(circle at 32% 30%, #fff6c2, #e8c060 45%, #a87b12); }
+.medal.m2 { background: radial-gradient(circle at 32% 30%, #ffffff, #c6ccd4 45%, #7f868f); }
+.medal.m3 { background: radial-gradient(circle at 32% 30%, #ffd2a8, #c58a5a 45%, #7d4e25); }
+.rank { color: var(--muted); font-size: 12px; }
 @media (max-width: 700px) { .tier { grid-template-columns: 1fr 60px; } .tier .bar, .tier .pill.num { display: none; } }
 @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; } main { padding: 10px; } }

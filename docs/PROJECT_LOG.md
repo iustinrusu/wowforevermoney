@@ -33,6 +33,11 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Ranking (user: numbered rows, medals, smart order).** `Engine.rank`: profit basis (daily + 10% of
+  what more gold adds; gph for activities; profit for snipes) x confidence x risk 1/(1 + 0.05 x downside/profit),
+  downside = cost - vendor salvage x doable (skill gap 0.5, other profession 0.25) x problems 0.2 x preferred 1.1.
+  Checked on real data: with 3s of gold, Green Firework (16/day affordable) now beats Junglevine Wine (1/day).
+  Weights started at 25%/0.5 and were lowered after that check.
 - **2026-11-14 Price history kept locally (TSM has none).** TSM's AppData holds only averages (marketValue 14-day,
   marketValueRecent, historical, regionHistorical, regionMarketValue, regionSale), no series. Each scan is
   ~6,800 rows (~0.3 MB), so hourly for 45 days would be ~300 MB: now every scan for 14 days, then one daily
@@ -211,6 +216,9 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Open items
 
+- **Recipe cooldowns aren't modelled** (found 2026-11-14): Transmute: Arcanite shows ~38.8g/day potential as if
+  ~10 crafts a day were possible; Mooncloth, transmutes and salt are overstated too. Needs the SpellCooldowns
+  table from wago.tools (Forever build), waiting for the user's OK to download it.
 - Read more Wowhead Forever zones (Arathi, Hinterlands, Western Plaguelands, Felwood, Un'Goro, Swamp of
   Sorrows, Desolace, Thousand Needles, Alterac, Hillsbrad, Wetlands, Moonglade, Winterspring, Eastern
   Plaguelands, Burning Steppes, Silithus, and Forever-only zones) and containers (Bloated fish, Sealed/Heavy
@@ -232,6 +240,10 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Ranking: `Engine.rank` score on every row, # column with gold/silver/bronze medals, "Why it's
+  ranked here" in details, investments ranked (cheap vs long-term x sells x risk), numbered bags and search.
+  Tests: 107.
 
 - **2026-11-14** History: 14 days of scans + daily candles for a year (`History.compact`); Market tab shows TSM
   long-term and recent averages and a long-term reference line. Tests: 99.

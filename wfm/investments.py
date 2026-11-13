@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 from .paths import DATA
-from .pricing import ah_buy, ah_sell
+from .pricing import ah_buy, ah_sell, liquidity
 
 LIST_FILE = DATA / 'investments.json'
 DAY = 86400
@@ -20,6 +20,21 @@ SHORT_HISTORY = DAY      # under a day of snapshots: first vs latest, flagged as
 EDGE = DAY / 2           # with longer history, each end is the median of 12 hours of snapshots (one odd listing can't swing it)
 WEEK = 7 * DAY
 SLOW_SALE_RATE = 0.1     # under 10% of listings sell: you may wait a long time to sell
+RISK_FACTOR = {'low': 1.0, 'medium': 0.75, 'high': 0.5}
+
+
+def invest_score(buy: int | None, long_term: int | None, p: dict, risk: str) -> float:
+    """Rank: cheap vs its long-term average (TSM historical) x how well it sells x risk. Unitless.
+
+    A price 30% under its long-term average scores 1.3 before the other factors; 30% over scores 0.7.
+    """
+    value = 1.0
+    if buy and long_term:
+        value = 1 + max(-0.5, min(0.75, 1 - buy / long_term))
+    liq = liquidity(p)['flags']
+    sells = 0.3 if ('hard_to_sell' in liq or 'no_sales_data' in liq) else (0.7 if 'slow_to_sell' in liq else 1.0) * (
+        0.8 if 'crowded' in liq else 1.0)
+    return round(value * sells * RISK_FACTOR.get(risk, 0.75), 4)
 
 
 def load_list(path: Path = LIST_FILE) -> dict:
@@ -128,6 +143,8 @@ def build(curated: dict, items: dict, recipes: list, prices: dict, series_of, wa
             flags.append('slow_sale_rate')
         market = p.get('marketValue')
         names = sorted(set(used_in.get(iid, [])))
+        long_term = p.get('historical') or p.get('regionHistorical')
+        buy_v = buy.value if buy else None
         rows.append({
             'item_id': iid, 'name': it.name, 'quality': it.quality, 'category': e.get('category', ''),
             'thesis': e.get('thesis', ''), 'horizon': e.get('horizon', ''), 'risk': e.get('risk', ''),
@@ -139,8 +156,11 @@ def build(curated: dict, items: dict, recipes: list, prices: dict, series_of, wa
             'vs_market': (p['minBuyout'] / market - 1) if p.get('minBuyout') and p.get('numAuctions') and market else None,
             'vendor_sell': it.sell_price, 'downside': downside(buy.value if buy else None, it.sell_price),
             'trend': tr, 'used_in_count': len(names), 'used_in': names[:12],
-            'watching': iid in watch, 'flags': flags,
+            'watching': iid in watch, 'flags': flags, 'long_term': long_term,
+            'vs_long_term': (buy_v / long_term - 1) if buy_v and long_term else None,
+            'score': invest_score(buy_v, long_term, p, e.get('risk', '')),
         })
+    rows.sort(key=lambda r: -r['score'])
     # the gauge then: every cloth tier at our oldest snapshot (one moment, so the shares are comparable)
     cloth = curated.get('progression_cloth', [])
     cloth_series = {c['id']: [x for x in series_of(c['id']) if x.get('sold_per_day') is not None] for c in cloth}

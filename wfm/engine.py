@@ -40,6 +40,18 @@ def confidence(flags) -> float:
     return round(c, 3)
 
 
+# Ranking (Engine.rank). Score = expected profit x how sure we are x risk x can-do-now x problems x preference.
+HOURLY_KINDS = ('fishing_spot', 'fishing_zone', 'farm_zone')
+ONE_OFF_KINDS = ('realm_dip', 'ah_to_vendor')
+PROBLEM_FLAGS = {'hard_to_sell', 'slow_seller', 'no_sales_data', 'unverified_recipe', 'above_region', 'black_market',
+                 'event_vendor', 'classic_unconfirmed'}
+PROBLEM_FACTOR = 0.2        # a flagged problem sinks a row below every clean one of similar profit
+SKILL_GAP_FACTOR = 0.5      # your profession, but more skill needed
+OTHER_PROFESSION_FACTOR = 0.25   # a profession you don't have
+UNAFFORDABLE_SHARE = 0.1    # what more gold would add counts 10%: what you can afford now ranks first
+RISK_WEIGHT = 0.05          # risking 20x the profit (if it doesn't sell) halves the score
+PREFERRED_BONUS = 1.1
+
 MAX_UNITS_PER_DAY = 200          # sanity cap when demand is effectively unlimited (e.g. selling to vendors)
 COPPER_PER_GOLD = 10000
 
@@ -61,6 +73,7 @@ class Opportunity:
     preferred: bool = False
     flags: list = field(default_factory=list)
     detail: dict = field(default_factory=dict)
+    score: float = 0.0        # ranking score (Engine.rank): higher = do it first
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -805,6 +818,37 @@ class Engine:
         out.sort(key=lambda u: (self.WATCH_ORDER[u['issue']], -u['value']))
         return out
 
+    def rank(self, o: Opportunity, later: bool = False) -> tuple[float, dict]:
+        """Ranking score and its parts (shown in the row's details).
+
+        later=True ranks by what a pick earns once you have the gold and skill (the "unlock" sections).
+        """
+        conf = confidence(o.flags)
+        if o.kind in HOURLY_KINDS:
+            base, basis = (o.gph or 0), 'gold per hour'
+        elif o.kind in ONE_OFF_KINDS:
+            base, basis = o.profit_unit, 'profit on the purchase'
+        else:
+            potential = max(o.daily, o.detail.get('daily_if_affordable', o.daily))
+            if later:
+                base, basis = potential, 'profit per day once you have the gold'
+            else:
+                base = o.daily + UNAFFORDABLE_SHARE * (potential - o.daily)
+                basis = 'profit per day' + (' (+ 10% of what more gold would add)' if potential > o.daily else '')
+        item = self.gd.items.get(o.item_id)
+        salvage = (item.sell_price if item else 0) * (o.detail.get('product_count') or 1)
+        downside = max(0, o.cost_unit - salvage) if o.kind not in HOURLY_KINDS else 0
+        risk = 1 / (1 + RISK_WEIGHT * downside / max(o.profit_unit, 1)) if downside else 1.0
+        doable = 1.0 if (o.doable or later) else (
+            OTHER_PROFESSION_FACTOR if 'other_profession' in o.flags else SKILL_GAP_FACTOR)
+        problems = sorted(set(o.flags) & PROBLEM_FLAGS)
+        problem = PROBLEM_FACTOR if problems else 1.0
+        pref = PREFERRED_BONUS if o.preferred else 1.0
+        score = max(0.0, base) * conf * risk * doable * problem * pref
+        return score, {'basis': basis, 'base': int(base), 'confidence': conf, 'risk': round(risk, 3),
+                       'downside': downside, 'doable': doable, 'problems': problems, 'preferred': pref,
+                       'score': round(score, 1)}
+
     # ---------- everything ----------
     def run(self) -> dict:
         best_use = self.best_uses()
@@ -820,6 +864,9 @@ class Engine:
                 liq = liquidity(self.price(o.item_id), min_spd)
                 o.detail['liquidity'] = liq
                 o.flags.extend(f for f in liq['flags'] if f not in o.flags)
+        for o in all_opps:
+            o.detail['confidence'] = confidence(o.flags)
+            o.score, o.detail['rank'] = self.rank(o)
         return {'opportunities': all_opps, 'best_use': best_use, 'top': self.top_picks(all_opps),
                 'undervalued': self.undervaluation_watch()}
 
@@ -833,6 +880,8 @@ class Engine:
 
         for o in opps:
             o.detail['confidence'] = confidence(o.flags)
+            if not o.detail.get('rank'):
+                o.score, o.detail['rank'] = self.rank(o)
         # "Unlock by levelling" and "switch professions" are about later: what you can afford today doesn't hide them
         later = [o for o in opps if o.kind in ('craft', 'vendor_flip') and clean(o, allow_unaffordable=True)]
         daily = [o for o in later if clean(o)]
@@ -847,16 +896,15 @@ class Engine:
         # small sample can make a zone look 3x better than it is)
         hourly = [o for o in opps if o.gph and o.doable and 'classic_unconfirmed' not in o.flags
                   and (o.kind != 'fishing_spot' or (o.detail.get('confirmed_by') and 'small_sample' not in o.flags))]
-        # rank by expected profit x how sure we are of it (rows with doubtful prices rank lower)
-        key = lambda o: (o.daily * (1.1 if o.preferred else 1.0) * o.detail['confidence'])
-        # sections about later rank by what a pick earns once you have the gold for it
-        later_key = lambda o: (o.detail.get('daily_if_affordable', o.daily) * o.detail['confidence'])
+        # ranked by Engine.rank: profit x how sure we are x risk x can-do-now x problems x preference
+        key = lambda o: o.score
+        # sections about later rank by what a pick earns once you have the gold and skill for it
+        later_key = lambda o: self.rank(o, later=True)[0]
         return {
             'now': [o.key for o in sorted(own, key=key, reverse=True)[:n]],
             'level_up': [o.key for o in sorted((o for o in later if not o.doable and 'other_profession' not in o.flags),
                                                key=later_key, reverse=True)[:n]],
             'switch': [o.key for o in sorted(stretch, key=later_key, reverse=True)[:5]],
-            'hourly': [o.key for o in sorted(hourly, key=lambda o: o.gph or 0, reverse=True)[:n]],
-            'snipes': [o.key for o in sorted(speculative, key=lambda o: ('cant_afford' in o.flags,
-                                                                         -o.profit_unit * o.detail['confidence']))[:n]],
+            'hourly': [o.key for o in sorted(hourly, key=key, reverse=True)[:n]],
+            'snipes': [o.key for o in sorted(speculative, key=lambda o: ('cant_afford' in o.flags, -o.score))[:n]],
         }

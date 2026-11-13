@@ -68,6 +68,8 @@ const FLAGS = {
   slow_sale_rate: ['warn', 'slow to sell', 'Under 10% of listings sell (TSM region sale rate): you may wait a long time to sell'],
   ah_price_doubtful: ['warn', 'AH price doubtful', 'Listed with no recorded sales or far above the region: counted at its sale price instead'],
 };
+const rankCell = (r) => `<td class="rk">${r <= 3 ? `<span class="medal m${r}" title="${['', 'Gold', 'Silver', 'Bronze'][r]}: #${r}">${r}</span>` : `<span class="rank">${r}</span>`}</td>`;
+const RANK_TIP = 'Ranked by expected profit (per day; per hour for activities; per purchase for snipes) x how sure we are (data quality and how well it sells) x risk (what you would lose if it does not sell, vs the profit) x whether you can do it now. Problems such as barely selling sink a row. Click a row to see its numbers.';
 const flagHtml = (flags) => (flags || []).map((f) => { const d = FLAGS[f] || ['', f, f]; return `<span class="flag ${d[0]}" title="${esc(d[2])}">${esc(d[1])}</span>`; }).join('');
 const itemLink = (id, name, q) => `<a class="q${q ?? 1}" href="https://www.wowhead.com/forever/item=${id}" target="_blank" rel="noopener" data-wowhead="item=${id}&domain=forever">${esc(name)}</a>`;
 function toast(text) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; $('#toasts').appendChild(t); setTimeout(() => t.remove(), 9000); }
@@ -92,12 +94,14 @@ async function loadState() {
 function oppTable(rows, opts = {}) {
   if (!rows.length) return `<div class="empty">${esc(opts.empty || 'Nothing here right now.')}</div>`;
   const id = opts.id || 't' + Math.random().toString(36).slice(2, 7);
-  const cols = opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'flags'];
+  const cols = (opts.rank === false ? [] : ['rank']).concat(opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'flags']);
+  const ranks = opts.ranks || new Map(rows.map((o, i) => [o.key, i + 1]));
   const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Per day', daily: 'Per day profit', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', sells: 'Sells (region)', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
   const st = sortState[id];
-  if (st) rows = [...rows].sort((a, b) => ((a[st.k] ?? -1e18) < (b[st.k] ?? -1e18) ? -1 : 1) * (st.dir));
+  const sortVal = (o) => st.k === 'rank' ? -ranks.get(o.key) : (st.k === 'sells' ? ((o.detail || {}).liquidity || {}).sold_per_day : o[st.k]);
+  if (st) rows = [...rows].sort((a, b) => ((sortVal(a) ?? -1e18) < (sortVal(b) ?? -1e18) ? -1 : 1) * (st.dir));
   const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells']);
-  const head = cols.map((c) => `<th data-k="${c}" class="${numeric.has(c) ? 'num' : ''}">${H[c] || c}</th>`).join('');
+  const head = cols.map((c) => c === 'rank' ? `<th data-k="rank" class="rk" title="${esc(RANK_TIP)}">#</th>` : `<th data-k="${c}" class="${numeric.has(c) ? 'num' : ''}">${H[c] || c}</th>`).join('');
   const body = rows.map((o) => {
     const cells = cols.map((c) => {
       if (c === 'title') {
@@ -105,6 +109,7 @@ function oppTable(rows, opts = {}) {
         const label = (o.kind === 'fishing_zone' || o.kind === 'fishing_spot') ? esc(o.title) : esc(o.title).replace(esc(name), itemLink(o.item_id, name, o.quality));
         return `<td>${label}${o.needs ? `<div class="needs">needs ${esc(o.needs)}</div>` : ''}${o.tip ? `<div class="pill">💡 ${esc(o.tip)}</div>` : ''}</td>`;
       }
+      if (c === 'rank') return rankCell(ranks.get(o.key));
       if (c === 'flags') return `<td>${flagHtml(o.flags)}</td>`;
       if (c === 'units_day') return `<td class="num">${num(o.units_day)}</td>`;
       if (c === 'sells') { const l = (o.detail || {}).liquidity; return l ? `<td class="num" title="${esc(l.why || 'sells well')}">${num(l.sold_per_day, 0)}/day<div class="pill">${l.sale_rate === null || l.sale_rate === undefined ? '' : (l.sale_rate * 100).toFixed(0) + '% sell · '}${l.listed} listed</div></td>` : '<td class="num pill">–</td>'; }
@@ -115,7 +120,7 @@ function oppTable(rows, opts = {}) {
     return `<tr class="row ${o.doable ? '' : 'notdoable'}" data-key="${esc(o.key)}" data-item="${o.item_id}">${cells}</tr>`;
   }).join('');
   const exp = opts.export !== false ? `<button class="btn" data-export="${id}">Copy item list for TSM</button>` : '';
-  setTimeout(() => wireTable(id, rows, opts), 0);
+  setTimeout(() => wireTable(id, rows, {...opts, ranks}), 0);
   const inner = `<div class="tablewrap"><table id="${id}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div><div class="controls" style="margin-top:6px">${exp}<span class="pill">${rows.length} rows</span></div>`;
   return opts.inner ? inner : `<div id="wrap-${id}">${inner}</div>`;
 }
@@ -322,17 +327,17 @@ const VIEWS = {
   },
   async flips() {
     const sellsOnly = sessionStorage.getItem('sellsOnly') !== '0', hide = sellsOnly ? '&hide=hard_to_sell,no_sales_data' : '';
-    const [vf, av, dip] = await Promise.all([api('/api/opps?kind=vendor_flip' + hide), api('/api/opps?kind=ah_to_vendor&sort=profit_unit'), api('/api/opps?kind=realm_dip&sort=profit_unit' + hide)]);
+    const [vf, av, dip] = await Promise.all([api('/api/opps?kind=vendor_flip' + hide), api('/api/opps?kind=ah_to_vendor'), api('/api/opps?kind=realm_dip' + hide)]);
     return `<div class="controls"><label class="chk"><input type="checkbox" class="sells-only" ${sellsOnly ? 'checked' : ''}> hide items that barely sell</label></div><div class="panel"><h2>Buy from a vendor, sell on the AH</h2><div class="hint">Vendors are checked against Questie's Forever database and filtered to your faction. Limited-stock vendors restock over time.</div>${oppTable(vf)}</div>
       <div class="panel"><h2>Buy on the AH, sell to a vendor</h2><div class="hint">Listings below what a vendor pays, at the last scan. TSM's Sniper catches these live in game.</div>${oppTable(av, {cols: ['title', 'profit_unit', 'cost_unit', 'flags']})}</div>
       <div class="panel"><h2>Cheap listings to relist</h2><div class="hint">Lowest listing under 60% of the lowest of realm market value, region market value and region average sale price. Speculative.</div>${oppTable(dip, {cols: ['title', 'profit_unit', 'cost_unit', 'flags']})}</div>`;
   },
   async gather() {
-    const [zones, g] = await Promise.all([api('/api/opps?kind=fishing_spot&sort=gph&limit=600'), api('/api/opps?kind=gather&sort=profit_unit&limit=600')]);
+    const [zones, g] = await Promise.all([api('/api/opps?kind=fishing_spot&limit=600'), api('/api/opps?kind=gather&limit=600')]);
     const fishDoable = sessionStorage.getItem('fishDoable') === '1', fishConfirmed = sessionStorage.getItem('fishConfirmed') === '1';
     const isClassic = (o) => o.flags.includes('classic_unconfirmed') ? 1 : 0;
     const fz = zones.filter((o) => (!fishDoable || o.doable) && (!fishConfirmed || !isClassic(o)))
-      .sort((a, b) => (isClassic(a) - isClassic(b)) || ((b.gph || 0) - (a.gph || 0)));   // Forever data first
+      .sort((a, b) => (isClassic(a) - isClassic(b)) || ((b.score || 0) - (a.score || 0)));   // Forever data first, then rank
     return `<div class="panel"><h2>Fishing spots <small>Forever data first; Classic tables only where there is none yet</small></h2>
       <div class="hint">"Fish in …" rows are Forever data: your own catches (ForeverAngler, ForeverMoneyBridge) and Wowhead Forever counts. "Classic table: …" rows are WoW Classic 1.12 tables (cMaNGOS): <b>not Forever data</b>, often wrong for Forever (Data health shows how far off), and never in Top picks. Click a row for the fish list and every source.</div>
       <div class="controls"><label class="chk"><input type="checkbox" id="fd" ${fishDoable ? 'checked' : ''}> only spots I can fish now</label>
@@ -346,8 +351,8 @@ const VIEWS = {
     const inv = await api('/api/inventory');
     if (!inv.length) return '<div class="panel empty">No bag data yet. Syndicator saves it when you log out or /reload.</div>';
     return inv.map((c) => `<div class="panel"><h2>${esc(c.character)} <small>bags + bank worth ${money(c.total)}</small></h2>
-      <div class="tablewrap"><table><thead><tr><th>Item</th><th class="num">Count</th><th>Best thing to do</th><th class="num">Each</th><th class="num">Total</th><th>Notes</th></tr></thead><tbody>
-      ${c.items.map((i) => `<tr class="row" data-item="${i.item_id}"><td>${itemLink(i.item_id, i.name, i.quality)}</td><td class="num">${i.count}</td><td>${esc(i.action)}</td><td class="num">${money(i.unit_value)}</td><td class="num">${money(i.total)}</td><td>${flagHtml(i.flags)}</td></tr>`).join('')}
+      <div class="tablewrap"><table><thead><tr><th class="rk">#</th><th>Item</th><th class="num">Count</th><th>Best thing to do</th><th class="num">Each</th><th class="num">Total</th><th>Notes</th></tr></thead><tbody>
+      ${c.items.map((i, n) => `<tr class="row" data-item="${i.item_id}">${rankCell(n + 1)}<td>${itemLink(i.item_id, i.name, i.quality)}</td><td class="num">${i.count}</td><td>${esc(i.action)}</td><td class="num">${money(i.unit_value)}</td><td class="num">${money(i.total)}</td><td>${flagHtml(i.flags)}</td></tr>`).join('')}
       </tbody></table></div></div>`).join('');
   },
   async invest() {
@@ -357,14 +362,15 @@ const VIEWS = {
       <div class="bar"><span style="width:${(t.share * 100).toFixed(1)}%"></span></div><div class="num">${chg(t.share, 1, false)}</div>
       <div class="num pill">${num(t.sold_per_day, 0)}/day${t.share_then !== null && t.share_then !== undefined ? ` · was ${(t.share_then * 100).toFixed(1)}%` : ''}</div></div>`).join('');
     const risk = {low: 'good', medium: 'warn', high: 'bad'};
-    const rows = d.items.map((r) => {
+    const rows = d.items.map((r, i) => {
       const t = r.trend || {};
       const span = t.scans ? `${t.scans} snapshots, ${new Date(t.from_ts * 1000).toLocaleString()} to ${new Date(t.to_ts * 1000).toLocaleString()}` : 'not enough snapshots yet';
-      return `<tr class="row" data-item="${r.item_id}"><td>${itemLink(r.item_id, r.name, r.quality)} <span class="pill">${esc(r.category)}</span>
+      return `<tr class="row" data-item="${r.item_id}">${rankCell(i + 1)}<td>${itemLink(r.item_id, r.name, r.quality)} <span class="pill">${esc(r.category)}</span>
         <div class="thesis">${esc(r.thesis)}</div><div class="pill">When: ${esc(r.horizon)} · Risk: ${esc(r.risk_note)}</div>
         ${r.used_in_count ? `<div class="pill" title="${esc(r.used_in.join(', '))}">Used in ${r.used_in_count} Forever recipes</div>` : ''}</td>
         <td class="num">${money(r.buy)}<div class="pill">${num(r.listings, 0)} listed</div></td>
         <td class="num" title="Lowest listing compared with TSM's 14-day realm market value">${chg(r.vs_market)}<div class="pill">avg ${money(r.market)}</div></td>
+        <td class="num" title="Buy price now compared with TSM's long-term realm average: below it is cheaper than usual">${chg(r.vs_long_term)}<div class="pill">avg ${money(r.long_term)}</div></td>
         <td class="num" title="${esc(span)}">${chg(t.change)}</td>
         <td class="num">${chg(t.change_7d)}</td>
         <td class="num">${num(r.sold_per_day, 0)}<div class="pill">${r.sale_rate !== null && r.sale_rate !== undefined ? (r.sale_rate * 100).toFixed(0) + '% sell' : ''}</div></td>
@@ -377,7 +383,7 @@ const VIEWS = {
       <div class="panel"><h2>How far the server has levelled <small>each cloth tier's share of the region's cloth sales per day</small></h2>${tiers}
       <div class="hint">More Runecloth traded means more players near level 60, when raid and endgame demand starts. A rough sign only: sales mix supply and demand. ${p.then_ts ? `"was" = at the first price snapshot, ${new Date(p.then_ts * 1000).toLocaleDateString()}.` : 'A comparison over time appears after a day of price history.'}</div></div>
       <div class="panel"><h2>Candidates <small>list checked ${esc(d.checked || '?')} · price history since ${d.history_from ? new Date(d.history_from * 1000).toLocaleString() : 'none yet'}</small></h2>
-      <div class="tablewrap"><table><thead><tr><th>Item and idea</th><th class="num">Buy now</th><th class="num">vs 14-day avg</th><th class="num">Trend</th><th class="num">7 days</th><th class="num">Sold/day (region)</th><th class="num">Worst case</th><th>Risk</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="tablewrap"><table><thead><tr><th class="rk" title="Ranked by how cheap it is vs its long-term average x how well it sells x risk">#</th><th>Item and idea</th><th class="num">Buy now</th><th class="num">vs 14-day avg</th><th class="num">vs long-term avg</th><th class="num">Trend</th><th class="num">7 days</th><th class="num">Sold/day (region)</th><th class="num">Worst case</th><th>Risk</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
       <div class="hint">Trend: our own price snapshots (lowest listing); with a day or more of history each end is a 12-hour median, so one odd listing can't swing it. 7 days appears after a week. Worst case: what you'd lose if the price fell to what a vendor pays. Click a row for the item's details and price chart; Watch alerts you on big price moves.</div>${dropped}</div>`;
   },
   async market() {
@@ -392,8 +398,8 @@ const VIEWS = {
     const q = sessionStorage.getItem('search') || '';
     const rows = q ? await api('/api/search?q=' + encodeURIComponent(q)) : [];
     return `<div class="panel"><h2>Every item in the game</h2><div class="controls"><input id="sq" placeholder="Item name or id…" value="${esc(q)}" style="width:320px"><button class="btn primary" id="sb">Search</button></div>
-      ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>Item</th><th>Type</th><th class="num">Lowest</th><th class="num">Market</th><th class="num">Listings</th><th class="num">Sold/day (region)</th><th class="num">Vendor pays</th></tr></thead><tbody>
-      ${rows.map((r) => `<tr class="row" data-item="${r.id}"><td>${itemLink(r.id, r.name, r.quality)}</td><td>${esc(r.category)}</td><td class="num">${money(r.min_buyout)}</td><td class="num">${money(r.market)}</td><td class="num">${num(r.listings, 0)}</td><td class="num">${num(r.sold_per_day)}</td><td class="num">${money(r.vendor_sell)}</td></tr>`).join('')}
+      ${rows.length ? `<div class="tablewrap"><table><thead><tr><th class="rk">#</th><th>Item</th><th>Type</th><th class="num">Lowest</th><th class="num">Market</th><th class="num">Listings</th><th class="num">Sold/day (region)</th><th class="num">Vendor pays</th></tr></thead><tbody>
+      ${rows.map((r, n) => `<tr class="row" data-item="${r.id}">${rankCell(n + 1)}<td>${itemLink(r.id, r.name, r.quality)}</td><td>${esc(r.category)}</td><td class="num">${money(r.min_buyout)}</td><td class="num">${money(r.market)}</td><td class="num">${num(r.listings, 0)}</td><td class="num">${num(r.sold_per_day)}</td><td class="num">${money(r.vendor_sell)}</td></tr>`).join('')}
       </tbody></table></div>` : (q ? '<div class="empty">No items found.</div>' : '<div class="hint">Search any of the ~32,000 items. Click one to see everything about it.</div>')}</div>`;
   },
   async changes() {
@@ -501,6 +507,17 @@ function oppDetail(o) {
     <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
     <div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
     ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>`;
+  const rk = d.rank;
+  if (rk) {
+    const f = (v) => `×${(+v).toFixed(2)}`;
+    html += `<h3>Why it's ranked here</h3><div class="kv"><div>Starts from</div><div>${money(rk.base)} ${esc(rk.basis)}</div>
+      <div>How sure we are</div><div>${f(rk.confidence)} <span class="pill">data quality and how well it sells (the notes)</span></div>
+      <div>Risk</div><div>${f(rk.risk)} <span class="pill">${rk.downside ? `you'd lose up to ${moneyText(rk.downside)} each if it doesn't sell` : 'little to lose'}</span></div>
+      <div>Can you do it now</div><div>${f(rk.doable)}</div>
+      ${rk.problems.length ? `<div>Problems</div><div>×0.20 <span class="pill">${rk.problems.map((p) => esc((FLAGS[p] || ['', p])[1])).join(', ')}</span></div>` : ''}
+      ${rk.preferred > 1 ? '<div>Preferred profession</div><div>×1.10</div>' : ''}
+      <div>Score</div><div><b>${money(rk.score)}</b></div></div>`;
+  }
   const liq = d.liquidity;
   if (liq) html += `<h3>How well it sells <small>TSM, whole Forever EU region</small></h3><div class="kv"><div>Sold per day</div><div>${num(liq.sold_per_day, 1)}</div>
     <div>Listings that sell</div><div>${liq.sale_rate === null || liq.sale_rate === undefined ? '–' : (liq.sale_rate * 100).toFixed(0) + '%'}</div>
