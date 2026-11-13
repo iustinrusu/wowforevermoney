@@ -1,4 +1,6 @@
-# WoW Forever Money
+# Gold Ever After
+
+*A WoW: Forever money guide* (project folder: WoWForeverMoney)
 
 A local app that ranks every way to make gold in **WoW: Forever**: crafting in any profession, vendor flips, auction-house snipes, farming and fishing spots. It combines TSM prices with the game's own data and your addons' data, and it updates itself when new prices arrive.
 

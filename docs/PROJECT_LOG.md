@@ -33,6 +33,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Name and look: "Gold Ever After"** ("happily ever after" + WoW: Forever). Theme: serif headings
+  (Palatino/Book Antiqua, already on Windows), gold trim, tab icons, Wowhead item icons (iconizeLinks via the
+  tooltip script the page already loaded), zebra tables, "How to read this page" on Top picks, "How this is
+  worked out" per Gathering view. No new third-party scripts or fonts. Repo/folder name unchanged.
 - **2026-11-14 Herbalism and mining spots + Gathering tab** (`wfm/nodes.py`, `Engine.node_spots`). Node locations:
   QuestieDB Forever spawns per zone. Items per node: Classic loot from the cMaNGOS dump already on disk (times the
   average number of gathers a node allows, data4/data5), flag `classic_yields`, never in Top picks. Black Lotus
@@ -282,6 +286,8 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** UI refresh and new name (Gold Ever After); README section "Addons this tool uses" (CurseForge app).
 
 - **2026-11-14** Gathering tab (Fishing, Skinning, Herbalism, Mining, Mob farming, Materials), herb/ore spots,
   instance detection by map id, settings for nodes per hour.

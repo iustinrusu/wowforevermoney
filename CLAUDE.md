@@ -1,4 +1,4 @@
-# WoW Forever Money: notes for Claude
+# Gold Ever After (WoW Forever Money): notes for Claude
 
 A local Python app (web page at http://127.0.0.1:8765) that ranks every way to make gold in **WoW: Forever**
 for the user's characters, using TSM auction data plus game data and addon data. User-facing docs: `README.md`.
