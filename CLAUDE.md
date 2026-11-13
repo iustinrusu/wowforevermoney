@@ -27,8 +27,10 @@ memory of the project, not the chat.
   browser pane when asked.
 - **Downloads:** ask first (file name, source, size).
 - **Usage limits:** when usage is getting tight, don't interrupt a task midway: finish the current piece,
-  commit it, and schedule the remaining steps as a self-contained task after the limit resets (and note
-  them in the project log). The user said this should always be done.
+  commit it, write the remaining steps into a plan file in `docs/plans/` (and note them in the project log),
+  and set a one-time reminder for after the limit resets. The user said this should always be done.
+- **Scheduled tasks are reminders only.** A scheduled task never does the work: it only reminds the user and
+  points to the plan file. The user starts the work themselves (user's rule, 2026-11-13).
 - **Privacy:** never send the user's name, email, or character names to outside services. HTTP requests use
   the generic User-Agent `WoWForeverMoney/0.1 (personal gold tool)`.
 - **Git:** remote is https://github.com/iustinrusu/wowforevermoney.git (branch `main`). Commit or push

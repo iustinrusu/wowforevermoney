@@ -32,7 +32,9 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 - **2026-11-13 Generic defaults for other users;** the user's own professions/level/realm/preferences live in their
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
-- **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and schedule the rest.
+- **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-13 Scheduled tasks are reminders only (user):** no scheduled task runs work by itself. Postponed
+  work goes into a plan file in `docs/plans/`; a one-time reminder points to it and the user starts it.
 - **2026-11-13 Item database = Forever server data first; your game client is the referee.** Source priority:
   in-game (addon item checks) > server data (client hotfix cache DBCache.bin, `wfm/hotfix.py`) > client tables
   (wago) > Wowhead tooltip > Questie name. Hotfix layout inferred from 1,523 overlapping items and graded per
@@ -156,9 +158,9 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   Iron Bound < Mithril Bound.
 - ItemSparse `Flags_0 & 0x4` = openable (has its own loot); `LockID > 0` = needs Lockpicking/key.
 
-## Scheduled builds (2026-11-14 00:15, task "wfm-skinning-mobs-investments")
+## Postponed builds (plan `docs/plans/skinning-mobs-investments.md`; reminder 2026-11-14 00:15)
 
-Postponed by the usage rule; the task prompt has the full brief. In order:
+Postponed by the usage rule; the plan file has the full brief. Nothing runs by itself. In order:
 1. **Skinning spots:** Wowhead Forever "Skinned from" tabs for leathers, hides and scales; QuestieDB mob
    zones; gold/hour from a kills_per_hour setting, measured when the addon has data.
 2. **Mob farming:** Wowhead Forever "Dropped by" tabs for cloth, elementals and the best BoE drops; value per
@@ -166,7 +168,7 @@ Postponed by the usage rule; the task prompt has the full brief. In order:
 3. **Investments tab:** a curated Classic-informed list with Forever prices, our price trends, the vendor
    floor, and a server progression gauge from cloth-tier volumes. Clearly labelled speculation.
 
-## Next session plan (scheduled 2026-11-14 10:00, task "wfm-review-and-wowhead")
+## Next session plan (plan `docs/plans/review-and-wowhead.md`; reminder 2026-11-14 10:00)
 
 The user is firm that the data must be correct and accurate. In order:
 1. **Review and test today's work adversarially:** `wfm/classicdb.py`, `wfm/fishing.py`, `wfm/valuation.py`,
@@ -182,7 +184,7 @@ The user is firm that the data must be correct and accurate. In order:
    SavedVariables, no trunk contents in the fishing activity, and `activity[zone].fishing.sources/pools`
    (does GetLootSourceInfo give the pool's object id when fishing a pool, or the bobber's?). Then use the
    measured pool share/search time in the pool bonus instead of "every pool you pass".
-4. Fix the gathering list (exclude crafted products), then update this log, commit and push.
+4. Check the gathering list (crafted products are already excluded), then update this log, commit and push.
 
 ## Open items
 
@@ -197,7 +199,6 @@ The user is firm that the data must be correct and accurate. In order:
 - Tips for the remaining top picks (only Frilled Lichen 249399 is done).
 - Verify ForeverMoneyBridge vendor-price and loot recording after the user visits a vendor, loots and
   /reloads (only the character snapshot is verified so far).
-- Gathering list wrongly includes crafted products (cooked fish, cured hides): exclude recipe products.
 - Known gaps: vendors with faction '' treated as accessible; AH deposits ignored; bulk-buy cost uses only
   the lowest listing.
 - Cast pace is the 240 casts/hour setting until ForeverMoneyBridge has 10+ minutes of timed fishing.
@@ -208,6 +209,12 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-13** Scheduled tasks turned into reminders only (user's request). Both postponed briefs saved as
+  `docs/plans/skinning-mobs-investments.md` and `docs/plans/review-and-wowhead.md`; usage rule updated.
+
+- **2026-11-13** Seasons from Forever catches; starting the app replaces an earlier copy; generic defaults
+  (the user's own values in local `data/settings.json`); `docs/GETTING_STARTED.md`. Tests: 67.
 
 - **2026-11-13** Item database from the server's hotfix cache + in-game item checks (addon 1.4.0); price safeguards
   (odd listings, stale banner, snapshot age, confidence ranking); crafts capped by ingredient volume; UI fixes;
