@@ -26,6 +26,9 @@ memory of the project, not the chat.
   linking to Wowhead, the public tooltip API (slow, cached), and reading a short list of pages in the
   browser pane when asked.
 - **Downloads:** ask first (file name, source, size).
+- **Usage limits:** when usage is getting tight, don't interrupt a task midway: finish the current piece,
+  commit it, and schedule the remaining steps as a self-contained task after the limit resets (and note
+  them in the project log). The user said this should always be done.
 - **Privacy:** never send the user's name, email, or character names to outside services. HTTP requests use
   the generic User-Agent `WoWForeverMoney/0.1 (personal gold tool)`.
 - **Git:** remote is https://github.com/iustinrusu/wowforevermoney.git (branch `main`). Commit or push

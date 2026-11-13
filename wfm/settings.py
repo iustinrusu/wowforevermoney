@@ -11,14 +11,12 @@ DEFAULTS = {
     'auto_detect': True,            # fill level, gold, faction, professions from your saved addon data
     'character': None,              # None = the character you played last
     'gold_scope': 'faction',        # 'faction' = all your characters' gold on this faction, 'character' = just one
-    'realm': 'PvP-Horde',
-    'faction': 'H',                 # H or A: which vendors you can use
-    'gold': 1.0,                    # gold you have available to invest
-    'level': 42,
-    'professions': {                # your skill levels; anything not listed is "not learned"
-        'First Aid': 225, 'Cooking': 225, 'Fishing': 225, 'Skinning': 270, 'Leatherworking': 161,
-    },
-    'preferred': ['Fishing', 'Cooking', 'First Aid'],   # shown first when profits are close
+    'realm': 'PvP-Horde',           # if your TSM data doesn't have it, the first realm TSM has is used
+    'faction': 'H',                 # H or A: which vendors you can use (detected from your characters)
+    'gold': 0.0,                    # gold you have available to invest (detected from your characters)
+    'level': 1,
+    'professions': {},              # your skill levels (detected by the addon); anything not listed is "not learned"
+    'preferred': [],                # professions shown first when profits are close, e.g. ['Fishing', 'Cooking']
     'switch_bonus': 1.5,            # other professions must earn this many times more to be recommended
     'ah_cut': 0.05,                 # auction house cut on sales
     'market_share': 0.2,            # share of the region's daily sales you can expect to capture

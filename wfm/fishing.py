@@ -91,8 +91,43 @@ def _top_zone(gd, area: int) -> int:
     return area
 
 
-def item_shares(cf: ClassicFishing, entries: list[dict], now: float | None = None) -> tuple[dict[int, dict], float]:
-    """Per-catch share of each item from a loot table, with seasons applied. Returns (shares, coverage)."""
+SEASON_EVIDENCE_DAYS = 14     # a seasonal fish caught in Forever this recently means its season is on
+
+
+def seasonal_items(cf: ClassicFishing) -> dict[int, set[int]]:
+    """Game event id -> items only caught while it's active (Winter Squid, Summer Bass...)."""
+    out: dict[int, set[int]] = {}
+    for rows in list(cf.loot.values()) + list(cf.refs.values()):
+        for e in rows:
+            c = cf.conditions.get(e['condition']) or {}
+            if c.get('type') == CONDITION_EVENT and e['minref'] > 0:
+                out.setdefault(c['value1'], set()).add(e['item'])
+    return out
+
+
+def forever_seasons(cf: ClassicFishing, wowhead: dict | None, now: float | None = None) -> dict[int, bool]:
+    """Which seasons are on in Forever right now, from Forever catches (Wowhead Forever counts read in the last
+    two weeks): a seasonal fish being caught means its season is on, and then a season with none of its fish
+    caught is off. No recent evidence: {} (the Classic calendar is used, labelled as such)."""
+    import time as _t
+    now = _t.time() if now is None else now
+    seen = set()
+    for z in (wowhead or {}).values():
+        try:
+            age = (now - _t.mktime(_t.strptime(str(z.get('checked', '')), '%Y-%m-%d'))) / 86400
+        except ValueError:
+            continue
+        if age <= SEASON_EVIDENCE_DAYS:
+            seen |= {int(i) for i, c in (z.get('items') or {}).items() if int(c) > 0}
+    gated = seasonal_items(cf)
+    on = {eid for eid, items in gated.items() if items & seen}
+    return {eid: eid in on for eid in gated} if on else {}
+
+
+def item_shares(cf: ClassicFishing, entries: list[dict], now: float | None = None,
+                seasons: dict[int, bool] | None = None) -> tuple[dict[int, dict], float]:
+    """Per-catch share of each item from a loot table, with seasons applied. Returns (shares, coverage).
+    seasons: what Forever catches say is in season (forever_seasons); otherwise the Classic calendar."""
     out, coverage = {}, 0.0
     for item, o in expected_items(entries, cf.refs).items():
         seasonal, in_season, factor = None, None, 1.0
@@ -100,8 +135,14 @@ def item_shares(cf: ClassicFishing, entries: list[dict], now: float | None = Non
             c = cf.conditions.get(cid) or {}
             if c.get('type') == CONDITION_EVENT:
                 seasonal = cf.events.get(c['value1'], {}).get('name') or f'event {c["value1"]}'
-                in_season, part = cf.event_status(c['value1'], now)
-                factor *= part if in_season is None else (1.0 if in_season else 0.0)
+                if seasons and c['value1'] in seasons:
+                    in_season = seasons[c['value1']]
+                    seasonal += ' (Forever catches)'
+                    factor *= 1.0 if in_season else 0.0
+                else:
+                    in_season, part = cf.event_status(c['value1'], now)
+                    seasonal += ' (Classic calendar)'
+                    factor *= part if in_season is None else (1.0 if in_season else 0.0)
         share = o['count'] * factor
         out[item] = {'share': share, 'quest': o['quest'], 'seasonal': seasonal, 'in_season': in_season,
                      'raw': o['count']}
@@ -110,7 +151,8 @@ def item_shares(cf: ClassicFishing, entries: list[dict], now: float | None = Non
     return out, coverage
 
 
-def build_spots(cf: ClassicFishing, gd, now: float | None = None) -> dict[int, list[Spot]]:
+def build_spots(cf: ClassicFishing, gd, now: float | None = None,
+                seasons: dict[int, bool] | None = None) -> dict[int, list[Spot]]:
     groups: dict[tuple, list[int]] = {}
     for area, entries in cf.loot.items():
         zid = _top_zone(gd, area)
@@ -120,7 +162,7 @@ def build_spots(cf: ClassicFishing, gd, now: float | None = None) -> dict[int, l
         groups.setdefault((zid, sig, skill), []).append(area)
     spots: dict[int, list[Spot]] = {}
     for (zid, _sig, skill), areas in groups.items():
-        shares, coverage = item_shares(cf, cf.loot[areas[0]], now)
+        shares, coverage = item_shares(cf, cf.loot[areas[0]], now, seasons)
         names = sorted(gd.zones.get(a) or f'Area {a}' for a in areas if a != zid)
         spots.setdefault(zid, []).append(Spot(
             zone_id=zid, zone=gd.zones.get(zid) or f'Area {zid}', areas=sorted(areas), names=names, skill=skill,

@@ -22,6 +22,17 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-13 Seasons from Forever catches.** A seasonal fish counts as in season if it appears in Wowhead Forever
+  counts read in the last 14 days; its opposite season is then off. No recent evidence -> Classic calendar,
+  labelled. Forever rows drop out-of-season fish from their counts. Now: winter (Winter Squid caught, no Summer Bass).
+- **2026-11-13 Starting the app always replaces an earlier copy** (PID file `data/app.pid`, or a python process
+  listening on the port; nothing else is touched). Cause of the user's "zombie": the lock socket is bound but not
+  listening, so netstat doesn't show it, and Claude's preview copy held it. tasklist can't see some processes;
+  PowerShell's Get-Process can.
+- **2026-11-13 Generic defaults for other users;** the user's own professions/level/realm/preferences live in their
+  local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
+  Guide: `docs/GETTING_STARTED.md`.
+- **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and schedule the rest.
 - **2026-11-13 Item database = Forever server data first; your game client is the referee.** Source priority:
   in-game (addon item checks) > server data (client hotfix cache DBCache.bin, `wfm/hotfix.py`) > client tables
   (wago) > Wowhead tooltip > Questie name. Hotfix layout inferred from 1,523 overlapping items and graded per

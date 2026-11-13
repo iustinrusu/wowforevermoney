@@ -555,7 +555,15 @@ class Engine:
         obs = fishing.observations(self.w.angler, (getattr(self.w, 'profile', None) or {}).get('activity'))
         fishing.add_wowhead(obs, getattr(self.w, 'forever_fishing', None))
         skill = int(self.profs.get('Fishing') or 0)
-        spots = fishing.build_spots(cf, self.gd) if cf else {}
+        seasons = fishing.forever_seasons(cf, getattr(self.w, 'forever_fishing', None)) if cf else {}
+        spots = fishing.build_spots(cf, self.gd, seasons=seasons) if cf else {}
+        # fish whose season is over (by Forever catches, else the Classic calendar) don't count in Forever data
+        out_of_season = set()
+        if cf:
+            for eid, items in fishing.seasonal_items(cf).items():
+                active = seasons.get(eid) if eid in seasons else cf.event_status(eid)[0]
+                if active is False:
+                    out_of_season |= items
         pools = fishing.pool_items(cf) if cf else {}
         zone_by_name: dict[str, int] = {}
         for zid, rows in spots.items():
@@ -573,6 +581,8 @@ class Engine:
             for i, c in o.wh_items.items():
                 items[i] = items.get(i, 0) + c
             n_all = (o.caught if use_own else 0) + o.wh_fished
+            for i in out_of_season & set(items):         # caught last season: not catchable now
+                n_all -= items.pop(i)
             pool = {i: c for i, c in items.items() if i in pool_only}
             if with_pools:
                 return {'n': n_all, 'items': items, 'n_all': n_all, 'items_all': items, 'pool': pool}

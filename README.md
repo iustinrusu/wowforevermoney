@@ -2,6 +2,8 @@
 
 A local app that ranks every way to make gold in **WoW: Forever**: crafting in any profession, vendor flips, auction-house snipes, farming and fishing spots. It combines TSM prices with the game's own data and your addons' data, and it updates itself when new prices arrive.
 
+**New here? Follow [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** (about 15 minutes).
+
 Everything runs on your PC. The page is only reachable from your own computer, and your character data never leaves it.
 
 ## First-time setup
@@ -13,7 +15,7 @@ Everything runs on your PC. The page is only reachable from your own computer, a
 2. **Start the app:** double-click `start.bat`.
    - It installs the one Python package it needs and opens `http://127.0.0.1:8765/` in your browser.
    - The first start downloads the game's item and recipe tables from wago.tools, which takes about a minute.
-   - Keep the black window open while you use the app. Closing it stops the app.
+   - Keep the black window open while you use the app. Closing it stops the app. Starting it again always replaces an earlier copy, even a hidden one.
 3. **Turn on the addon in WoW:**
    - The app copies its addon, **ForeverMoneyBridge**, into your AddOns folder every time it starts.
    - At the character screen, click **AddOns**, tick **ForeverMoneyBridge**, then log in and type `/reload` once.

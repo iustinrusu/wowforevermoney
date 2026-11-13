@@ -497,12 +497,76 @@ def _single_instance() -> bool:
     return True
 
 
+PID_FILE = DATA / 'app.pid'
+
+
+def _python_pids_on_port(port: int) -> set[int]:
+    """PIDs of python processes listening on the app's port (Windows netstat + tasklist; nothing else is touched)."""
+    import subprocess
+    pids = set()
+    try:
+        out = subprocess.run(['netstat', '-ano', '-p', 'TCP'], capture_output=True, text=True, timeout=10).stdout
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 5 and parts[1].endswith(f':{port}') and parts[3] == 'LISTENING':
+                pids.add(int(parts[4]))
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return set()
+    return {p for p in pids if _is_python(p)}
+
+
+def _is_python(pid: int) -> bool:
+    """Is this PID a python process? tasklist can't see some processes (e.g. ones started by another app's
+    session), so PowerShell's process list is asked too."""
+    import subprocess
+    for cmd in (['tasklist', '/FI', f'PID eq {pid}', '/FO', 'CSV', '/NH'],
+                ['powershell', '-NoProfile', '-Command', f'(Get-Process -Id {pid} -ErrorAction SilentlyContinue).ProcessName']):
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True, timeout=15).stdout
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if 'python' in out.lower():
+            return True
+    return False
+
+
+def _take_over(port: int) -> bool:
+    """Stop any earlier copy (even one you can't see, e.g. a hidden window), then take the single-instance lock."""
+    import os
+    import signal
+    targets = set()
+    try:
+        old = int(PID_FILE.read_text().strip())
+        if old != os.getpid() and _is_python(old):
+            targets.add(old)
+    except (OSError, ValueError):
+        pass
+    targets |= _python_pids_on_port(port)
+    targets.discard(os.getpid())
+    for pid in targets:
+        try:
+            os.kill(pid, signal.SIGTERM)          # on Windows this terminates the process
+            log(f'Stopped an earlier copy of the app (process {pid}).')
+        except OSError:
+            pass
+    for _ in range(50):                            # wait up to 5 s for the old copy to let go of the lock
+        if _single_instance():
+            return True
+        time.sleep(0.1)
+    return False
+
+
 def main(port: int = 8765, open_browser: bool = True):
-    if not _single_instance():
-        log('WoW Forever Money is already running; open the existing page instead (default http://127.0.0.1:8765/).')
-        if open_browser:
-            webbrowser.open(f'http://127.0.0.1:{port}/')
+    import os
+    if not _single_instance() and not _take_over(port):
+        log('Another copy of WoW Forever Money is running and could not be stopped. Close it (or restart Windows) '
+            'and start again.')
         return
+    try:
+        PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PID_FILE.write_text(str(os.getpid()))
+    except OSError:
+        pass
     app = App()
     app.start()
     server = ThreadingHTTPServer(('127.0.0.1', port), make_handler(app))

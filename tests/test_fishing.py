@@ -101,6 +101,24 @@ class LootMathTests(unittest.TestCase):
         self.assertEqual(cf.event_status(99, nov), (None, 0.5))
 
 
+class SeasonTests(unittest.TestCase):
+    def test_forever_catches_decide_the_season(self):
+        # Winter Squid (event 35) caught in Forever this week -> winter on, Summer Bass (36) off, whatever the
+        # Classic calendar says; with no recent Forever evidence, nothing is decided here (calendar fallback).
+        cf = ClassicFishing(refs={90: [e(W, 100, 0, cond=1), e(B, 100, 0, cond=2)]},
+                            loot={440: [e(A, 90, 1), e(0, 10, 0, minref=-90)]},
+                            conditions={1: {'type': 12, 'value1': 35}, 2: {'type': 12, 'value1': 36}})
+        today = time.strftime('%Y-%m-%d')
+        wh = {'Tanaris': {'checked': today, 'fished': 100, 'items': {W: 5, A: 95}}}
+        self.assertEqual(fishing.forever_seasons(cf, wh), {35: True, 36: False})
+        old = {'Tanaris': {'checked': '2026-01-01', 'fished': 100, 'items': {W: 5, A: 95}}}
+        self.assertEqual(fishing.forever_seasons(cf, old, now=time.mktime(time.strptime('2026-11-13', '%Y-%m-%d'))), {})
+        shares, _ = fishing.item_shares(cf, cf.loot[440], seasons={35: True, 36: False})
+        self.assertAlmostEqual(shares[W]['share'], 0.10)
+        self.assertEqual(shares[B]['share'], 0.0)
+        self.assertIn('Forever catches', shares[W]['seasonal'])
+
+
 def world(angler=None, activity=None, wowhead=None):
     gd = GameData(build='test')
     for iid, name, sell in [(A, 'Raw Spotted Yellowtail', 100), (B, 'Stonescale Eel', 400), (J, 'Old Boot', 10),
