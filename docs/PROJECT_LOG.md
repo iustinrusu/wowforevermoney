@@ -156,6 +156,16 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   Iron Bound < Mithril Bound.
 - ItemSparse `Flags_0 & 0x4` = openable (has its own loot); `LockID > 0` = needs Lockpicking/key.
 
+## Scheduled builds (2026-11-14 00:15, task "wfm-skinning-mobs-investments")
+
+Postponed by the usage rule; the task prompt has the full brief. In order:
+1. **Skinning spots:** Wowhead Forever "Skinned from" tabs for leathers, hides and scales; QuestieDB mob
+   zones; gold/hour from a kills_per_hour setting, measured when the addon has data.
+2. **Mob farming:** Wowhead Forever "Dropped by" tabs for cloth, elementals and the best BoE drops; value per
+   kill, plus skinning.
+3. **Investments tab:** a curated Classic-informed list with Forever prices, our price trends, the vendor
+   floor, and a server progression gauge from cloth-tier volumes. Clearly labelled speculation.
+
 ## Next session plan (scheduled 2026-11-14 10:00, task "wfm-review-and-wowhead")
 
 The user is firm that the data must be correct and accurate. In order:
