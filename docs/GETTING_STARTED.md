@@ -49,8 +49,11 @@ WoW: Forever by itself; if it can't, it asks you to paste your "World of Warcraf
 
 ## 5. Recommended addons
 
-The app reads these if you have them (all on CurseForge):
-- **QuestieDB:** which vendors sell what, and who drops what.
+Install them with the **CurseForge app** (curseforge.com/download/app): choose World of Warcraft, the **Forever**
+version, search each name and click Install; CurseForge keeps them updated. The TSM addons (TradeSkillMaster and
+TradeSkillMaster_AppHelper) come the same way. The full table, with what each one is for, is in the README under
+"Addons this tool uses".
+- **Questie** (with **QuestieDB**): which vendors sell what, who drops what, where herb and ore nodes are.
 - **SkillUpForever:** confirms which recipes can really be learned in Forever, with exact skill levels.
   Strongly recommended: without it, crafts are marked "unverified recipe" and never reach Top picks.
 - **Syndicator:** your bags and bank (enables the My bags tab).

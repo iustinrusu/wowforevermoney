@@ -71,6 +71,25 @@ Everything runs on your PC. The page is only reachable from your own computer, a
 - **pool loot extra**: "Gold / hour" is open water only. The "Gold / hour with pools" column adds the pools you come across (not counting the time spent finding them, so it's a ceiling).
 - **slow seller**, **can't afford**, **snapshot**: check before acting.
 
+## Addons this tool uses
+
+Install the public addons with the **CurseForge app** (curseforge.com/download/app): pick World of Warcraft, the
+**Forever** version, search each name below and click Install. CurseForge keeps them updated, and the app re-reads
+them automatically after every update. Only ForeverMoneyBridge comes from this tool instead.
+
+| Addon | Needed? | What the app gets from it | Where |
+|---|---|---|---|
+| **TSM desktop app** + **TradeSkillMaster** + **TradeSkillMaster_AppHelper** | **Required** | Auction prices: the desktop app writes them into AppHelper's folder about hourly | Addons: CurseForge app. Desktop app: tradeskillmaster.com |
+| **ForeverMoneyBridge** (this tool's addon) | **Required** | Your level, gold, professions, real vendor prices, loot and time per zone, trunk contents, in-game item checks | Installed by `start.bat` or `install_addon.bat` |
+| **SkillUpForever** | Strongly recommended | Which recipes can really be learned in Forever, exact skill levels. Without it, crafts are marked "unverified recipe" and never reach Top picks | CurseForge app |
+| **Questie** (with **QuestieDB**) | Strongly recommended | Vendors, who drops what, herb and ore node locations (Forever data) | CurseForge app |
+| **Syndicator** | Recommended | Your bags and bank: enables the My bags tab | CurseForge app |
+| **ForeverAngler** | Optional | Fishing log (pace and got-away rate) | CurseForge app |
+
+Not used yet, but worth knowing: several Forever addons record loot per mob and per node and might one day feed
+the app more Forever data (HexLoot, Blackthornes Farmer, Glimpse, LootInsight Forever, vanThos DataBase).
+GatherLite (Forever node locations from Wowhead) is read nowhere yet either. See docs/PROJECT_LOG.md, open items.
+
 ## The addon: ForeverMoneyBridge
 
 - **Item checks:** the app writes a list of items to verify (`Checks.lua` in the addon folder). In game, the addon asks your client about each one and saves the answers, which override every other source. Data health shows how often each source was right.
