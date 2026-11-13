@@ -47,7 +47,7 @@ prices aren't recorded.
 
 | Tab | What it's for |
 |---|---|
-| **Top picks** | What to do now, ranked by profit per day. Also: the best fishing and farming spots per hour, snipes (single cheap listings to check in game), things a higher profession skill unlocks, and other professions worth switching to. Only Forever-confirmed data appears here. |
+| **Top picks** | What to do now, ranked by profit per day. Also: the best fishing and farming spots per hour, snipes (single cheap listings to check in game), things a higher profession skill unlocks, and other professions worth switching to. Only Forever-confirmed data appears here. "Do these now" holds daily routines (about one sale a day or more); slower but valuable ones are under **Occasional big flips**, with the profit at the lowest listing and at what the item actually sells for. "Sales a day (you)" = what the whole region buys a day x your share (Settings), capped by your gold, stock and ingredients; "Profit a day" = profit each x that. |
 | **Crafting** | Every recipe in every profession, with ingredient costs (cheapest of vendor or AH) and sale value. Filter by profession, or tick "only what I can craft now". |
 | **Flips** | Buy from a vendor and sell on the AH; buy on the AH and sell to a vendor; cheap listings to relist. |
 | **Gathering** | Pick an activity: **Fishing**, **Skinning**, **Herbalism**, **Mining**, **Mob farming** or **Materials**. Each ranks zones by gold per hour and explains how. Rows measured by your addon come first and are the most reliable. Fishing and skinning use Forever counts from Wowhead; herb and ore yields are WoW Classic numbers (labelled, kept out of Top picks) until your addon measures your own gathering. |

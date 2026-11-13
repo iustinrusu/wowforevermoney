@@ -57,6 +57,17 @@ class Ranking(unittest.TestCase):
         d = opp(key='d', detail={'cooldown_group': 'Other'})
         self.assertEqual([o.key for o in Engine._one_per_cooldown([a, c, b, d])], ['a', 'c', 'd'])
 
+    def test_slow_sellers_go_to_occasional_flips_not_daily_routines(self):
+        # Pattern: Devilsaur Gauntlets topped "Do these now" at 0.26 sales a day (one every 4 days)
+        e = Engine(make_world({}), dict(SETTINGS))
+        fast = opp(key='fast', units_day=12, daily=3600, profit_unit=300)
+        slow = opp(key='slow', units_day=0.26, daily=180000, profit_unit=690000)
+        for o in (fast, slow):
+            o.score, o.detail['rank'] = e.rank(o)
+        top = e.top_picks([fast, slow])
+        self.assertEqual(top['now'], ['fast'])
+        self.assertEqual(top['slow'], ['slow'])
+
     def test_preferred_profession_bonus(self):
         self.assertAlmostEqual(self.score(preferred=True), self.score() * 1.1)
 

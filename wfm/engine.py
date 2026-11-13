@@ -56,6 +56,7 @@ OTHER_PROFESSION_FACTOR = 0.25   # a profession you don't have
 UNAFFORDABLE_SHARE = 0.1    # what more gold would add counts 10%: what you can afford now ranks first
 RISK_WEIGHT = 0.05          # risking 20x the profit (if it doesn't sell) halves the score
 PREFERRED_BONUS = 1.1
+DAILY_ROUTINE = 1.0         # "Do these now" needs about one sale a day or more; slower = occasional flip
 
 COOLDOWN_MIN_MS = 10 * 60 * 1000   # a recipe cooldown of 10+ minutes limits how many you can make a day
 
@@ -1009,6 +1010,12 @@ class Engine:
         for o in all_opps:
             o.detail['confidence'] = confidence(o.flags)
             o.score, o.detail['rank'] = self.rank(o)
+            # what each would make if it sold at the region's average sale price, not the lowest listing
+            liq = o.detail.get('liquidity')
+            sale = (self.price(o.item_id) or {}).get('regionSale')
+            if liq and sale and o.kind in ('craft', 'vendor_flip') and o.detail.get('sell_channel') != 'vendor':
+                per = o.detail.get('product_count') or 1
+                o.detail['profit_at_avg_sale'] = int(int(sale * (1 - self.cut)) * per - o.cost_unit)
         return {'opportunities': all_opps, 'best_use': best_use, 'top': self.top_picks(all_opps),
                 'undervalued': self.undervaluation_watch()}
 
@@ -1070,7 +1077,13 @@ class Engine:
         # sections about later rank by what a pick earns once you have the gold and skill for it
         later_key = lambda o: self.rank(o, later=True)[0]
         return {
-            'now': [o.key for o in self._one_per_cooldown(sorted(own, key=key, reverse=True))[:n]],
+            # daily routines: about one sale a day or more (Pattern: Devilsaur Gauntlets, 0.26 a day, topped this)
+            'now': [o.key for o in self._one_per_cooldown(sorted((o for o in own if o.units_day >= DAILY_ROUTINE),
+                                                                 key=key, reverse=True))[:n]],
+            # occasional big flips: slower sellers, ranked by what one sale earns x how sure we are
+            'slow': [o.key for o in self._one_per_cooldown(sorted((o for o in own if 0 < o.units_day < DAILY_ROUTINE),
+                                                                  key=lambda o: o.profit_unit * o.detail['confidence'] * o.detail['rank']['risk'],
+                                                                  reverse=True))[:8]],
             'level_up': [o.key for o in self._one_per_cooldown(sorted(
                 (o for o in later if not o.doable and 'other_profession' not in o.flags), key=later_key, reverse=True))[:n]],
             'switch': [o.key for o in self._one_per_cooldown(sorted(stretch, key=later_key, reverse=True))[:5]],

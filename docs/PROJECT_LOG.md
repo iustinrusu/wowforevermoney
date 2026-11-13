@@ -33,6 +33,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Daily routines vs occasional flips (user: "is Devilsaur really the top pick?").** Pattern: Devilsaur
+  Gauntlets was #1 in Do these now: 69g profit at the 75g lowest listing x 0.26 sales a day (region 1.28/day x 20%)
+  = 17.7g/day, even at confidence 0.36; it actually sells for 36g. Now Do these now needs >= 1 expected sale a day
+  (`DAILY_ROUTINE`); slower ones go to "Occasional big flips" (ranked by profit per sale x confidence x risk)
+  with profit at the region average sale price shown too. Column names: "Sales a day (you)" (shown as "1 every N
+  days" under 1) and "Profit a day", with hover explanations. Not modelled yet: effort (e.g. 49 vendor-sold
+  crafts a day ranks on profit alone).
 - **2026-11-14 Gold was read wrong: the app thought the user had 3s 20c, really 26g 78s.** ForeverMoneyBridge
   1.4.0 saved 0 gold for the active character (its snapshot on PLAYER_LOGOUT/reload can read 0), while Syndicator,
   saved at the same moment, had 267,812c. Every affordability cap and "can't afford" flag used the wrong gold.
@@ -298,6 +305,8 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Occasional big flips section; clearer per-day columns with hover help. Tests: 121.
 
 - **2026-11-14** Purse in the header; gold from Syndicator (fixes 0 gold from the addon); addon 1.4.1. Tests: 120.
 

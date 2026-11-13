@@ -15,6 +15,7 @@ function money(c) {
 }
 const num = (v, d = 1) => (v === null || v === undefined) ? '–' : Number(v).toLocaleString(undefined, {maximumFractionDigits: d});
 const chg = (v, d = 0, color = true) => (v === null || v === undefined) ? '<span class="pill">–</span>' : `<span class="${color ? (v > 0.005 ? 'up' : (v < -0.005 ? 'down' : '')) : ''}">${v > 0 && color ? '+' : ''}${(v * 100).toFixed(d)}%</span>`;
+const daysText = (d) => `${num(d, d < 10 ? 1 : 0)} ${Math.abs(d - 1) < 0.05 ? 'day' : 'days'}`;
 const ago = (ts) => { if (!ts) return 'never'; const s = Date.now() / 1000 - ts; if (s < 90) return `${Math.round(s)}s ago`; if (s < 5400) return `${Math.round(s / 60)} min ago`; if (s < 172800) return `${(s / 3600).toFixed(1)} h ago`; return `${(s / 86400).toFixed(1)} days ago`; };
 const KIND = {farm_zone: 'Farming spot', craft: 'Craft', vendor_flip: 'Vendor → AH', ah_to_vendor: 'AH → vendor', realm_dip: 'Cheap relist', gather: 'Farm', fishing_zone: 'Fishing spot', fishing_spot: 'Fishing spot'};
 const FLAGS = {
@@ -120,12 +121,17 @@ function oppTable(rows, opts = {}) {
   const cols = (opts.rank === false ? [] : ['rank']).concat(opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'cooldown', 'flags'])
     .filter((c) => c !== 'cooldown' || rows.some((o) => (o.detail || {}).cooldown_hours));   // only where a row has one
   const ranks = opts.ranks || new Map(rows.map((o, i) => [o.key, i + 1]));
-  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Per day', daily: 'Per day profit', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', sells: 'Sells (region)', cooldown: 'Cooldown', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
+  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Sales a day (you)', daily: 'Profit a day', profit_avg: 'At average sale', every: 'One sale every', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', sells: 'Sells (region)', cooldown: 'Cooldown', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
   const st = sortState[id];
   const sortVal = (o) => st.k === 'rank' ? -ranks.get(o.key) : (st.k === 'sells' ? ((o.detail || {}).liquidity || {}).sold_per_day : (st.k === 'cooldown' ? (o.detail || {}).cooldown_hours : o[st.k]));
   if (st) rows = [...rows].sort((a, b) => ((sortVal(a) ?? -1e18) < (sortVal(b) ?? -1e18) ? -1 : 1) * (st.dir));
-  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells', 'cooldown']);
-  const head = cols.map((c) => c === 'rank' ? `<th data-k="rank" class="rk" title="${esc(RANK_TIP)}">#</th>` : `<th data-k="${c}" class="${numeric.has(c) ? 'num' : ''}">${H[c] || c}</th>`).join('');
+  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells', 'cooldown', 'profit_avg', 'every']);
+  const HT = {units_day: 'How many you can expect to sell (or make) a day: what the whole region buys a day x your share (Settings, 20%), capped by your gold, vendor stock and ingredients. Under 1 means less than one a day.',
+    daily: 'Profit each x sales a day: what this earns on an average day if you keep doing it.',
+    profit_unit: 'Profit on one, after the AH cut, at the current lowest listing.',
+    profit_avg: "Profit on one if it sells at the region's average sale price instead of the lowest listing.",
+    every: 'How long one sale takes on average at your share of the region\'s sales.', ...(opts.headTips || {})};
+  const head = cols.map((c) => c === 'rank' ? `<th data-k="rank" class="rk" title="${esc(RANK_TIP)}">#</th>` : `<th data-k="${c}" class="${numeric.has(c) ? 'num' : ''}"${HT[c] ? ` title="${esc(HT[c])}"` : ''}>${H[c] || c}${HT[c] ? ' <span class="qmark">?</span>' : ''}</th>`).join('');
   const body = rows.map((o) => {
     const cells = cols.map((c) => {
       if (c === 'title') {
@@ -136,7 +142,9 @@ function oppTable(rows, opts = {}) {
       if (c === 'rank') return rankCell(ranks.get(o.key));
       if (c === 'cooldown') { const dd = o.detail || {}, h = dd.cooldown_hours; return h ? `<td class="num" title="${esc(dd.cooldown_group ? 'Shared cooldown: ' + dd.cooldown_group : 'Recipe cooldown from the game data')}">${h >= 1 ? num(h, 0) + ' h' : num(h * 60, 0) + ' min'}${dd.cooldown_group ? ' 🔗' : ''}<div class="pill">max ${num(24 / h, h > 12 ? 2 : 0)}/day</div></td>` : '<td class="num pill">–</td>'; }
       if (c === 'flags') return `<td>${flagHtml(o.flags)}</td>`;
-      if (c === 'units_day') return `<td class="num">${num(o.units_day)}</td>`;
+      if (c === 'units_day') return `<td class="num">${o.units_day >= 1 || !o.units_day ? num(o.units_day) : `1 every ${daysText(1 / o.units_day)}`}</td>`;
+      if (c === 'every') return `<td class="num">${o.units_day > 0 ? (o.units_day >= 1 ? `${num(o.units_day, 1)} a day` : daysText(1 / o.units_day)) : '–'}</td>`;
+      if (c === 'profit_avg') { const v = (o.detail || {}).profit_at_avg_sale; return `<td class="num">${v === undefined ? '<span class="pill">–</span>' : money(v)}</td>`; }
       if (c === 'sells') { const l = (o.detail || {}).liquidity; return l ? `<td class="num" title="${esc(l.why || 'sells well')}">${num(l.sold_per_day, 0)}/day<div class="pill">${l.sale_rate === null || l.sale_rate === undefined ? '' : (l.sale_rate * 100).toFixed(0) + '% sell · '}${l.listed} listed</div></td>` : '<td class="num pill">–</td>'; }
       if (c === 'kind') return `<td>${esc(KIND[o.kind] || o.kind)}</td>`;
       if (c === 'profession') return `<td>${esc(o.profession || '')}</td>`;
@@ -338,7 +346,10 @@ const VIEWS = {
     return `${stale}${unknown}
       <div class="hint">${who ? `Playing <b>${esc(who)}</b> (detected)` : 'Using your manual settings'}: ${num(e.gold, 2)}g to invest, level ${e.level}, realm ${esc(e.realm)}. Everything updates when TSM syncs or you log out / /reload. Click any row for details.</div>
       <details class="how"><summary>How to read this page</summary><div>Every list is <b>ranked</b>: 🥇🥈🥉 mark the best three, and the order weighs expected profit, how sure the numbers are, how well the item sells, what you would lose if it doesn't sell, and whether you can do it now. <b>Click any row</b> for the full numbers and "Why it's ranked here". The coloured <b>notes</b> explain warnings: hover one to read it. <b>Per day</b> assumes you sell a realistic share of what the whole region buys each day (Settings). Prices follow your realm's lowest listing, except where nobody actually pays that.</div></details>
-      <div class="panel"><h2>Do these now <small>things you can do today, ranked by expected profit per day</small></h2>${oppTable(t.now || [])}</div>
+      <div class="panel"><h2>Do these now <small>daily routines you can do today: each sells about once a day or more, ranked by profit a day</small></h2>${oppTable(t.now || [])}</div>
+      <div class="panel"><h2>Occasional big flips <small>worth a lot per sale, but you'd sell less than one a day</small></h2>
+        <div class="hint">These sell slowly: list one and expect to wait. Each shows the profit at the lowest listing and at what it actually sells for across the region, which is often less. Ranked by profit per sale and how sure the numbers are.</div>
+        ${oppTable(t.slow || [], {cols: ['title', 'profit_unit', 'profit_avg', 'cost_unit', 'every', 'sells', 'flags'], empty: 'No slow, valuable flips right now.'})}</div>
       <div class="panel"><h2>Fishing & farming spots <small>gold per hour: open water, and with the pools you come across</small></h2>${oppTable(withPools(t.hourly || []), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false, heads: {profit_unit: 'Per catch / each'}})}
         <div class="hint">${POOL_HINT}</div>
         <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. "measured" uses real time from ForeverMoneyBridge; otherwise ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
