@@ -322,6 +322,30 @@ class HistoryTests(unittest.TestCase):
             self.assertEqual([p['min_buyout'] for p in h.series(1)], [10, 20])
             self.assertEqual(h.previous(now)[1]['minBuyout'], 10)
 
+    def test_old_days_fold_into_daily_candles(self):
+        import time
+        from wfm.history import DAY, FULL_DAYS, KEEP_DAYS
+        with tempfile.TemporaryDirectory() as d:
+            h = History(Path(d) / 'h.db')
+            now = int(time.time())
+            old_day = (now - (FULL_DAYS + 3) * DAY) // DAY * DAY            # a whole UTC day, 17 days ago
+            for i, (mb, n) in enumerate([(100, 4), (150, 6), (80, 8), (120, 2)]):
+                h.record('PvP-Horde', old_day + 3600 * (i + 1), {1: {'minBuyout': mb, 'numAuctions': n, 'marketValue': 110,
+                                                                      'regionSale': 90, 'regionSoldPerDay': 5}})
+            h.record('PvP-Horde', old_day + 4000, {1: {'marketValue': 110}})   # nothing listed in this scan
+            h.record('PvP-Horde', now - 60, {1: {'minBuyout': 130, 'numAuctions': 3, 'marketValue': 115}})
+            s = h.series(1)
+            self.assertEqual(len(s), 2)                                     # one candle + the recent snapshot
+            c = s[0]
+            self.assertTrue(c['daily'])
+            self.assertEqual((c['open'], c['high'], c['low'], c['close']), (100, 150, 80, 120))
+            self.assertEqual(c['min_buyout'], 120)                          # lines use the close
+            self.assertAlmostEqual(c['num_auctions'], (4 + 6 + 8 + 2 + 0) / 5)
+            self.assertEqual(s[1]['min_buyout'], 130)
+            # a candle older than a year is dropped
+            self.assertEqual(h.compact(now + (KEEP_DAYS + 30) * DAY), 1)     # folds the recent day too
+            self.assertEqual(h.series(1), [])
+
 
 if __name__ == '__main__':
     unittest.main()

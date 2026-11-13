@@ -33,6 +33,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Price history kept locally (TSM has none).** TSM's AppData holds only averages (marketValue 14-day,
+  marketValueRecent, historical, regionHistorical, regionMarketValue, regionSale), no series. Each scan is
+  ~6,800 rows (~0.3 MB), so hourly for 45 days would be ~300 MB: now every scan for 14 days, then one daily
+  candle per item (OHLC of the lowest listing + averages) for 365 days. Snapshots exist only while the app runs.
 - **2026-11-14 A wall of overpriced listings is not a price.** Root cause of a 9g "Short Staff" flip: `ah_sell`
   trusted the lowest listing whenever more than 3 were listed (10 listings at 10g; sells for 1s 90c). Now, if
   the lowest listing is over 3x the region average sale price, the value is that sale price (flag
@@ -228,6 +232,9 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** History: 14 days of scans + daily candles for a year (`History.compact`); Market tab shows TSM
+  long-term and recent averages and a long-term reference line. Tests: 99.
 
 - **2026-11-14** Overpriced listing walls valued at actual sales (`pricing.WALL = 3`). Short Staff flip: 9g 49s
   -> 78c. Tests: 98.

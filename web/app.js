@@ -143,6 +143,7 @@ const RANGES = {'24h': 86400, '7d': 7 * 86400, '30d': 30 * 86400, all: Infinity}
 function dailyCandles(pts) {
   const days = new Map();
   for (const s of pts) {
+    if (s.daily && s.close > 0) { days.set('d' + s.ts, {t0: s.ts, t1: s.ts, o: s.open, h: s.high, l: s.low, c: s.close}); continue; }
     if (!(s.min_buyout > 0)) continue;
     const d = new Date(s.ts * 1000); const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
     const c = days.get(k);
@@ -152,7 +153,7 @@ function dailyCandles(pts) {
   return [...days.values()];
 }
 
-function marketChart(series, range, mode) {
+function marketChart(series, range, mode, longTerm) {
   const now = Date.now() / 1000;
   const pts = series.filter((s) => now - s.ts <= RANGES[range]);
   MK.pts = [];
@@ -161,7 +162,7 @@ function marketChart(series, range, mode) {
   const t0 = pts[0].ts, t1 = pts[pts.length - 1].ts;
   const candles = mode === 'candles' ? dailyCandles(pts) : [];
   const useCandles = candles.length >= 2;
-  const vals = pts.flatMap((s) => [s.min_buyout, s.market, s.region_sale]).filter((v) => v > 0);
+  const vals = pts.flatMap((s) => [s.min_buyout, s.market, s.region_sale]).concat(longTerm > 0 ? [longTerm] : []).filter((v) => v > 0);
   if (!vals.length) return '<div class="empty">No prices recorded in this range.</div>';
   let lo = Math.min(...vals), hi = Math.max(...vals);
   if (hi === lo) { hi *= 1.05; lo *= 0.95; }
@@ -196,13 +197,14 @@ function marketChart(series, range, mode) {
   } else {
     main += `<path d="${path('min_buyout')}" fill="none" stroke="#e8c060" stroke-width="2"/>`;
   }
+  if (longTerm > 0) main += `<line x1="${padL}" x2="${W - padR}" y1="${y(longTerm).toFixed(1)}" y2="${y(longTerm).toFixed(1)}" stroke="#b58cf0" stroke-dasharray="2 4" stroke-width="1.2"/>`;
   main += `<path d="${path('market')}" fill="none" stroke="#6ea8fe" stroke-width="1.5"/><path d="${path('region_sale')}" fill="none" stroke="#9aa3b2" stroke-width="1.2" stroke-dasharray="5 4"/>`;
   MK.pts = pts.map((s) => ({...s, x: x(s.ts)}));
   const note = mode === 'candles' && !useCandles ? '<div class="hint">Candles need at least 2 days of history; showing the line for now.</div>' : '';
   return `${note}<div class="chartwrap"><svg id="mk-svg" class="mk" viewBox="0 0 ${W} ${H}" role="img" aria-label="Price history chart">${g}${vol}${main}
     <line id="mk-cross" x1="0" x2="0" y1="${top}" y2="${volTop + volH}" stroke="#e6e6e6" stroke-opacity=".5" visibility="hidden"/>
     <rect x="${padL}" y="0" width="${W - padL - padR}" height="${H}" fill="transparent" id="mk-hit"/></svg><div id="mk-tip" class="mk-tip hidden"></div></div>
-    <div class="legend"><span><b style="color:#e8c060">━</b> lowest listing${useCandles ? ' (daily candles: open, high, low, close)' : ''}</span><span><b style="color:#6ea8fe">━</b> realm 14-day average (TSM market value)</span><span><b style="color:#9aa3b2">╌</b> region average sale price</span><span><b style="color:#3a4150">█</b> listed on your realm</span></div>`;
+    <div class="legend"><span><b style="color:#e8c060">━</b> lowest listing${useCandles ? ' (daily candles: open, high, low, close)' : ''}</span><span><b style="color:#6ea8fe">━</b> realm 14-day average (TSM market value)</span><span><b style="color:#9aa3b2">╌</b> region average sale price</span><span><b style="color:#3a4150">█</b> listed on your realm</span>${longTerm > 0 ? '<span><b style="color:#b58cf0">┈</b> TSM long-term realm average</span>' : ''}</div>`;
 }
 
 function marketBody(d) {
@@ -216,11 +218,13 @@ function marketBody(d) {
   return `<div class="panel"><h2>${itemLink(d.id, d.name, d.quality)} <button class="btn" id="mk-watch">${watching ? 'Watching' : 'Watch price'}</button> <button class="btn" id="mk-details">Full details</button></h2>
       <div class="stats">${stat('Lowest listing', money(p.numAuctions ? p.minBuyout : null), `${num(p.numAuctions || 0, 0)} listed on your realm`)}${stat('Realm 14-day average', money(p.marketValue))}${stat('Region average sale', money(p.regionSale))}
       ${stat('Sold per day (region)', num(liq.sold_per_day, 1), liq.sale_rate !== null && liq.sale_rate !== undefined ? `${(liq.sale_rate * 100).toFixed(0)}% of listings sell` : '')}${stat('Vendor pays', money(d.vendor_sell))}
-      ${stat('Change', tr(d.trend_24h), `24 h · 7 d ${tr(d.trend_7d)} · all ${tr(d.trend_all)}`)}</div></div>
+      ${stat('Change', tr(d.trend_24h), `24 h · 7 d ${tr(d.trend_7d)} · all ${tr(d.trend_all)}`)}
+      ${stat('TSM long-term average', money(p.historical), `realm; region ${moneyText(p.regionHistorical)}`)}${stat('TSM recent value', money(p.marketValueRecent), 'realm, from the latest scan data')}</div></div>
     <div class="grid2"><div class="panel"><h2>Price history <small>lowest listing on your realm, one snapshot per TSM scan</small></h2>
       <div class="controls seg">${Object.keys(RANGES).map((r) => `<button class="btn ${r === range ? 'active' : ''}" data-range="${r}">${r === 'all' ? 'All' : r}</button>`).join('')}
       <span style="width:12px"></span>${['line', 'candles'].map((m) => `<button class="btn ${m === mode ? 'active' : ''}" data-mode="${m}">${m === 'line' ? 'Line' : 'Candles'}</button>`).join('')}</div>
-      ${marketChart(d.series || [], range, mode)}</div>
+      ${marketChart(d.series || [], range, mode, p.historical)}
+      <div class="hint">Every TSM scan is kept for 14 days; older days are kept as one daily candle for a year. Snapshots are only saved while the app is running.</div></div>
     <div class="panel"><h2>Market sentiment <span class="sent ${cls}">${esc(s.label)}</span></h2>
       <table><tbody>${d.signals.map((g) => `<tr><td>${icon(g.score)}</td><td><b>${esc(g.name)}</b></td><td>${esc(g.reading)}</td></tr>`).join('')}</tbody></table>
       <div class="hint">Signals from Forever data only: TSM's numbers now and this app's own price history. ▲ points up, ▼ down, ● steady, · not enough data. Overall: Bullish at +2 or more, Bearish at −2 or less (${s.signals_with_data} of ${s.signals} signals have data). It describes the market now; it is not a forecast.</div></div></div>`;
