@@ -64,7 +64,9 @@ Everything runs on your PC. The page is only reachable from your own computer, a
 - **open it**: worth more opened than sold.
 - **small sample**: not many catches or loots logged yet.
 - **assumed casts/hour**: fishing pace from your setting. It becomes **measured** after about 10 minutes of fishing with the addon on.
-- **vendor price from game files** / **black market vendor**: open that vendor once with the addon on to record the real price.
+- **vendor price from game files**: open that vendor once with the addon on to record the real price.
+- **Black Market agents** charge far more than the game files say (Frilled Lichen: 4g 50s, not 1s 20c), so items
+  only they sell get no vendor price, no flip and no ingredient cost until you open their shop with the addon on.
 - **pool loot extra**: "Gold / hour" is open water only. The "Gold / hour with pools" column adds the pools you come across (not counting the time spent finding them, so it's a ceiling).
 - **slow seller**, **can't afford**, **snapshot**: check before acting.
 
@@ -147,7 +149,7 @@ The **Data health** tab shows every source's age and version, plus the accuracy 
 
 - TSM "market value" averages *listings*, not sales. "Region sold/day" and "region sale price" come from TSM users' sales records, so treat sold/day as a liquidity indicator, not an exact count.
 - Only the lowest listing is known. Buying many units costs more than the lowest price shown.
-- Game-file vendor prices are base prices; some vendors charge more (Black Market agents, for example). Those rows are flagged until ForeverMoneyBridge records the real price.
+- Game-file vendor prices are base prices; some vendors charge more (Black Market agents, for example). Those rows are flagged until ForeverMoneyBridge records the real price; items sold only by Black Market agents are left out until then.
 - About a third of recipe skill requirements are estimated (yellow − 40). They're marked `~`.
 - "Cheap relist" and "AH → vendor" rows come from one scan snapshot. Check them in game, or use TSM's Sniper.
 - AH deposits for listings that don't sell are not included.

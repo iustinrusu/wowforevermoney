@@ -141,11 +141,16 @@ class Engine:
         else:
             price = item.buy_price if item and item.buy_price > 0 else int(self.su.vendor_prices.get(iid, 0))
             if vendors and price > 0:
-                result = (price, vendors)
-                # Game files hold a base price; some vendors (e.g. Black Market agents) charge far more.
-                black = any('black market' in str((self.q.npcs.get(v['npc']) or {}).get('subName', '')).lower()
-                            for v in vendors)
-                self._vendor_flags[iid] = ('black_market',) if black else ('vendor_price_unconfirmed',)
+                # Game files hold a base price; Black Market agents charge far more (Frilled Lichen: 4g 50s, not
+                # the file's 1s 20c, seen in game 2026-11-13). If only they sell it, the real price is unknown until
+                # ForeverMoneyBridge sees it, so this vendor isn't used for flips or ingredient costs at all.
+                black = ['black market' in str((self.q.npcs.get(v['npc']) or {}).get('subName', '')).lower()
+                         for v in vendors]
+                if all(black):
+                    self._vendor_flags[iid] = ('black_market',)
+                else:
+                    result = (price, vendors)
+                    self._vendor_flags[iid] = ('black_market',) if any(black) else ('vendor_price_unconfirmed',)
         if result and not any(v.get('located', True) and not v.get('event') for v in result[1]):
             # every vendor is event-only (Darkmoon Faire, holidays) or has no known location
             self._vendor_flags[iid] = self._vendor_flags.get(iid, ()) + ('event_vendor',)

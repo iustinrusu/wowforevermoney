@@ -218,6 +218,10 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Change log
 
+- **2026-11-13** Items sold only by Black Market agents get no vendor price until ForeverMoneyBridge sees the
+  real one (user's choice): no vendor flips or ingredient costs from the game-file price. Affected now:
+  Frilled Lichen 249399, Torbernite 248820, Pristine Leather 249427.
+
 - **2026-11-13** Frilled Lichen (249399) costs **4g 50s** at Mister Graphed (Black Market), seen in game by the
   user; the tip and the black-market flag text said 4s 50c (coin icons misread on Wowhead). Corrected. Lesson:
   hand-written prices must say which coin they mean and be checked in game.

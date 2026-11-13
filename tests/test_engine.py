@@ -156,13 +156,19 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(e.vendor_price(MAT_VENDOR)[0], 30)      # 90 copper for 3 = 30 each, not the file's 10
         self.assertEqual(e.vendor_flags(MAT_VENDOR), ('vendor_price_seen',))
 
-    def test_black_market_vendor_flagged(self):
-        w = make_world({LIMITED: {'numAuctions': 2, 'minBuyout': 5000, 'marketValue': 5000, 'regionSoldPerDay': 100}})
+    def test_black_market_vendor_price_unknown_until_seen(self):
+        # Frilled Lichen: game files say 1s 20c, the Black Market agent charges 4g 50s. A flip built on the file
+        # price is fiction, so it isn't shown until ForeverMoneyBridge records the real price.
+        prices = {LIMITED: {'numAuctions': 2, 'minBuyout': 5000, 'marketValue': 5000, 'regionSoldPerDay': 100}}
+        w = make_world(prices)
         w.questie.npcs[100]['subName'] = 'Agent of the Black Market'
-        o = Engine(w, dict(SETTINGS)).vendor_flips()[0]
-        self.assertIn('black_market', o.flags)
-        r = Engine(w, dict(SETTINGS)).run()
-        self.assertNotIn(o.key, r['top']['now'], 'unconfirmed black-market prices never make the top picks')
+        e = Engine(w, dict(SETTINGS))
+        self.assertIsNone(e.vendor_price(LIMITED))
+        self.assertEqual([o for o in e.vendor_flips() if o.item_id == LIMITED], [])
+        w.profile = {'vendors': {100: {'items': {LIMITED: {'price': 1500, 'qty': 1}}}}}     # seen in game
+        e = Engine(w, dict(SETTINGS))
+        self.assertEqual(e.vendor_price(LIMITED)[0], 1500)
+        self.assertEqual(e.vendor_flags(LIMITED), ('vendor_price_seen',))
 
     def test_vendor_flip_with_limited_stock(self):
         prices = {LIMITED: {'numAuctions': 2, 'minBuyout': 5000, 'marketValue': 5000, 'regionSoldPerDay': 100,
