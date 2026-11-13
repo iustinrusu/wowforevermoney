@@ -66,6 +66,9 @@ const FLAGS = {
   no_value: ['bad', 'no known value', 'No AH price, vendor price, recipe or contents known'],
   short_history: ['', 'short history', 'Under a day of our own price snapshots: the trend is first vs latest scan and can swing a lot'],
   slow_sale_rate: ['warn', 'slow to sell', 'Under 10% of listings sell (TSM region sale rate): you may wait a long time to sell'],
+  skins_partial: ['warn', 'some skins not counted', 'Counts leathers and Light/Medium Hide only: heavier hides, scales and special leathers were not read from Wowhead Forever yet, so this is a floor'],
+  skill_classic_rule: ['', 'skill: Classic rule', 'Skinning skill per mob level uses the WoW Classic rule (level x 5 above level 20); Forever may differ'],
+  assumed_kill_rate: ['warn', 'assumed skins/hour', 'No timed skinning logs yet (ForeverMoneyBridge); uses your skins-per-hour setting'],
   ah_price_doubtful: ['warn', 'AH price doubtful', 'Listed with no recorded sales or far above the region: counted at its sale price instead'],
 };
 const rankCell = (r) => `<td class="rk">${r <= 3 ? `<span class="medal m${r}" title="${['', 'Gold', 'Silver', 'Bronze'][r]}: #${r}">${r}</span>` : `<span class="rank">${r}</span>`}</td>`;
@@ -106,7 +109,7 @@ function oppTable(rows, opts = {}) {
     const cells = cols.map((c) => {
       if (c === 'title') {
         const name = o.name || o.title;
-        const label = (o.kind === 'fishing_zone' || o.kind === 'fishing_spot') ? esc(o.title) : esc(o.title).replace(esc(name), itemLink(o.item_id, name, o.quality));
+        const label = (o.kind === 'fishing_zone' || o.kind === 'fishing_spot' || o.kind === 'skin_spot') ? esc(o.title) : esc(o.title).replace(esc(name), itemLink(o.item_id, name, o.quality));
         return `<td>${label}${o.needs ? `<div class="needs">needs ${esc(o.needs)}</div>` : ''}${o.tip ? `<div class="pill">💡 ${esc(o.tip)}</div>` : ''}</td>`;
       }
       if (c === 'rank') return rankCell(ranks.get(o.key));
@@ -333,7 +336,7 @@ const VIEWS = {
       <div class="panel"><h2>Cheap listings to relist</h2><div class="hint">Lowest listing under 60% of the lowest of realm market value, region market value and region average sale price. Speculative.</div>${oppTable(dip, {cols: ['title', 'profit_unit', 'cost_unit', 'flags']})}</div>`;
   },
   async gather() {
-    const [zones, g] = await Promise.all([api('/api/opps?kind=fishing_spot&limit=600'), api('/api/opps?kind=gather&limit=600')]);
+    const [zones, g, skins] = await Promise.all([api('/api/opps?kind=fishing_spot&limit=600'), api('/api/opps?kind=gather&limit=600'), api('/api/opps?kind=skin_spot&limit=200')]);
     const fishDoable = sessionStorage.getItem('fishDoable') === '1', fishConfirmed = sessionStorage.getItem('fishConfirmed') === '1';
     const isClassic = (o) => o.flags.includes('classic_unconfirmed') ? 1 : 0;
     const fz = zones.filter((o) => (!fishDoable || o.doable) && (!fishConfirmed || !isClassic(o)))
@@ -345,7 +348,10 @@ const VIEWS = {
       ${oppTable(withPools(fz), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false, heads: {profit_unit: 'Per catch'}})}
       <div class="hint">${POOL_HINT}</div></div>
       <div class="panel"><h2>What farmed materials are worth <small>per unit: best of selling on AH, to a vendor, or crafting it</small></h2>
-      <div class="hint">Set how many you gather per hour in an item's details to get gold/hour.</div>${oppTable(g, {cols: ['title', 'profession', 'profit_unit', 'units_day', 'gph', 'flags']})}</div>`;
+      <div class="hint">Set how many you gather per hour in an item's details to get gold/hour.</div>${oppTable(g, {cols: ['title', 'profession', 'profit_unit', 'units_day', 'gph', 'flags']})}</div>
+      <div class="panel"><h2>Skinning spots <small>Wowhead Forever skinning counts; value per skin x skins per hour</small></h2>
+      <div class="hint">Per zone: the mobs you can skin (Classic skill rule) and kill (up to 3 levels above you), weighted by how often each was skinned in Forever. Skins per hour come from your ForeverMoneyBridge logs once there are 10+ minutes, otherwise from Settings (${num(STATE.settings.kills_per_hour || 60, 0)}). Leathers and Light/Medium Hide are counted; other skins are not read yet, so values are a floor.</div>
+      ${oppTable(skins, {cols: ['title', 'profit_unit', 'gph', 'flags'], export: false, heads: {profit_unit: 'Per skin'}, empty: 'No Wowhead Forever skinning data yet.'})}</div>`;
   },
   async bags() {
     const inv = await api('/api/inventory');
@@ -444,6 +450,7 @@ const VIEWS = {
       <div>Hide items selling under</div><div><input type="number" step="0.5" id="s-minspd" value="${s.min_sold_per_day}"> per day <span class="pill">in the whole region; never below 1. Items where under 1 in 10 listings sells, or with over 10 days of sales already listed on your realm, are never suggested either</span></div>
       <div>Switch factor</div><div><input type="number" step="0.1" id="s-switch" value="${s.switch_bonus}"></div>
       <div>Fishing casts per hour</div><div><input type="number" id="s-casts" value="${s.casts_per_hour || 240}"></div>
+      <div>Skins per hour</div><div><input type="number" id="s-kph" value="${s.kills_per_hour || 60}"> <span class="pill">mobs killed and skinned per hour, until ForeverMoneyBridge has 10+ minutes of your skinning</span></div>
       <div>AH sale price</div><div><select id="s-basis"><option value="min_buyout" ${s.sale_price_basis !== 'actual_sales' ? 'selected' : ''}>current lowest buyout (what you'd list at)</option><option value="actual_sales" ${s.sale_price_basis === 'actual_sales' ? 'selected' : ''}>what items actually sell for (more conservative)</option></select> <span class="pill">nothing listed: the average sale price either way</span></div>
       <div>Fishing drop rates</div><div><label class="chk"><input type="checkbox" id="s-ownrates" ${s.own_logs_for_rates ? 'checked' : ''}> also use my own catch logs</label> <span class="pill">off: Wowhead Forever's big samples only; your logs still give your pace and got-away rate</span></div>
       <div>Fishing pools</div><div><label class="chk"><input type="checkbox" id="s-pools" ${s.fishing_pools ? 'checked' : ''}> count pool loot in gold/hour</label> <span class="pill">off: open water only; trunks, Stranglekelp and Rumsey Rum from pools shown as a bonus, since pools have to be found first</span></div>
@@ -485,7 +492,7 @@ function wireView() {
       document.querySelectorAll('.s-prof').forEach((i) => { if (i.value !== '') professions[i.dataset.p] = +i.value; });
       const body = {auto_detect: $('#s-auto').checked, character: $('#s-char').value || null, gold_scope: $('#s-gscope').value, gold: +$('#s-gold').value, level: +$('#s-level').value, realm: $('#s-realm').value, faction: $('#s-faction').value, professions,
         ah_cut: +$('#s-cut').value, market_share: +$('#s-share').value, min_sold_per_day: +$('#s-minspd').value, switch_bonus: +$('#s-switch').value,
-        casts_per_hour: +$('#s-casts').value, own_logs_for_rates: $('#s-ownrates').checked, sale_price_basis: $('#s-basis').value, fishing_pools: $('#s-pools').checked,
+        casts_per_hour: +$('#s-casts').value, kills_per_hour: +$('#s-kph').value, own_logs_for_rates: $('#s-ownrates').checked, sale_price_basis: $('#s-basis').value, fishing_pools: $('#s-pools').checked,
         include_unverified_recipes: $('#s-unver').checked,
         alerts: {enabled: $('#s-alerts').checked, min_daily_profit_gold: +$('#s-alertmin').value},
         stale_hours: {realm: +$('#s-stale-r').value, region: +$('#s-stale-g').value}};
@@ -504,7 +511,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#drawer
 function oppDetail(o) {
   const d = o.detail || {};
   let html = `<h3>${esc(o.title)} <small>${esc(KIND[o.kind] || o.kind)}</small></h3><div>${flagHtml(o.flags)}</div>
-    <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
+    <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
     <div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
     ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>`;
   const rk = d.rank;
@@ -538,6 +545,13 @@ function oppDetail(o) {
       ${d.fish.map((f) => `<tr class="row" data-item="${f.item_id}"><td>${itemLink(f.item_id, f.name)}</td><td class="num">${f.count}</td><td class="num">${(f.share * 100).toFixed(1)}%</td><td class="num">${money(f.value)}</td></tr>`).join('')}</tbody></table>`;
   }
   if (o.kind === 'fishing_spot') html += fishingDetail(o);
+  if (o.kind === 'skin_spot') {
+    html += `<div class="kv" style="margin-top:8px"><div>Mob levels</div><div>${esc(d.levels)}</div><div>Skins per hour</div><div>${num(d.skins_per_hour, 0)} <span class="pill">${esc(d.pace_source)}</span></div>
+      <div>Forever skins counted</div><div>${num(d.skins, 0)} <span class="pill">${esc(d.source)}</span></div></div>
+      <h3>Mobs here <small>value per skin at current prices</small></h3><table><thead><tr><th>Mob</th><th>Level</th><th class="num">Skinned</th><th class="num">Per skin</th><th>Gives</th></tr></thead><tbody>
+      ${d.mobs.map((m) => `<tr><td>${esc(m.name)}${m.can_skin ? '' : ` <span class="needs">Skinning ${m.skill_needed}</span>`}${m.can_kill ? '' : ' <span class="needs">too high</span>'}</td><td>${esc(m.levels)}</td><td class="num">${num(m.skinned, 0)}</td><td class="num">${money(m.value)}</td>
+        <td>${m.items.slice(0, 3).map((i) => `${itemLink(i.item_id, i.name)} ${(i.share * 100).toFixed(0)}%`).join(', ')}</td></tr>`).join('')}</tbody></table>`;
+  }
   if (o.kind === 'realm_dip') {
     html += `<div class="kv" style="margin-top:8px"><div>Lowest listing</div><div>${money(d.min_buyout)}</div><div>Realm market</div><div>${money(d.realm_market)}</div><div>Region market</div><div>${money(d.region_market)}</div><div>Region avg sale</div><div>${money(d.region_sale)}</div><div>Relist at</div><div>${money(d.relist_at)}</div></div>`;
   }
@@ -571,7 +585,7 @@ function fishingDetail(o) {
       <td>${f.quest ? '<span class="flag">quest item</span>' : ''}${f.seasonal ? `<span class="flag" title="Classic season schedule">${esc(f.seasonal)}${f.in_season === false ? ' (out of season)' : (f.in_season ? ' (in season)' : '')}</span>` : ''}${(f.pools || []).length ? `<span class="flag" title="${esc(f.pools.join(', '))}">from pools</span>` : ''}</td></tr>`).join('')}</tbody></table>`;
   return h;
 }
-function openOpp(o) { if (!o) return; if (o.kind === 'fishing_zone' || o.kind === 'fishing_spot') { openDrawer(oppDetail(o)); wireDrawer(); return; } openItem(o.item_id, o); }
+function openOpp(o) { if (!o) return; if (o.kind === 'fishing_zone' || o.kind === 'fishing_spot' || o.kind === 'skin_spot') { openDrawer(oppDetail(o)); wireDrawer(); return; } openItem(o.item_id, o); }
 
 function spark(hist) {
   const pts = hist.filter((h) => h.min_buyout || h.market);

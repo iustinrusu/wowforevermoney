@@ -20,6 +20,7 @@ from .paths import DATA, GamePaths
 WOWHEAD_FISHING = DATA / 'wowhead_forever_fishing.json'
 WOWHEAD_CONTAINERS = DATA / 'wowhead_forever_containers.json'
 from . import profile as profile_mod
+from . import skinning as skinning_mod
 from .questie import QuestieDB, load_drop_rates, load_questie
 from .skillup import SkillUpData, load_skillup
 from .tooltips import TooltipCache
@@ -75,6 +76,7 @@ class World:
         self.classic_fishing: classicdb.ClassicFishing | None = None
         self.forever_fishing: dict = {}      # zone name -> Wowhead Forever counts (read by hand)
         self.forever_containers: dict = {}   # item id -> what it contains in Forever (Wowhead, read by hand)
+        self.forever_skinning: dict = {}     # Wowhead Forever "Skinned from" counts (read by hand)
         self.inventory: dict = {}
         self.hotfix_info: dict = {}
         self.profile: dict = {'characters': {}, 'active': None, 'activity': {}}
@@ -285,7 +287,9 @@ class World:
         st.files.append(str(WOWHEAD_CONTAINERS))
         cdata = json.loads(WOWHEAD_CONTAINERS.read_text(encoding='utf-8')) if WOWHEAD_CONTAINERS.exists() else {}
         self.forever_containers = cdata.get('containers') or {}
-        st.loaded_at, st.file_time = int(time.time()), _mtime([p, WOWHEAD_CONTAINERS]) or None
+        st.files.append(str(skinning_mod.SNAPSHOT))
+        self.forever_skinning = skinning_mod.load()
+        st.loaded_at, st.file_time = int(time.time()), _mtime([p, WOWHEAD_CONTAINERS, skinning_mod.SNAPSHOT]) or None
         dates = sorted({v.get('checked', '') for v in list(self.forever_fishing.values()) + list(self.forever_containers.values())})
         st.version = dates[-1] if dates else None
         if not self.forever_fishing:
@@ -296,6 +300,7 @@ class World:
                        f'{sum(v.get("fished", 0) for v in self.forever_fishing.values()):,} Forever catches. '
                        f'Contents of {len(self.forever_containers)} containers '
                        f'({", ".join(v.get("name", k) for k, v in self.forever_containers.items())}). '
+                       f'Skinning: {len((self.forever_skinning or {}).get("items") or {})} items. '
                        f'A snapshot from {", ".join(dates)}; refresh by re-reading the pages.')
         self.version += 1
 

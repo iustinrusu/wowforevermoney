@@ -10,7 +10,7 @@ import re
 import time
 from dataclasses import asdict, dataclass, field
 
-from . import fishing, pricing, valuation
+from . import fishing, pricing, skinning, valuation
 from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
@@ -30,7 +30,7 @@ DARKMOON_ZONES = {12, 215}       # Elwynn Forest + Mulgore: where the Darkmoon F
 # the numbers shown: a pick with doubtful prices ranks below an equally good one with solid prices.
 DOUBT = {'listed_far_above_sales': 0.8, 'slow_to_sell': 0.7, 'crowded': 0.7, 'sells_lower': 0.6, 'price_looks_off': 0.6, 'none_listed': 0.8, 'mat_not_listed': 0.8, 'small_sample': 0.8,
          'limited_mat': 0.9, 'limited_stock': 0.9, 'seasonal': 0.9, 'vendor_price_unconfirmed': 0.95,
-         'skill_estimated': 0.95, 'assumed_rate': 0.95, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
+         'skill_estimated': 0.95, 'assumed_rate': 0.95, 'assumed_kill_rate': 0.9, 'skins_partial': 0.95, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
 
 
 def confidence(flags) -> float:
@@ -41,7 +41,7 @@ def confidence(flags) -> float:
 
 
 # Ranking (Engine.rank). Score = expected profit x how sure we are x risk x can-do-now x problems x preference.
-HOURLY_KINDS = ('fishing_spot', 'fishing_zone', 'farm_zone')
+HOURLY_KINDS = ('fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot')
 ONE_OFF_KINDS = ('realm_dip', 'ah_to_vendor')
 PROBLEM_FLAGS = {'hard_to_sell', 'slow_seller', 'no_sales_data', 'unverified_recipe', 'above_region', 'black_market',
                  'event_vendor', 'classic_unconfirmed'}
@@ -553,6 +553,53 @@ class Engine:
                             'fish': rows, 'casts': loots, 'caught': loots, 'got_away': 0, 'source': 'ForeverMoneyBridge'}))
         return out
 
+    def skinning_spots(self, best_use: dict[int, dict]) -> list[Opportunity]:
+        """Skinning spots per zone from Wowhead Forever "Skinned from" counts (see skinning.py)."""
+        table = skinning.mobs(getattr(self.w, 'forever_skinning', None) or {})
+        if not table:
+            return []
+        level = int(self.s.get('level', 1) or 1)
+        skill = self.profs.get('Skinning')
+        pace, minutes = skinning.measured_pace((getattr(self.w, 'profile', None) or {}).get('activity'))
+        per_hour = pace or float(self.s.get('kills_per_hour', 60) or 60)
+        value_of = lambda iid: self.fish_value(iid, best_use)
+        out = []
+        for sp in skinning.spots(table, value_of, lambda z: self.gd.zones.get(z, f'zone {z}'), skill, level):
+            if sp['value'] <= 0:
+                continue
+            usable = [m for m in sp['mobs'] if m['can_skin'] and m['can_kill']]
+            top = (usable or sp['mobs'])[:3]
+            flags = ['wowhead_forever', 'skins_partial', 'skill_classic_rule',
+                     'measured_pace' if pace else 'assumed_kill_rate']
+            if sp['skins'] < skinning.SOLID_SAMPLE:
+                flags.append('small_sample')
+            needs = ''
+            if not sp['doable']:
+                if skill is None:
+                    needs = 'Learn Skinning'
+                elif skill < sp['skill_needed']:
+                    needs = f'Skinning {sp["skill_needed"]} (you have {skill}; Classic rule)'
+                else:
+                    needs = f'level {max(1, sp["min_level"] - skinning.LEVEL_REACH)}+ (you are {level})'
+            best_item = max(top[0]['items'], key=lambda i: top[0]['items'][i] * value_of(i)) if top else 0
+            mobs = [{'npc': m['npc'], 'name': m['name'], 'levels': f"{m['min_level']}-{m['max_level']}",
+                     'skinned': m['skinned'], 'value': m['value'], 'skill_needed': m['skill_needed'],
+                     'can_skin': m['can_skin'], 'can_kill': m['can_kill'],
+                     'items': sorted(({'item_id': i, 'name': self.name(i), 'share': round(s, 3), 'value': value_of(i)}
+                                      for i, s in m['items'].items()), key=lambda x: -x['share'] * x['value'])}
+                    for m in sp['mobs'][:12]]
+            out.append(Opportunity(
+                kind='skin_spot', key=f'skin:{sp["zone_id"]}', item_id=best_item,
+                title=f'Skin in {sp["zone"]}: ' + ', '.join(m['name'] for m in top),
+                profit_unit=sp['value'], cost_unit=0, units_day=0, daily=0, gph=int(sp['value'] * per_hour),
+                doable=sp['doable'], needs=needs, profession='Skinning', preferred='Skinning' in self.preferred,
+                flags=flags,
+                detail={'zone': sp['zone'], 'zone_id': sp['zone_id'], 'mobs': mobs, 'skins': sp['skins'],
+                        'levels': f"{sp['min_level']}-{sp['max_level']}", 'skins_per_hour': round(per_hour, 1),
+                        'pace_source': f'measured ({minutes:.0f} min of your skinning)' if pace else 'your skins-per-hour setting',
+                        'source': 'Wowhead Forever "Skinned from" counts'}))
+        return out
+
     def valuer(self, best_use: dict[int, dict] | None = None) -> valuation.Valuer:
         """Item values through every channel (AH, vendor, crafting, opening it), built once per run."""
         if self._valuer is None or (best_use is not None and self._valuer.best_use is not best_use):
@@ -855,7 +902,8 @@ class Engine:
         # fishing logs (with time) feed the fishing spots below; other activities get their own measured rows
         measured = [o for o in self.activity_zones(best_use) if o.kind != 'fishing_zone']
         all_opps = (self.crafts() + self.vendor_flips() + self.ah_to_vendor() + self.realm_dips()
-                    + self.gathering(best_use) + measured + self.fishing_spots(best_use))
+                    + self.gathering(best_use) + measured + self.fishing_spots(best_use)
+                    + self.skinning_spots(best_use))
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         for o in all_opps:
             # anything you'd sell on the AH: does it actually sell? (hard to sell: never suggested)
@@ -869,6 +917,19 @@ class Engine:
             o.score, o.detail['rank'] = self.rank(o)
         return {'opportunities': all_opps, 'best_use': best_use, 'top': self.top_picks(all_opps),
                 'undervalued': self.undervaluation_watch()}
+
+    @staticmethod
+    def _varied(ranked: list[Opportunity], n: int, per_kind: int) -> list[str]:
+        """The best n keys, at most per_kind of each kind (so one activity can't fill a section)."""
+        seen: dict[str, int] = {}
+        out = []
+        for o in ranked:
+            if seen.get(o.kind, 0) < per_kind:
+                seen[o.kind] = seen.get(o.kind, 0) + 1
+                out.append(o.key)
+            if len(out) == n:
+                break
+        return out
 
     def top_picks(self, opps: list[Opportunity], n: int = 15) -> dict:
         bonus = float(self.s.get('switch_bonus', 1.5))
@@ -895,7 +956,8 @@ class Engine:
         # (a fishing spot needs confirming Forever data and 30+ Forever catches: a few lucky trunks in a
         # small sample can make a zone look 3x better than it is)
         hourly = [o for o in opps if o.gph and o.doable and 'classic_unconfirmed' not in o.flags
-                  and (o.kind != 'fishing_spot' or (o.detail.get('confirmed_by') and 'small_sample' not in o.flags))]
+                  and (o.kind != 'fishing_spot' or (o.detail.get('confirmed_by') and 'small_sample' not in o.flags))
+                  and (o.kind != 'skin_spot' or 'small_sample' not in o.flags)]
         # ranked by Engine.rank: profit x how sure we are x risk x can-do-now x problems x preference
         key = lambda o: o.score
         # sections about later rank by what a pick earns once you have the gold and skill for it
@@ -905,6 +967,6 @@ class Engine:
             'level_up': [o.key for o in sorted((o for o in later if not o.doable and 'other_profession' not in o.flags),
                                                key=later_key, reverse=True)[:n]],
             'switch': [o.key for o in sorted(stretch, key=later_key, reverse=True)[:5]],
-            'hourly': [o.key for o in sorted(hourly, key=key, reverse=True)[:n]],
+            'hourly': self._varied(sorted(hourly, key=key, reverse=True), n, per_kind=5),
             'snipes': [o.key for o in sorted(speculative, key=lambda o: ('cant_afford' in o.flags, -o.score))[:n]],
         }

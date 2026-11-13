@@ -33,6 +33,15 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Skinning spots** (`wfm/skinning.py`, `Engine.skinning_spots`, `data/wowhead_forever_skinning.json`):
+  Wowhead Forever "Skinned from" counts per mob (count/outof, levels, zones; Classic Era rows skipped, flag is
+  `classicEra: true` on this tab), mobs skinned 50+ times, top 40 per item. Zone value per skin = average over mobs
+  you can skin (Classic skill rule, labelled) and kill (<= level + 3), weighted by times skinned. Pace measured
+  from ForeverMoneyBridge skinning logs (10+ min; 136/h for the user), else `kills_per_hour` (60). Read 7 of 19
+  items before Wowhead returned 403 (all five leathers + Light/Medium Hide): values are a floor (flag
+  `skins_partial`). Hourly Top picks now hold at most 5 rows per activity type.
+- **2026-11-14 Wowhead 403 after 7 pages at 11 s spacing** (Heavy Hide). My batch made one more request after
+  the 403 because the stop check returned a value instead of throwing: next time throw so the batch halts.
 - **2026-11-14 Ranking (user: numbered rows, medals, smart order).** `Engine.rank`: profit basis (daily + 10% of
   what more gold adds; gph for activities; profit for snipes) x confidence x risk 1/(1 + 0.05 x downside/profit),
   downside = cost - vendor salvage x doable (skill gap 0.5, other profession 0.25) x problems 0.2 x preferred 1.1.
@@ -216,6 +225,11 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Open items
 
+- **Wowhead Forever reads left** (blocked by 403 on 2026-11-14): skinning items 4235 Heavy Hide, 8169 Thick Hide,
+  8171 Rugged Hide, 15417 Devilsaur Leather, 8368 Thick Wolfhide, scales 8167/8154/7286/8165, 15412/15419/15423;
+  then the "Dropped by" tabs for mob farming (cloth 2589/2592/4306/4338/14047/14256, elementals 7067-7070, 7075,
+  7077, 7079, 7081, 12803, 12808, 7972, Righteous Orb 12811). Same compact extract (see docs/plans), stop by
+  throwing on a non-Forever page.
 - **Recipe cooldowns aren't modelled** (found 2026-11-14): Transmute: Arcanite shows ~38.8g/day potential as if
   ~10 crafts a day were possible; Mooncloth, transmutes and salt are overstated too. Needs the SpellCooldowns
   table from wago.tools (Forever build), waiting for the user's OK to download it.
@@ -240,6 +254,9 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Skinning spots on the Farming tab and in hourly Top picks; skins-per-hour setting; Wowhead
+  Forever skinning snapshot (7 items). Tests: 113.
 
 - **2026-11-14** Ranking: `Engine.rank` score on every row, # column with gold/silver/bronze medals, "Why it's
   ranked here" in details, investments ranked (cheap vs long-term x sells x risk), numbered bags and search.

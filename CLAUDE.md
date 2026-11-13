@@ -64,6 +64,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/classicdb.py` | cMaNGOS classic-db fishing/pool tables (Classic 1.12: fallback only, never Forever fact) |
 | `wfm/fishing.py` | fishing spots, your catch logs + Wowhead Forever counts, got-away and pace model |
 | `wfm/hotfix.py` | decodes the client's hotfix cache (DBCache.bin): exact Forever item data; layout inferred and graded |
+| `wfm/skinning.py` | skinning spots from Wowhead Forever "Skinned from" counts |
 | `wfm/valuation.py` | an item's worth through every channel (AH, vendor, craft, open it) |
 | `wfm/lua.py` | Lua table parser for SavedVariables and addon data files |
 | `wfm/profile.py` | characters from ForeverMoneyBridge + TSM; auto-fills settings |

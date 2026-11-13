@@ -19,7 +19,8 @@ Python: %LOCALAPPDATA%\Programs\Python\Python313\python.exe. Tests: `python -m u
 Build these three, in order. Commit and push after each one; push only if all tests pass. End commit messages with:
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 
-1. **Skinning spots**, ranked by gold/hour like fishing (wfm/fishing.py and Engine.fishing_spots are the model to follow).
+1. **PARTLY DONE 2026-11-14** (7 of 19 items read before a Wowhead 403; see the project log's open items for the
+   rest). **Skinning spots**, ranked by gold/hour like fishing (wfm/fishing.py and Engine.fishing_spots are the model to follow).
    - **Data:** on Wowhead Forever item pages (https://www.wowhead.com/forever/item=<id>), read the "Skinned from" listview. Check `Object.keys(window.g_listviews)` for its id; its rows are NPCs with count and outof. Pages to read:
      - leathers: Light 2318, Medium 2319, Heavy 4234, Thick 4304, Rugged 8170
      - hides: Light 783, Medium 4232, Heavy 4235, Thick 8169, Rugged 8171
