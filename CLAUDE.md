@@ -3,7 +3,8 @@
 A local Python app (web page at http://127.0.0.1:8765) that ranks every way to make gold in **WoW: Forever**
 for the user's characters, using TSM auction data plus game data and addon data. User-facing docs: `README.md`.
 
-**To-do list: `docs/plans/TODO.md`.** When the user says "start doing the things on the todo list", work through it
+**Open work and decisions, the user's checklist: `docs/plans/open-items-and-decisions.md`** (when the user asks
+what's left or about the decisions, go through every item). **To-do list: `docs/plans/TODO.md`.** When the user says "start doing the things on the todo list", work through it
 in order (each item points to a plan file with the full brief).
 
 **Read `docs/PROJECT_LOG.md` at the start of every session.** It holds the decisions made so far and why,

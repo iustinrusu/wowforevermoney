@@ -390,6 +390,8 @@ moved into `forever-data-next.md`.
 
 ## Open items
 
+- The full checklist of open work and decisions (the user asked to go through all of it later):
+  `docs/plans/open-items-and-decisions.md`.
 - User's idea (2026-11-14): a Dungeons (and raids) view. Claude's view in the change log entry of that day; the user
   said "not yet" (2026-11-14): ask again before building it.
 - Re-read later the 22 pages Wowhead has no Forever rows for yet (Data health lists them after the queue).

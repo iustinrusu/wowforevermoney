@@ -1,5 +1,8 @@
 # To-do list (in order)
 
+**The user's checklist of all open work and decisions: `docs/plans/open-items-and-decisions.md`.** When the user
+asks what's left or about the decisions, go through every item there.
+
 When the user says "start doing the things on the todo list" (or similar), work through this list top to bottom.
 Each item points to a plan file with the full brief. Follow CLAUDE.md's standing rules, check usage before each
 step, commit and push each finished piece, tick it off here and note it in docs/PROJECT_LOG.md. If usage gets
