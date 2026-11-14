@@ -253,6 +253,11 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-14: SkillUpForever's own prices (Integrations/Prices.lua): buying = Auctionator's latest buyout if
+  installed, else TSM `first(DBRecent, DBMinBuyout, DBMarket)`; a vendor price seen in game beats its bundled list;
+  cheapest source wins; crafted value = TSM `DBRegionSaleAvg` minus 5%, vendor price as the floor. The app reads only
+  its recipe facts (skill levels, trainer fees, limited stock, vendor prices), not these prices.
+
 - 2026-11-14: ForeverMoneyBridge 1.4.1 saves gold correctly: its figure equals Syndicator's to the copper on both
   characters saved at 10:49 (1.4.0 saved 0 on logout).
 - 2026-11-14: ForeverMoneyBridge 1.4.0 records containers on the Forever client (Big-mouth Clam x7, Mithril
