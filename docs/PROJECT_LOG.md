@@ -399,6 +399,9 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-14** Wowhead after the back-off: 5 more item pages (Powerful Mojo, Living Essence, Heavy Thorium Ore,
+  Turtle Meat, Arthas' Tears) at 2 minutes apart, no block; 81 item pages in all.
+
 - **2026-11-14** Tests no longer overwrite the cached Classic node loot (data/classicdb/nodes.json): node spots
   return early when no herb or ore node is known.
 

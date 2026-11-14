@@ -29,9 +29,10 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   coverage, node yields, skinning merge, mob farming rows (to-do item 4, first version).
 - Step 3: 76 of the top 100 read at one a minute (plus 6 earlier pages); **Wowhead returned 403 at 15:28 on page 77
   (12804 Powerful Mojo)**. Back-off check at 15:59 (30 minutes later): one page (12804) loaded normally, so the
-  block had lifted. Left, in order: 12803 248815 3712 4236 8836 1206 15419 12800 3820 13546 249428 2842
-  8154 12203 6471 3864 249391 249427 12184 4232 6037 13464 1529 4387 3182 3356 5500, then the skinning items 7286 8165
-  15412 15423. Next sessions: about 5 pages a session (the rule after a block), 60+ s apart; if blocked again, one
+  block had lifted. 16:01-16:08: 4 more at 2 minutes apart, no block (12803 248815 3712 8836; 4236 Cured Heavy Hide
+  skipped: crafted-only like the other cured hides, read it last). Left, in order: 1206 15419 12800 3820 13546 249428 2842
+  8154 12203 6471 3864 249391 249427 12184 4232 6037 13464 1529 4387 3182 3356 5500, 4236, then the skinning items
+  7286 8165 15412 15423. Next sessions: about 5 pages a session (the rule after a block), 60+ s apart; if blocked again, one
   single page after 30 minutes, then 2 hours, then the next day.
 - How to read (works): in the Wowhead tab, `localStorage` keys `wfm_fn` (reader: throws on a blocked or non-Forever
   page, stores the page under `wfm_pages`) and `wfm_go2` (waits until 60 s since the last page, at most 40 s);
