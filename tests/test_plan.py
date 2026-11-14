@@ -265,3 +265,21 @@ class FishingBonusFromYourThings(unittest.TestCase):
         self.assertEqual(bonus, 50 + 15)          # Nightcrawlers in the bags + Darkwood pole in hand
         self.assertIn('Nightcrawlers +50', source)
         self.assertEqual(Engine(w, dict(SETTINGS, fishing_skill_bonus=10)).fishing_bonus(), (10, 'your setting'))
+
+
+class PlanStepLinks(unittest.TestCase):
+    """Plan steps carry their item's name and quality so the page links the name in the title to Wowhead."""
+
+    def test_plan_steps_carry_the_item_name(self):
+        from types import SimpleNamespace
+        from wfm.app import App
+        from tests.test_engine import item
+        app = App.__new__(App)
+        app.world = SimpleNamespace(gamedata=SimpleNamespace(items={7: item(7, 'Dark Rune', quality=2)}))
+        plan = {'actions': [{'title': 'If it is still listed: buy Dark Rune at 2g 25s', 'item_id': 7},
+                            {'title': 'Spend an hour: Kill Marsh Owl', 'item_id': None}], 'goal': None}
+        v = app.plan_view(plan)
+        self.assertEqual((v['actions'][0]['item_name'], v['actions'][0]['quality']), ('Dark Rune', 2))
+        self.assertNotIn('item_name', v['actions'][1])
+        self.assertNotIn('item_name', plan['actions'][0])        # the engine's plan is left alone
+        self.assertIsNone(app.plan_view(None))

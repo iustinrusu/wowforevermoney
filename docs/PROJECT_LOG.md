@@ -417,6 +417,9 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-14** Plan for today: item names in step titles link to Wowhead Forever (with icon and quality colour),
+  like the tables (user's nitpick). Tests: 179.
+
 - **2026-11-14** Lure cost per hour in fishing gold/hour, lure used only where it pays. Tests: 178.
 
 - **2026-11-14** Fishing gear bonuses confirmed from Forever tooltips (14 of 15; the Darkwood pole stays labelled

@@ -178,6 +178,18 @@ class App:
         d['sells'] = (o.detail.get('liquidity') or {}).get('sold_per_day')
         return d
 
+    def plan_view(self, plan: dict | None) -> dict | None:
+        """The plan with each step's item name and quality, so the page can link the name in its title to Wowhead."""
+        if not plan:
+            return plan
+        gd = self.world.gamedata
+
+        def step(a):
+            it = gd.items.get(a.get('item_id')) if gd and a and a.get('item_id') else None
+            return {**a, 'item_name': it.name, 'quality': it.quality} if it else a
+        return {**plan, 'actions': [step(a) for a in plan.get('actions') or []],
+                'goal': step(plan['goal']) if plan.get('goal') else plan.get('goal')}
+
     def state(self) -> dict:
         r = self.result or {'top': {}, 'opportunities': []}
         by = r.get('by_key', {})
@@ -196,7 +208,7 @@ class App:
             'realms': pd.realms() if pd else [], 'client_build': self.world.client_build,
             'counts': counts, 'audit_summary': audit.summary(self.audit),
             'top': {sec: [self.opp_view(by[k]) for k in keys if k in by] for sec, keys in r['top'].items()},
-            'plan': r.get('plan'), 'time_value_source': r.get('time_value_source'),
+            'plan': self.plan_view(r.get('plan')), 'time_value_source': r.get('time_value_source'),
             'events': self.events.recent(20),
             'professions_available': sorted({rc.profession for rc in self.world.gamedata.recipes}) if self.world.gamedata else [],
         }

@@ -389,7 +389,7 @@ function planCard(a, goal) {
   return `<div class="plan-card${goal ? ' goal' : ''}${a.rank && a.rank <= 3 ? ' top' + a.rank : ''}" data-key="${esc(a.key || '')}" data-item="${a.item_id || ''}" data-type="${esc(a.type)}">
     <div class="plan-rank">${badge}</div>
     <div class="plan-body"><div class="plan-label">${PLAN_ICON[a.type] || ''} ${esc(a.label)}</div>
-      <div class="plan-title">${esc(a.title)}</div><div class="plan-why">${esc(a.why)}</div>
+      <div class="plan-title">${a.item_name ? esc(a.title).replace(esc(a.item_name), itemLink(a.item_id, a.item_name, a.quality)) : esc(a.title)}</div><div class="plan-why">${esc(a.why)}</div>
       <div class="plan-chips">${chips}</div>${planItems(a)}</div></div>`;
 }
 function planPanel(p) {
