@@ -248,6 +248,8 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-14: ForeverMoneyBridge 1.4.1 saves gold correctly: its figure equals Syndicator's to the copper on both
+  characters saved at 10:49 (1.4.0 saved 0 on logout).
 - 2026-11-14: ForeverMoneyBridge 1.4.0 records containers on the Forever client (Big-mouth Clam x7, Mithril
   Bound Trunk x4, Iron Bound Trunk x4 with contents); no trunk-only items (Bolts) appear in mob or skinning logs.
   Fishing exclusion not verifiable yet (no fishing logged since 1.4.0).
@@ -319,6 +321,10 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Fishing skill bonus worked out from your bags, bank and equipped items (user's request): best pole +
+  best lure + fishing hat and boots, WoW Classic values, labelled; Settings can override. Your main: +75 (Bright
+  Baubles). It follows the character you play (an alt without gear gets 0). Tests: 148.
 
 - **2026-11-14** Wowhead Forever skinning: 5 more items read (40 s apart, no 403): 12 of 19. "Some skins not counted"
   now names the 7 left. Other tabs of those pages kept in the Wowhead tab's localStorage (`wfm_pages`).

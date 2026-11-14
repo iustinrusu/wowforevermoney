@@ -332,7 +332,7 @@ class World:
             self.syndicator[char] = {
                 'name': det.get('character') or char.split('-')[0], 'realm': det.get('realm') or '',
                 'faction': det.get('faction') or '', 'money': int(cd.get('money') or 0),
-                'mail': _item_counts(cd.get('mail')),
+                'mail': _item_counts(cd.get('mail')), 'equipped': _item_counts(cd.get('equipped')),
                 'auctions': [{'item': int(a['itemID']), 'count': int(a.get('itemCount') or 1),
                               'expires': int(a.get('expirationTime') or 0)}
                              for a in _as_list(cd.get('auctions')) if isinstance(a, dict) and a.get('itemID')]}

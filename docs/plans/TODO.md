@@ -5,7 +5,7 @@ Each item points to a plan file with the full brief. Follow CLAUDE.md's standing
 step, commit and push each finished piece, tick it off here and note it in docs/PROJECT_LOG.md. If usage gets
 tight: finish the current piece, commit, update this list, and set a reminder that runs nothing.
 
-0. [ ] **Quick check, needs the user in game** (/reload once): addon 1.4.1 saves gold (compare with Syndicator in
+0. [x] **Quick check, needs the user in game** (done 2026-11-14: 1.4.1's gold = Syndicator's on both characters) (/reload once): addon 1.4.1 saves gold (compare with Syndicator in
        the app's purse), and see the project log's open items for the other in-game checks. Checked 2026-11-14:
        not yet possible, the saved file is older than the 1.4.1 install.
 1. [x] **Plan for today** on the main page (the user's priority): `docs/plans/todays-plan.md` (done 2026-11-14)

@@ -60,7 +60,10 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
    Wetlands 11, Moonglade 493, Winterspring 618, Eastern Plaguelands 139, Burning Steppes 46, Silithus 1377,
    Forever-only zones); containers Data health lists as "contents unknown" (13881, 21243, 8366, 13874, 13875, 6355,
    6357).
-6. **Got-away follow-ups.** Fill `fishing_skill_bonus` automatically: the equipped pole and fishing gear
+6. **Got-away follow-ups.** Partly done 2026-11-14: `Engine.fishing_bonus` = best pole + best lure + fishing hat and
+   boots found in bags, bank and equipped (`fishing.FISHING_GEAR`, Classic values, an id counts only if Forever's
+   name matches); a number in Settings overrides. Left: confirm each value from its Forever tooltip (the tooltip
+   API, `wfm/tooltips.py`), lure cost per hour, more gear. Original brief: Fill `fishing_skill_bonus` automatically: the equipped pole and fishing gear
    (Syndicator's equipped items) and the best lure in your bags, with bonus values from Forever's game data
    (SpellEffect on wago.tools: ask before downloading) or labelled Classic values; subtract the lure's cost per hour
    (one lure per 10 minutes). Check whether Wowhead Forever zone pages state a fishing skill (Forever zone skills

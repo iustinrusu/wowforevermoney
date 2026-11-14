@@ -28,7 +28,7 @@ DEFAULTS = {
     'alerts': {'enabled': True, 'min_daily_profit_gold': 5.0, 'desktop': True},
     'stale_hours': {'realm': 3, 'region': 36},
     'casts_per_hour': 240,
-    'fishing_skill_bonus': 0,       # what your pole, gear and lure add to Fishing (e.g. Bright Baubles +75)
+    'fishing_skill_bonus': None,    # None = from your bags, bank and gear; a number overrides (pole + gear + lure)
     'kills_per_hour': 60,           # mobs killed and skinned per hour (your own logged time is never used)
     'herb_nodes_per_hour': 40,      # herb nodes gathered per hour (until the addon measures it)
     'ore_nodes_per_hour': 40,       # ore nodes mined per hour (until the addon measures it)

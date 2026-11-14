@@ -713,6 +713,20 @@ class Engine:
             self._valuer = valuation.Valuer(self, best_use if best_use is not None else {}, contents)
         return self._valuer
 
+    def fishing_bonus(self) -> tuple[int, str]:
+        """Fishing skill added by your pole, lure and fishing gear: a number set in Settings, else worked out from what
+        the character you play has in bags, bank and equipped (Syndicator; user's request 2026-11-14)."""
+        fixed = self.s.get('fishing_skill_bonus')
+        if fixed not in (None, ''):
+            return int(fixed), 'your setting'
+        syn = getattr(self.w, 'syndicator', None) or {}
+        key = plan.character_key(syn, (getattr(self.w, 'profile', None) or {}).get('active') or '')
+        if not key:
+            return 0, 'no bags read (needs Syndicator)'
+        have = set((getattr(self.w, 'inventory', None) or {}).get(key) or {}) | set(syn[key].get('equipped') or {})
+        bonus, parts = fishing.skill_bonus(have, self.gd.items)
+        return bonus, ('from your things: ' + ', '.join(parts) + ' (WoW Classic values)') if parts else             'nothing in your bags, bank or gear raises Fishing'
+
     def fish_value(self, iid: int, best_use: dict[int, dict]) -> int:
         """What one looted item is worth: the best of selling, crafting and opening it (see valuation.py)."""
         return self.valuer(best_use).worth(iid)
@@ -727,8 +741,8 @@ class Engine:
         cf = getattr(self.w, 'classic_fishing', None)
         obs = fishing.observations(self.w.angler, (getattr(self.w, 'profile', None) or {}).get('activity'))
         fishing.add_wowhead(obs, getattr(self.w, 'forever_fishing', None))
-        # effective skill = your Fishing skill + what your pole, gear and lure add (Settings): the got-away roll uses it
-        bonus = int(self.s.get('fishing_skill_bonus') or 0)
+        # effective skill = your Fishing skill + what your pole, gear and lure add: the got-away roll uses it
+        bonus, bonus_from = self.fishing_bonus()
         skill = int(self.profs.get('Fishing') or 0) + bonus
         seasons = fishing.forever_seasons(cf, getattr(self.w, 'forever_fishing', None)) if cf else {}
         spots = fishing.build_spots(cf, self.gd, seasons=seasons) if cf else {}
@@ -912,7 +926,7 @@ class Engine:
                     'classic_spot': spot.label(several) if spot else None,
                     'subzones': spot.names if spot else [], 'areas': spot.areas if spot else [],
                     'zone_skill': zone_skill, 'your_skill': skill,
-                    'skill_bonus': int(self.s.get('fishing_skill_bonus') or 0), 'keep': round(keep, 3), 'keep_source': keep_src,
+                    'skill_bonus': self.fishing_bonus()[0], 'skill_bonus_from': self.fishing_bonus()[1], 'keep': round(keep, 3), 'keep_source': keep_src,
                     'landed_share': model.landed_share, 'casts_per_hour': round(model.casts_per_hour),
                     'catches_per_hour': round(cph), 'pace_source': pace,
                     'coverage': round(spot.coverage, 3) if spot else None,

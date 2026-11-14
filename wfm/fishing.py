@@ -248,3 +248,33 @@ def catch_model(obs: dict[str, Obs], zone_skill_of, setting_casts: float) -> Cat
     # Pace is always the casts-per-hour setting. Your logged time is never used: time in a zone includes travel,
     # questing and breaks, so it is not a farming rate (user's rule, 2026-11-14).
     return CatchModel(landed_share, keep_by_zone, keep_by_skill, setting_casts, 'setting')
+
+
+# Items that raise Fishing skill: item id -> (name, kind, bonus). Values are WoW Classic's; each item only counts if
+# Forever's item table has the same name under that id (Forever may still change a value: check the tooltip).
+FISHING_GEAR = {
+    6529: ('Shiny Bauble', 'lure', 25), 6530: ('Nightcrawlers', 'lure', 50), 6811: ('Aquadynamic Fish Lens', 'lure', 50),
+    6532: ('Bright Baubles', 'lure', 75), 7307: ('Flesh Eating Worm', 'lure', 75),
+    6533: ('Aquadynamic Fish Attractor', 'lure', 100),
+    6256: ('Fishing Pole', 'pole', 0), 12225: ('Blump Family Fishing Pole', 'pole', 3),
+    6365: ('Strong Fishing Pole', 'pole', 5), 6366: ('Darkwood Fishing Pole', 'pole', 15),
+    6367: ('Big Iron Fishing Pole', 'pole', 20), 19022: ("Nat Pagle's Extreme Angler FC-5000", 'pole', 25),
+    19970: ('Arcanite Fishing Pole', 'pole', 35),
+    19972: ('Lucky Fishing Hat', 'head', 5), 19969: ("Nat Pagle's Extreme Anglin' Boots", 'feet', 5),
+}
+
+
+def skill_bonus(have: set[int], items: dict) -> tuple[int, list[str]]:
+    """Fishing skill your things add: the best pole, the best lure and each fishing gear slot found among `have`
+    (item ids in your bags, bank and equipped). Returns (bonus, ['Bright Baubles +75', ...])."""
+    best: dict[str, tuple[int, str]] = {}
+    for iid in have:
+        g = FISHING_GEAR.get(iid)
+        it = items.get(iid)
+        if not g or not it or it.name != g[0]:
+            continue
+        name, kind, bonus = g
+        if bonus > best.get(kind, (-1, ''))[0]:
+            best[kind] = (bonus, name)
+    parts = [f'{n} +{b}' for b, n in sorted(best.values(), reverse=True) if b > 0]
+    return sum(b for b, _ in best.values()), parts

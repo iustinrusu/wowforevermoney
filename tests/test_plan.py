@@ -205,3 +205,37 @@ class YourTimeIsNeverARate(unittest.TestCase):
         e = Engine(self.world(act), dict(SETTINGS))
         e.run()
         self.assertEqual((e.time_value, e.time_value_source), (20000, 'default'))
+
+
+class FishingBonusFromYourThings(unittest.TestCase):
+    """User's request (2026-11-14): the Fishing skill bonus is worked out from what you have in bags and bank."""
+
+    def items(self, *ids):
+        from wfm.fishing import FISHING_GEAR
+        return {i: Item(id=i, name=FISHING_GEAR[i][0], quality=1, item_level=1, req_level=0, sell_price=1, buy_price=0,
+                        stack=20, class_id=0, subclass_id=8, bonding=0) for i in ids}
+
+    def test_best_pole_best_lure_and_gear(self):
+        from wfm.fishing import skill_bonus
+        items = self.items(6529, 6532, 6365, 6367, 19972)
+        bonus, parts = skill_bonus({6529, 6532, 6365, 6367, 19972}, items)
+        self.assertEqual(bonus, 75 + 20 + 5)       # Bright Baubles beats Shiny Bauble; Big Iron beats Strong
+        self.assertEqual(parts, ['Bright Baubles +75', 'Big Iron Fishing Pole +20', 'Lucky Fishing Hat +5'])
+
+    def test_an_id_with_another_name_in_forever_does_not_count(self):
+        from wfm.fishing import skill_bonus
+        items = self.items(6532)
+        items[6532] = Item(id=6532, name='Something Else', quality=1, item_level=1, req_level=0, sell_price=1,
+                           buy_price=0, stack=20, class_id=0, subclass_id=8, bonding=0)
+        self.assertEqual(skill_bonus({6532}, items), (0, []))
+
+    def test_engine_reads_bags_bank_and_equipped_unless_set(self):
+        w = make_world({})
+        w.gamedata.items.update(self.items(6530, 6366))
+        w.syndicator = {'Kel-Realm': {'name': 'Kel', 'mail': {}, 'auctions': [], 'equipped': {6366: 1}}}
+        w.inventory = {'Kel-Realm': {6530: 14}}
+        w.profile = {'active': 'Kel'}
+        bonus, source = Engine(w, dict(SETTINGS)).fishing_bonus()
+        self.assertEqual(bonus, 50 + 15)          # Nightcrawlers in the bags + Darkwood pole in hand
+        self.assertIn('Nightcrawlers +50', source)
+        self.assertEqual(Engine(w, dict(SETTINGS, fishing_skill_bonus=10)).fishing_bonus(), (10, 'your setting'))
