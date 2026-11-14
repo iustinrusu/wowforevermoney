@@ -280,6 +280,9 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Open items
 
+- **Later: `docs/plans/strategy-features.md`** (2026-11-14 talk on professions and phases): profession advisor,
+  levelling planner, vertical integration, server phase tracker, peak-and-fade items, recipe finder, alt planner,
+  raid-week rhythm, demand trends. After todays-plan.md and forever-data-next.md.
 - **Next: `docs/plans/todays-plan.md`** (user priority, 2026-11-14): "Do these now" becomes a smart plan for today
   (cash in bags, cooldowns, routines with exact instructions, one farming session, one big flip, one goal).
   Postponed at 82% usage; reminder 2026-11-14 10:00.
