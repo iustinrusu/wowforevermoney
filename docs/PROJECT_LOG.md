@@ -305,7 +305,8 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 - 2026-11-14: TSM's raw region sale value for Masterwork Target Dummy (16023) is `643L3` = 6,426,275c by hand: the
   642g sale average is TSM's data, not a parsing error.
 - 2026-11-14: Wowhead returned 403 (CloudFront "The request could not be satisfied") on the 77th page of a session
-  read at one page per 60 s (about 80 minutes, 15:28), built-in browser. Earlier: 7 pages at 11 s -> 403; 5 at 40 s ok.
+  read at one page per 60 s (about 80 minutes, 15:28), built-in browser; one page 30 minutes later (15:59) loaded
+  normally, so the block lasted under 30 minutes. Earlier: 7 pages at 11 s -> 403; 5 at 40 s ok.
 - 2026-11-14: the built-in browser pane blocks requests from a public site to 127.0.0.1 (net::ERR_BLOCKED_BY_CLIENT).
 - 2026-11-14: Wowhead Forever item pages: listview ids `dropped-by`, `skinned-from`, `pick-pocketed-from`,
   `mined-from-object`, `gathered-from-object`, `contained-in-object`, `contained-in-item`, `fished-in`;
