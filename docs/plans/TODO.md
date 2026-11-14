@@ -11,7 +11,8 @@ tight: finish the current piece, commit, update this list, and set a reminder th
 1. [x] **Plan for today** on the main page (the user's priority): `docs/plans/todays-plan.md` (done 2026-11-14)
 2. [ ] **TOP PRIORITY: Forever source data for every material** (fixes "some skins not counted", pool loot,
        mob drops, node yields; the user's top priority for data accuracy, 2026-11-14): `docs/plans/material-coverage.md`.
-       It replaces the old Wowhead-reads item (same slow pace).
+       It replaces the old Wowhead-reads item (same slow pace). Work in the order at the top of that file: other
+       Forever data sources, the item-page data format, 5 top pages a session (target: top 50), pools, mob farming.
 3. [-] ~~Own Forever loot tables from the addon~~: cancelled by the user (2026-11-14): loot tables come from online
        sources only, never our own logs. ForeverMoneyBridge stays at 1.4.1.
 4. [ ] **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with drop rates from Wowhead Forever

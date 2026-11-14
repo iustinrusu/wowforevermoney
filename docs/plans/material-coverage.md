@@ -21,7 +21,24 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
 - Got-away rate = the game's rule with effective skill (skill + pole, gear, lure) vs the zone's or pool's skill.
   Done 2026-11-14 (setting `fishing_skill_bonus`); follow-ups in step 6.
 
-## Steps (in order)
+## Order to work in (decided with the user, 2026-11-14)
+Wowhead stays at the polite pace (about 5 pages a session; the user asked about one page a minute non-stop and
+agreed not to: that is bulk scraping against Wowhead's blocking and CLAUDE.md's rule, and it could get the user's
+own connection blocked). Reading the top of the queue is enough: the top 10 / 30 / 50 / 100 material pages cover
+37% / 59% / 72% / 88% of the uncovered traded material value (331 materials uncovered). Target: the top 50.
+1. **Other Forever data sources first** (step 7 below): one web search for WoW: Forever loot databases, exports or
+   addons with Forever loot data; ask before downloading anything. A bulk source would replace most page reading.
+2. **Item-page data format and its use** (no Wowhead needed): a tracked `data/wowhead_forever_items.json` with each
+   read page's source tabs (dropped-by, skinned-from, mined/gathered-from, fished-in, contained-in), its ids passed to
+   `coverage.audit` as `pages`, and the engine using it: value per kill for mob drops, node yields replacing Classic
+   ones. Test data: the 5 pages already saved in the Wowhead tab's localStorage (`wfm_pages`).
+3. **Every session, first: read 5 pages from the top of the coverage queue** (Data health), then the 7 skinning
+   items left (step 2 below).
+4. **Pools** (step 3 below): first find the Forever pool objects' Wowhead pages (e.g. from a zone's fishing tab or
+   an item's "Fished in"/"Contained in" tab, which names the pool), then read them.
+5. **Mob farming** (to-do item 4), then the rest of the to-do list.
+
+## Steps (reference)
 1. **Done 2026-11-14: coverage audit** (`wfm/coverage.py`, Data health "Forever source data for every material",
    tests/test_coverage.py). First result: 17 of 351 traded materials and 20 of 2,437 traded looted items fully
    covered; dropped by mobs 0 of 1,333, objects 0 of 1,536, herbs 0 of 39, veins 0 of 23, skinned 5 of 48, fished
