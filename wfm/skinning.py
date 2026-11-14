@@ -67,9 +67,10 @@ def spots(mob_table: dict[int, dict], value_of, zone_name, skill: int | None, le
             continue
         per_skin = sum(share * value_of(iid) for iid, share in m['items'].items())
         need = skill_needed(m['max_level'])
+        known = bool(m['max_level'])          # a level Wowhead and Questie don't give: not counted as doable
         by_zone.setdefault(zone, []).append({**m, 'value': int(per_skin), 'skill_needed': need,
-                                             'can_skin': skill is not None and skill >= need,
-                                             'can_kill': m['max_level'] <= level + LEVEL_REACH})
+                                             'can_skin': known and skill is not None and skill >= need,
+                                             'can_kill': known and m['max_level'] <= level + LEVEL_REACH})
     out = []
     for zone, ms in by_zone.items():
         ms.sort(key=lambda m: -m['value'])
@@ -79,6 +80,7 @@ def spots(mob_table: dict[int, dict], value_of, zone_name, skill: int | None, le
         value = sum(m['value'] * m['skinned'] for m in use) / weight
         out.append({'zone_id': zone, 'zone': zone_name(zone), 'value': int(value), 'mobs': ms, 'doable': bool(ok),
                     'skins': sum(m['skinned'] for m in ms),
-                    'min_level': min(m['min_level'] for m in ms), 'max_level': max(m['max_level'] for m in ms),
-                    'skill_needed': min(m['skill_needed'] for m in ms)})
+                    'min_level': min((m['min_level'] for m in ms if m['max_level']), default=0),
+                    'max_level': max(m['max_level'] for m in ms),
+                    'skill_needed': min((m['skill_needed'] for m in ms if m['max_level']), default=1)})
     return out

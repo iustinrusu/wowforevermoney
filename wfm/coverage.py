@@ -9,9 +9,12 @@ A material here = something traded on the AH (TSM region sales >= min_sold a day
 crafted or bought: trade goods of a gathered kind (cloth, leather, metal & stone, meat, herbs, elemental, other),
 raw fish and meat that recipes use, or anything QuestieDB (Forever) says drops from mobs or objects.
 
-What counts as covered today: "Skinned from" read (data/wowhead_forever_skinning.json), "Fished in" through the
-zone pages read (data/wowhead_forever_fishing.json), and any item page read in full (`pages`: item ids). Mob drops
-and node yields have no Forever data yet: QuestieDB knows who drops an item in Forever but not how often.
+What counts as covered: "Skinned from" read (data/wowhead_forever_skinning.json), "Fished in" through the zone
+pages read (data/wowhead_forever_fishing.json), the ways an item page read in full has Forever rows for (`pages`:
+item id -> ways, from data/wowhead_forever_items.json; a plain set of ids means every way), and, for herbs and ore,
+any item listed on a node's own page read in full (`node_items`). QuestieDB knows who drops an item in Forever but
+not how often, so it never counts as covered. An item whose page was read but has no Forever rows for some way
+leaves the reading queue for `read_no_data`: Wowhead hasn't recorded it yet, so re-read it later.
 """
 from __future__ import annotations
 
@@ -53,10 +56,16 @@ def expected_kinds(item, questie_item: dict, is_product: bool, is_reagent: bool,
     return kinds
 
 
-def covered_kinds(iid: int, kinds: set[str], skinned: set[int], fished: set[int], pages: set[int]) -> set[str]:
-    if iid in pages:
-        return set(kinds)
+def covered_kinds(iid: int, kinds: set[str], skinned: set[int], fished: set[int], pages,
+                  node_items: set[int] = frozenset()) -> set[str]:
     out = set()
+    if iid in pages:
+        ways = pages[iid] if isinstance(pages, dict) else None
+        if ways is None:
+            return set(kinds)
+        out |= kinds & ways
+    if iid in node_items:
+        out |= kinds & {'mining', 'herbalism'}
     if 'skinning' in kinds and iid in skinned:
         out.add('skinning')
     if 'fishing' in kinds and iid in fished:
@@ -65,7 +74,8 @@ def covered_kinds(iid: int, kinds: set[str], skinned: set[int], fished: set[int]
 
 
 def audit(items: dict, prices: dict, questie_items: dict, recipes, skinning: dict | None, fishing: dict | None,
-          pages: set[int] | None = None, fish_hint: set[int] | None = None, min_sold: float = MIN_SOLD) -> dict:
+          pages: set[int] | None = None, fish_hint: set[int] | None = None, min_sold: float = MIN_SOLD,
+          node_items: set[int] | None = None, unlooted: set[int] | None = None) -> dict:
     """Coverage of every traded looted item and a reading queue: materials first, then other items (gear, books),
     each by most traded value first."""
     products = {r.product_id for r in recipes}
@@ -73,7 +83,8 @@ def audit(items: dict, prices: dict, questie_items: dict, recipes, skinning: dic
     skinned = {int(i) for i in ((skinning or {}).get('items') or {})}
     fished = {int(i) for z in (fishing or {}).values() for i in ((z or {}).get('items') or {})}
     fishy = fished | set(fish_hint or ())
-    pages = set(pages or ())
+    pages = pages if isinstance(pages, dict) else {i: None for i in (pages or ())}
+    node_items = set(node_items or ())
     rows, by_kind = [], {}
     for iid, it in items.items():
         p = prices.get(iid) or {}
@@ -81,22 +92,25 @@ def audit(items: dict, prices: dict, questie_items: dict, recipes, skinning: dic
         if spd < min_sold:
             continue
         kinds = expected_kinds(it, questie_items.get(iid), iid in products, iid in reagents, iid in fishy)
-        if not kinds:
-            continue
-        have = covered_kinds(iid, kinds, skinned, fished, pages)
+        if not kinds or (iid in products and iid in (unlooted or ())):
+            continue          # crafted: a recipe makes it and its Wowhead Forever page lists no way to loot it
+        have = covered_kinds(iid, kinds, skinned, fished, pages, node_items)
         for k in kinds:
             c = by_kind.setdefault(k, [0, 0])
             c[1] += 1
             c[0] += k in have
         price = p.get('regionSale') or p.get('marketValue') or 0
-        rows.append({'item_id': iid, 'name': it.name, 'material': is_material(it), 'kinds': sorted(kinds), 'missing': sorted(kinds - have),
+        rows.append({'item_id': iid, 'name': it.name, 'material': is_material(it), 'kinds': sorted(kinds),
+                     'missing': sorted(kinds - have), 'read': iid in pages,
                      'sold_per_day': round(spd, 1), 'price': int(price), 'market': int(price * spd),
                      'url': WOWHEAD.format(iid)})
     rows.sort(key=lambda r: (not r['material'], -r['market']))
-    queue = [r for r in rows if r['missing']]
+    queue = [r for r in rows if r['missing'] and not r['read']]
+    waiting = [r for r in rows if r['missing'] and r['read']]
     mats = [r for r in rows if r['material']]
-    return {'total': len(rows), 'covered': len(rows) - len(queue), 'materials': len(mats),
-            'materials_covered': sum(1 for r in mats if not r['missing']), 'by_kind': by_kind, 'queue': queue}
+    return {'total': len(rows), 'covered': sum(1 for r in rows if not r['missing']), 'materials': len(mats),
+            'materials_covered': sum(1 for r in mats if not r['missing']), 'by_kind': by_kind, 'queue': queue,
+            'read_no_data': waiting}
 
 
 def describe(row: dict) -> str:

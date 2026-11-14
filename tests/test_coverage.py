@@ -53,6 +53,30 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual((r['materials'], r['materials_covered']), (5, 3))
         self.assertEqual(r['by_kind']['skinning'], [1, 1])
 
+    def test_a_page_without_forever_rows_leaves_the_queue_but_is_not_covered(self):
+        # Mithril Ore's page read: "Mined from" had Forever rows. Silk Cloth's page read: "Dropped by" was all
+        # Classic Era rows, so Wowhead has no Forever data yet: out of the reading queue, still not covered.
+        r = coverage.audit(ITEMS, PRICES, QUESTIE, RECIPES, None, None, {ORE: {'mining'}, CLOTH: set()},
+                           fish_hint={FISH, SQUID})
+        queue = {x['item_id'] for x in r['queue']}
+        waiting = {x['item_id']: x['missing'] for x in r['read_no_data']}
+        self.assertNotIn(ORE, queue | set(waiting))
+        self.assertEqual(waiting, {CLOTH: ['drops']})
+        self.assertNotIn(CLOTH, queue)
+        self.assertEqual(r['by_kind']['drops'][0], 0)
+
+    def test_a_crafted_leather_whose_page_lists_no_source_is_left_out(self):
+        # Cured Medium Hide, 2026-11-14: a leather (so "skinned" by its kind), made by a recipe, and its Wowhead
+        # Forever page has no source tab at all: it is crafted, not looted. A fish with no tabs stays (zone pages).
+        recipes = RECIPES + [Recipe(spell_id=3, name='Cure Hide', profession='Leatherworking', skill_line=165,
+                                    product_id=HIDE, product_count=1, reagents=[(BAR, 1)], trivial_low=1,
+                                    trivial_high=2, min_rank=1)]
+        r = coverage.audit(ITEMS, PRICES, QUESTIE, recipes, None, None, {HIDE: set(), FISH: set()},
+                           fish_hint={FISH, SQUID}, unlooted={HIDE, FISH})
+        ids = {x['item_id'] for x in r['queue'] + r['read_no_data']}
+        self.assertNotIn(HIDE, ids)
+        self.assertIn(FISH, ids)
+
     def test_rarely_traded_items_are_left_out(self):
         prices = {**PRICES, HIDE: {'regionSoldPerDay': 0.2, 'regionSale': 500}}
         r = coverage.audit(ITEMS, prices, QUESTIE, RECIPES, None, None, fish_hint={FISH, SQUID})

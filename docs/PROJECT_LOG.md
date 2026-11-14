@@ -24,6 +24,35 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-14 Wowhead Forever pages are the source; Everloot is not a bulk replacement (yet).** One search found
+  Everloot (everloot.app, player uploads, data CC BY-SA 4.0, public API): 1,753 public drop rates (3+ installs) from
+  9,761 loot windows; they cover 94 of 331 uncovered materials but only 15% of their traded value (none of Dark Rune,
+  Runecloth, Arcane Crystal, Righteous Orb, Mageweave), median 21 loot windows per rate; its bulk export (2026-10-19,
+  beta) has empty drop files. So the user's decision applied: top 100 Wowhead pages at one a minute. Everloot is a
+  candidate second source for cross-checks later (ask before downloading). Email draft for Wowhead:
+  docs/plans/wowhead-data-request.md (the user sends it).
+- **2026-11-14 Wowhead pages file** `data/wowhead_forever_items.json` (tracked; `wfm/wowhead_items.py`): sections
+  items / objects / npcs; per tab the entity kind, total, Classic rows skipped, rows from < 10 loots skipped, and up to
+  60 rows (most looted first; the reader keeps 30) as id, count, outof, levels, zone, classification, stack spread.
+  Rate = count / outof x average stack. The browser pane blocks a public page from reaching 127.0.0.1, so a batch is
+  read out of the tab and saved with `python -m wfm.wowhead_items import <file>` (checks every field).
+- **2026-11-14 Coverage counts only Forever rows.** A page read with a tab of only Classic Era rows (Runecloth's chests,
+  Black Lotus's herbs, Death Lotus: no tabs) is not covered: it leaves the reading queue for "read, no Forever data
+  yet" (re-read later). An item a recipe makes whose page lists no way to loot it (Cured Rugged/Medium Hide, Thorium
+  Widget, Truesilver Transformer) is crafted and left out.
+- **2026-11-14 Node yields: Forever item by item.** A node's items from Wowhead "Mined from"/"Gathered from" rows
+  replace the Classic table item by item (a node's own page would replace it whole), times the Classic gathers per
+  node (flag `classic_gathers`). A spot keeps `classic_yields` (out of Top picks) until no counted node has a
+  Classic part; partly Forever spots say so (`forever_yields_partial`) and each item is labelled in the details.
+- **2026-11-14 Mob farming rows (`Engine.mob_spots`, kind `mob_spot`).** One row per mob from "Dropped by" counts:
+  value per kill = drops read so far (a floor: coins, gray items, gear missing; flag `drops_partial`) + a skin if you
+  can skin it; kills per hour from Settings (renamed "Kills per hour"; used by skinning too). Elites, bosses and
+  dungeon mobs get value per kill only (no gold/hour: 60 kills an hour of a boss gave "836g/h") and stay out of Top
+  picks, like small samples (< 50 loots). A floor never sets the time value (first run: it dropped to 5s 39c/h).
+- **2026-11-14 Skinning from item pages, mob by mob.** Item pages' "Skinned from" rows join the skinning snapshot per
+  mob (both lists kept; for the same mob the newer read wins); names and levels missing on compact rows come from
+  QuestieDB; a mob with no known level is not doable (it counted as level 0). `skins_partial` shows only while some
+  skinning items are unread and the row names them.
 - **2026-11-14 Your own time is never a rate (user: "I am low level and time spent in zones is not spent entirely on
   farming... only reported, computed or theoretical rates").** Removed everywhere: the "measured" gold/hour of
   `activity_zones` rows (now a loot log, flag `your_log`, no gph: "Kill mobs in Dustwallow Marsh 10.26g/h" was
@@ -253,6 +282,16 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-14: Wowhead returned 403 (CloudFront "The request could not be satisfied") on the 77th page of a session
+  read at one page per 60 s (about 80 minutes, 15:28), built-in browser. Earlier: 7 pages at 11 s -> 403; 5 at 40 s ok.
+- 2026-11-14: the built-in browser pane blocks requests from a public site to 127.0.0.1 (net::ERR_BLOCKED_BY_CLIENT).
+- 2026-11-14: Wowhead Forever item pages: listview ids `dropped-by`, `skinned-from`, `pick-pocketed-from`,
+  `mined-from-object`, `gathered-from-object`, `contained-in-object`, `contained-in-item`, `fished-in`;
+  `template.entityType` 1 npc, 2 object, 3 item, 7 zone; `pctstack` is a string like "{1: 50,3: 50}" (percent per stack
+  size); `classification` 1 elite, 2 rare elite, 3 boss, 4 rare; `location` < 0 = several or special places. A note
+  "Wowhead hasn't recorded WoW: Forever drops for this yet" marks a tab of only Classic Era rows.
+- 2026-11-14: Everloot (everloot.app): `kills` in its drop rates are loot windows, not kills; anonymous API limit 30
+  requests an hour, 500 rows a page; rates public at 3 installs.
 - 2026-11-14: SkillUpForever's own prices (Integrations/Prices.lua): buying = Auctionator's latest buyout if
   installed, else TSM `first(DBRecent, DBMinBuyout, DBMarket)`; a vendor price seen in game beats its bundled list;
   cheapest source wins; crafted value = TSM `DBRegionSaleAvg` minus 5%, vendor price as the floor. The app reads only
@@ -313,6 +352,11 @@ moved into `forever-data-next.md`.
 
 ## Open items
 
+- User's idea (2026-11-14): a Dungeons (and raids) view. Claude's view in the change log entry of that day; not decided.
+- Re-read later the 22 pages Wowhead has no Forever rows for yet (Data health lists them after the queue).
+- Mob values are floors until mobs' own pages (Drops tab: coins aside, every drop) are read; nodes are complete once
+  their own pages are read (wowhead_items supports `npc=` and `object=` pages).
+- Everloot as a second source to cross-check rates (ask before downloading; CC BY-SA, keep in data/ uncommitted).
 - The to-do list (`docs/plans/TODO.md`) holds the planned work; below are smaller known gaps.
 - Not valued yet: coins inside containers, disenchanting (the user has an Enchanting alt), quest rewards for
   quest items (e.g. Savage Coast Blue Sailfin), lockpicking boxes beyond their contents.
@@ -331,6 +375,14 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Material coverage, session 2: bulk-source search (Everloot: too small yet) and Wowhead email draft;
+  `wfm/wowhead_items.py` + `data/wowhead_forever_items.json` (76 item pages read at one a minute, 403 on the 77th);
+  coverage counts Forever rows only (67 of 347 materials covered, was 20); node yields Forever item by item; mob
+  farming rows (Gathering -> Mob farming, drops drawer); skinning from item pages (Turtle Scale read; 6 left).
+  User's question: is a Dungeons/raids tab worth it? Claude: dungeons yes (Dark Rune and Righteous Orb, #1 and #4 by
+  traded value, drop only in dungeons; a "run" row = trash + bosses at your share of a group, runs per hour from
+  Settings, instance limit), after the mobs' own pages are read; raids no for now (raid loot is shared). Tests: 171.
 
 - **2026-11-14** Fishing skill bonus worked out from your bags, bank and equipped items (user's request): best pole +
   best lure + fishing hat and boots, WoW Classic values, labelled; Settings can override. Your main: +75 (Bright

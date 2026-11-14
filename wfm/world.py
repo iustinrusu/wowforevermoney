@@ -21,6 +21,7 @@ WOWHEAD_FISHING = DATA / 'wowhead_forever_fishing.json'
 WOWHEAD_CONTAINERS = DATA / 'wowhead_forever_containers.json'
 from . import profile as profile_mod
 from . import skinning as skinning_mod
+from . import wowhead_items
 from .questie import QuestieDB, load_drop_rates, load_questie
 from .skillup import SkillUpData, load_skillup
 from .tooltips import TooltipCache
@@ -80,6 +81,7 @@ class World:
         self.forever_fishing: dict = {}      # zone name -> Wowhead Forever counts (read by hand)
         self.forever_containers: dict = {}   # item id -> what it contains in Forever (Wowhead, read by hand)
         self.forever_skinning: dict = {}     # Wowhead Forever "Skinned from" counts (read by hand)
+        self.forever_pages: dict = {}        # Wowhead Forever item/object/npc pages (wowhead_items.py)
         self.inventory: dict = {}
         self.hotfix_info: dict = {}
         self.profile: dict = {'characters': {}, 'active': None, 'activity': {}}
@@ -281,7 +283,7 @@ class World:
         return True
 
     def _load_checks(self):
-        st = self.status.setdefault('checks', SourceStatus('checks', 'Wowhead Forever fishing and container data (read by hand)'))
+        st = self.status.setdefault('checks', SourceStatus('checks', 'Wowhead Forever pages (read by hand): fishing, containers, skinning, item sources'))
         p = WOWHEAD_FISHING
         st.files = [str(p)]
         data = json.loads(p.read_text(encoding='utf-8')) if p.exists() else {}
@@ -290,10 +292,15 @@ class World:
         st.files.append(str(WOWHEAD_CONTAINERS))
         cdata = json.loads(WOWHEAD_CONTAINERS.read_text(encoding='utf-8')) if WOWHEAD_CONTAINERS.exists() else {}
         self.forever_containers = cdata.get('containers') or {}
-        st.files.append(str(skinning_mod.SNAPSHOT))
-        self.forever_skinning = skinning_mod.load()
-        st.loaded_at, st.file_time = int(time.time()), _mtime([p, WOWHEAD_CONTAINERS, skinning_mod.SNAPSHOT]) or None
-        dates = sorted({v.get('checked', '') for v in list(self.forever_fishing.values()) + list(self.forever_containers.values())})
+        st.files += [str(skinning_mod.SNAPSHOT), str(wowhead_items.SNAPSHOT)]
+        self.forever_pages = wowhead_items.load()
+        # item pages read in full add their "Skinned from" rows to the skinning snapshot (an item page wins)
+        self.forever_skinning = wowhead_items.merge_skinning(skinning_mod.load(), self.forever_pages)
+        st.loaded_at = int(time.time())
+        st.file_time = _mtime([p, WOWHEAD_CONTAINERS, skinning_mod.SNAPSHOT, wowhead_items.SNAPSHOT]) or None
+        dates = sorted({v.get('checked', '') for v in list(self.forever_fishing.values()) + list(self.forever_containers.values())}
+                       | {pg.get('read', '') for sec in wowhead_items.SECTIONS
+                          for pg in (self.forever_pages.get(sec) or {}).values()} - {''})
         st.version = dates[-1] if dates else None
         if not self.forever_fishing:
             st.status, st.note = 'missing', 'No zones read from Wowhead Forever yet.'
@@ -304,6 +311,9 @@ class World:
                        f'Contents of {len(self.forever_containers)} containers '
                        f'({", ".join(v.get("name", k) for k, v in self.forever_containers.items())}). '
                        f'Skinning: {len((self.forever_skinning or {}).get("items") or {})} items. '
+                       f'Pages read in full: {len(self.forever_pages.get("items") or {})} items, '
+                       f'{len(self.forever_pages.get("objects") or {})} objects, '
+                       f'{len(self.forever_pages.get("npcs") or {})} mobs. '
                        f'A snapshot from {", ".join(dates)}; refresh by re-reading the pages.')
         self.version += 1
 
@@ -392,7 +402,8 @@ class World:
         'skillup': ('_load_skillup', lambda self: [self.paths.skillup_data]),
         'angler': ('_load_angler', lambda self: [self._sv('ForeverAngler.lua') or '']),
         'classicdb': ('_load_classic', lambda self: [classicdb.CACHE]),
-        'checks': ('_load_checks', lambda self: [WOWHEAD_FISHING, WOWHEAD_CONTAINERS]),
+        'checks': ('_load_checks', lambda self: [WOWHEAD_FISHING, WOWHEAD_CONTAINERS, skinning_mod.SNAPSHOT,
+                                                 wowhead_items.SNAPSHOT]),
         'inventory': ('_load_inventory', lambda self: [self._sv('Syndicator.lua') or '']),
         'profile': ('_load_profile', lambda self: [self._sv('ForeverMoneyBridge.lua') or '',
                                                    self._sv('TradeSkillMaster.lua') or '']),

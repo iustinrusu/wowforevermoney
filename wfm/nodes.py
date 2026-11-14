@@ -1,8 +1,9 @@
 """Herbalism and mining spots.
 
-Where nodes are: QuestieDB's Forever object database (spawn points per zone). What a node gives: the WoW Classic
-1.12 node loot tables (cMaNGOS classic-db, the dump already downloaded for fishing), labelled Classic until your
-own ForeverMoneyBridge herbalism/mining logs measure it. Skill per node: the Classic skill table, labelled.
+Where nodes are: QuestieDB's Forever object database (spawn points per zone). What a node gives: Wowhead Forever
+pages read by hand (wowhead_items.py: an item's "Mined from"/"Gathered from" rows, or the node's own page), item by
+item; whatever is not read yet comes from the WoW Classic 1.12 node loot tables (cMaNGOS classic-db), labelled, and
+keeps the spot out of Top picks. Gathers per node (data4/data5) are Classic too. Skill per node: Classic table.
 """
 from __future__ import annotations
 
@@ -121,6 +122,24 @@ def per_node(node: dict, refs: dict) -> dict[int, float]:
     uses = float(node.get('uses') or 1.0)
     return {i: o['count'] * uses for i, o in classicdb.expected_items(node['loot'], rr).items()
             if not o['quest'] and o['count'] > 0}
+
+
+def combine(classic_items: dict[int, float], forever: dict | None, uses: float,
+            main_item: int) -> tuple[dict[int, float], dict[int, str]]:
+    """Items per node from both sources: Forever rates (Wowhead Forever, per gather) times the gathers a node allows,
+    replacing Classic item by item; a node's own page read in full (`complete`) replaces the Classic table whole.
+    Returns ({item: count per node}, {item: 'forever' | 'classic' | 'assumed'})."""
+    fy = (forever or {}).get('items') or {}
+    if forever and forever.get('complete'):
+        return {i: q * uses for i, q in fy.items()}, {i: 'forever' for i in fy}
+    items = dict(classic_items)
+    src = {i: 'classic' for i in classic_items}
+    for i, q in fy.items():
+        items[i] = q * uses
+        src[i] = 'forever'
+    if not items:
+        return {main_item: 1.0}, {main_item: 'assumed'}
+    return items, src
 
 
 def measured_pace(activity: dict, act: str) -> tuple[float | None, float]:

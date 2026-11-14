@@ -10,7 +10,7 @@ import re
 import time
 from dataclasses import asdict, dataclass, field
 
-from . import fishing, gamedata, nodes, plan, pricing, skinning, valuation
+from . import fishing, gamedata, nodes, plan, pricing, skinning, valuation, wowhead_items
 from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
@@ -46,7 +46,8 @@ def confidence(flags) -> float:
 
 
 # Ranking (Engine.rank). Score = expected profit x how sure we are x risk x can-do-now x problems x preference.
-HOURLY_KINDS = ('fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot')
+HOURLY_KINDS = ('fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot', 'mob_spot')
+ELITE = {1, 2, 3}          # Wowhead classification (Questie rank): elite, rare elite, boss; 4 = rare
 ONE_OFF_KINDS = ('realm_dip', 'ah_to_vendor')
 PROBLEM_FLAGS = {'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'unverified_recipe', 'above_region', 'black_market',
                  'event_vendor', 'classic_unconfirmed'}
@@ -599,18 +600,25 @@ class Engine:
         table = skinning.mobs(getattr(self.w, 'forever_skinning', None) or {})
         if not table:
             return []
+        for m in table.values():          # item pages' rows carry ids only: names and levels from QuestieDB (Forever)
+            qn = (self.q.npcs.get(m['npc']) if self.q else None) or {}
+            m['name'] = m['name'] or qn.get('name') or f"mob {m['npc']}"
+            if not m['max_level']:
+                m['min_level'], m['max_level'] = qn.get('minLevel') or 0, qn.get('maxLevel') or 0
         level = int(self.s.get('level', 1) or 1)
         skill = self.profs.get('Skinning')
         # pace is the setting only: your logged skinning time includes questing and travel (user, 2026-11-14)
         per_hour = float(self.s.get('kills_per_hour', 60) or 60)
         value_of = lambda iid: self.fish_value(iid, best_use)
+        # skinning items Wowhead Forever pages are not read for yet (the flag goes once all are read)
+        not_read = list(((getattr(self.w, 'forever_skinning', None) or {}).get('not_read') or {}).values())
         out = []
         for sp in skinning.spots(table, value_of, lambda z: self.gd.zones.get(z, f'zone {z}'), skill, level):
             if sp['value'] <= 0:
                 continue
             usable = [m for m in sp['mobs'] if m['can_skin'] and m['can_kill']]
             top = (usable or sp['mobs'])[:3]
-            flags = ['wowhead_forever', 'skins_partial', 'skill_classic_rule', 'assumed_kill_rate']
+            flags = ['wowhead_forever'] + (['skins_partial'] if not_read else []) + ['skill_classic_rule', 'assumed_kill_rate']
             if sp['skins'] < skinning.SOLID_SAMPLE:
                 flags.append('small_sample')
             needs = ''
@@ -636,8 +644,70 @@ class Engine:
                 flags=flags,
                 detail={'zone': sp['zone'], 'zone_id': sp['zone_id'], 'mobs': mobs, 'skins': sp['skins'],
                         'levels': f"{sp['min_level']}-{sp['max_level']}", 'skins_per_hour': round(per_hour, 1),
-                        'pace_source': 'your skins-per-hour setting',
+                        'pace_source': 'your skins-per-hour setting', 'skins_not_read': not_read,
                         'source': 'Wowhead Forever "Skinned from" counts'}))
+        return out
+
+    def mob_spots(self, best_use: dict[int, dict]) -> list[Opportunity]:
+        """Mob farming, one row per mob: Wowhead Forever "Dropped by" counts from item pages read by hand (only those
+        items: a floor until the mob's own page is read), plus a skin if you can skin it. Kills per hour: Settings."""
+        mobs = wowhead_items.mob_drops(getattr(self.w, 'forever_pages', None) or {})
+        if not mobs:
+            return []
+        q, gd = self.q, self.gd
+        skins = skinning.mobs(getattr(self.w, 'forever_skinning', None) or {})
+        level = int(self.s.get('level', 1) or 1)
+        skill = self.profs.get('Skinning')
+        per_hour = float(self.s.get('kills_per_hour', 60) or 60)    # the setting only, never your logged time
+        value_of = lambda iid: self.fish_value(iid, best_use)
+        out = []
+        for npc, m in mobs.items():
+            qn = (q.npcs.get(npc) if q else None) or {}
+            drops = sorted(({'item_id': i, 'name': self.name(i), 'per_kill': round(c, 4), 'value': value_of(i),
+                             'count': m['counts'][i][0], 'looted': m['counts'][i][1]} for i, c in m['items'].items()),
+                           key=lambda d: -d['per_kill'] * d['value'])
+            drop_value = sum(d['per_kill'] * d['value'] for d in drops)
+            sk = skins.get(npc)
+            skin_value, skin_need = 0.0, None
+            if sk:
+                skin_need = skinning.skill_needed(sk['max_level'])
+                skin_value = sum(share * value_of(i) for i, share in sk['items'].items())
+            can_skin = bool(sk) and skill is not None and skill >= skin_need
+            value = drop_value + (skin_value if can_skin else 0)
+            if value <= 0:
+                continue
+            lo = m['min_level'] or qn.get('minLevel') or (sk or {}).get('min_level')
+            hi = m['max_level'] or qn.get('maxLevel') or (sk or {}).get('max_level')
+            zone = next((z for z in m['zones'] if z and z > 0), None) or qn.get('zoneID')
+            cls = m['classification'] if m['classification'] is not None else qn.get('rank')
+            name = qn.get('name') or m['name'] or f'mob {npc}'
+            can_kill = bool(hi) and hi <= level + skinning.LEVEL_REACH
+            flags = ['wowhead_forever', 'kills_from_settings']
+            if not m['complete']:
+                flags.append('drops_partial')
+            if m['small_sample']:
+                flags.append('small_sample')
+            if cls in ELITE:
+                flags.append('elite')
+            if zone and gamedata.is_instance(gd, zone):
+                flags.append('dungeon')
+            if sk and not can_skin:
+                flags.append('skin_extra')
+            needs = '' if can_kill else (f'level {max(1, hi - skinning.LEVEL_REACH)}+ (you are {level})' if hi
+                                         else 'its level is unknown')
+            zname = gd.zones.get(zone, f'zone {zone}') if zone else 'unknown zone'
+            out.append(Opportunity(
+                kind='mob_spot', key=f'mob:{npc}', item_id=drops[0]['item_id'] if drops else 0,
+                title=f'Kill {name} in {zname}', profit_unit=int(value), cost_unit=0, units_day=0, daily=0,
+                # elites, bosses and dungeon mobs can't be killed at the kills-per-hour pace: value per kill only
+                gph=None if {'elite', 'dungeon'} & set(flags) else int(value * per_hour),
+                doable=can_kill, needs=needs, profession=None, preferred=False, flags=flags,
+                detail={'npc': npc, 'zone': zname, 'zone_id': zone, 'levels': f'{lo or "?"}-{hi or "?"}',
+                        'classification': cls, 'looted': m['looted'], 'drops': drops[:12],
+                        'drop_value': int(drop_value), 'skin_value': int(skin_value), 'can_skin': can_skin,
+                        'skin_needed': skin_need, 'kills_per_hour': round(per_hour, 1),
+                        'pace_source': 'your kills-per-hour setting', 'read': m['read'],
+                        'source': 'Wowhead Forever "Dropped by" counts' + (' and "Skinned from" counts' if sk else '')}))
         return out
 
     def node_spots(self, best_use: dict[int, dict]) -> list[Opportunity]:
@@ -655,6 +725,7 @@ class Engine:
                 if nodes.node_kind((q.objects.get(o) or {}).get('name', ''), herb_names):
                     main.setdefault(o, iid)
         loot = nodes.load_or_build(set(main)) or {}
+        forever = wowhead_items.object_yields(getattr(self.w, 'forever_pages', None) or {})
         value_of = lambda iid: self.fish_value(iid, best_use)
         node_list = []
         for oid, iid in main.items():
@@ -662,10 +733,19 @@ class Engine:
             spawns = ob.get('spawns') or {}
             zones = {int(z): len(c) for z, c in spawns.items()} if isinstance(spawns, dict) else {}
             classic = (loot.get('nodes') or {}).get(str(oid))
-            items = nodes.per_node(classic, loot.get('refs') or {}) if classic else {iid: 1.0}
+            classic_items = nodes.per_node(classic, loot.get('refs') or {}) if classic else {}
+            fy = forever.get(oid)
+            uses = float((classic or {}).get('uses') or 1.0)
+            items, src = nodes.combine(classic_items, fy, uses, iid)
+            value = sum(c * value_of(i) for i, c in items.items())
+            classic_value = sum(c * value_of(i) for i, c in items.items() if src[i] != 'forever')
             node_list.append({'id': oid, 'name': ob.get('name', ''), 'kind': nodes.node_kind(ob.get('name', ''), herb_names),
                               'skill': nodes.node_skill(ob.get('name', '')), 'zones': zones, 'classic_loot': bool(classic),
-                              'items': items, 'value': int(sum(c * value_of(i) for i, c in items.items()))})
+                              'items': items, 'sources': src, 'value': int(value), 'uses': uses,
+                              'forever_share': round(1 - classic_value / value, 3) if value > 0 else 0.0,
+                              'forever_looted': (fy or {}).get('looted', 0),
+                              'forever_complete': bool((fy or {}).get('complete')),
+                              'small_sample': bool(fy and fy.get('small_sample'))})
         activity = (getattr(self.w, 'profile', None) or {}).get('activity')
         out = []
         for kind, prof, label, setting in (('herbalism', 'Herbalism', 'Gather herbs in', 'herb_nodes_per_hour'),
@@ -676,7 +756,17 @@ class Engine:
                 if sp['value'] <= 0:
                     continue
                 top = [n for n in sp['nodes'] if n['can']][:3] or sp['nodes'][:3]
-                flags = ['classic_yields', 'skill_classic_rule', 'assumed_node_rate']
+                counted = [n for n in sp['nodes'] if not n['rare']] or sp['nodes']
+                # Top picks only once nothing counted here rests on Classic yields (Forever data only, user's rule)
+                all_forever = all(n['forever_share'] >= 0.999 for n in counted)
+                any_forever = any(n['forever_share'] > 0 for n in counted)
+                flags = ['wowhead_forever' if all_forever else 'classic_yields', 'skill_classic_rule', 'assumed_node_rate']
+                if any_forever and not all_forever:
+                    flags.append('forever_yields_partial')
+                if any_forever and any(n['uses'] != 1.0 for n in counted if n['forever_share'] > 0):
+                    flags.append('classic_gathers')
+                if any(n['small_sample'] for n in counted if n['forever_share'] > 0):
+                    flags.append('small_sample')
                 if gamedata.is_instance(gd, sp['zone_id']):
                     flags.append('dungeon')
                 if any(n['rare'] for n in sp['nodes']):
@@ -696,13 +786,20 @@ class Engine:
                     detail={'zone': sp['zone'], 'zone_id': sp['zone_id'], 'node_count': sp['node_count'],
                             'nodes_per_hour': round(per_hour, 1),
                             'pace_source': 'your nodes-per-hour setting',
-                            'nodes': [{'name': n['name'], 'count': n['count'], 'skill': n['skill'], 'can': n['can'], 'rare': n['rare'],
-                                       'value': n['value'], 'classic_loot': n['classic_loot'],
+                            'nodes': [{'id': n['id'], 'name': n['name'], 'count': n['count'], 'skill': n['skill'],
+                                       'can': n['can'], 'rare': n['rare'], 'value': n['value'],
+                                       'classic_loot': n['classic_loot'], 'forever_share': n['forever_share'],
+                                       'forever_looted': n['forever_looted'], 'forever_complete': n['forever_complete'],
+                                       'gathers_per_node': n['uses'],
                                        'items': sorted(({'item_id': i, 'name': self.name(i), 'per_node': round(c, 2),
-                                                         'value': value_of(i)} for i, c in n['items'].items()),
-                                                       key=lambda x: -x['per_node'] * x['value'])[:4]}
+                                                         'value': value_of(i), 'source': n['sources'].get(i, 'classic')}
+                                                        for i, c in n['items'].items()),
+                                                       key=lambda x: -x['per_node'] * x['value'])[:6]}
                                       for n in sp['nodes'][:10]],
-                            'source': 'node locations: QuestieDB (Forever); items per node: WoW Classic loot tables'}))
+                            'source': 'node locations: QuestieDB (Forever); items per node: '
+                                      + ('Wowhead Forever pages read by hand' if all_forever else
+                                         'Wowhead Forever pages where read, the rest WoW Classic loot tables'
+                                         if any_forever else 'WoW Classic loot tables')}))
         return out
 
     def valuer(self, best_use: dict[int, dict] | None = None) -> valuation.Valuer:
@@ -1053,7 +1150,7 @@ class Engine:
         logged = [o for o in self.activity_zones(best_use) if o.kind != 'fishing_zone']
         all_opps = (self.crafts() + self.vendor_flips() + self.ah_to_vendor() + self.realm_dips()
                     + self.gathering(best_use) + logged + self.fishing_spots(best_use)
-                    + self.skinning_spots(best_use) + self.node_spots(best_use))
+                    + self.skinning_spots(best_use) + self.node_spots(best_use) + self.mob_spots(best_use))
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         for o in all_opps:
             # anything you'd sell on the AH: does it actually sell? (hard to sell: never suggested)
@@ -1063,8 +1160,9 @@ class Engine:
                 o.detail['liquidity'] = liq
                 o.flags.extend(f for f in liq['flags'] if f not in o.flags)
         # what an hour of your time is worth: half the best farming spot backed by Forever data (rates from Wowhead
-        # Forever counts at the paces in Settings; never your own logged time). A setting can fix it.
-        best = max((o.gph or 0 for o in all_opps if self._hourly_ok(o)), default=0)
+        # Forever counts at the paces in Settings; never your own logged time). A setting can fix it. Mob farming with
+        # only some drops counted (no coins or gray items yet) is a floor, so it never sets what your time is worth.
+        best = max((o.gph or 0 for o in all_opps if self._hourly_ok(o) and 'drops_partial' not in o.flags), default=0)
         fixed = float(self.s.get('time_value_gold') or 0) * COPPER_PER_GOLD
         self.time_value = int(fixed or (best * TIME_VALUE_SHARE if best else DEFAULT_TIME_VALUE))
         self.time_value_source = 'your setting' if fixed else ('half the best Forever farming spot' if best else 'default')
@@ -1162,7 +1260,8 @@ class Engine:
         """A farming row good enough for Top picks: a gold/hour backed by Forever data, something you can do now."""
         return bool(o.gph and o.doable and not ({'classic_unconfirmed', 'classic_yields'} & set(o.flags))
                     and (o.kind != 'fishing_spot' or (o.detail.get('confirmed_by') and 'small_sample' not in o.flags))
-                    and (o.kind != 'skin_spot' or 'small_sample' not in o.flags))
+                    and (o.kind != 'skin_spot' or 'small_sample' not in o.flags)
+                    and (o.kind != 'mob_spot' or not ({'small_sample', 'elite', 'dungeon'} & set(o.flags))))
 
     def top_picks(self, opps: list[Opportunity], n: int = 15) -> dict:
         bonus = float(self.s.get('switch_bonus', 1.5))

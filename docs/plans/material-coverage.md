@@ -21,6 +21,23 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
 - Got-away rate = the game's rule with effective skill (skill + pole, gear, lure) vs the zone's or pool's skill.
   Done 2026-11-14 (setting `fishing_skill_bonus`); follow-ups in step 6.
 
+## Progress (session 2, 2026-11-14)
+- Step 1 done: Everloot (everloot.app, CC BY-SA, player uploads) is the only bulk Forever source found; it covers 15%
+  of the uncovered traded material value with tiny samples, so it does not replace page reading (project log).
+  1b done: docs/plans/wowhead-data-request.md (the user sends it).
+- Step 2 done: `wfm/wowhead_items.py`, `data/wowhead_forever_items.json`, importer `python -m wfm.wowhead_items import`,
+  coverage, node yields, skinning merge, mob farming rows (to-do item 4, first version).
+- Step 3: 76 of the top 100 read at one a minute (plus 6 earlier pages); **Wowhead returned 403 at 15:28 on page 77
+  (12804 Powerful Mojo)**. Left, in order: 12804 12803 248815 3712 4236 8836 1206 15419 12800 3820 13546 249428 2842
+  8154 12203 6471 3864 249391 249427 12184 4232 6037 13464 1529 4387 3182 3356 5500, then the skinning items 7286 8165
+  15412 15423. Back off per the rules: one single page after 30 minutes, then 2 hours, then the next day; after that
+  about 5 pages a session.
+- How to read (works): in the Wowhead tab, `localStorage` keys `wfm_fn` (reader: throws on a blocked or non-Forever
+  page, stores the page under `wfm_pages`) and `wfm_go2` (waits until 60 s since the last page, at most 40 s);
+  per page a batch of [wait 10, wait 10, run wfm_go2, navigate, run wfm_fn]; 3 pages per batch (the tool stops a call
+  after about 4 minutes; 25 actions max). Every 10-15 pages read `wfm_pages` out, save it to a file and run the
+  importer, then clear it. Saved copies stay in the tab as `wfm_pages_saved_00N`.
+
 ## Order to work in (decided with the user, 2026-11-14)
 The user's goal: all the Forever data, the only way to accurate numbers. Reading the top of the queue covers most of
 the value: the top 10 / 30 / 50 / 100 material pages cover 37% / 59% / 72% / 88% of the uncovered traded material

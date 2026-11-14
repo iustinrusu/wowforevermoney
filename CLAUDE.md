@@ -43,8 +43,9 @@ memory of the project, not the chat.
 - **Privacy:** never send the user's name, email, or character names to outside services (GitHub included: no
   real character names in tests, docs or commits; use made-up names). HTTP requests use
   the generic User-Agent `WoWForeverMoney/0.1 (personal gold tool)`.
-- **Git:** remote is https://github.com/iustinrusu/wowforevermoney.git (branch `main`). Commit or push
-  only when the user asks. Never commit `data/` (caches, price history, logs, settings) except the
+- **Git:** remote is https://github.com/iustinrusu/wowforevermoney.git (branch `main`). Always commit and
+  push each finished piece of work without asking (the user's standing permission for this project,
+  2026-11-14). Never commit `data/` (caches, price history, logs, settings) except the
   hand-curated `data/tips.json`, `data/investments.json` and `data/wowhead_forever_*.json`, and never commit the WoW account folder
   number or other account identifiers.
 
@@ -75,6 +76,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/fishing.py` | fishing spots, your catch logs + Wowhead Forever counts, got-away and pace model |
 | `wfm/hotfix.py` | decodes the client's hotfix cache (DBCache.bin): exact Forever item data; layout inferred and graded |
 | `wfm/skinning.py` | skinning spots from Wowhead Forever "Skinned from" counts |
+| `wfm/wowhead_items.py` | Wowhead Forever item/object/npc pages read by hand: format, importer, mob drops, node yields |
 | `wfm/valuation.py` | an item's worth through every channel (AH, vendor, craft, open it) |
 | `wfm/lua.py` | Lua table parser for SavedVariables and addon data files |
 | `wfm/profile.py` | characters from ForeverMoneyBridge + TSM; auto-fills settings |

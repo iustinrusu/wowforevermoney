@@ -5,7 +5,7 @@ Run on every recompute (shown on the Data health page) and from the command line
 """
 from __future__ import annotations
 
-from . import coverage
+from . import coverage, wowhead_items
 from .engine import PROFESSIONS
 
 
@@ -190,17 +190,24 @@ def run(world, engine) -> list[dict]:
 
     # Forever source data for every material and item (the user's top priority, 2026-11-14)
     try:
+        read = getattr(world, 'forever_pages', None) or {}
         cov = coverage.audit(gd.items, prices, q.items if q else {}, gd.recipes,
                              getattr(world, 'forever_skinning', None), getattr(world, 'forever_fishing', None),
+                             pages=wowhead_items.page_kinds(read), node_items=wowhead_items.covered_by_objects(read),
+                             unlooted=wowhead_items.no_sources(read),
                              fish_hint=coverage.fish_items(getattr(world, 'classic_fishing', None)))
         kinds = ', '.join(f'{coverage.KIND_TEXT[k]} {c[0]} of {c[1]}' for k, c in sorted(cov['by_kind'].items()))
         out.append(_check('Forever source data for every material', 'warn' if cov['queue'] else 'pass',
                           f"{cov['materials_covered']} of {cov['materials']} traded materials (and {cov['covered']} of "
                           f"{cov['total']} traded items that are looted) have Forever data for every way they are "
                           f"obtained. By way: {kinds}. Without it, values per mob, node or pool are missing or come "
-                          f"from WoW Classic. Next to read on Wowhead Forever (one item page covers every source; "
-                          f"materials first, most traded value first):",
-                          [coverage.describe(r) for r in cov['queue']]))
+                          f"from WoW Classic. {len(cov['read_no_data'])} items have their Wowhead Forever page read, "
+                          f"but Wowhead has not recorded Forever data yet for some ways of getting them (re-read "
+                          f"later; listed after the queue). Next to read on Wowhead Forever (one item page covers "
+                          f"every source; materials first, most traded value first):",
+                          [coverage.describe(r) for r in cov['queue']]
+                          + [coverage.describe(r) + ' (page read: no Forever data on Wowhead yet)'
+                             for r in cov['read_no_data']]))
     except Exception as e:          # never let a check break the audit
         out.append(_check('Forever source data for every material', 'warn', f'Could not work it out: {e}'))
     return out

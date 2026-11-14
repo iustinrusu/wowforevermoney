@@ -17,7 +17,7 @@ const num = (v, d = 1) => (v === null || v === undefined) ? '–' : Number(v).to
 const chg = (v, d = 0, color = true) => (v === null || v === undefined) ? '<span class="pill">–</span>' : `<span class="${color ? (v > 0.005 ? 'up' : (v < -0.005 ? 'down' : '')) : ''}">${v > 0 && color ? '+' : ''}${(v * 100).toFixed(d)}%</span>`;
 const daysText = (d) => `${num(d, d < 10 ? 1 : 0)} ${Math.abs(d - 1) < 0.05 ? 'day' : 'days'}`;
 const ago = (ts) => { if (!ts) return 'never'; const s = Date.now() / 1000 - ts; if (s < 90) return `${Math.round(s)}s ago`; if (s < 5400) return `${Math.round(s / 60)} min ago`; if (s < 172800) return `${(s / 3600).toFixed(1)} h ago`; return `${(s / 86400).toFixed(1)} days ago`; };
-const KIND = {farm_zone: 'Farming spot', craft: 'Craft', vendor_flip: 'Vendor → AH', ah_to_vendor: 'AH → vendor', realm_dip: 'Cheap relist', gather: 'Farm', fishing_zone: 'Fishing spot', fishing_spot: 'Fishing spot'};
+const KIND = {mob_spot: 'Mob farming', farm_zone: 'Farming spot', craft: 'Craft', vendor_flip: 'Vendor → AH', ah_to_vendor: 'AH → vendor', realm_dip: 'Cheap relist', gather: 'Farm', fishing_zone: 'Fishing spot', fishing_spot: 'Fishing spot'};
 const FLAGS = {
   none_listed: ['warn', 'nothing listed now', 'No listings on your realm right now; price is the market average'],
   no_realm_data: ['warn', 'region price only', 'No realm data; using the region average'],
@@ -53,7 +53,7 @@ const FLAGS = {
   classic_unconfirmed: ['bad', 'Classic, unconfirmed', 'A Classic WoW 1.12 table (cMaNGOS), not Forever data. Forever often differs (see Data health). Never used in Top picks.'],
   classic_incomplete: ['warn', 'Classic table incomplete', 'The Classic table explains under 90% of catches here; the rest is unknown'],
   forever_only: ['good', 'Forever only', 'A zone Classic does not have; entirely from Forever data'],
-  wowhead_forever: ['good', 'Wowhead Forever', 'Includes Forever catch counts read by hand from Wowhead Forever'],
+  wowhead_forever: ['good', 'Wowhead Forever', 'Uses WoW: Forever counts (catches, drops, skins or gathers) read by hand from Wowhead Forever pages'],
   forever_change: ['warn', 'differs from Classic', 'Your Forever catches include fish Classic does not list here, or lack a common Classic fish'],
   seasonal: ['', 'seasonal', 'Part of the value is a seasonal fish (Classic schedule; Forever may differ)'],
   classic_getaway: ['warn', 'some fish get away', "Your effective fishing skill (skill + the pole, gear and lure bonus in Settings) is below what this zone needs to keep every fish, so some get away (the game's rule, with WoW Classic zone skills). A lure raises it"],
@@ -65,12 +65,18 @@ const FLAGS = {
   no_value: ['bad', 'no known value', 'No AH price, vendor price, recipe or contents known'],
   short_history: ['', 'short history', 'Under a day of our own price snapshots: the trend is first vs latest scan and can swing a lot'],
   slow_sale_rate: ['warn', 'slow to sell', 'Under 10% of listings sell (TSM region sale rate): you may wait a long time to sell'],
-  skins_partial: ['warn', 'some skins not counted', 'Leathers and hides are counted, but 7 scales and special leathers (Turtle, Scorpid, Black Whelp, Worn and Green Dragonscale; Warbear and Chimera Leather) are not read from Wowhead Forever yet, so mobs that give them are worth a bit more than shown'],
+  skins_partial: ['warn', 'some skins not counted', 'Some skinning items are not read from Wowhead Forever yet (the row names them), so mobs that give them are worth a bit more than shown'],
   skill_classic_rule: ['', 'skill: Classic rule', 'Skinning skill per mob level uses the WoW Classic rule (level x 5 above level 20); Forever may differ'],
   assumed_kill_rate: ['', 'skins/hour from Settings', 'Gold per hour uses your skins-per-hour number in Settings (60 by default); your own skinning time is never used, because time in a zone includes questing and travel'],
   cooldown: ['', 'cooldown', 'The recipe has a cooldown in the game data (Transmute: Arcanite 47 hours, Mooncloth 95 hours): per day counts only the crafts it allows'],
   shared_cooldown: ['warn', 'shared cooldown', 'Shares one cooldown with other recipes (all Forever transmutes share Transmute - Alchemy): doing one blocks the rest, so Top picks only suggest the best of them'],
-  classic_yields: ['bad', 'Classic yields', 'What a node gives comes from WoW Classic loot tables, not Forever data; kept out of Top picks until your addon measures your own gathering'],
+  classic_yields: ['bad', 'Classic yields', 'What a node gives comes (at least partly) from WoW Classic loot tables, not Forever data; kept out of Top picks until the Wowhead Forever pages of its herbs, ores, stones and gems (or the node itself) are read'],
+  forever_yields_partial: ['warn', 'partly Forever yields', 'Some of what these nodes give is from Wowhead Forever pages read by hand, the rest still from WoW Classic tables (each item in the details says which)'],
+  drops_partial: ['warn', 'only some drops counted', 'Only the drops whose Wowhead Forever item pages are read so far count (mostly materials): coins, gray items, gear and the other drops are not, so a kill is worth more than shown'],
+  kills_from_settings: ['', 'kills/hour from Settings', 'Gold per hour uses the kills-per-hour number in Settings (60 by default); your own time is never used, because time in a zone includes questing and travel'],
+  elite: ['warn', 'elite', 'An elite, rare elite or boss: hard to kill alone and few of them, so it is kept out of Top picks'],
+  skin_extra: ['', 'skinnable', 'Can be skinned, but not with your Skinning skill (or you do not have Skinning): the skin is not counted. The row says what it would add'],
+  classic_gathers: ['', 'gathers per node: Classic', 'A vein can be mined more than once before it is used up; how many times comes from the WoW Classic tables (Forever may differ). Wowhead counts each gather on its own'],
   assumed_node_rate: ['', 'nodes/hour from Settings', 'Gold per hour uses your nodes-per-hour number in Settings; your own gathering time is never used, because time in a zone includes questing and travel'],
   yield_unknown: ['warn', 'some yields unknown', 'A node here is not in the Classic tables (new in Forever?): counted as one of its herb or ore'],
   rare_nodes_extra: ['', 'rare node extra', 'Black Lotus spawns here but is rare (few of its spawn points are active at once): listed, not counted in the average'],
@@ -138,7 +144,7 @@ function oppTable(rows, opts = {}) {
     const cells = cols.map((c) => {
       if (c === 'title') {
         const name = o.name || o.title;
-        const label = ['fishing_zone', 'fishing_spot', 'skin_spot', 'herb_spot', 'mine_spot', 'farm_zone'].includes(o.kind) ? esc(o.title) : esc(o.title).replace(esc(name), itemLink(o.item_id, name, o.quality));
+        const label = ['fishing_zone', 'fishing_spot', 'skin_spot', 'herb_spot', 'mine_spot', 'farm_zone', 'mob_spot'].includes(o.kind) ? esc(o.title) : esc(o.title).replace(esc(name), itemLink(o.item_id, name, o.quality));
         return `<td>${label}${o.needs ? `<div class="needs">needs ${esc(o.needs)}</div>` : ''}${o.tip ? `<div class="pill">💡 ${esc(o.tip)}</div>` : ''}</td>`;
       }
       if (c === 'rank') return rankCell(ranks.get(o.key));
@@ -483,13 +489,14 @@ const VIEWS = {
       const kind = sel === 'herbalism' ? 'herb_spot' : 'mine_spot';
       const [m, spots] = await Promise.all([measured(sel), api(`/api/opps?kind=${kind}&limit=200`)]);
       body = measuredPanel(m, 'node') + `<div class="panel"><h2>${g.label} spots <small>where the nodes are (Forever) and what a node gives (Classic, until measured)</small></h2>
-        ${how(`Node locations come from QuestieDB's Forever data. What one node gives comes from the <b>WoW Classic</b> loot tables (cMaNGOS), including every gather a vein allows, so these rows are labelled and kept out of Top picks until your addon measures your own gathering. Black Lotus is listed but left out of the per-node average: it has many spawn points but few active at once. Gold/hour = value per node × nodes per hour (${num(STATE.settings[sel === 'herbalism' ? 'herb_nodes_per_hour' : 'ore_nodes_per_hour'] || 40, 0)} from Settings until measured). Skill per node uses the Classic table.`)}
+        ${how(`Node locations come from QuestieDB's Forever data. What one node gives comes from <b>Wowhead Forever</b> pages read by hand where they are read (an ore's or herb's "Mined from" / "Gathered from" counts, or the node's own page), and from the <b>WoW Classic</b> loot tables (cMaNGOS) for the rest; a spot with any Classic part is labelled and kept out of Top picks. How many times a vein can be gathered comes from the Classic tables. Black Lotus is listed but left out of the per-node average: it has many spawn points but few active at once. Gold/hour = value per node × nodes per hour (${num(STATE.settings[sel === 'herbalism' ? 'herb_nodes_per_hour' : 'ore_nodes_per_hour'] || 40, 0)} from Settings until measured). Skill per node uses the Classic table.`)}
         <div class="controls">${doableBox}</div>${oppTable(onlyDoable(spots), {cols: ['title', 'profit_unit', 'gph', 'flags'], export: false, heads: {profit_unit: 'Per node'}, empty: 'No node data yet.'})}</div>`;
     } else if (sel === 'mobs') {
-      const m = await measured('mobs');
-      body = measuredPanel(m, 'kill') + `<div class="panel"><h2>Mob farming</h2>
-        ${how('Measured rows come from the loot and time your ForeverMoneyBridge addon logs while you kill mobs (coins and every drop count). A full list of the best mobs needs Wowhead Forever "Dropped by" counts; Wowhead blocked reading for now, so that is planned (QuestieDB has no cloth drop lists at all).')}
-        ${m.length ? '' : '<div class="empty">Kill some mobs with ForeverMoneyBridge on, then /reload: your gold per hour per zone shows up here.</div>'}</div>`;
+      const [m, mobs] = await Promise.all([measured('mobs'), api('/api/opps?kind=mob_spot&limit=300')]);
+      body = `<div class="panel"><h2>Mob farming <small>Wowhead Forever drop counts</small></h2>
+        ${how(`One row per mob. Value per kill = for each drop, how often it dropped in Forever (Wowhead's "Dropped by" counts: drops / times looted) × its average stack × what it is worth to you, plus a skin if you can skin it (Classic skill rule: level × 5 above level 20). Only drops whose Wowhead Forever item pages are read count so far (materials first), so coins, gray items and gear are missing and every value is a floor. Gold/hour = value per kill × kills per hour (${num(STATE.settings.kills_per_hour || 60, 0)} from Settings). Mobs up to 3 levels above you count as doable. Elites, bosses, dungeon mobs and mobs looted fewer than 50 times stay out of Top picks.`)}
+        <div class="controls">${doableBox}</div>${oppTable(onlyDoable(mobs), {cols: ['title', 'profit_unit', 'gph', 'flags'], export: false, heads: {profit_unit: 'Per kill'}, empty: 'No Wowhead Forever drop counts read yet.'})}</div>`
+        + (m.length ? `<div class="panel"><h2>Your loot log <small>what ForeverMoneyBridge saw you loot: a log, never a rate</small></h2>${oppTable(m, {cols: ['title', 'profit_unit', 'flags'], export: false})}</div>` : '');
     } else {
       const rows = await api('/api/opps?kind=gather&limit=600');
       body = `<div class="panel"><h2>What farmed materials are worth <small>per unit: best of selling on AH, to a vendor, or crafting it</small></h2>
@@ -599,7 +606,7 @@ const VIEWS = {
       <div>Herb nodes per hour</div><div><input type="number" id="s-hph" value="${s.herb_nodes_per_hour || 40}"> <span class="pill">until ForeverMoneyBridge has 10+ minutes of your herbalism</span></div>
       <div>Ore nodes per hour</div><div><input type="number" id="s-oph" value="${s.ore_nodes_per_hour || 40}"> <span class="pill">until ForeverMoneyBridge has 10+ minutes of your mining</span></div>
       <div>Your time is worth</div><div><input type="number" step="0.5" id="s-tv" value="${s.time_value_gold || ''}" placeholder="auto"> gold an hour <span class="pill">blank = half your best measured farming. Routines that earn less than their time is worth are marked "not worth your time"</span></div>
-      <div>Skins per hour</div><div><input type="number" id="s-kph" value="${s.kills_per_hour || 60}"> <span class="pill">mobs killed and skinned per hour, until ForeverMoneyBridge has 10+ minutes of your skinning</span></div>
+      <div>Kills per hour</div><div><input type="number" id="s-kph" value="${s.kills_per_hour || 60}"> <span class="pill">mobs you kill (and skin) in an hour of farming: used for skinning and mob farming gold per hour</span></div>
       <div>AH sale price</div><div><select id="s-basis"><option value="min_buyout" ${s.sale_price_basis !== 'actual_sales' ? 'selected' : ''}>current lowest buyout (what you'd list at)</option><option value="actual_sales" ${s.sale_price_basis === 'actual_sales' ? 'selected' : ''}>what items actually sell for (more conservative)</option></select> <span class="pill">nothing listed: the average sale price either way</span></div>
       <div>Fishing drop rates</div><div><label class="chk"><input type="checkbox" id="s-ownrates" ${s.own_logs_for_rates ? 'checked' : ''}> also use my own catch logs</label> <span class="pill">off: Wowhead Forever's big samples only; your logs still give your pace and got-away rate</span></div>
       <div>Fishing pools</div><div><label class="chk"><input type="checkbox" id="s-pools" ${s.fishing_pools ? 'checked' : ''}> count pool loot in gold/hour</label> <span class="pill">off: open water only; trunks, Stranglekelp and Rumsey Rum from pools shown as a bonus, since pools have to be found first</span></div>
@@ -666,7 +673,7 @@ function oppDetail(o) {
   const d = o.detail || {};
   const notes = (o.flags || []).filter((f) => FLAGS[f]);
   let html = `<h3>${esc(o.title)} <small>${esc(KIND[o.kind] || o.kind)}</small></h3>${notes.length ? `<ul class="notes">${notes.map((f) => `<li><span class="flag ${FLAGS[f][0]}">${esc(FLAGS[f][1])}</span> ${esc(FLAGS[f][2])}</li>`).join('')}</ul>` : ''}
-    <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
+    <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot', 'mob_spot'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
     <div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
     ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>`;
   const ef = d.effort;
@@ -707,14 +714,25 @@ function oppDetail(o) {
     html += `<div class="kv" style="margin-top:8px"><div>Nodes in this zone</div><div>${num(d.node_count, 0)} spawn points</div><div>Nodes per hour</div><div>${num(d.nodes_per_hour, 0)} <span class="pill">${esc(d.pace_source)}</span></div><div>Sources</div><div class="pill">${esc(d.source)}</div></div>
       <h3>Nodes here <small>value per node at current prices</small></h3><table><thead><tr><th>Node</th><th class="num">Spawns</th><th class="num">Skill</th><th class="num">Per node</th><th>Gives (per node)</th></tr></thead><tbody>
       ${d.nodes.map((n) => `<tr><td>${esc(n.name)}${n.rare ? ' <span class="pill">rare, not averaged</span>' : ''}${n.can ? '' : ' <span class="needs">need skill</span>'}</td><td class="num">${n.count}</td><td class="num">${n.skill ?? '?'}</td><td class="num">${money(n.value)}</td>
-        <td>${n.items.map((i) => `${itemLink(i.item_id, i.name)} ×${num(i.per_node, 2)}`).join(', ')}</td></tr>`).join('')}</tbody></table>`;
+        <td>${n.items.map((i) => `${itemLink(i.item_id, i.name)} ×${num(i.per_node, 2)}${i.source === 'forever' ? '' : ` <span class="pill" title="${i.source === 'classic' ? 'From the WoW Classic node loot table, not Forever data' : 'Not in any table: counted as one of its herb or ore'}">${i.source === 'classic' ? 'Classic' : 'assumed'}</span>`}`).join(', ')}</td></tr>`).join('')}</tbody></table>
+      <p class="note">Items without a label come from Wowhead Forever pages read by hand: what each gather gave, over all gathers Wowhead counted${d.nodes.some((n) => n.gathers_per_node !== 1) ? ', times the gathers a node allows (WoW Classic number)' : ''}. Items labelled Classic come from the WoW Classic node loot table and keep this spot out of Top picks until their Forever pages are read.</p>`;
   }
   if (o.kind === 'skin_spot') {
     html += `<div class="kv" style="margin-top:8px"><div>Mob levels</div><div>${esc(d.levels)}</div><div>Skins per hour</div><div>${num(d.skins_per_hour, 0)} <span class="pill">${esc(d.pace_source)}</span></div>
-      <div>Forever skins counted</div><div>${num(d.skins, 0)} <span class="pill">${esc(d.source)}</span></div></div>
+      <div>Forever skins counted</div><div>${num(d.skins, 0)} <span class="pill">${esc(d.source)}</span></div>
+      ${(d.skins_not_read || []).length ? `<div>Not read yet</div><div>${d.skins_not_read.map(esc).join(', ')} <span class="pill">mobs that give these are worth a bit more than shown</span></div>` : ''}</div>
       <h3>Mobs here <small>value per skin at current prices</small></h3><table><thead><tr><th>Mob</th><th>Level</th><th class="num">Skinned</th><th class="num">Per skin</th><th>Gives</th></tr></thead><tbody>
       ${d.mobs.map((m) => `<tr><td>${esc(m.name)}${m.can_skin ? '' : ` <span class="needs">Skinning ${m.skill_needed}</span>`}${m.can_kill ? '' : ' <span class="needs">too high</span>'}</td><td>${esc(m.levels)}</td><td class="num">${num(m.skinned, 0)}</td><td class="num">${money(m.value)}</td>
         <td>${m.items.slice(0, 3).map((i) => `${itemLink(i.item_id, i.name)} ${(i.share * 100).toFixed(0)}%`).join(', ')}</td></tr>`).join('')}</tbody></table>`;
+  }
+  if (o.kind === 'mob_spot') {
+    html += `<div class="kv" style="margin-top:8px"><div>Mob level</div><div>${esc(d.levels)}</div><div>Kills per hour</div><div>${o.gph == null ? 'not worked out: an elite, boss or dungeon mob can\'t be killed at your kills-per-hour pace, so only the value per kill is shown' : `${num(d.kills_per_hour, 0)} <span class="pill">${esc(d.pace_source)}</span>`}</div>
+      <div>Times looted in Forever</div><div>${num(d.looted, 0)} <span class="pill">${esc(d.source)}</span></div>
+      <div>Drops worth</div><div>${money(d.drop_value)} a kill</div>
+      ${d.skin_value ? `<div>Skin worth</div><div>${money(d.skin_value)} a skin ${d.can_skin ? '' : `<span class="needs">not counted: needs Skinning ${d.skin_needed}</span>`}</div>` : ''}</div>
+      <h3>Drops counted <small>chance per kill × average stack, at current prices</small></h3><table><thead><tr><th>Item</th><th class="num">Per kill</th><th class="num">Worth each</th><th class="num">Seen</th></tr></thead><tbody>
+      ${d.drops.map((x) => `<tr class="row" data-item="${x.item_id}"><td>${itemLink(x.item_id, x.name)}</td><td class="num">${num(x.per_kill, 3)}</td><td class="num">${money(x.value)}</td><td class="num">${num(x.count, 0)} of ${num(x.looted, 0)}</td></tr>`).join('')}</tbody></table>
+      <p class="note">Only items whose Wowhead Forever pages are read are counted (materials first); coins, gray items and gear are not, so a kill is worth more than this.</p>`;
   }
   if (o.kind === 'realm_dip') {
     html += `<div class="kv" style="margin-top:8px"><div>Lowest listing</div><div>${money(d.min_buyout)}</div><div>Realm market</div><div>${money(d.realm_market)}</div><div>Region market</div><div>${money(d.region_market)}</div><div>Region avg sale</div><div>${money(d.region_sale)}</div><div>Relist at</div><div>${money(d.relist_at)}</div></div>`;
@@ -749,7 +767,7 @@ function fishingDetail(o) {
       <td>${f.quest ? '<span class="flag">quest item</span>' : ''}${f.seasonal ? `<span class="flag" title="Classic season schedule">${esc(f.seasonal)}${f.in_season === false ? ' (out of season)' : (f.in_season ? ' (in season)' : '')}</span>` : ''}${(f.pools || []).length ? `<span class="flag" title="${esc(f.pools.join(', '))}">from pools</span>` : ''}</td></tr>`).join('')}</tbody></table>`;
   return h;
 }
-function openOpp(o) { if (!o) return; if (['fishing_zone', 'fishing_spot', 'skin_spot', 'herb_spot', 'mine_spot'].includes(o.kind)) { openDrawer(oppDetail(o)); wireDrawer(); return; } openItem(o.item_id, o); }
+function openOpp(o) { if (!o) return; if (['fishing_zone', 'fishing_spot', 'skin_spot', 'herb_spot', 'mine_spot', 'mob_spot'].includes(o.kind)) { openDrawer(oppDetail(o)); wireDrawer(); return; } openItem(o.item_id, o); }
 
 function spark(hist) {
   const pts = hist.filter((h) => h.min_buyout || h.market);
