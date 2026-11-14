@@ -29,7 +29,8 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   (1.25 sales a day), while its region listing average is 11g 25s. Sales normally average below listings (median
   0.66x, 99% under 1.6x); 21 items were over 3x. Now, with nothing listed, a sale average over 3x the region listing
   average (`pricing.SALE_OUTLIER`) is ignored: valued at the lower of the listing averages, flag `sale_price_outlier`
-  (confidence x0.7). The dummy: 11g 25s, 8g 54s profit each, about 2g 13s a day.
+  (confidence x0.7). The dummy: 11g 25s, 8g 54s profit each, about 2g 13s a day. Every use of TSM's regionSale now
+  goes through `pricing.usual_sale` (also "profit at the usual sale price", contents/catch values, coverage order).
 - **2026-11-14 Wowhead Forever pages are the source; Everloot is not a bulk replacement (yet).** One search found
   Everloot (everloot.app, player uploads, data CC BY-SA 4.0, public API): 1,753 public drop rates (3+ installs) from
   9,761 loot windows; they cover 94 of 331 uncovered materials but only 15% of their traded value (none of Dark Rune,
@@ -288,6 +289,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-14 price sweep (7,460 priced items, user's request "check all item pricings"): 27 sell quotes are over 3x
+  their references (median of realm/region listing averages and the usual sale price), all lone listings with no
+  recorded sales (hard to sell: out of suggestions); 730 under a third (walls valued at actual sales, real cheap
+  listings); no craft uses an odd cheap ingredient listing (1-3 listed, under half the realm market); 119 of 703
+  craft/flip rows make a profit at the lowest listing but lose money at the usual sale price (top 40: 5 lose, 9 make
+  under half; e.g. Bronze Tube flip +5s at the 14s listing, -3s at the usual ~5s; Arcanite Bar 50g vs 20g 65s).
 - 2026-11-14: TSM's raw region sale value for Masterwork Target Dummy (16023) is `643L3` = 6,426,275c by hand: the
   642g sale average is TSM's data, not a parsing error.
 - 2026-11-14: Wowhead returned 403 (CloudFront "The request could not be satisfied") on the 77th page of a session
@@ -360,6 +367,9 @@ moved into `forever-data-next.md`.
 
 ## Open items
 
+- User's question (2026-11-14): show both the lowest listing and the usual sale price, and which one "Profit a day"
+  uses. Claude's recommendation: show both; profit a day at the lower of the two (the existing 'actual_sales' basis is
+  close). Waiting for the user's choice.
 - User's idea (2026-11-14): a Dungeons (and raids) view. Claude's view in the change log entry of that day; not decided.
 - Re-read later the 22 pages Wowhead has no Forever rows for yet (Data health lists them after the queue).
 - Mob values are floors until mobs' own pages (Drops tab: coins aside, every drop) are read; nodes are complete once

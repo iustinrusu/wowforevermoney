@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .pricing import usual_sale
+
 OPEN_DEPTH = 2              # a container inside a container is valued; deeper than that isn't
 WORTH_OPENING = 1.2         # flag "open it" when opening beats selling by 20%+
 CRAFT_DEMAND = 50           # flag a crafting value when its product's market absorbs fewer units/day than this
@@ -89,7 +91,7 @@ class Valuer:
             # a lone listing far above the region (or no recorded sale at all) isn't a price you'd get: value
             # contents and catches at the actual sale price, or not on the AH at all if it never sold
             flags.append('ah_price_doubtful')
-            sale = (e.price(iid) or {}).get('regionSale') or 0
+            sale = usual_sale(e.price(iid))
             sell = min(sell, int(sale * (1 - e.cut))) if sale else 0
         vendor = 0 if not item or 'sell_price' in getattr(item, 'untrusted', ()) else item.sell_price
         tradeable = not (item and (item.bonding == 1 or item.class_id == 12))     # soulbound or quest item

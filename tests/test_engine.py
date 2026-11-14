@@ -64,6 +64,16 @@ class PricingTests(unittest.TestCase):
         # up to 3x the listing average is kept (a real premium can sell above old listings)
         self.assertEqual(ah_sell({'regionMarketValue': 1000, 'regionSale': 2900, 'regionSoldPerDay': 5}).value, 2900)
 
+    def test_every_use_of_the_sale_average_drops_freak_sales(self):
+        from wfm.pricing import usual_sale
+        dummy = {'regionMarketValue': 112550, 'regionHistorical': 112550, 'regionSale': 6426275}
+        self.assertEqual(usual_sale(dummy), 0)                       # 57x the listing average: freak sales
+        self.assertEqual(usual_sale({'regionMarketValue': 1000, 'regionSale': 660}), 660)
+        self.assertEqual(usual_sale({'regionSale': 660}), 660)       # nothing to compare with: kept
+        # listed now: the lowest listing stands, and the freak sale average can't hide a wall of listings
+        q = ah_sell({**dummy, 'numAuctions': 4, 'minBuyout': 120000, 'marketValue': 118000, 'regionSoldPerDay': 1})
+        self.assertEqual((q.value, q.source), (120000, 'lowest listing'))
+
     def test_wall_of_overpriced_listings_is_not_a_price(self):
         # Short Staff, 2026-11-14: 10 listings at 10g, sells for 1s 90c -> the app showed a 9g vendor flip
         staff = {'numAuctions': 10, 'minBuyout': 100000, 'marketValue': 286, 'marketValueRecent': 100000,

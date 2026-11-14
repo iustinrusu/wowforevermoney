@@ -18,6 +18,8 @@ leaves the reading queue for `read_no_data`: Wowhead hasn't recorded it yet, so 
 """
 from __future__ import annotations
 
+from .pricing import usual_sale
+
 WOWHEAD = 'https://www.wowhead.com/forever/item={}'
 TRADE_GOODS, CONSUMABLE, FOOD = 7, 0, 5
 # trade goods subclass -> how it is mainly obtained (meat 8 and "other" 11 depend on whether it is a fish: see fish_hint)
@@ -99,7 +101,7 @@ def audit(items: dict, prices: dict, questie_items: dict, recipes, skinning: dic
             c = by_kind.setdefault(k, [0, 0])
             c[1] += 1
             c[0] += k in have
-        price = p.get('regionSale') or p.get('marketValue') or 0
+        price = usual_sale(p) or p.get('marketValue') or 0
         rows.append({'item_id': iid, 'name': it.name, 'material': is_material(it), 'kinds': sorted(kinds),
                      'missing': sorted(kinds - have), 'read': iid in pages,
                      'sold_per_day': round(spd, 1), 'price': int(price), 'market': int(price * spd),

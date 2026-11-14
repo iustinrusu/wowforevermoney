@@ -47,6 +47,15 @@ WALL = 3.0       # lowest listing over 3x the region's average sale price: nobod
 SALE_OUTLIER = 3.0   # nothing listed and the region's sale average over 3x its listing average: freak sales
 
 
+def usual_sale(p: dict | None) -> int:
+    """The region's average sale price, or 0 when it is freak sales: over SALE_OUTLIER x the region listing average
+    (sales normally average below listings: median 0.66x, 99% under 1.6x on 2026-11-14). Every use of TSM's
+    regionSale goes through here."""
+    sale = int((p or {}).get('regionSale') or 0)
+    listing_avg = max(int((p or {}).get('regionMarketValue') or 0), int((p or {}).get('regionHistorical') or 0))
+    return 0 if sale and listing_avg and sale > SALE_OUTLIER * listing_avg else sale
+
+
 def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
     """The price you'd sell one unit for on your realm's AH (before the AH cut).
 
@@ -60,7 +69,8 @@ def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
     if not p:
         return None
     flags = []
-    sale = int(p.get('regionSale', 0) or 0)
+    sale = usual_sale(p)
+    freak = bool(p.get('regionSale')) and not sale
     if listed(p):
         value, source = int(p['minBuyout']), 'lowest listing'
         mv = int(p.get('marketValue') or 0)
@@ -78,6 +88,9 @@ def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
             flags.append('listed_far_above_sales')
     else:
         flags.append('none_listed')
+        # A sale average far above every listing is a few freak sales on a rarely traded item (Masterwork Target
+        # Dummy: 642g sale average, listed at 11g 25s, which made a 608g "craft"): usual_sale() drops it, and the item
+        # is valued at what it is listed for.
         options = [(int(v), s) for v, s in ((sale, 'average sale price (region, actual sales)'),
                                             (p.get('marketValue'), 'realm market value'),
                                             (p.get('regionMarketValue'), 'region market value')) if v]
@@ -85,13 +98,7 @@ def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
             return None
         if not sale and not p.get('marketValue'):
             flags.append('no_realm_data')
-        listing_avg = max(int(p.get('regionMarketValue') or 0), int(p.get('regionHistorical') or 0))
-        if sale and listing_avg and sale > SALE_OUTLIER * listing_avg:
-            # Sales normally average below listings (median 0.66x, 99% under 1.6x on 2026-11-14). A sale average far
-            # above every listing is a few freak sales on a rarely traded item (Masterwork Target Dummy: 642g sale
-            # average, listed at 11g 25s, which made a 608g "craft"): value it at what it is listed for.
-            sale = 0
-            options = [(v, s) for v, s in options if s != 'average sale price (region, actual sales)']
+        if freak:
             flags.append('sale_price_outlier')
         value, source = options[0] if sale else min(options)
     if sale and sale < 0.7 * value:

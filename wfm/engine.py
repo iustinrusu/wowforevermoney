@@ -1177,7 +1177,7 @@ class Engine:
             o.score, o.detail['rank'] = self.rank(o)
             # what each would make if it sold at the region's average sale price, not the lowest listing
             liq = o.detail.get('liquidity')
-            sale = (self.price(o.item_id) or {}).get('regionSale')
+            sale = pricing.usual_sale(self.price(o.item_id))          # freak sale averages left out
             if liq and sale and o.kind in ('craft', 'vendor_flip') and o.detail.get('sell_channel') != 'vendor':
                 per = o.detail.get('product_count') or 1
                 o.detail['profit_at_avg_sale'] = int(int(sale * (1 - self.cut)) * per - o.cost_unit)
