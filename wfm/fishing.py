@@ -212,20 +212,21 @@ class CatchModel:
     keep_by_zone: dict[str, float]   # measured 1 - got-away rate per zone (enough data only)
     keep_by_skill: dict[int, float]  # measured, pooled by Classic zone skill
     casts_per_hour: float
-    pace_source: str                 # 'measured' or 'setting'
+    pace_source: str                 # always 'setting' (your own time is never used)
 
     def keep(self, zone: str, zone_skill: int | None, skill: int, use_zone: bool = True) -> tuple[float, str]:
-        """use_zone: your measured rate in this zone only applies to the spot your log was matched to."""
-        if use_zone and zone in self.keep_by_zone:
-            return self.keep_by_zone[zone], 'your got-away rate here'
-        if zone_skill is not None and zone_skill in self.keep_by_skill and skill >= zone_skill:
-            return self.keep_by_skill[zone_skill], f'your got-away rate in other zone-skill {zone_skill} zones'
+        """Share of hooked fish you keep: always the game's rule, your effective fishing skill (skill + pole, gear and
+        lure bonus) against the zone's skill. Never your own logs (user's rule, 2026-11-14): keep_by_zone/skill are
+        shown for comparison only."""
         if zone_skill is None:
             return 1.0, 'zone skill unknown; assuming nothing gets away'
-        return success_chance(skill, zone_skill), 'Classic formula (no logs at this zone skill yet)'
+        return (success_chance(skill, zone_skill),
+                f'game rule: your effective skill {skill} vs the zone\'s {zone_skill} (zone skill from WoW Classic)')
 
     def catches_per_hour(self, keep: float) -> float:
-        return self.casts_per_hour * (self.landed_share or 1.0) * keep
+        # every cast is assumed to be clicked in time: your own miss rate (bites you didn't click, early recasts)
+        # depends on how closely you watched, like your time, so it is shown but not used (user, 2026-11-14)
+        return self.casts_per_hour * keep
 
 
 def catch_model(obs: dict[str, Obs], zone_skill_of, setting_casts: float) -> CatchModel:
@@ -244,12 +245,6 @@ def catch_model(obs: dict[str, Obs], zone_skill_of, setting_casts: float) -> Cat
             k, h = pooled.get(zs, (0, 0))
             pooled[zs] = (k + o.caught, h + hooked)
     keep_by_skill = {zs: k / h for zs, (k, h) in pooled.items() if h >= MIN_RATE_SAMPLE}
-    timed = [o for o in obs.values() if o.timed_catches and o.seconds > 0]
-    secs = sum(o.seconds for o in timed)
-    if secs >= 600:
-        catches_h = sum(o.timed_catches for o in timed) / secs * 3600
-        hooked = sum(o.caught + o.escaped for o in obs.values())
-        keep_all = sum(o.caught for o in obs.values()) / hooked if hooked else 1.0
-        cph = catches_h / max(0.05, (landed_share or 1.0) * keep_all)
-        return CatchModel(landed_share, keep_by_zone, keep_by_skill, cph, 'measured')
+    # Pace is always the casts-per-hour setting. Your logged time is never used: time in a zone includes travel,
+    # questing and breaks, so it is not a farming rate (user's rule, 2026-11-14).
     return CatchModel(landed_share, keep_by_zone, keep_by_skill, setting_casts, 'setting')

@@ -232,8 +232,8 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(zone.title, 'Fish in Tanaris')
         self.assertIn('forever_only', zone.flags)
         self.assertEqual(zone.profit_unit, int(190 * 40 / 90))   # value per catch
-        # 200 casts/hour, all landed (90 caught + 10 got away of 100), 90% kept -> 180 catches/hour
-        self.assertEqual(zone.gph, 15200)                        # 190 x 40/90 x 180 = the old per-cast 190 x 0.4 x 200
+        # 200 casts/hour (setting); no zone skill known, so nothing gets away: your log's 10 of 100 is not used
+        self.assertEqual(zone.gph, round(190 * 40 / 90 * 200))
 
     def test_crafts_are_capped_by_ingredient_market_volume(self):
         # Regression: a vendor-sold craft assumed 200 crafts a day (6.36g/day for Mender's Mail Boots); you can't

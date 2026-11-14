@@ -24,6 +24,27 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-14 Your own time is never a rate (user: "I am low level and time spent in zones is not spent entirely on
+  farming... only reported, computed or theoretical rates").** Removed everywhere: the "measured" gold/hour of
+  `activity_zones` rows (now a loot log, flag `your_log`, no gph: "Kill mobs in Dustwallow Marsh 10.26g/h" was
+  questing time), measured skinning/node/fishing pace (always the Settings numbers: skins, nodes, casts per hour),
+  fishing's "measured here" pace, and your landed share (bites you didn't click depend on attention, like time;
+  shown, not used). Time value = half the best farming spot that may reach Top picks (`Engine._hourly_ok`: Forever
+  counts at Settings paces), else 2g/h. Also fixed: skinning rows said "your pace: catches per hour from
+  your timed fishing" (a fishing label reused).
+- **2026-11-14 Loot tables only from online sources (user: "we should not build our own loot tables").** The
+  per-mob/node logging drafted as addon 1.5.0 was taken out before it was committed (ForeverMoneyBridge stays
+  1.4.1); to-do item "own Forever loot tables" cancelled. If coins per loot are wanted later, the drafted method
+  was: the gold change (PLAYER_MONEY) while a loot window is open + 1 s, no language-dependent text parsing.
+- **2026-11-14 Got-away rate = the game's rule with your effective skill (user).** Effective skill = Fishing skill +
+  setting `fishing_skill_bonus` (pole, gear, lure; default 0) against the zone's skill (WoW Classic zone skills,
+  labelled); your own got-away log is never used. With no bonus set, the user's 232 in Tanaris (205) keeps 32%
+  (232 - 205 + 5), so Tanaris dropped from 6g 91s/h; Bright Baubles (+75) brings it to 100%. Auto-filling the
+  bonus from pole, gear and lures (and lure cost per hour) is in docs/plans/material-coverage.md step 6.
+- **2026-11-14 Pools are undercounted (user's hunch, checked).** "With pools" only counts pool loot that appears in
+  Wowhead's per-zone fishing counts (Tanaris 3.6% of catches, Stranglethorn 12.9%); pool objects' own contents
+  (Floating Debris materials) were never read. Fix: docs/plans/material-coverage.md step 3.
+- **2026-11-14 Every material needs Forever source data: top priority (user).** docs/plans/material-coverage.md.
 - **2026-11-14 Your plan for today (user: "Do these now should be our main attraction... think like a pro").**
   `wfm/plan.py` (pure functions, tests/test_plan.py) builds `result['plan']` (in `/api/state`), shown as numbered
   cards at the top of Top picks. Sources: cash-in from what the character you play holds (`Engine.my_holdings`:
@@ -287,7 +308,6 @@ moved into `forever-data-next.md`.
 - Verify in game after the user /reloads: addon 1.4.1 saves gold correctly (1.4.0 saved 0 on logout; still unchecked on
   2026-11-14: the saved file predates the 1.4.1 install); vendor-price
   recording at a vendor; fishing `sources`/`pools` (does GetLootSourceInfo give the pool's object id?).
-- Fishing pace is the 240 casts/hour setting until ForeverMoneyBridge has 10+ minutes of timed fishing.
 - No JavaScript syntax check in the tests (no Node on this PC): check the browser console after editing
   `web/app.js`; tests/test_web.py catches broken flag labels and names declared twice.
 - Is Javnir Nashak (Green Firework vendor, Durotar) permanent or event-only? Questie gives no hint.
@@ -295,6 +315,10 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Own logged time/pace no longer used for any rate; time value from Forever farming spots; pace labels
+  fixed; got-away from effective skill (setting `fishing_skill_bonus`); material-coverage plan (top priority).
+  Tests: 140.
 
 - **2026-11-14** Plan for today on Top picks (`wfm/plan.py`, `Engine.my_holdings`, plan cards with medals, chips and
   "How this plan is made"); "Do these now" renamed "Daily routines"; narrow screens no longer scroll sideways

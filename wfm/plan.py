@@ -287,14 +287,12 @@ def snipe(o) -> dict:
 
 
 def farm(o) -> dict:
-    f = set(o.flags)
-    if 'measured' in f:
-        src = 'what you actually earned doing this (timed by ForeverMoneyBridge)'
-    elif 'measured_pace' in f:
-        src = 'Wowhead Forever loot counts at your own measured pace'
-    else:
-        src = 'Wowhead Forever counts at the pace set in Settings'
-    why = f'About {gold(o.gph)} an hour, from {src}.'
+    d = o.detail
+    pace = (f"{d['skins_per_hour']:g} skins" if d.get('skins_per_hour') else
+            f"{d['casts_per_hour']:g} casts" if d.get('casts_per_hour') else
+            f"{d['nodes_per_hour']:g} nodes" if d.get('nodes_per_hour') else 'the pace')
+    why = (f'About {gold(o.gph)} an hour, worked out from Wowhead Forever loot counts at {pace} an hour '
+           f'(your number in Settings).')
     if o.detail.get('gph_with_pools') and o.detail.get('gph_with_pools') > (o.gph or 0):
         why += f' Fishing the pools you pass adds more (up to {gold(o.detail["gph_with_pools"])} an hour).'
     return _action('farm', f'Spend an hour: {o.title}', why, o.gph or 0, 60, o.detail.get('confidence', 1.0),

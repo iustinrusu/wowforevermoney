@@ -167,3 +167,41 @@ class BuildTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class YourTimeIsNeverARate(unittest.TestCase):
+    """User's rule (2026-11-14): time logged in a zone includes questing, travel and breaks, so your own logs never
+    set a gold/hour or a pace; rates come from reported counts at the paces in Settings."""
+
+    def world(self, activity):
+        w = make_world({})
+        w.profile = {'activity': activity}
+        return w
+
+    def test_loot_log_has_no_gold_per_hour(self):
+        act = {'Marsh': {'mobs': {'loots': 40, 'seconds': 3600, 'items': {}}}}
+        o = Engine(self.world(act), dict(SETTINGS)).activity_zones({})[0]
+        self.assertIsNone(o.gph)
+        self.assertEqual(o.flags[0], 'your_log')
+
+    def test_logged_skinning_time_does_not_set_the_pace(self):
+        from tests.test_skinning import SNAP
+        act = {'Marsh': {'skinning': {'loots': 400, 'seconds': 3600, 'items': {}}}}    # 400 an hour logged
+        w = self.world(act)
+        w.forever_skinning = SNAP
+        for iid, name, sell in ((2318, 'Light Leather', 600), (2319, 'Medium Leather', 1000)):
+            w.gamedata.items[iid] = Item(id=iid, name=name, quality=1, item_level=20, req_level=0, sell_price=sell,
+                                         buy_price=0, stack=20, class_id=7, subclass_id=6, bonding=0)
+        s = dict(SETTINGS, kills_per_hour=60, level=40, professions={'Skinning': 300})
+        rows = Engine(w, s).skinning_spots({})
+        self.assertTrue(rows)
+        for o in rows:
+            self.assertEqual(o.detail['skins_per_hour'], 60)
+            self.assertIn('assumed_kill_rate', o.flags)
+            self.assertNotIn('measured_pace', o.flags)
+
+    def test_time_value_comes_from_forever_farming_spots_not_your_log(self):
+        act = {'Marsh': {'mobs': {'loots': 400, 'seconds': 600, 'items': {}}}}
+        e = Engine(self.world(act), dict(SETTINGS))
+        e.run()
+        self.assertEqual((e.time_value, e.time_value_source), (20000, 'default'))

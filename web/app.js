@@ -48,17 +48,15 @@ const FLAGS = {
   more_with_skill: ['', 'more with skill', "A recipe you can't make yet would make it worth more (see details); valued at what you can do now"],
   event_vendor: ['bad', 'event vendor', 'Every vendor selling it is event-only (Darkmoon Faire, holidays) or has no known location: check it is there now. Kept out of Top picks'],
   black_market: ['bad', 'black market vendor', 'Black Market agents charge more than the game-file price (e.g. Frilled Lichen: 4g 50s, not 1s 20c). Visit once to record the real price'],
-  measured: ['good', 'measured', 'Gold/hour from real time spent (ForeverMoneyBridge)'],
-  not_enough_time: ['warn', 'needs more time', 'Under 5 minutes logged; gold/hour not shown yet'],
-  assumed_rate: ['warn', 'assumed casts/hour', 'No timed fishing logs yet (ForeverMoneyBridge); uses your casts-per-hour setting'],
-  measured_pace: ['', 'your pace', 'Catches per hour from your timed fishing in other zones'],
+  your_log: ['', 'your loot log', 'What you looted here, from ForeverMoneyBridge. No gold per hour: the time logged in a zone includes questing, travel and breaks, so it is not a farming rate'],
+  assumed_rate: ['', 'casts/hour from Settings', 'Catches per hour use your casts-per-hour number in Settings, with every bite clicked in time; your own fishing time is never used, because time in a zone includes travel and breaks'],
   classic_unconfirmed: ['bad', 'Classic, unconfirmed', 'A Classic WoW 1.12 table (cMaNGOS), not Forever data. Forever often differs (see Data health). Never used in Top picks.'],
   classic_incomplete: ['warn', 'Classic table incomplete', 'The Classic table explains under 90% of catches here; the rest is unknown'],
   forever_only: ['good', 'Forever only', 'A zone Classic does not have; entirely from Forever data'],
   wowhead_forever: ['good', 'Wowhead Forever', 'Includes Forever catch counts read by hand from Wowhead Forever'],
   forever_change: ['warn', 'differs from Classic', 'Your Forever catches include fish Classic does not list here, or lack a common Classic fish'],
   seasonal: ['', 'seasonal', 'Part of the value is a seasonal fish (Classic schedule; Forever may differ)'],
-  classic_getaway: ['warn', 'got-away rate: Classic formula', 'No logs at this zone skill yet; Classic formula used, which your Forever logs suggest is too harsh'],
+  classic_getaway: ['warn', 'some fish get away', "Your effective fishing skill (skill + the pole, gear and lure bonus in Settings) is below what this zone needs to keep every fish, so some get away (the game's rule, with WoW Classic zone skills). A lure raises it"],
   dungeon: ['', 'dungeon', 'Inside a dungeon'],
   pools_extra: ['', 'pool loot extra', 'Pool loot (trunks, Stranglekelp, Rumsey Rum) is not in this gold/hour, because pools have to be found first. Open the row to see what pools add, or count them in Settings.'],
   contents_unknown: ['warn', 'contents unknown', 'Can be opened, but what it contains in Forever is unknown: valued as a floor. Open one with ForeverMoneyBridge enabled, or read its Wowhead Forever page'],
@@ -69,11 +67,11 @@ const FLAGS = {
   slow_sale_rate: ['warn', 'slow to sell', 'Under 10% of listings sell (TSM region sale rate): you may wait a long time to sell'],
   skins_partial: ['warn', 'some skins not counted', 'Counts leathers and Light/Medium Hide only: heavier hides, scales and special leathers were not read from Wowhead Forever yet, so this is a floor'],
   skill_classic_rule: ['', 'skill: Classic rule', 'Skinning skill per mob level uses the WoW Classic rule (level x 5 above level 20); Forever may differ'],
-  assumed_kill_rate: ['warn', 'assumed skins/hour', 'No timed skinning logs yet (ForeverMoneyBridge); uses your skins-per-hour setting'],
+  assumed_kill_rate: ['', 'skins/hour from Settings', 'Gold per hour uses your skins-per-hour number in Settings (60 by default); your own skinning time is never used, because time in a zone includes questing and travel'],
   cooldown: ['', 'cooldown', 'The recipe has a cooldown in the game data (Transmute: Arcanite 47 hours, Mooncloth 95 hours): per day counts only the crafts it allows'],
   shared_cooldown: ['warn', 'shared cooldown', 'Shares one cooldown with other recipes (all Forever transmutes share Transmute - Alchemy): doing one blocks the rest, so Top picks only suggest the best of them'],
   classic_yields: ['bad', 'Classic yields', 'What a node gives comes from WoW Classic loot tables, not Forever data; kept out of Top picks until your addon measures your own gathering'],
-  assumed_node_rate: ['warn', 'assumed nodes/hour', 'No timed gathering logs yet (ForeverMoneyBridge); uses your nodes-per-hour setting'],
+  assumed_node_rate: ['', 'nodes/hour from Settings', 'Gold per hour uses your nodes-per-hour number in Settings; your own gathering time is never used, because time in a zone includes questing and travel'],
   yield_unknown: ['warn', 'some yields unknown', 'A node here is not in the Classic tables (new in Forever?): counted as one of its herb or ore'],
   rare_nodes_extra: ['', 'rare node extra', 'Black Lotus spawns here but is rare (few of its spawn points are active at once): listed, not counted in the average'],
   not_worth_time: ['bad', 'not worth your time', 'Earns less a day than the time it takes is worth (half of what your best farming earns an hour; Settings can set your own value). Kept out of Top picks'],
@@ -423,7 +421,7 @@ const VIEWS = {
         ${oppTable(t.slow || [], {cols: ['title', 'profit_unit', 'profit_avg', 'cost_unit', 'every', 'sells', 'flags'], empty: 'No slow, valuable flips right now.'})}</div>
       <div class="panel"><h2>Fishing & farming spots <small>gold per hour: open water, and with the pools you come across</small></h2>${oppTable(withPools(t.hourly || []), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false, heads: {profit_unit: 'Per catch / each'}})}
         <div class="hint">${POOL_HINT}</div>
-        <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. "measured" uses real time from ForeverMoneyBridge; otherwise ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
+        <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. Catches per hour use ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
       <div class="panel"><h2>Snipes <small>single cheap listings at the last scan; check them in game first</small></h2>${oppTable(t.snipes || [], {cols: ['title', 'kind', 'profit_unit', 'cost_unit', 'sells', 'flags']})}</div>
       <div class="grid2">
         <div class="panel"><h2>Unlock by levelling a profession you have</h2>${oppTable(ifAffordable(t.level_up || []), {cols: ['title', 'profit_unit', 'daily', 'sells', 'cooldown', 'flags'], heads: {daily: 'Per day (with the gold)'}, empty: noProfs ? 'No professions known yet: see the note at the top.' : 'Nothing worth it a few skill points away right now.'})}</div>
@@ -597,6 +595,7 @@ const VIEWS = {
       <div>Hide items selling under</div><div><input type="number" step="0.5" id="s-minspd" value="${s.min_sold_per_day}"> per day <span class="pill">in the whole region; never below 1. Items where under 1 in 10 listings sells, or with over 10 days of sales already listed on your realm, are never suggested either</span></div>
       <div>Switch factor</div><div><input type="number" step="0.1" id="s-switch" value="${s.switch_bonus}"></div>
       <div>Fishing casts per hour</div><div><input type="number" id="s-casts" value="${s.casts_per_hour || 240}"></div>
+      <div>Fishing skill bonus</div><div><input type="number" id="s-fbonus" value="${s.fishing_skill_bonus || 0}"> <span class="pill">what your pole, gear and lure add to Fishing (Shiny Bauble +25, Nightcrawlers +50, Bright Baubles +75, Aquadynamic Fish Attractor +100). Fewer fish get away when your skill plus this beats the zone's skill</span></div>
       <div>Herb nodes per hour</div><div><input type="number" id="s-hph" value="${s.herb_nodes_per_hour || 40}"> <span class="pill">until ForeverMoneyBridge has 10+ minutes of your herbalism</span></div>
       <div>Ore nodes per hour</div><div><input type="number" id="s-oph" value="${s.ore_nodes_per_hour || 40}"> <span class="pill">until ForeverMoneyBridge has 10+ minutes of your mining</span></div>
       <div>Your time is worth</div><div><input type="number" step="0.5" id="s-tv" value="${s.time_value_gold || ''}" placeholder="auto"> gold an hour <span class="pill">blank = half your best measured farming. Routines that earn less than their time is worth are marked "not worth your time"</span></div>
@@ -647,7 +646,7 @@ function wireView() {
       document.querySelectorAll('.s-prof').forEach((i) => { if (i.value !== '') professions[i.dataset.p] = +i.value; });
       const body = {auto_detect: $('#s-auto').checked, character: $('#s-char').value || null, gold_scope: $('#s-gscope').value, gold: +$('#s-gold').value, level: +$('#s-level').value, realm: $('#s-realm').value, faction: $('#s-faction').value, professions,
         ah_cut: +$('#s-cut').value, market_share: +$('#s-share').value, min_sold_per_day: +$('#s-minspd').value, switch_bonus: +$('#s-switch').value,
-        casts_per_hour: +$('#s-casts').value, kills_per_hour: +$('#s-kph').value, time_value_gold: $('#s-tv').value === '' ? null : +$('#s-tv').value, herb_nodes_per_hour: +$('#s-hph').value, ore_nodes_per_hour: +$('#s-oph').value, own_logs_for_rates: $('#s-ownrates').checked, sale_price_basis: $('#s-basis').value, fishing_pools: $('#s-pools').checked,
+        casts_per_hour: +$('#s-casts').value, fishing_skill_bonus: +$('#s-fbonus').value, kills_per_hour: +$('#s-kph').value, time_value_gold: $('#s-tv').value === '' ? null : +$('#s-tv').value, herb_nodes_per_hour: +$('#s-hph').value, ore_nodes_per_hour: +$('#s-oph').value, own_logs_for_rates: $('#s-ownrates').checked, sale_price_basis: $('#s-basis').value, fishing_pools: $('#s-pools').checked,
         include_unverified_recipes: $('#s-unver').checked,
         alerts: {enabled: $('#s-alerts').checked, min_daily_profit_gold: +$('#s-alertmin').value},
         stale_hours: {realm: +$('#s-stale-r').value, region: +$('#s-stale-g').value}};
@@ -736,9 +735,9 @@ function fishingDetail(o) {
     <div>Your catches here</div><div>${d.casts ? `${d.casts} casts, ${d.caught} caught, ${d.got_away} got away` : (d.caught ? `${d.caught} caught` : 'none logged yet')}${d.forever && !d.own_logs_used ? ' <span class="pill">used for your pace and got-away rate, not drop rates (Settings)</span>' : ''}</div>
     ${(d.pool_loot || []).length ? `<div>Pool loot</div><div>${pct(d.pool_share)} of Forever catches here were pool loot (${d.pool_loot.slice(0, 4).map((f) => esc(f.name)).join(', ')}). ${d.pools_counted ? 'Counted in gold/hour (Settings).' : `Not counted, because pools have to be found first. If you fish every pool you pass: ${money(d.value_with_pools)} per catch${d.gph_with_pools ? `, about ${money(d.gph_with_pools)}/hour before the time spent finding them` : ''}.`}</div>` : ''}
     ${d.wowhead_fished ? `<div>Wowhead Forever</div><div>${num(d.wowhead_fished, 0)} catches in this zone <span class="pill">read by hand ${esc(d.wowhead_checked)}</span> <a href="${esc(d.wowhead_url)}" target="_blank" rel="noopener">source</a></div>` : ''}
-    <div>Zone skill (Classic)</div><div>${d.zone_skill ?? 'unknown'} · you: ${d.your_skill}</div>
+    <div>Zone skill (Classic)</div><div>${d.zone_skill ?? 'unknown'} · you: ${d.your_skill}${d.skill_bonus ? ` <span class="pill">your skill + ${d.skill_bonus} from pole, gear and lure (Settings)</span>` : ' <span class="pill">no pole or lure bonus set (Settings)</span>'}</div>
     <div>Fish kept when hooked</div><div>${pct(d.keep)} <span class="pill">${esc(d.keep_source)}</span></div>
-    <div>Catches per hour</div><div>${num(d.catches_per_hour, 0)} <span class="pill">${esc(d.pace_source === 'setting' ? `${d.casts_per_hour} casts/hour setting` : d.pace_source)}${d.landed_share ? ` · you land ${pct(d.landed_share)} of casts` : ''}</span></div>
+    <div>Catches per hour</div><div>${num(d.catches_per_hour, 0)} <span class="pill">${esc(d.pace_source === 'setting' ? `${d.casts_per_hour} casts/hour setting` : d.pace_source)}</span></div>
     ${has(d.coverage) && d.coverage < 0.9 ? `<div>Classic table</div><div class="needs">explains only ${pct(d.coverage)} of catches here; the rest is unknown</div>` : ''}
     ${!o.doable ? `<div>If you had the skill</div><div>${money(d.gph_if_skilled)}/hour</div>` : ''}
   </div>`;

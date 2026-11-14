@@ -9,10 +9,13 @@ tight: finish the current piece, commit, update this list, and set a reminder th
        the app's purse), and see the project log's open items for the other in-game checks. Checked 2026-11-14:
        not yet possible, the saved file is older than the 1.4.1 install.
 1. [x] **Plan for today** on the main page (the user's priority): `docs/plans/todays-plan.md` (done 2026-11-14)
-2. [ ] **Own Forever loot tables**: per-mob and per-node loot logging in ForeverMoneyBridge, then measured yields
-       replace Classic ones: `docs/plans/forever-data-next.md`, section 1
-3. [ ] **Wowhead Forever reads**, about 5 pages per session, 30-60 s apart: `docs/plans/forever-data-next.md`, section 2
-4. [ ] **Mob farming**: `docs/plans/forever-data-next.md`, section 3
+2. [ ] **TOP PRIORITY: Forever source data for every material** (fixes "some skins not counted", pool loot,
+       mob drops, node yields; the user's top priority for data accuracy, 2026-11-14): `docs/plans/material-coverage.md`.
+       It replaces the old Wowhead-reads item (same slow pace).
+3. [-] ~~Own Forever loot tables from the addon~~: cancelled by the user (2026-11-14): loot tables come from online
+       sources only, never our own logs. ForeverMoneyBridge stays at 1.4.1.
+4. [ ] **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with drop rates from Wowhead Forever
+       ("Dropped by", material-coverage step 4) and the kills-per-hour setting, never your own logged time
 5. [ ] **Forever loot addons** (only if the user installed one through CurseForge) and **GatherLite node
        locations** (ask before downloading the UiMap tables): `docs/plans/forever-data-next.md`, sections 4-5
 6. [ ] **Review** of the 2026-11-13/14 work: `docs/plans/forever-data-next.md`, section 6

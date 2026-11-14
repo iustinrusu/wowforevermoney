@@ -186,10 +186,11 @@ class SpotTests(unittest.TestCase):
         self.assertEqual(coast.profit_unit, int(value))
         self.assertEqual(d['classic_value'], 250)
         self.assertEqual(d['observed_value'], int(0.5 * 400 + 25 / 60 * 100 + 3 / 60 * 50 + 2 / 60 * 300))
-        # catches/hour = 200 casts x 80/100 landed x 60/80 kept here
-        self.assertEqual(d['catches_per_hour'], 120)
-        self.assertEqual(coast.gph, round(value * 120))
-        self.assertEqual(d['keep_source'], 'your got-away rate here')
+        # catches/hour = 200 casts (setting) x 25% kept: skill 225 vs zone skill 205 -> 225 - 205 + 5 = 25 (the game's
+        # roll). Your own log (60 kept of 80) and landed share are never used (user's rule, 2026-11-14)
+        self.assertEqual(d['catches_per_hour'], 50)
+        self.assertEqual(coast.gph, round(value * 50))
+        self.assertIn('your effective skill 225', d['keep_source'])
         self.assertEqual([f['item_id'] for f in d['new_in_forever']], [N], 'the trunk is pool loot, not new')
         self.assertIn('forever_change', coast.flags)
         self.assertNotIn('classic_unconfirmed', coast.flags)
@@ -207,12 +208,12 @@ class SpotTests(unittest.TestCase):
 
     def test_by_default_your_logs_give_pace_not_drop_rates(self):
         # The user's catch log is small, mixes pools and open water and is incomplete: by default it must not
-        # set drop rates. It still gives the got-away rate (about you, not the zone).
+        # set drop rates, nor the got-away rate (always the game's rule with your effective skill).
         opps = spots_by_key(Engine(world(TANARIS_LOG), dict(DEFAULTS)).fishing_spots({}))
         self.assertNotIn('fish:zone:440', opps, 'no Wowhead data and own logs off: no Forever row')
         inland = opps['fish:440:440']
         self.assertIn('classic_unconfirmed', inland.flags)
-        self.assertAlmostEqual(inland.detail['keep'], 0.75, msg='got-away rate still from your log (60 kept of 80)')
+        self.assertAlmostEqual(inland.detail['keep'], 0.25, msg='the game rule, not your log (60 kept of 80)')
 
     def test_pool_loot_is_a_bonus_by_default(self):
         # Floating Wreckage etc. have to be found first: gold/hour counts open water; pool loot is shown apart.
@@ -255,15 +256,22 @@ class SpotTests(unittest.TestCase):
 
     def test_got_away_rate_sources(self):
         opps = spots_by_key(Engine(world(TANARIS_LOG), dict(SETTINGS)).fishing_spots({}))
-        feralas = opps['fish:357:357']                            # unvisited, same Classic zone skill as Tanaris
-        self.assertAlmostEqual(feralas.detail['keep'], 0.75)
-        self.assertIn('zone-skill 205', feralas.detail['keep_source'])
+        feralas = opps['fish:357:357']                            # Classic zone skill 205, like Tanaris
+        self.assertAlmostEqual(feralas.detail['keep'], 0.25)       # 225 - 205 + 5 = 25%
+        self.assertIn("the zone's 205", feralas.detail['keep_source'])
+        self.assertIn('classic_getaway', feralas.flags)
+        # a lure counts: +75 (Bright Baubles) -> effective 300 -> nothing gets away at 205
+        lured = spots_by_key(Engine(world(TANARIS_LOG), dict(SETTINGS, fishing_skill_bonus=75)).fishing_spots({}))
+        self.assertAlmostEqual(lured['fish:357:357'].detail['keep'], 1.0)
+        self.assertEqual(lured['fish:357:357'].detail['your_skill'], 300)
+        self.assertNotIn('classic_getaway', lured['fish:357:357'].flags)
+        self.assertFalse(lured['fish:618:618'].doable, 'effective 300 is still under the 330 Winterspring needs')
         winterspring = opps['fish:618:618']                       # 330 > 225: Classic says nothing bites
         self.assertFalse(winterspring.doable)
         self.assertIsNone(winterspring.gph)
         self.assertEqual(winterspring.needs, 'Fishing 330 (Classic zone skill)')
         self.assertIn('classic_getaway', winterspring.flags)
-        self.assertEqual(winterspring.detail['gph_if_skilled'], int(900 * 200 * 0.8))
+        self.assertEqual(winterspring.detail['gph_if_skilled'], int(900 * 200))     # no landed share
 
     def test_log_is_not_forced_onto_a_spot_that_does_not_explain_it(self):
         # Regression: a Feralas log of mostly pool loot plus a few lake fish was matched to a skill-330 lake,
@@ -280,14 +288,17 @@ class SpotTests(unittest.TestCase):
         self.assertEqual(lake.detail['caught'], 0)
         self.assertEqual(opps['fish:357:357'].detail['caught'], 0)
 
-    def test_forever_only_zone_with_timed_log(self):
+    def test_your_logged_time_never_sets_the_pace(self):
+        # 50 catches in 30 minutes logged = 100 an hour, but time in a zone includes travel and breaks: the
+        # casts-per-hour setting (200) is used instead (user's rule, 2026-11-14)
         activity = {'Riverglades': {'fishing': {'loots': 50, 'seconds': 1800, 'items': {N: 50}}}}
         o = spots_by_key(Engine(world(None, activity), dict(SETTINGS)).fishing_spots({}))['fish:log:Riverglades']
         self.assertIn('forever_only', o.flags)
-        self.assertIn('measured', o.flags)
+        self.assertIn('assumed_rate', o.flags)
+        self.assertNotIn('measured', o.flags)
         self.assertEqual(o.profit_unit, 50)
-        self.assertEqual(o.detail['catches_per_hour'], 100)
-        self.assertEqual(o.gph, 5000)
+        self.assertEqual(o.detail['catches_per_hour'], 200)
+        self.assertEqual(o.gph, 50 * 200)
 
     def test_two_addons_logging_the_same_catches_are_not_added(self):
         activity = {'Tanaris': {'fishing': {'loots': 70, 'seconds': 900, 'items': {B: 40, A: 30}}}}

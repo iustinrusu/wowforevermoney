@@ -63,7 +63,7 @@ CRAFT_SECONDS = 3            # one craft
 VENDOR_TRIP_SECONDS = 120    # go to a vendor and back, once a day
 POST_STACK = 5               # stackable items are posted a few at a time
 TIME_VALUE_SHARE = 0.5       # AH and crafting time is worth half of what your best farming earns an hour
-DEFAULT_TIME_VALUE = 20000   # 2g an hour until you have measured farming
+DEFAULT_TIME_VALUE = 20000   # 2g an hour when no Forever-backed farming spot is known
 DAILY_ROUTINE = 1.0         # "Daily routines" (was "Do these now") need about one sale a day or more; slower = occasional flip
 
 COOLDOWN_MIN_MS = 10 * 60 * 1000   # a recipe cooldown of 10+ minutes limits how many you can make a day
@@ -579,8 +579,9 @@ class Engine:
                     rows.append({'item_id': iid, 'name': self.name(iid), 'count': int(count), 'value': val,
                                  'share': round(int(count) / loots, 3)})
                 rows.sort(key=lambda r: -r['value'] * r['count'])
-                gph = int(total / seconds * 3600) if seconds >= 300 else None
-                flags = ['measured'] if gph else ['not_enough_time']
+                # never a gold/hour: time logged in a zone includes questing, travel and breaks (user, 2026-11-14)
+                gph = None
+                flags = ['your_log']
                 if loots < 30:
                     flags.append('small_sample')
                 out.append(Opportunity(
@@ -600,8 +601,8 @@ class Engine:
             return []
         level = int(self.s.get('level', 1) or 1)
         skill = self.profs.get('Skinning')
-        pace, minutes = skinning.measured_pace((getattr(self.w, 'profile', None) or {}).get('activity'))
-        per_hour = pace or float(self.s.get('kills_per_hour', 60) or 60)
+        # pace is the setting only: your logged skinning time includes questing and travel (user, 2026-11-14)
+        per_hour = float(self.s.get('kills_per_hour', 60) or 60)
         value_of = lambda iid: self.fish_value(iid, best_use)
         out = []
         for sp in skinning.spots(table, value_of, lambda z: self.gd.zones.get(z, f'zone {z}'), skill, level):
@@ -609,8 +610,7 @@ class Engine:
                 continue
             usable = [m for m in sp['mobs'] if m['can_skin'] and m['can_kill']]
             top = (usable or sp['mobs'])[:3]
-            flags = ['wowhead_forever', 'skins_partial', 'skill_classic_rule',
-                     'measured_pace' if pace else 'assumed_kill_rate']
+            flags = ['wowhead_forever', 'skins_partial', 'skill_classic_rule', 'assumed_kill_rate']
             if sp['skins'] < skinning.SOLID_SAMPLE:
                 flags.append('small_sample')
             needs = ''
@@ -636,7 +636,7 @@ class Engine:
                 flags=flags,
                 detail={'zone': sp['zone'], 'zone_id': sp['zone_id'], 'mobs': mobs, 'skins': sp['skins'],
                         'levels': f"{sp['min_level']}-{sp['max_level']}", 'skins_per_hour': round(per_hour, 1),
-                        'pace_source': f'measured ({minutes:.0f} min of your skinning)' if pace else 'your skins-per-hour setting',
+                        'pace_source': 'your skins-per-hour setting',
                         'source': 'Wowhead Forever "Skinned from" counts'}))
         return out
 
@@ -671,13 +671,12 @@ class Engine:
         for kind, prof, label, setting in (('herbalism', 'Herbalism', 'Gather herbs in', 'herb_nodes_per_hour'),
                                            ('mining', 'Mining', 'Mine in', 'ore_nodes_per_hour')):
             skill = self.profs.get(prof)
-            pace, minutes = nodes.measured_pace(activity, kind)
-            per_hour = pace or float(self.s.get(setting, 40) or 40)
+            per_hour = float(self.s.get(setting, 40) or 40)     # the setting only, never your logged time
             for sp in nodes.spots([n for n in node_list if n['kind'] == kind], lambda z: gd.zones.get(z, f'zone {z}'), skill):
                 if sp['value'] <= 0:
                     continue
                 top = [n for n in sp['nodes'] if n['can']][:3] or sp['nodes'][:3]
-                flags = ['classic_yields', 'skill_classic_rule', 'measured_pace' if pace else 'assumed_node_rate']
+                flags = ['classic_yields', 'skill_classic_rule', 'assumed_node_rate']
                 if gamedata.is_instance(gd, sp['zone_id']):
                     flags.append('dungeon')
                 if any(n['rare'] for n in sp['nodes']):
@@ -696,7 +695,7 @@ class Engine:
                     doable=sp['doable'], needs=needs, profession=prof, preferred=prof in self.preferred, flags=flags,
                     detail={'zone': sp['zone'], 'zone_id': sp['zone_id'], 'node_count': sp['node_count'],
                             'nodes_per_hour': round(per_hour, 1),
-                            'pace_source': f'measured ({minutes:.0f} min of your {kind})' if pace else 'your nodes-per-hour setting',
+                            'pace_source': 'your nodes-per-hour setting',
                             'nodes': [{'name': n['name'], 'count': n['count'], 'skill': n['skill'], 'can': n['can'], 'rare': n['rare'],
                                        'value': n['value'], 'classic_loot': n['classic_loot'],
                                        'items': sorted(({'item_id': i, 'name': self.name(i), 'per_node': round(c, 2),
@@ -728,7 +727,9 @@ class Engine:
         cf = getattr(self.w, 'classic_fishing', None)
         obs = fishing.observations(self.w.angler, (getattr(self.w, 'profile', None) or {}).get('activity'))
         fishing.add_wowhead(obs, getattr(self.w, 'forever_fishing', None))
-        skill = int(self.profs.get('Fishing') or 0)
+        # effective skill = your Fishing skill + what your pole, gear and lure add (Settings): the got-away roll uses it
+        bonus = int(self.s.get('fishing_skill_bonus') or 0)
+        skill = int(self.profs.get('Fishing') or 0) + bonus
         seasons = fishing.forever_seasons(cf, getattr(self.w, 'forever_fishing', None)) if cf else {}
         spots = fishing.build_spots(cf, self.gd, seasons=seasons) if cf else {}
         # fish whose season is over (by Forever catches, else the Classic calendar) don't count in Forever data
@@ -840,8 +841,6 @@ class Engine:
 
         keep, keep_src = model.keep(zone, zone_skill, skill, use_zone=forever)
         cph, pace = model.catches_per_hour(keep), model.pace_source
-        if forever and o.timed_catches and o.seconds >= 300:
-            cph, pace = o.timed_catches / o.seconds * 3600, 'measured here'
         doable = keep > 0
         classic_items = {i for s in zone_spots for i in s.shares}
         new_fish = [{'item_id': i, 'name': self.name(i), 'count': c, 'share': round(c / n, 4)}
@@ -891,9 +890,9 @@ class Engine:
             flags.append('seasonal')
         if new_fish or missing:
             flags.append('forever_change')
-        if keep_src.startswith('Classic') and keep < 1:
+        if zone_skill is not None and keep < 1:
             flags.append('classic_getaway')
-        flags.append('measured' if pace == 'measured here' else ('assumed_rate' if pace == 'setting' else 'measured_pace'))
+        flags.append('assumed_rate')
         if spot and spot.dungeon:
             flags.append('dungeon')
         if unknown_containers:
@@ -912,7 +911,8 @@ class Engine:
             detail={'zone': zone, 'zone_id': zid, 'forever': forever,
                     'classic_spot': spot.label(several) if spot else None,
                     'subzones': spot.names if spot else [], 'areas': spot.areas if spot else [],
-                    'zone_skill': zone_skill, 'your_skill': skill, 'keep': round(keep, 3), 'keep_source': keep_src,
+                    'zone_skill': zone_skill, 'your_skill': skill,
+                    'skill_bonus': int(self.s.get('fishing_skill_bonus') or 0), 'keep': round(keep, 3), 'keep_source': keep_src,
                     'landed_share': model.landed_share, 'casts_per_hour': round(model.casts_per_hour),
                     'catches_per_hour': round(cph), 'pace_source': pace,
                     'coverage': round(spot.coverage, 3) if spot else None,
@@ -1035,10 +1035,10 @@ class Engine:
     # ---------- everything ----------
     def run(self) -> dict:
         best_use = self.best_uses()
-        # fishing logs (with time) feed the fishing spots below; other activities get their own measured rows
-        measured = [o for o in self.activity_zones(best_use) if o.kind != 'fishing_zone']
+        # your loot log per zone (no gold/hour); fishing logs feed the fishing spots below
+        logged = [o for o in self.activity_zones(best_use) if o.kind != 'fishing_zone']
         all_opps = (self.crafts() + self.vendor_flips() + self.ah_to_vendor() + self.realm_dips()
-                    + self.gathering(best_use) + measured + self.fishing_spots(best_use)
+                    + self.gathering(best_use) + logged + self.fishing_spots(best_use)
                     + self.skinning_spots(best_use) + self.node_spots(best_use))
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         for o in all_opps:
@@ -1048,11 +1048,12 @@ class Engine:
                 liq = liquidity(self.price(o.item_id), min_spd)
                 o.detail['liquidity'] = liq
                 o.flags.extend(f for f in liq['flags'] if f not in o.flags)
-        # what an hour of your time is worth: half your best measured farming gold/hour (a setting can fix it)
-        best = max((o.gph or 0 for o in measured if 'measured' in o.flags), default=0)
+        # what an hour of your time is worth: half the best farming spot backed by Forever data (rates from Wowhead
+        # Forever counts at the paces in Settings; never your own logged time). A setting can fix it.
+        best = max((o.gph or 0 for o in all_opps if self._hourly_ok(o)), default=0)
         fixed = float(self.s.get('time_value_gold') or 0) * COPPER_PER_GOLD
         self.time_value = int(fixed or (best * TIME_VALUE_SHARE if best else DEFAULT_TIME_VALUE))
-        self.time_value_source = 'your setting' if fixed else ('half your best measured farming' if best else 'default')
+        self.time_value_source = 'your setting' if fixed else ('half the best Forever farming spot' if best else 'default')
         for o in all_opps:
             ef = self.effort(o)
             if ef:
@@ -1142,6 +1143,13 @@ class Engine:
                 break
         return out
 
+    @staticmethod
+    def _hourly_ok(o: Opportunity) -> bool:
+        """A farming row good enough for Top picks: a gold/hour backed by Forever data, something you can do now."""
+        return bool(o.gph and o.doable and not ({'classic_unconfirmed', 'classic_yields'} & set(o.flags))
+                    and (o.kind != 'fishing_spot' or (o.detail.get('confirmed_by') and 'small_sample' not in o.flags))
+                    and (o.kind != 'skin_spot' or 'small_sample' not in o.flags))
+
     def top_picks(self, opps: list[Opportunity], n: int = 15) -> dict:
         bonus = float(self.s.get('switch_bonus', 1.5))
         bad = {'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
@@ -1166,9 +1174,7 @@ class Engine:
         # data from another WoW version can't reach top picks until Forever data confirms it
         # (a fishing spot needs confirming Forever data and 30+ Forever catches: a few lucky trunks in a
         # small sample can make a zone look 3x better than it is)
-        hourly = [o for o in opps if o.gph and o.doable and not ({'classic_unconfirmed', 'classic_yields'} & set(o.flags))
-                  and (o.kind != 'fishing_spot' or (o.detail.get('confirmed_by') and 'small_sample' not in o.flags))
-                  and (o.kind != 'skin_spot' or 'small_sample' not in o.flags)]
+        hourly = [o for o in opps if self._hourly_ok(o)]
         # ranked by Engine.rank: profit x how sure we are x risk x can-do-now x problems x preference
         key = lambda o: o.score
         # sections about later rank by what a pick earns once you have the gold and skill for it
