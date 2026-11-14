@@ -44,6 +44,7 @@ def ah_buy(p: dict | None) -> Quote | None:
 SALE_BASES = ('min_buyout', 'actual_sales')
 ODD_LISTINGS, ODD_LOW, ODD_HIGH = 3, 0.5, 2.0    # few listings outside half..double the recent average: looks off
 WALL = 3.0       # lowest listing over 3x the region's average sale price: nobody pays it, value at actual sales
+SALE_OUTLIER = 3.0   # nothing listed and the region's sale average over 3x its listing average: freak sales
 
 
 def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
@@ -84,6 +85,14 @@ def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
             return None
         if not sale and not p.get('marketValue'):
             flags.append('no_realm_data')
+        listing_avg = max(int(p.get('regionMarketValue') or 0), int(p.get('regionHistorical') or 0))
+        if sale and listing_avg and sale > SALE_OUTLIER * listing_avg:
+            # Sales normally average below listings (median 0.66x, 99% under 1.6x on 2026-11-14). A sale average far
+            # above every listing is a few freak sales on a rarely traded item (Masterwork Target Dummy: 642g sale
+            # average, listed at 11g 25s, which made a 608g "craft"): value it at what it is listed for.
+            sale = 0
+            options = [(v, s) for v, s in options if s != 'average sale price (region, actual sales)']
+            flags.append('sale_price_outlier')
         value, source = options[0] if sale else min(options)
     if sale and sale < 0.7 * value:
         flags.append('sells_lower')       # listed well above what it actually sells for: it may sit unsold

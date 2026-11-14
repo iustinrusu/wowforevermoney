@@ -50,6 +50,20 @@ class PricingTests(unittest.TestCase):
         self.assertEqual(ah_buy({'regionMarketValue': 90}).flags, ('no_realm_data',))
         self.assertIsNone(ah_buy({}))
 
+    def test_freak_sales_are_not_a_price(self):
+        # Masterwork Target Dummy, 2026-11-14 (raw TSM): nothing listed, region sale average 642g 62s from 1.25
+        # sales a day, region listing average 11g 25s -> the app showed a 608g craft profit
+        dummy = {'regionMarketValue': 112550, 'regionHistorical': 112550, 'regionSale': 6426275,
+                 'regionSoldPerDay': 1.25, 'regionSalePercent': 0.5}
+        q = ah_sell(dummy)
+        self.assertEqual(q.value, 112550)
+        self.assertIn('sale_price_outlier', q.flags)
+        # a normal one: sales below listings (the usual case) still use the sale average
+        q = ah_sell({'regionMarketValue': 1000, 'regionSale': 660, 'regionSoldPerDay': 5})
+        self.assertEqual((q.value, 'sale_price_outlier' in q.flags), (660, False))
+        # up to 3x the listing average is kept (a real premium can sell above old listings)
+        self.assertEqual(ah_sell({'regionMarketValue': 1000, 'regionSale': 2900, 'regionSoldPerDay': 5}).value, 2900)
+
     def test_wall_of_overpriced_listings_is_not_a_price(self):
         # Short Staff, 2026-11-14: 10 listings at 10g, sells for 1s 90c -> the app showed a 9g vendor flip
         staff = {'numAuctions': 10, 'minBuyout': 100000, 'marketValue': 286, 'marketValueRecent': 100000,

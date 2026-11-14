@@ -24,6 +24,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-14 Freak sales are not a price (user: "the numbers seem fishy").** Masterwork Target Dummy was the #1 craft
+  at 608g profit each: nothing listed on the realm, so the app sold at TSM's region average sale price, 642g 62s
+  (1.25 sales a day), while its region listing average is 11g 25s. Sales normally average below listings (median
+  0.66x, 99% under 1.6x); 21 items were over 3x. Now, with nothing listed, a sale average over 3x the region listing
+  average (`pricing.SALE_OUTLIER`) is ignored: valued at the lower of the listing averages, flag `sale_price_outlier`
+  (confidence x0.7). The dummy: 11g 25s, 8g 54s profit each, about 2g 13s a day.
 - **2026-11-14 Wowhead Forever pages are the source; Everloot is not a bulk replacement (yet).** One search found
   Everloot (everloot.app, player uploads, data CC BY-SA 4.0, public API): 1,753 public drop rates (3+ installs) from
   9,761 loot windows; they cover 94 of 331 uncovered materials but only 15% of their traded value (none of Dark Rune,
@@ -282,6 +288,8 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-14: TSM's raw region sale value for Masterwork Target Dummy (16023) is `643L3` = 6,426,275c by hand: the
+  642g sale average is TSM's data, not a parsing error.
 - 2026-11-14: Wowhead returned 403 (CloudFront "The request could not be satisfied") on the 77th page of a session
   read at one page per 60 s (about 80 minutes, 15:28), built-in browser. Earlier: 7 pages at 11 s -> 403; 5 at 40 s ok.
 - 2026-11-14: the built-in browser pane blocks requests from a public site to 127.0.0.1 (net::ERR_BLOCKED_BY_CLIENT).
@@ -375,6 +383,9 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Sale averages far above listings (freak sales) no longer price an item when nothing is listed
+  (`sale_price_outlier`); Masterwork Target Dummy craft 608g -> 8g 54s profit each. Tests: 172.
 
 - **2026-11-14** Material coverage, session 2: bulk-source search (Everloot: too small yet) and Wowhead email draft;
   `wfm/wowhead_items.py` + `data/wowhead_forever_items.json` (76 item pages read at one a minute, 403 on the 77th);
