@@ -34,7 +34,11 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
    gathered from nodes (none: Classic yields), fishing (zone counts), container contents, pool contents. Output a
    ranked reading queue (AH value x region sold/day) of Wowhead Forever pages, each with what it fixes.
    Tests: a fake item set -> the right gaps and order.
-2. **Skinning (fixes "some skins not counted").** Read each item's full page (every source tab, not only Skinned
+2. **Skinning (fixes "some skins not counted").** Progress 2026-11-14: 5 more read 40 s apart with no block
+   (4235 Heavy Hide, 8169 Thick Hide, 8171 Rugged Hide, 15417 Devilsaur Leather, 8368 Thick Wolfhide): 12 of 19.
+   Their other tabs (dropped-by, contained-in) are kept in the Wowhead tab's localStorage key `wfm_pages`
+   (built-in browser profile) for step 4: read them out from there instead of reloading the pages. Left: 8167,
+   8154, 7286, 8165, 15412, 15419, 15423. Original brief: Read each item's full page (every source tab, not only Skinned
    from) for the 12 items left: 4235 Heavy Hide, 8169 Thick Hide,
    8171 Rugged Hide, 15417 Devilsaur Leather, 8368 Thick Wolfhide, 8167 Turtle Scale, 8154 Scorpid Scale,
    7286 Black Whelp Scale, 8165 Worn Dragonscale, 15412 Green Dragonscale, 15419 Warbear Leather,

@@ -65,7 +65,7 @@ const FLAGS = {
   no_value: ['bad', 'no known value', 'No AH price, vendor price, recipe or contents known'],
   short_history: ['', 'short history', 'Under a day of our own price snapshots: the trend is first vs latest scan and can swing a lot'],
   slow_sale_rate: ['warn', 'slow to sell', 'Under 10% of listings sell (TSM region sale rate): you may wait a long time to sell'],
-  skins_partial: ['warn', 'some skins not counted', 'Counts leathers and Light/Medium Hide only: heavier hides, scales and special leathers were not read from Wowhead Forever yet, so this is a floor'],
+  skins_partial: ['warn', 'some skins not counted', 'Leathers and hides are counted, but 7 scales and special leathers (Turtle, Scorpid, Black Whelp, Worn and Green Dragonscale; Warbear and Chimera Leather) are not read from Wowhead Forever yet, so mobs that give them are worth a bit more than shown'],
   skill_classic_rule: ['', 'skill: Classic rule', 'Skinning skill per mob level uses the WoW Classic rule (level x 5 above level 20); Forever may differ'],
   assumed_kill_rate: ['', 'skins/hour from Settings', 'Gold per hour uses your skins-per-hour number in Settings (60 by default); your own skinning time is never used, because time in a zone includes questing and travel'],
   cooldown: ['', 'cooldown', 'The recipe has a cooldown in the game data (Transmute: Arcanite 47 hours, Mooncloth 95 hours): per day counts only the crafts it allows'],

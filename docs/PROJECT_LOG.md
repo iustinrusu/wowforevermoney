@@ -320,6 +320,9 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-14** Wowhead Forever skinning: 5 more items read (40 s apart, no 403): 12 of 19. "Some skins not counted"
+  now names the 7 left. Other tabs of those pages kept in the Wowhead tab's localStorage (`wfm_pages`).
+
 - **2026-11-14** Own logged time/pace no longer used for any rate; time value from Forever farming spots; pace labels
   fixed; got-away from effective skill (setting `fishing_skill_bonus`); material-coverage plan (top priority);
   coverage audit on Data health. Tests: 145.
