@@ -1,5 +1,7 @@
 # Plan: skinning spots, mob farming, Investments tab
 
+**Superseded (2026-11-14):** investments done, skinning built (7 of 19 items read), mob farming and the remaining reads are in docs/plans/forever-data-next.md.
+
 Postponed on 2026-11-13 by the usage rule. Nothing runs by itself: a reminder points here. To start, open a
 Claude Code session in this folder and say "Do the plan in docs/plans/skinning-mobs-investments.md".
 

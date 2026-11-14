@@ -9,16 +9,18 @@ Make as much gold as possible in WoW: Forever. The app knows every item, uses TS
 every money-making option: crafting (any profession), vendor flips (vendor→AH, AH→vendor), recipe flips,
 AH snipes, farming, fishing. It monitors continuously, updates itself when TSM syncs, and alerts on changes.
 
-## The user's setup (as of 2026-11-13)
+## The user's setup (as of 2026-11-14)
 
-- Realm: **PvP-Horde**, region Forever-EU, faction Horde.
-- Main: rogue, level 42. Cooking 225, Fishing 225, First Aid 225, Skinning 270, Leatherworking 161,
-  Poisons 210. Two alts with little gold. Gold is low (~1-6g), so affordability matters.
-- Preference: fishing > cooking > first aid. Switch to skinning/LW only if it makes a lot more gold.
-- TSM 4.15 addon + TSM desktop app (syncs AppData.lua about hourly).
+- Realm: **PvP-Horde** (the addon may record the server's internal name "CAMWOW EU5 Realm 4 PvP"), region
+  Forever-EU, faction Horde.
+- Main: rogue, level 42. Skinning 275, Leatherworking 161, Fishing 232, Cooking 225, First Aid 225, Poisons.
+  Two alts with little gold. Gold ~26.8g across the faction (read from Syndicator).
+- Profession thinking (2026-11-14 talk): keep Skinning + Leatherworking for the long run (push LW toward 265 for
+  Devilsaur Gauntlets before most players reach 60); maybe add a gathering/alchemy alt later.
+- TSM addon + TSM desktop app (syncs AppData.lua about hourly).
 - WoW install: `C:\Games\World of Warcraft\_forever_` (product `wowf`, build 1.60.1.x, interface 16001).
-- Addons in use that the app reads: TSM, QuestieDB, SkillUpForever, ForeverAngler, Syndicator,
-  ForeverMoneyBridge (ours). The user updates most addons almost daily.
+- Addons the app reads: TSM + AppHelper, QuestieDB, SkillUpForever, ForeverAngler, Syndicator, ForeverMoneyBridge
+  (ours). Installed but not read yet: GatherLite (Forever node locations). Public addons come from the CurseForge app.
 
 ## Decisions (dated, with the reason)
 
@@ -251,73 +253,34 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   Iron Bound < Mithril Bound.
 - ItemSparse `Flags_0 & 0x4` = openable (has its own loot); `LockID > 0` = needs Lockpicking/key.
 
-## Postponed builds (plan `docs/plans/skinning-mobs-investments.md`; reminder 2026-11-14 00:15)
+## What to do next
 
-Postponed by the usage rule; the plan file has the full brief. Nothing runs by itself. In order:
-1. **Skinning spots:** Wowhead Forever "Skinned from" tabs for leathers, hides and scales; QuestieDB mob
-   zones; gold/hour from a kills_per_hour setting, measured when the addon has data.
-2. **Mob farming:** Wowhead Forever "Dropped by" tabs for cloth, elementals and the best BoE drops; value per
-   kill, plus skinning.
-3. ~~Investments tab~~: done 2026-11-13 (see Decisions).
-
-## Next session plan (plan `docs/plans/review-and-wowhead.md`; reminder 2026-11-14 10:00)
-
-The user is firm that the data must be correct and accurate. In order:
-1. **Review and test today's work adversarially:** `wfm/classicdb.py`, `wfm/fishing.py`, `wfm/valuation.py`,
-   the engine's fishing/valuation/watch code, the loaders in `wfm/world.py`, `app.py` item/inventory, the
-   fishing UI, and addon 1.2.0 (do `GetLootSourceInfo` and the `C_Container.UseContainerItem` hook exist on
-   the Forever client?). Recompute by hand 3 fishing rows and 2 container values from the JSON snapshots
-   and TSM prices, and compare with the app.
-2. **Wowhead Forever, slowly:** zone Fishing tabs for every remaining fishing zone (Forever-only zones
-   included), then the Contains tab for every item in the "Possibly undervalued items" check. One page
-   every 8+ seconds; stop all Wowhead reading on the first 403. Read `window.g_listviews`, skip `classicEra`
-   rows. Every 5th page, screenshot the tab and check a few numbers against what was extracted.
-3. **Verify addon 1.3.0** once the user has /reloaded, fished and opened a trunk: `containers` in
-   SavedVariables, no trunk contents in the fishing activity, and `activity[zone].fishing.sources/pools`
-   (does GetLootSourceInfo give the pool's object id when fishing a pool, or the bobber's?). Then use the
-   measured pool share/search time in the pool bonus instead of "every pool you pass".
-4. Check the gathering list (crafted products are already excluded), then update this log, commit and push.
+The ordered to-do list is **`docs/plans/TODO.md`**; each item links to a plan file with the full brief.
+Older plan files (`skinning-mobs-investments.md`, `review-and-wowhead.md`) are superseded; their open parts
+moved into `forever-data-next.md`.
 
 ## Open items
 
-- **Ordered to-do list: `docs/plans/TODO.md`** (the user will say "start doing the things on the todo list").
-- **Later: `docs/plans/strategy-features.md`** (2026-11-14 talk on professions and phases): profession advisor,
-  levelling planner, vertical integration, server phase tracker, peak-and-fade items, recipe finder, alt planner,
-  raid-week rhythm, demand trends. After todays-plan.md and forever-data-next.md.
-- **Next: `docs/plans/todays-plan.md`** (user priority, 2026-11-14): "Do these now" becomes a smart plan for today
-  (cash in bags, cooldowns, routines with exact instructions, one farming session, one big flip, one goal).
-  Postponed at 82% usage; reminder 2026-11-14 10:00.
-- **Next plan: `docs/plans/forever-data-next.md`** (reminder 2026-11-14 10:00): own per-mob/per-node loot
-  logging in the addon, remaining Wowhead reads, mob farming, Forever loot addons (user installs via CurseForge),
-  GatherLite node locations, review. Forever data sources checked 2026-11-14: Wowhead Forever (best, rate
-  limited), GatherLite (Forever node locations from Wowhead), DungeonMaster (built from Classic data),
-  QuestieTrace (raw events for Questie devs, nothing usable saved), and several CurseForge loot addons.
-- **Wowhead Forever reads left** (blocked by 403 on 2026-11-14): skinning items 4235 Heavy Hide, 8169 Thick Hide,
-  8171 Rugged Hide, 15417 Devilsaur Leather, 8368 Thick Wolfhide, scales 8167/8154/7286/8165, 15412/15419/15423;
-  then the "Dropped by" tabs for mob farming (cloth 2589/2592/4306/4338/14047/14256, elementals 7067-7070, 7075,
-  7077, 7079, 7081, 12803, 12808, 7972, Righteous Orb 12811). Same compact extract (see docs/plans), stop by
-  throwing on a non-Forever page.
-- Read more Wowhead Forever zones (Arathi, Hinterlands, Western Plaguelands, Felwood, Un'Goro, Swamp of
-  Sorrows, Desolace, Thousand Needles, Alterac, Hillsbrad, Wetlands, Moonglade, Winterspring, Eastern
-  Plaguelands, Burning Steppes, Silithus, and Forever-only zones) and containers (Bloated fish, Sealed/Heavy
-  Crate, locked chests) slowly; the undervaluation watch on Data health lists which containers matter.
-- New addon ForeverMoneyBridge 1.2.0 logs container contents (and no longer counts trunk contents as
-  fishing/mob loot): verify after the user opens a trunk and /reloads.
+- The to-do list (`docs/plans/TODO.md`) holds the planned work; below are smaller known gaps.
 - Not valued yet: coins inside containers, disenchanting (the user has an Enchanting alt), quest rewards for
   quest items (e.g. Savage Coast Blue Sailfin), lockpicking boxes beyond their contents.
+- Not modelled: AH deposits and the cost of unsold listings; recipe learn cost is shown, not subtracted; bulk-buy
+  cost uses only the lowest listing; vendors with faction '' are treated as accessible; effort uses estimates.
 - Tips for the remaining top picks (only Frilled Lichen 249399 is done).
-- Verify ForeverMoneyBridge vendor-price and loot recording after the user visits a vendor, loots and
-  /reloads (only the character snapshot is verified so far).
-- Known gaps: vendors with faction '' treated as accessible; AH deposits ignored; bulk-buy cost uses only
-  the lowest listing.
-- Cast pace is the 240 casts/hour setting until ForeverMoneyBridge has 10+ minutes of timed fishing.
-- No JavaScript syntax check in the tests (no Node on this PC): an unescaped apostrophe broke the page once
-  on 2026-11-13. Check the browser console after editing `web/app.js`.
-- AH deposits and the cost of unsold listings aren't modelled; recipe learn cost is shown, not subtracted.
+- Verify in game after the user /reloads: addon 1.4.1 saves gold correctly (1.4.0 saved 0 on logout); vendor-price
+  recording at a vendor; fishing `sources`/`pools` (does GetLootSourceInfo give the pool's object id?).
+- Fishing pace is the 240 casts/hour setting until ForeverMoneyBridge has 10+ minutes of timed fishing.
+- No JavaScript syntax check in the tests (no Node on this PC): check the browser console after editing
+  `web/app.js`; tests/test_web.py catches broken flag labels and names declared twice.
 - Is Javnir Nashak (Green Firework vendor, Durotar) permanent or event-only? Questie gives no hint.
-- Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
+- The user's character name was in tests until 2026-11-14 and is still in the first commit (0b17b50); removing it
+  from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Docs cleanup for new sessions: stale plan sections replaced by a pointer to docs/plans/TODO.md,
+  open items pruned, setup updated, missing Wowhead fishing/container reads added to the plan, new standing rules
+  (plain explanations, CurseForge addons, no real character names on GitHub); character name removed from tests.
 
 - **2026-11-14** Effort model and time value; "Time a day" column; plain-language notes everywhere.
 

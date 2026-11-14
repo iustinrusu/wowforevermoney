@@ -31,7 +31,12 @@ localStorage and read it out once; make the stop check THROW on a non-Forever pa
 Order: skinning items left (4235 Heavy Hide, 8169 Thick Hide, 8171 Rugged Hide, 15417 Devilsaur Leather,
 8368 Thick Wolfhide, 8167, 8154, 7286, 8165, 15412, 15419, 15423), then "Dropped by" for cloth (2589, 2592, 4306,
 4338, 14047, 14256) and elementals (7067-7070, 7075, 7077, 7079, 7081, 12803, 12808, 7972, 12811), then herb and
-ore node object pages ("Contains" tab) for Forever yields. Save to data/wowhead_forever_*.json (tracked).
+ore node object pages ("Contains" tab) for Forever yields, then fishing zone pages (`g_listviews['fishing']`) for
+zones not in data/wowhead_forever_fishing.json (Arathi 45, Hinterlands 47, Western Plaguelands 28, Felwood 361,
+Un'Goro 490, Swamp of Sorrows 8, Desolace 405, Thousand Needles 400, Alterac 36, Hillsbrad 267, Wetlands 11,
+Moonglade 493, Winterspring 618, Eastern Plaguelands 139, Burning Steppes 46, Silithus 1377, Forever-only zones),
+and container pages ("Contains") for the items Data health lists as "contents unknown" (e.g. 13881, 21243,
+8366, 13874, 13875, 6355, 6357). Save to data/wowhead_forever_*.json (tracked), same formats as now.
 
 ## 3. Mob farming tab (after 1 or 2)
 Rows "Kill <mob> in <zone>": value per kill (drops x your value, + skinning for beasts if you skin), kills per hour

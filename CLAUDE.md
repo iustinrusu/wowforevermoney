@@ -34,7 +34,13 @@ memory of the project, not the chat.
   and set a one-time reminder for after the limit resets. The user said this should always be done.
 - **Scheduled tasks are reminders only.** A scheduled task never does the work: it only reminds the user and
   points to the plan file. The user starts the work themselves (user's rule, 2026-11-13).
-- **Privacy:** never send the user's name, email, or character names to outside services. HTTP requests use
+- **Explain everything plainly.** Every number, column and note in the app has a clear explanation in plain
+  language (hover help, "how this is worked out", full-sentence notes); no cryptic few-word labels. UI:
+  readability and usability first, then the WoW theme.
+- **Addons:** public addons are installed by the user through the CurseForge app; our ForeverMoneyBridge comes
+  with the app. Recommend, never download addons yourself.
+- **Privacy:** never send the user's name, email, or character names to outside services (GitHub included: no
+  real character names in tests, docs or commits; use made-up names). HTTP requests use
   the generic User-Agent `WoWForeverMoney/0.1 (personal gold tool)`.
 - **Git:** remote is https://github.com/iustinrusu/wowforevermoney.git (branch `main`). Commit or push
   only when the user asks. Never commit `data/` (caches, price history, logs, settings) except the

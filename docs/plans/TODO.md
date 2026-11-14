@@ -5,6 +5,8 @@ Each item points to a plan file with the full brief. Follow CLAUDE.md's standing
 step, commit and push each finished piece, tick it off here and note it in docs/PROJECT_LOG.md. If usage gets
 tight: finish the current piece, commit, update this list, and set a reminder that runs nothing.
 
+0. [ ] **Quick check, needs the user in game** (/reload once): addon 1.4.1 saves gold (compare with Syndicator in
+       the app's purse), and see the project log's open items for the other in-game checks.
 1. [ ] **Plan for today** on the main page (the user's priority): `docs/plans/todays-plan.md`
 2. [ ] **Own Forever loot tables**: per-mob and per-node loot logging in ForeverMoneyBridge, then measured yields
        replace Classic ones: `docs/plans/forever-data-next.md`, section 1
