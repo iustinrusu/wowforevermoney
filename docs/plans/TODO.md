@@ -13,7 +13,7 @@ tight: finish the current piece, commit, update this list, and set a reminder th
 5. [ ] **Forever loot addons** (only if the user installed one through CurseForge) and **GatherLite node
        locations** (ask before downloading the UiMap tables): `docs/plans/forever-data-next.md`, sections 4-5
 6. [ ] **Review** of the 2026-11-13/14 work: `docs/plans/forever-data-next.md`, section 6
-7. [ ] **Strategy features**, items 1-9 (profession advisor and levelling planner first):
+7. [ ] **Strategy features**, items 1-10 (profession advisor, levelling planner and niches first):
        `docs/plans/strategy-features.md`
 
 Done earlier: investments tab, skinning spots (7 of 19 items read), cooldowns, ranking, effort, Market tab, and
