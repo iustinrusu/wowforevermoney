@@ -280,6 +280,7 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Open items
 
+- **Ordered to-do list: `docs/plans/TODO.md`** (the user will say "start doing the things on the todo list").
 - **Later: `docs/plans/strategy-features.md`** (2026-11-14 talk on professions and phases): profession advisor,
   levelling planner, vertical integration, server phase tracker, peak-and-fade items, recipe finder, alt planner,
   raid-week rhythm, demand trends. After todays-plan.md and forever-data-next.md.
