@@ -24,6 +24,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-14 Never skip a check on an assumption (user: "we need to check everything in order to be extremely
+  accurate").** Claude skipped Cured Heavy Hide in the reading order as "almost certainly crafted"; the user had it
+  read (it was crafted-only, but that is now confirmed by its page, not guessed). Read every item in the queue's order;
+  a reason to deprioritize one goes to the user first.
 - **2026-11-14 Profit is worked out at the lower of the lowest listing and the usual sale price (user's decision;
   supersedes the 2026-11-13 "sale price = current lowest buyout").** Setting `sale_price_basis` = `lower` (new
   default; `min_buyout` and `actual_sales` remain). Why: 119 of 703 crafts and flips made a profit only at the lowest
@@ -399,8 +403,8 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
-- **2026-11-14** Wowhead after the back-off: 5 more item pages (Powerful Mojo, Living Essence, Heavy Thorium Ore,
-  Turtle Meat, Arthas' Tears) at 2 minutes apart, no block; 81 item pages in all.
+- **2026-11-14** Wowhead after the back-off: 6 more item pages (Powerful Mojo, Living Essence, Heavy Thorium Ore,
+  Turtle Meat, Arthas' Tears, Cured Heavy Hide) at 2+ minutes apart, no block; 82 item pages in all.
 
 - **2026-11-14** Tests no longer overwrite the cached Classic node loot (data/classicdb/nodes.json): node spots
   return early when no herb or ore node is known.
