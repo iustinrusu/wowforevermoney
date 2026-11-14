@@ -1,0 +1,67 @@
+"""Forever source coverage (wfm/coverage.py): which looted items lack Forever data, and the reading order."""
+import unittest
+from types import SimpleNamespace
+
+from wfm import coverage
+from wfm.gamedata import Item, Recipe
+
+
+def item(iid, name, cls=7, sub=0):
+    return Item(id=iid, name=name, quality=1, item_level=30, req_level=0, sell_price=1, buy_price=0, stack=20,
+                class_id=cls, subclass_id=sub, bonding=0)
+
+
+HIDE, CLOTH, ORE, BAR, THREAD, FISH, SQUID, GLOVES, ELIXIR = range(1, 10)
+ITEMS = {HIDE: item(HIDE, 'Heavy Hide', sub=6), CLOTH: item(CLOTH, 'Silk Cloth', sub=5),
+         ORE: item(ORE, 'Mithril Ore', sub=7), BAR: item(BAR, 'Mithril Bar', sub=7),
+         THREAD: item(THREAD, 'Fine Thread', sub=5), FISH: item(FISH, 'Raw Yellowtail', sub=8),
+         SQUID: item(SQUID, 'Raw Winter Squid', cls=0, sub=5), GLOVES: item(GLOVES, 'Fancy Gloves', cls=4, sub=2),
+         ELIXIR: item(ELIXIR, 'Elixir', cls=0, sub=2)}
+PRICES = {i: {'regionSoldPerDay': 10, 'regionSale': 100 * i} for i in ITEMS}
+QUESTIE = {CLOTH: {'npcDrops': [1]}, ORE: {'objectDrops': [9]}, THREAD: {'vendors': [5]}, GLOVES: {'npcDrops': [2]}}
+RECIPES = [Recipe(spell_id=1, name='Smelt Mithril', profession='Mining', skill_line=186, product_id=BAR,
+                  product_count=1, reagents=[(ORE, 1)], trivial_low=1, trivial_high=2, min_rank=1),
+           Recipe(spell_id=2, name='Squid', profession='Cooking', skill_line=185, product_id=ELIXIR,
+                  product_count=1, reagents=[(SQUID, 1)], trivial_low=1, trivial_high=2, min_rank=1)]
+
+
+class CoverageTests(unittest.TestCase):
+    def run_audit(self, skinning=None, fishing=None, pages=()):
+        return coverage.audit(ITEMS, PRICES, QUESTIE, RECIPES, skinning, fishing, set(pages), fish_hint={FISH, SQUID})
+
+    def test_what_counts_as_looted_and_how(self):
+        rows = {r['item_id']: r for r in self.run_audit()['queue']}
+        self.assertEqual(rows[HIDE]['kinds'], ['skinning'])
+        self.assertEqual(rows[CLOTH]['kinds'], ['drops'])
+        self.assertEqual(rows[ORE]['kinds'], ['mining'])             # its node is the object
+        self.assertEqual(rows[FISH]['kinds'], ['fishing'])           # meat, but in a fishing table
+        self.assertEqual(rows[SQUID]['kinds'], ['fishing'])          # "food" in the data, but fished
+        self.assertEqual(rows[GLOVES]['kinds'], ['drops'])
+        for crafted_or_bought in (BAR, THREAD, ELIXIR):
+            self.assertNotIn(crafted_or_bought, rows)
+
+    def test_materials_first_then_by_traded_value(self):
+        order = [r['item_id'] for r in self.run_audit()['queue']]
+        self.assertEqual(order[-1], GLOVES, 'gear after every material')
+        self.assertEqual(order[:2], [SQUID, FISH])                   # 700c and 600c x 10 a day
+
+    def test_read_data_counts_as_covered(self):
+        r = self.run_audit(skinning={'items': {str(HIDE): {}}}, fishing={'Tanaris': {'items': {FISH: 3}}},
+                           pages=[CLOTH])
+        missing = {x['item_id'] for x in r['queue']}
+        self.assertFalse({HIDE, FISH, CLOTH} & missing)
+        self.assertEqual((r['materials'], r['materials_covered']), (5, 3))
+        self.assertEqual(r['by_kind']['skinning'], [1, 1])
+
+    def test_rarely_traded_items_are_left_out(self):
+        prices = {**PRICES, HIDE: {'regionSoldPerDay': 0.2, 'regionSale': 500}}
+        r = coverage.audit(ITEMS, prices, QUESTIE, RECIPES, None, None, fish_hint={FISH, SQUID})
+        self.assertNotIn(HIDE, [x['item_id'] for x in r['queue']])
+
+    def test_describe_is_a_plain_sentence(self):
+        row = self.run_audit()['queue'][0]
+        self.assertIn('no Forever data on how it is fished', coverage.describe(row))
+
+
+if __name__ == '__main__':
+    unittest.main()

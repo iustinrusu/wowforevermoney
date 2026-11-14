@@ -87,6 +87,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/alerts.py` | change events and Windows toasts |
 | `wfm/tooltips.py` | slow cached Wowhead tooltip fetch for items missing from the game tables |
 | `wfm/audit.py` | cross-source accuracy checks (shown on the Data health tab) |
+| `wfm/coverage.py` | which traded materials/items lack Forever source data; Wowhead reading queue |
 | `wfm/app.py` | HTTP server, JSON API, SSE live updates, watcher loop |
 | `web/` | the page (index.html, app.js, style.css) |
 | `addon/ForeverMoneyBridge/` | our WoW addon; copied into AddOns when the app starts |

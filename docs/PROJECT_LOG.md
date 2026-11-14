@@ -45,6 +45,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   Wowhead's per-zone fishing counts (Tanaris 3.6% of catches, Stranglethorn 12.9%); pool objects' own contents
   (Floating Debris materials) were never read. Fix: docs/plans/material-coverage.md step 3.
 - **2026-11-14 Every material needs Forever source data: top priority (user).** docs/plans/material-coverage.md.
+  Coverage audit (`wfm/coverage.py`, Data health): a traded (region sold/day >= 1) looted item = Questie (Forever)
+  drop/object sources, or a trade good of a gathered kind, or anything in a fishing table (Classic tables only hint
+  what to look for: raw fish is meat 7/8 or food 0/5 in the data); crafted (recipe product) or vendor-bought ones
+  are left out. Reading unit = one Wowhead Forever item page (all its source tabs). Start: 17 of 351 materials.
 - **2026-11-14 Your plan for today (user: "Do these now should be our main attraction... think like a pro").**
   `wfm/plan.py` (pure functions, tests/test_plan.py) builds `result['plan']` (in `/api/state`), shown as numbered
   cards at the top of Top picks. Sources: cash-in from what the character you play holds (`Engine.my_holdings`:
@@ -317,8 +321,8 @@ moved into `forever-data-next.md`.
 ## Change log
 
 - **2026-11-14** Own logged time/pace no longer used for any rate; time value from Forever farming spots; pace labels
-  fixed; got-away from effective skill (setting `fishing_skill_bonus`); material-coverage plan (top priority).
-  Tests: 140.
+  fixed; got-away from effective skill (setting `fishing_skill_bonus`); material-coverage plan (top priority);
+  coverage audit on Data health. Tests: 145.
 
 - **2026-11-14** Plan for today on Top picks (`wfm/plan.py`, `Engine.my_holdings`, plan cards with medals, chips and
   "How this plan is made"); "Do these now" renamed "Daily routines"; narrow screens no longer scroll sideways

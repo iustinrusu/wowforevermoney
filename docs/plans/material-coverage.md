@@ -22,14 +22,20 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   Done 2026-11-14 (setting `fishing_skill_bonus`); follow-ups in step 6.
 
 ## Steps (in order)
-1. **Coverage audit (code, no Wowhead).** New `wfm/coverage.py` + a Data health check "Forever source coverage":
+1. **Done 2026-11-14: coverage audit** (`wfm/coverage.py`, Data health "Forever source data for every material",
+   tests/test_coverage.py). First result: 17 of 351 traded materials and 20 of 2,437 traded looted items fully
+   covered; dropped by mobs 0 of 1,333, objects 0 of 1,536, herbs 0 of 39, veins 0 of 23, skinned 5 of 48, fished
+   37 of 65. Queue top: Dark Rune, Runecloth, Arcane Crystal, Righteous Orb, Mageweave, Silk. To make a read count,
+   save full item pages to a tracked `data/wowhead_forever_items.json` and pass their ids as `pages`. Original
+   brief: **Coverage audit (code, no Wowhead).** New `wfm/coverage.py` + a Data health check "Forever source coverage":
    every material (trade goods: cloth, leather, hides, scales, herbs, ore, bars, stone, gems, elemental, meat,
    fish; raw fish/meat of class 0/5 that recipes use; openable containers) with a TSM price, and for each which
    Forever source data we have: skinned from (`data/wowhead_forever_skinning.json`), dropped by (none yet),
    gathered from nodes (none: Classic yields), fishing (zone counts), container contents, pool contents. Output a
    ranked reading queue (AH value x region sold/day) of Wowhead Forever pages, each with what it fixes.
    Tests: a fake item set -> the right gaps and order.
-2. **Skinning (fixes "some skins not counted").** Read the 12 items left: 4235 Heavy Hide, 8169 Thick Hide,
+2. **Skinning (fixes "some skins not counted").** Read each item's full page (every source tab, not only Skinned
+   from) for the 12 items left: 4235 Heavy Hide, 8169 Thick Hide,
    8171 Rugged Hide, 15417 Devilsaur Leather, 8368 Thick Wolfhide, 8167 Turtle Scale, 8154 Scorpid Scale,
    7286 Black Whelp Scale, 8165 Worn Dragonscale, 15412 Green Dragonscale, 15419 Warbear Leather,
    15423 Chimera Leather, plus any skinnable material the audit lists. Then set `skins_partial` per spot only when
