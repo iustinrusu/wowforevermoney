@@ -33,6 +33,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   local `data/settings.json` (not in git). The GitHub repo is private: friends need collaborator access or a ZIP.
   Guide: `docs/GETTING_STARTED.md`.
 - **2026-11-13 Usage rule (user):** when usage is tight, finish the current piece, commit, and postpone the rest.
+- **2026-11-14 Effort and time value (user).** `Engine.effort`: estimated minutes a day for crafts and vendor
+  flips (10 s per post, reposts = 1/sale rate up to 5, stackables posted 5 at a time, 15 s per AH ingredient,
+  3 s per craft, 2 min vendor trip). Time value = half the best measured farming gold/hour (4.7g/h for the
+  user) or `time_value_gold`. Ranking subtracts the time's worth; daily profit <= it -> `not_worth_time`
+  (problem flag, out of Top picks): 434 rows on 2026-11-14. Notes are explained in full sentences under every
+  table and in each row's details; cryptic labels rewritten.
 - **2026-11-14 Daily routines vs occasional flips (user: "is Devilsaur really the top pick?").** Pattern: Devilsaur
   Gauntlets was #1 in Do these now: 69g profit at the 75g lowest listing x 0.26 sales a day (region 1.28/day x 20%)
   = 17.7g/day, even at confidence 0.36; it actually sells for 36g. Now Do these now needs >= 1 expected sale a day
@@ -305,6 +311,8 @@ The user is firm that the data must be correct and accurate. In order:
 - Later: skinning spots and mob farming (Forever data first; Classic creature/skinning loot only as fallback).
 
 ## Change log
+
+- **2026-11-14** Effort model and time value; "Time a day" column; plain-language notes everywhere.
 
 - **2026-11-14** Occasional big flips section; clearer per-day columns with hover help. Tests: 121.
 

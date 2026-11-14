@@ -101,6 +101,9 @@ details.how div { margin-top: 6px; max-width: 900px; line-height: 1.5; }
 .purse-gold { font-size: 15px; font-weight: 700; }
 .purse-sub { font-size: 11px; color: var(--muted); }
 .qmark { display: inline-block; width: 13px; height: 13px; line-height: 13px; border-radius: 50%; background: #2b3140; color: var(--muted); font-size: 9px; text-align: center; vertical-align: 1px; }
+details.legend ul, ul.notes { margin: 6px 0 0; padding-left: 0; list-style: none; }
+details.legend li, ul.notes li { margin: 3px 0; color: var(--text); font-size: 12.5px; }
+ul.notes { margin: 6px 0 10px; }
 @media (max-width: 700px) { .tier { grid-template-columns: 1fr 60px; } .tier .bar, .tier .pill.num { display: none; } }
 @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; } main { padding: 10px; } }
 

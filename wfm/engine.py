@@ -48,7 +48,7 @@ def confidence(flags) -> float:
 # Ranking (Engine.rank). Score = expected profit x how sure we are x risk x can-do-now x problems x preference.
 HOURLY_KINDS = ('fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot')
 ONE_OFF_KINDS = ('realm_dip', 'ah_to_vendor')
-PROBLEM_FLAGS = {'hard_to_sell', 'slow_seller', 'no_sales_data', 'unverified_recipe', 'above_region', 'black_market',
+PROBLEM_FLAGS = {'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'unverified_recipe', 'above_region', 'black_market',
                  'event_vendor', 'classic_unconfirmed'}
 PROBLEM_FACTOR = 0.2        # a flagged problem sinks a row below every clean one of similar profit
 SKILL_GAP_FACTOR = 0.5      # your profession, but more skill needed
@@ -56,6 +56,14 @@ OTHER_PROFESSION_FACTOR = 0.25   # a profession you don't have
 UNAFFORDABLE_SHARE = 0.1    # what more gold would add counts 10%: what you can afford now ranks first
 RISK_WEIGHT = 0.05          # risking 20x the profit (if it doesn't sell) halves the score
 PREFERRED_BONUS = 1.1
+# Effort: estimated seconds of your play time (shown in the app as estimates)
+POST_SECONDS = 10            # post one auction (or one stack)
+BUY_SECONDS = 15             # buy one ingredient type on the AH
+CRAFT_SECONDS = 3            # one craft
+VENDOR_TRIP_SECONDS = 120    # go to a vendor and back, once a day
+POST_STACK = 5               # stackable items are posted a few at a time
+TIME_VALUE_SHARE = 0.5       # AH and crafting time is worth half of what your best farming earns an hour
+DEFAULT_TIME_VALUE = 20000   # 2g an hour until you have measured farming
 DAILY_ROUTINE = 1.0         # "Do these now" needs about one sale a day or more; slower = occasional flip
 
 COOLDOWN_MIN_MS = 10 * 60 * 1000   # a recipe cooldown of 10+ minutes limits how many you can make a day
@@ -106,6 +114,8 @@ class Engine:
         self.sale_basis = settings.get('sale_price_basis', 'min_buyout')   # see pricing.ah_sell
         self.share = float(settings.get('market_share', 0.2))
         self.gold = float(settings.get('gold', 0)) * COPPER_PER_GOLD
+        self.time_value = DEFAULT_TIME_VALUE
+        self.time_value_source = 'default'
         self.profs = {k: int(v) for k, v in (settings.get('professions') or {}).items()}
         self.preferred = list(settings.get('preferred') or [])
         self.faction = settings.get('faction', 'H')
@@ -960,6 +970,32 @@ class Engine:
         out.sort(key=lambda u: (self.WATCH_ORDER[u['issue']], -u['value']))
         return out
 
+    def effort(self, o: Opportunity) -> dict | None:
+        """Estimated minutes of play a day for a daily routine (craft or vendor flip), and what that time earns."""
+        if o.kind not in ('craft', 'vendor_flip') or o.units_day <= 0:
+            return None
+        units = o.units_day
+        item = self.gd.items.get(o.item_id)
+        stack = item.stack if item else 1
+        liq = o.detail.get('liquidity') or {}
+        rate = liq.get('sale_rate') or 0.5
+        relist = min(5.0, 1 / max(0.2, rate))                     # listings per sale, counting the ones that expire
+        to_vendor = o.detail.get('sell_channel') == 'vendor'
+        sold = units * (o.detail.get('product_count') or 1) if o.kind == 'craft' else units
+        posts = 0.0 if to_vendor else math.ceil(sold / (POST_STACK if stack > 1 else 1)) * relist
+        seconds = posts * POST_SECONDS + (5 if to_vendor else 0)
+        if o.kind == 'craft':
+            mats = o.detail.get('mats') or []
+            seconds += units * CRAFT_SECONDS + BUY_SECONDS * sum(1 for m in mats if m.get('source') != 'vendor')
+            if any(m.get('source') == 'vendor' for m in mats):
+                seconds += VENDOR_TRIP_SECONDS
+        else:
+            seconds += VENDOR_TRIP_SECONDS
+        minutes = seconds / 60
+        return {'minutes': round(minutes, 1), 'per_hour': int(o.daily / (minutes / 60)) if minutes else None,
+                'time_value': self.time_value, 'cost': int(minutes / 60 * self.time_value),
+                'posts': round(posts, 1)}
+
     def rank(self, o: Opportunity, later: bool = False) -> tuple[float, dict]:
         """Ranking score and its parts (shown in the row's details).
 
@@ -977,6 +1013,10 @@ class Engine:
             else:
                 base = o.daily + UNAFFORDABLE_SHARE * (potential - o.daily)
                 basis = 'profit per day' + (' (+ 10% of what more gold would add)' if potential > o.daily else '')
+                ef = o.detail.get('effort')
+                if ef:
+                    base -= ef['cost']           # your time isn't free: minus what it's worth
+                    basis += f", minus {ef['minutes']:g} min of your time"
         item = self.gd.items.get(o.item_id)
         salvage = vendor_sell(item) * (o.detail.get('product_count') or 1)
         downside = max(0, o.cost_unit - salvage) if o.kind not in HOURLY_KINDS else 0
@@ -1007,6 +1047,17 @@ class Engine:
                 liq = liquidity(self.price(o.item_id), min_spd)
                 o.detail['liquidity'] = liq
                 o.flags.extend(f for f in liq['flags'] if f not in o.flags)
+        # what an hour of your time is worth: half your best measured farming gold/hour (a setting can fix it)
+        best = max((o.gph or 0 for o in measured if 'measured' in o.flags), default=0)
+        fixed = float(self.s.get('time_value_gold') or 0) * COPPER_PER_GOLD
+        self.time_value = int(fixed or (best * TIME_VALUE_SHARE if best else DEFAULT_TIME_VALUE))
+        self.time_value_source = 'your setting' if fixed else ('half your best measured farming' if best else 'default')
+        for o in all_opps:
+            ef = self.effort(o)
+            if ef:
+                o.detail['effort'] = ef
+                if o.daily > 0 and o.daily <= ef['cost'] and 'not_worth_time' not in o.flags:
+                    o.flags.append('not_worth_time')
         for o in all_opps:
             o.detail['confidence'] = confidence(o.flags)
             o.score, o.detail['rank'] = self.rank(o)
@@ -1017,6 +1068,7 @@ class Engine:
                 per = o.detail.get('product_count') or 1
                 o.detail['profit_at_avg_sale'] = int(int(sale * (1 - self.cut)) * per - o.cost_unit)
         return {'opportunities': all_opps, 'best_use': best_use, 'top': self.top_picks(all_opps),
+                'time_value': self.time_value, 'time_value_source': self.time_value_source,
                 'undervalued': self.undervaluation_watch()}
 
     @staticmethod
@@ -1047,7 +1099,7 @@ class Engine:
 
     def top_picks(self, opps: list[Opportunity], n: int = 15) -> dict:
         bonus = float(self.s.get('switch_bonus', 1.5))
-        bad = {'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
+        bad = {'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
                'event_vendor'}
 
         def clean(o, allow_unaffordable=False):

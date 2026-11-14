@@ -19,7 +19,7 @@ const daysText = (d) => `${num(d, d < 10 ? 1 : 0)} ${Math.abs(d - 1) < 0.05 ? 'd
 const ago = (ts) => { if (!ts) return 'never'; const s = Date.now() / 1000 - ts; if (s < 90) return `${Math.round(s)}s ago`; if (s < 5400) return `${Math.round(s / 60)} min ago`; if (s < 172800) return `${(s / 3600).toFixed(1)} h ago`; return `${(s / 86400).toFixed(1)} days ago`; };
 const KIND = {farm_zone: 'Farming spot', craft: 'Craft', vendor_flip: 'Vendor → AH', ah_to_vendor: 'AH → vendor', realm_dip: 'Cheap relist', gather: 'Farm', fishing_zone: 'Fishing spot', fishing_spot: 'Fishing spot'};
 const FLAGS = {
-  none_listed: ['warn', 'none listed now', 'No listings on your realm right now; price is the market average'],
+  none_listed: ['warn', 'nothing listed now', 'No listings on your realm right now; price is the market average'],
   no_realm_data: ['warn', 'region price only', 'No realm data; using the region average'],
   sells_lower: ['warn', 'sells for less', 'Listed well above what it actually sells for (region average sale price): at the lowest buyout it may not sell. Settings can value it at actual sales instead'],
   no_sales_data: ['bad', 'no sales data', 'TSM has no recorded sales for this item'],
@@ -30,15 +30,15 @@ const FLAGS = {
   crowded: ['warn', 'crowded', 'Your realm already has over 3 days of the whole region\'s sales listed: expect undercutting and waiting. Ranked lower'],
   cant_afford: ['bad', "can't afford", 'Costs more than the gold you have set'],
   unverified_recipe: ['bad', 'unverified recipe', 'Not in SkillUpForever\'s list of obtainable recipes'],
-  skill_estimated: ['', 'skill ~', 'Exact skill requirement unknown; estimated'],
+  skill_estimated: ['', 'skill level estimated', 'Exact skill requirement unknown; estimated'],
   sell_to_vendor: ['good', 'vendor sale', 'Selling to a vendor beats the AH'],
-  mat_not_listed: ['warn', 'mat not listed', 'An ingredient has no listings right now'],
-  limited_mat: ['warn', 'limited mat', 'An ingredient comes from a limited-stock vendor'],
+  mat_not_listed: ['warn', 'an ingredient isn\'t listed', 'An ingredient has no listings right now'],
+  limited_mat: ['warn', 'ingredient in limited stock', 'An ingredient comes from a limited-stock vendor'],
   limited_stock: ['warn', 'limited stock', 'Vendor has limited stock that restocks over time'],
   other_profession: ['', 'other profession', 'You don\'t have this profession'],
-  snapshot: ['warn', 'snapshot', 'Based on one listing at the last scan; check in game'],
-  often_below_vendor: ['good', 'often', 'Usually listed below vendor price'],
-  risky: ['bad', 'risky', 'Speculative: depends on prices recovering'],
+  snapshot: ['warn', 'one listing, last scan', 'Based on one listing at the last scan; check in game'],
+  often_below_vendor: ['good', 'often below vendor price', 'Usually listed below vendor price'],
+  risky: ['bad', 'speculative', 'Speculative: depends on prices recovering'],
   small_sample: ['warn', 'small sample', 'Not many catches/loots logged here yet'],
   vendor_price_unconfirmed: ['', 'vendor price from game files', 'Base price from the game files; open the vendor once with ForeverMoneyBridge to confirm the real price'],
   listed_far_above_sales: ['warn', 'listings far above sales', 'Every listing on your realm is over 3x what it actually sells for across the region (a wall of wishful prices): valued at the region average sale price instead of the lowest listing'],
@@ -76,6 +76,7 @@ const FLAGS = {
   assumed_node_rate: ['warn', 'assumed nodes/hour', 'No timed gathering logs yet (ForeverMoneyBridge); uses your nodes-per-hour setting'],
   yield_unknown: ['warn', 'some yields unknown', 'A node here is not in the Classic tables (new in Forever?): counted as one of its herb or ore'],
   rare_nodes_extra: ['', 'rare node extra', 'Black Lotus spawns here but is rare (few of its spawn points are active at once): listed, not counted in the average'],
+  not_worth_time: ['bad', 'not worth your time', 'Earns less a day than the time it takes is worth (half of what your best farming earns an hour; Settings can set your own value). Kept out of Top picks'],
   ah_price_doubtful: ['warn', 'AH price doubtful', 'Listed with no recorded sales or far above the region: counted at its sale price instead'],
 };
 const rankCell = (r) => `<td class="rk">${r <= 3 ? `<span class="medal m${r}" title="${['', 'Gold', 'Silver', 'Bronze'][r]}: #${r}">${r}</span>` : `<span class="rank">${r}</span>`}</td>`;
@@ -118,19 +119,22 @@ $('#purse').onclick = () => { TAB = 'bags'; localStorage.setItem('tab', TAB); re
 function oppTable(rows, opts = {}) {
   if (!rows.length) return `<div class="empty">${esc(opts.empty || 'Nothing here right now.')}</div>`;
   const id = opts.id || 't' + Math.random().toString(36).slice(2, 7);
-  const cols = (opts.rank === false ? [] : ['rank']).concat(opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'cooldown', 'flags'])
-    .filter((c) => c !== 'cooldown' || rows.some((o) => (o.detail || {}).cooldown_hours));   // only where a row has one
+  const cols = (opts.rank === false ? [] : ['rank']).concat(opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'effort', 'sells', 'cooldown', 'flags'])
+    .filter((c) => c !== 'cooldown' || rows.some((o) => (o.detail || {}).cooldown_hours))    // only where a row has one
+    .filter((c) => c !== 'effort' || rows.some((o) => (o.detail || {}).effort));
   const ranks = opts.ranks || new Map(rows.map((o, i) => [o.key, i + 1]));
-  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Sales a day (you)', daily: 'Profit a day', profit_avg: 'At average sale', every: 'One sale every', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', sells: 'Sells (region)', cooldown: 'Cooldown', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
+  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Sales a day (you)', daily: 'Profit a day', profit_avg: 'At average sale', every: 'One sale every', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', sells: 'Sells (region)', cooldown: 'Cooldown', effort: 'Time a day', flags: 'Notes', profession: 'Profession', kind: 'Type'}, ...(opts.heads || {})};
   const st = sortState[id];
   const sortVal = (o) => st.k === 'rank' ? -ranks.get(o.key) : (st.k === 'sells' ? ((o.detail || {}).liquidity || {}).sold_per_day : (st.k === 'cooldown' ? (o.detail || {}).cooldown_hours : o[st.k]));
   if (st) rows = [...rows].sort((a, b) => ((sortVal(a) ?? -1e18) < (sortVal(b) ?? -1e18) ? -1 : 1) * (st.dir));
-  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells', 'cooldown', 'profit_avg', 'every']);
+  const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells', 'cooldown', 'profit_avg', 'every', 'effort']);
   const HT = {units_day: 'How many you can expect to sell (or make) a day: what the whole region buys a day x your share (Settings, 20%), capped by your gold, vendor stock and ingredients. Under 1 means less than one a day.',
     daily: 'Profit each x sales a day: what this earns on an average day if you keep doing it.',
     profit_unit: 'Profit on one, after the AH cut, at the current lowest listing.',
     profit_avg: "Profit on one if it sells at the region's average sale price instead of the lowest listing.",
-    every: 'How long one sale takes on average at your share of the region\'s sales.', ...(opts.headTips || {})};
+    every: 'How long one sale takes on average at your share of the region\'s sales.',
+    effort: 'Estimated minutes of play a day: posting auctions (and reposting the ones that expire), buying ingredients, crafting, one vendor trip. Below it: what that time earns per hour.',
+    flags: 'Warnings and facts about this row. Hover one, or read the list under the table.', ...(opts.headTips || {})};
   const head = cols.map((c) => c === 'rank' ? `<th data-k="rank" class="rk" title="${esc(RANK_TIP)}">#</th>` : `<th data-k="${c}" class="${numeric.has(c) ? 'num' : ''}"${HT[c] ? ` title="${esc(HT[c])}"` : ''}>${H[c] || c}${HT[c] ? ' <span class="qmark">?</span>' : ''}</th>`).join('');
   const body = rows.map((o) => {
     const cells = cols.map((c) => {
@@ -143,6 +147,7 @@ function oppTable(rows, opts = {}) {
       if (c === 'cooldown') { const dd = o.detail || {}, h = dd.cooldown_hours; return h ? `<td class="num" title="${esc(dd.cooldown_group ? 'Shared cooldown: ' + dd.cooldown_group : 'Recipe cooldown from the game data')}">${h >= 1 ? num(h, 0) + ' h' : num(h * 60, 0) + ' min'}${dd.cooldown_group ? ' 🔗' : ''}<div class="pill">max ${num(24 / h, h > 12 ? 2 : 0)}/day</div></td>` : '<td class="num pill">–</td>'; }
       if (c === 'flags') return `<td>${flagHtml(o.flags)}</td>`;
       if (c === 'units_day') return `<td class="num">${o.units_day >= 1 || !o.units_day ? num(o.units_day) : `1 every ${daysText(1 / o.units_day)}`}</td>`;
+      if (c === 'effort') { const ef = (o.detail || {}).effort; return ef ? `<td class="num" title="About ${ef.minutes} minutes of play a day; earns ${moneyText(ef.per_hour)} per hour of your time">~${num(ef.minutes, ef.minutes < 10 ? 1 : 0)} min<div class="pill">${esc(moneyText(ef.per_hour))}/h</div></td>` : '<td class="num pill">–</td>'; }
       if (c === 'every') return `<td class="num">${o.units_day > 0 ? (o.units_day >= 1 ? `${num(o.units_day, 1)} a day` : daysText(1 / o.units_day)) : '–'}</td>`;
       if (c === 'profit_avg') { const v = (o.detail || {}).profit_at_avg_sale; return `<td class="num">${v === undefined ? '<span class="pill">–</span>' : money(v)}</td>`; }
       if (c === 'sells') { const l = (o.detail || {}).liquidity; return l ? `<td class="num" title="${esc(l.why || 'sells well')}">${num(l.sold_per_day, 0)}/day<div class="pill">${l.sale_rate === null || l.sale_rate === undefined ? '' : (l.sale_rate * 100).toFixed(0) + '% sell · '}${l.listed} listed</div></td>` : '<td class="num pill">–</td>'; }
@@ -154,7 +159,9 @@ function oppTable(rows, opts = {}) {
   }).join('');
   const exp = opts.export !== false ? `<button class="btn" data-export="${id}">Copy item list for TSM</button>` : '';
   setTimeout(() => wireTable(id, rows, {...opts, ranks}), 0);
-  const inner = `<div class="tablewrap"><table id="${id}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div><div class="controls" style="margin-top:6px">${exp}<span class="pill">${rows.length} rows</span></div>`;
+  const used = [...new Set(rows.flatMap((o) => o.flags || []))].filter((f) => FLAGS[f]);
+  const legend = used.length ? `<details class="how legend"><summary>What the notes in this table mean</summary><ul>${used.map((f) => `<li><span class="flag ${FLAGS[f][0]}">${esc(FLAGS[f][1])}</span> ${esc(FLAGS[f][2])}</li>`).join('')}</ul></details>` : '';
+  const inner = `<div class="tablewrap"><table id="${id}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div><div class="controls" style="margin-top:6px">${exp}<span class="pill">${rows.length} rows</span></div>${legend}`;
   return opts.inner ? inner : `<div id="wrap-${id}">${inner}</div>`;
 }
 function wireTable(id, rows, opts) {
@@ -369,7 +376,7 @@ const VIEWS = {
       <div class="controls"><select id="cp"><option value="">All professions</option>${[...new Set(profs)].map((p) => `<option ${p === sel ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
       <label class="chk"><input type="checkbox" id="cd" ${doable ? 'checked' : ''}> only what I can craft now</label>
       <label class="chk" title="Hides items that barely sell: under 1 a day in the whole region, under 1 in 10 listings selling, or over 10 days of sales already listed on your realm"><input type="checkbox" class="sells-only" ${sellsOnly ? 'checked' : ''}> hide items that barely sell</label></div>
-      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'sells', 'cooldown', 'flags']})}</div>`;
+      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'effort', 'sells', 'cooldown', 'flags']})}</div>`;
   },
   async flips() {
     const sellsOnly = sessionStorage.getItem('sellsOnly') !== '0', hide = sellsOnly ? '&hide=hard_to_sell,no_sales_data' : '';
@@ -528,6 +535,7 @@ const VIEWS = {
       <div>Fishing casts per hour</div><div><input type="number" id="s-casts" value="${s.casts_per_hour || 240}"></div>
       <div>Herb nodes per hour</div><div><input type="number" id="s-hph" value="${s.herb_nodes_per_hour || 40}"> <span class="pill">until ForeverMoneyBridge has 10+ minutes of your herbalism</span></div>
       <div>Ore nodes per hour</div><div><input type="number" id="s-oph" value="${s.ore_nodes_per_hour || 40}"> <span class="pill">until ForeverMoneyBridge has 10+ minutes of your mining</span></div>
+      <div>Your time is worth</div><div><input type="number" step="0.5" id="s-tv" value="${s.time_value_gold || ''}" placeholder="auto"> gold an hour <span class="pill">blank = half your best measured farming. Routines that earn less than their time is worth are marked "not worth your time"</span></div>
       <div>Skins per hour</div><div><input type="number" id="s-kph" value="${s.kills_per_hour || 60}"> <span class="pill">mobs killed and skinned per hour, until ForeverMoneyBridge has 10+ minutes of your skinning</span></div>
       <div>AH sale price</div><div><select id="s-basis"><option value="min_buyout" ${s.sale_price_basis !== 'actual_sales' ? 'selected' : ''}>current lowest buyout (what you'd list at)</option><option value="actual_sales" ${s.sale_price_basis === 'actual_sales' ? 'selected' : ''}>what items actually sell for (more conservative)</option></select> <span class="pill">nothing listed: the average sale price either way</span></div>
       <div>Fishing drop rates</div><div><label class="chk"><input type="checkbox" id="s-ownrates" ${s.own_logs_for_rates ? 'checked' : ''}> also use my own catch logs</label> <span class="pill">off: Wowhead Forever's big samples only; your logs still give your pace and got-away rate</span></div>
@@ -574,7 +582,7 @@ function wireView() {
       document.querySelectorAll('.s-prof').forEach((i) => { if (i.value !== '') professions[i.dataset.p] = +i.value; });
       const body = {auto_detect: $('#s-auto').checked, character: $('#s-char').value || null, gold_scope: $('#s-gscope').value, gold: +$('#s-gold').value, level: +$('#s-level').value, realm: $('#s-realm').value, faction: $('#s-faction').value, professions,
         ah_cut: +$('#s-cut').value, market_share: +$('#s-share').value, min_sold_per_day: +$('#s-minspd').value, switch_bonus: +$('#s-switch').value,
-        casts_per_hour: +$('#s-casts').value, kills_per_hour: +$('#s-kph').value, herb_nodes_per_hour: +$('#s-hph').value, ore_nodes_per_hour: +$('#s-oph').value, own_logs_for_rates: $('#s-ownrates').checked, sale_price_basis: $('#s-basis').value, fishing_pools: $('#s-pools').checked,
+        casts_per_hour: +$('#s-casts').value, kills_per_hour: +$('#s-kph').value, time_value_gold: $('#s-tv').value === '' ? null : +$('#s-tv').value, herb_nodes_per_hour: +$('#s-hph').value, ore_nodes_per_hour: +$('#s-oph').value, own_logs_for_rates: $('#s-ownrates').checked, sale_price_basis: $('#s-basis').value, fishing_pools: $('#s-pools').checked,
         include_unverified_recipes: $('#s-unver').checked,
         alerts: {enabled: $('#s-alerts').checked, min_daily_profit_gold: +$('#s-alertmin').value},
         stale_hours: {realm: +$('#s-stale-r').value, region: +$('#s-stale-g').value}};
@@ -592,10 +600,13 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#drawer
 
 function oppDetail(o) {
   const d = o.detail || {};
-  let html = `<h3>${esc(o.title)} <small>${esc(KIND[o.kind] || o.kind)}</small></h3><div>${flagHtml(o.flags)}</div>
+  const notes = (o.flags || []).filter((f) => FLAGS[f]);
+  let html = `<h3>${esc(o.title)} <small>${esc(KIND[o.kind] || o.kind)}</small></h3>${notes.length ? `<ul class="notes">${notes.map((f) => `<li><span class="flag ${FLAGS[f][0]}">${esc(FLAGS[f][1])}</span> ${esc(FLAGS[f][2])}</li>`).join('')}</ul>` : ''}
     <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
     <div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
     ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>`;
+  const ef = d.effort;
+  if (ef) html += `<h3>Your time</h3><div class="kv"><div>About</div><div>${num(ef.minutes, 1)} minutes a day (${num(ef.posts, 0)} auction posts incl. reposts, ingredients, crafting, a vendor trip: estimates)</div><div>Earns</div><div>${money(ef.per_hour)} per hour of your time</div><div>Your time is worth</div><div>${money(ef.time_value)} an hour <span class="pill">half your best measured farming; change it in Settings</span></div></div>`;
   const rk = d.rank;
   if (rk) {
     const f = (v) => `×${(+v).toFixed(2)}`;

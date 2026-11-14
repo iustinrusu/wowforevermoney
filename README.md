@@ -170,6 +170,11 @@ The **Data health** tab shows every source's age and version, plus the accuracy 
   what you can afford now comes first. The number stays with the row when you sort by another column; each row's
   details show the breakdown. Investments rank by how cheap the item is vs its TSM long-term average x how well
   it sells x risk.
+- **Your time counts.** Each daily routine gets an estimated play time a day (posting auctions and reposting the
+  ones that expire, buying ingredients, crafting, one vendor trip). That time is charged at what an hour of your
+  time is worth: half your best measured farming gold per hour (or your own value in Settings). Routines that
+  earn less than their time is worth are marked "not worth your time" and left out of Top picks. The "Time a
+  day" column shows the minutes and what they earn per hour.
 - **Does it actually sell?** Before suggesting anything you'd sell on the AH, the app checks three TSM numbers:
   how many sell per day in the whole Forever EU region, what share of listings sell, and how many are already
   listed on your realm (as days of the region's sales). **Barely sells** (never suggested; hidden by default on
