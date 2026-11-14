@@ -10,7 +10,7 @@ import re
 import time
 from dataclasses import asdict, dataclass, field
 
-from . import fishing, gamedata, nodes, plan, pricing, skinning, valuation, wowhead_items
+from . import anomalies, fishing, gamedata, nodes, plan, pricing, skinning, valuation, wowhead_items
 from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
@@ -28,7 +28,7 @@ EVENT_WORDS = ('holiday', 'festival', 'darkmoon', 'fireworks vendor', 'lunar', '
 DARKMOON_ZONES = {12, 215}       # Elwynn Forest + Mulgore: where the Darkmoon Faire alternates
 # How sure we are of an opportunity's numbers, from its flags (1 = no doubts). Used to rank picks, not to change
 # the numbers shown: a pick with doubtful prices ranks below an equally good one with solid prices.
-DOUBT = {'listed_far_above_sales': 0.8, 'sale_price_outlier': 0.7, 'slow_to_sell': 0.7, 'crowded': 0.7, 'sells_lower': 0.6, 'price_looks_off': 0.6, 'none_listed': 0.8, 'mat_not_listed': 0.8, 'small_sample': 0.8,
+DOUBT = {'price_check': 0.7, 'price_check_fails': 0.4, 'listed_far_above_sales': 0.8, 'sale_price_outlier': 0.7, 'slow_to_sell': 0.7, 'crowded': 0.7, 'sells_lower': 0.6, 'price_looks_off': 0.6, 'none_listed': 0.8, 'mat_not_listed': 0.8, 'small_sample': 0.8,
          'limited_mat': 0.9, 'limited_stock': 0.9, 'seasonal': 0.9, 'vendor_price_unconfirmed': 0.95,
          'skill_estimated': 0.95, 'assumed_rate': 0.95, 'assumed_kill_rate': 0.9, 'skins_partial': 0.95, 'classic_yields': 0.85, 'dungeon': 0.6, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
 
@@ -505,12 +505,18 @@ class Engine:
             req, _ = self.required_skill(r)
             have = self.profs.get(r.profession)
             can = have is not None and have >= req
+            # how many crafts a day the product's market takes at your share (and its cooldown allows)
+            crafts = sold_per_day(self.price(r.product_id)) * self.share / max(r.product_count, 1)
+            per_cooldown = cooldown_per_day(r)
+            if per_cooldown is not None:
+                crafts = min(crafts, per_cooldown)
             for mid, cnt in r.reagents:
                 if self.vendor_price(mid):
                     continue   # vendor mats aren't "your" materials
                 val = (revenue - (sum(costs.values()) - costs[mid])) / cnt
                 entry = {'value': int(val), 'recipe': r.name, 'product': self.name(r.product_id),
-                         'profession': r.profession, 'doable': can, 'skill': req}
+                         'profession': r.profession, 'doable': can, 'skill': req,
+                         'units_per_day': round(crafts * cnt, 2)}
                 cur = best.get(mid)
                 if cur is None:
                     cur = best[mid] = dict(entry, doable_value=None, doable_recipe=None, doable_profession=None)
@@ -518,12 +524,7 @@ class Engine:
                     cur.update(entry)
                 if can and (cur['doable_value'] is None or val > cur['doable_value']):
                     cur['doable_value'], cur['doable_recipe'], cur['doable_profession'] = int(val), r.name, r.profession
-                    # how many units of this material a day the product's market can absorb at your share
-                    crafts = sold_per_day(self.price(r.product_id)) * self.share / max(r.product_count, 1)
-                    per_cooldown = cooldown_per_day(r)
-                    if per_cooldown is not None:
-                        crafts = min(crafts, per_cooldown)          # a cooldown limits how much it can use
-                    cur['doable_units_per_day'] = round(crafts * cnt, 1)
+                    cur['doable_units_per_day'] = round(crafts * cnt, 2)   # what the product's market absorbs
         return best
 
     def gathering(self, best_use: dict[int, dict]) -> list[Opportunity]:
@@ -1218,6 +1219,8 @@ class Engine:
                 o.detail['effort'] = ef
                 if o.daily > 0 and o.daily <= ef['cost'] and 'not_worth_time' not in o.flags:
                     o.flags.append('not_worth_time')
+        # price checks: a second opinion at typical prices flags rows that rest on unusual prices (anomalies.py)
+        checks = anomalies.run(self, all_opps, best_use)
         for o in all_opps:
             o.detail['confidence'] = confidence(o.flags)
             o.score, o.detail['rank'] = self.rank(o)
@@ -1232,7 +1235,7 @@ class Engine:
         return {'opportunities': all_opps, 'best_use': best_use, 'top': top,
                 'plan': plan.build(all_opps, top, self.my_holdings(self.valuer(best_use)), self.time_value,
                                    self.share, self.cut, int(self.gold)),
-                'time_value': self.time_value, 'time_value_source': self.time_value_source,
+                'time_value': self.time_value, 'time_value_source': self.time_value_source, 'anomalies': checks,
                 'undervalued': self.undervaluation_watch()}
 
     def add_upside(self, o: Opportunity) -> None:
@@ -1328,7 +1331,7 @@ class Engine:
 
     def top_picks(self, opps: list[Opportunity], n: int = 15) -> dict:
         bonus = float(self.s.get('switch_bonus', 1.5))
-        bad = {'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
+        bad = {'price_check_fails', 'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
                'event_vendor'}
 
         def clean(o, allow_unaffordable=False):

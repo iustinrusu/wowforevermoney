@@ -232,7 +232,10 @@ if __name__ == '__main__':
     st = Settings()
     w = World(GamePaths(find_wow_dir(st.snapshot().get('wow_dir'))), st, log=lambda m: None)
     w.load_all()
-    for r in run(w, Engine(w, st.snapshot())):
+    from . import anomalies
+    from .profile import apply
+    eng = Engine(w, apply(st.snapshot(), w.profile)[0])
+    for r in run(w, eng) + [anomalies.audit_check(Engine(w, apply(st.snapshot(), w.profile)[0]).run())]:
         print(f"[{r['status'].upper():4}] {r['name']}: {r['detail']}")
         for ex in r['examples'][:5]:
             print(f'         - {ex}')

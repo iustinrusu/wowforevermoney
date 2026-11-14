@@ -46,7 +46,8 @@ TYPE_LABEL = {'cash_ah': 'Cash in', 'cash_open': 'Cash in', 'cash_vendor': 'Cash
               'routine': 'Daily routine', 'snipe': 'Snipe', 'farm': 'Farming', 'big_flip': 'Big flip',
               'goal': 'Long-term goal'}
 BAD_FLAGS = {'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe',
-             'above_region', 'black_market', 'event_vendor', 'classic_unconfirmed', 'classic_yields'}
+             'above_region', 'black_market', 'event_vendor', 'classic_unconfirmed', 'classic_yields',
+             'price_check_fails'}
 
 
 def gold(c: float | None) -> str:

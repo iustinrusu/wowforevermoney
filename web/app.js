@@ -41,6 +41,8 @@ const FLAGS = {
   risky: ['bad', 'speculative', 'Speculative: depends on prices recovering'],
   small_sample: ['warn', 'small sample', 'Not many catches/loots logged here yet'],
   vendor_price_unconfirmed: ['', 'vendor price from game files', 'Base price from the game files; open the vendor once with ForeverMoneyBridge to confirm the real price'],
+  price_check_fails: ['bad', 'only pays at odd prices', 'Second opinion: at typical prices (the median of the realm and region listing averages and the usual sale price) this loses money. It only pays at today\'s unusual prices, so it is kept out of Top picks and the plan. The details show the numbers'],
+  price_check: ['warn', 'check the price', 'Second opinion: at typical prices (the median of the realm and region listing averages and the usual sale price) this makes under a third of the profit shown. Check the prices in game before acting; the details show the numbers'],
   sale_price_outlier: ['warn', 'odd sale prices', 'Nothing is listed on your realm, and the region average sale price is over 3x what it is listed for across the region: a few sales at odd prices on a rarely traded item. Valued at the region listing average instead'],
   listed_far_above_sales: ['warn', 'listings far above sales', 'Every listing on your realm is over 3x what it actually sells for across the region (a wall of wishful prices): valued at the region average sale price instead of the lowest listing'],
   price_looks_off: ['warn', 'price looks off', "Only a few listings, far from the realm's recent average: valued at the recent average until more listings confirm the new price"],
@@ -683,7 +685,7 @@ function oppDetail(o) {
   let html = `<h3>${esc(o.title)} <small>${esc(KIND[o.kind] || o.kind)}</small></h3>${notes.length ? `<ul class="notes">${notes.map((f) => `<li><span class="flag ${FLAGS[f][0]}">${esc(FLAGS[f][1])}</span> ${esc(FLAGS[f][2])}</li>`).join('')}</ul>` : ''}
     <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot', 'mob_spot'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
     <div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
-    ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>`;
+    ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>${d.price_check ? `<div class="hint">⚠ Second opinion: ${esc(d.price_check.text)}</div>` : ''}`;
   const ef = d.effort;
   if (ef) html += `<h3>Your time</h3><div class="kv"><div>About</div><div>${num(ef.minutes, 1)} minutes a day (${num(ef.posts, 0)} auction posts incl. reposts, ingredients, crafting, a vendor trip: estimates)</div><div>Earns</div><div>${money(ef.per_hour)} per hour of your time</div><div>Your time is worth</div><div>${money(ef.time_value)} an hour <span class="pill">half your best measured farming; change it in Settings</span></div></div>`;
   const rk = d.rank;

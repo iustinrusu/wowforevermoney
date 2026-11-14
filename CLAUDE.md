@@ -58,6 +58,7 @@ Python 3.13: `%LOCALAPPDATA%\Programs\Python\Python313\python.exe` (only depende
 python run.py --no-browser --port 8765
 python -m unittest discover -s tests -t .
 python -m wfm.audit
+python -m wfm.anomalies
 python -m wfm.classicdb --update
 ```
 
@@ -91,6 +92,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/alerts.py` | change events and Windows toasts |
 | `wfm/tooltips.py` | slow cached Wowhead tooltip fetch for items missing from the game tables |
 | `wfm/audit.py` | cross-source accuracy checks (shown on the Data health tab) |
+| `wfm/anomalies.py` | price checks every run: second opinion at typical prices, crafted worth, TSM data monitor; `python -m wfm.anomalies` |
 | `wfm/coverage.py` | which traded materials/items lack Forever source data; Wowhead reading queue |
 | `wfm/app.py` | HTTP server, JSON API, SSE live updates, watcher loop |
 | `web/` | the page (index.html, app.js, style.css) |

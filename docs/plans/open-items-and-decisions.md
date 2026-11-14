@@ -42,6 +42,9 @@ order: `docs/plans/material-coverage.md`, Progress section).
       GatherLite's node locations also need map tables downloaded (Claude asks with file name and size first).
 - [ ] C5. The user's character name in the first commit (0b17b50): remove it from GitHub's history (needs a force
       push, which rewrites history) or leave it?
+- [ ] C7. "Worth if crafted": count it only for as many as the product's market (your share) and cooldown take a day,
+      the rest at the sale price? (asked 2026-11-14, not answered yet; the price checks list the 8 ingredients
+      affected, e.g. Thorium Bar 21g 65s via Transmute: Arcanite for 1 every 2 days, sells for 17s.)
 - [ ] C6. Settings assumptions: kills per hour (60), herb and ore nodes per hour (40 each), casts per hour, market
       share (20%): set to match the user's own play?
 

@@ -24,6 +24,17 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-14 Price checks every run (user: "we need a system to detect these errors").** `wfm/anomalies.py`:
+  (1) a second opinion on every craft and vendor flip: profit with each price capped at what is typical (the median
+  of the realm and region listing averages and the usual sale price; an ingredient from 1-3 listings at under half
+  its typical price costed at typical); loses money -> `price_check_fails` (out of Top picks and the plan,
+  confidence x0.4), under a third -> `price_check` (x0.7); the row's details explain it. A first version also costed
+  every ingredient at typical and flagged 61 rows, most of them real cheap ingredients with plenty listed: only
+  optimism is corrected now. (2) Crafted worth over 5x the sale price while the market takes under one a day.
+  (3) Data monitor: freak sale averages, walls, lone listings. Data health entry "Price checks (second opinion)",
+  alerts for new findings on Top picks or the plan, `python -m wfm.anomalies` for the full report. First run on the
+  user's data: 6 rows only pay at odd prices, 8 make under a third, 8 ingredients' crafted worth holds for under one
+  a day.
 - **2026-11-14 A product that doesn't sell adds nothing to its ingredients (user: "ironweb spider silk price is
   wrong").** Ironweb Spider Silk showed "worth 18g 11s if crafted" (vs about 30s on the AH): `best_uses` took the
   Delicate Arcanite Converter at its 71g 71c region sale price, but the region sells 0 a day (15 listed, 0% sell).
@@ -421,6 +432,9 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Price checks (`wfm/anomalies.py`): second opinion on crafts and flips, crafted-worth check, TSM data
+  monitor, Data health entry, alerts, report command. Tests: 189.
 
 - **2026-11-14** Ingredients' "worth if crafted" ignores products that do not sell (Ironweb Spider Silk 18g 11s ->
   29s 25c). Tests: 180.

@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import audit
+from . import anomalies, audit
 from . import investments as investments_mod
 from . import market as market_mod
 from . import profile as profile_mod
@@ -78,8 +78,12 @@ class App:
             result['by_key'] = {o.key: o for o in result['opportunities']}
             # Only market/data changes produce "what changed" events; changing your settings shouldn't spam alerts.
             events = diff_runs(self.result, result, settings, self.name) if reason.startswith('data changed') else []
+            # what you see: Top picks and the plan; a new price-check finding there becomes an alert
+            shown = {k for keys in (result.get('top') or {}).values() for k in keys} | \
+                {a.get('key') for a in ((result.get('plan') or {}).get('actions') or [])}
+            events += anomalies.new_events((self.result or {}).get('anomalies'), result.get('anomalies') or {}, shown)
             self.result, self.generated_at = result, int(time.time())
-            self.audit = audit.run(self.world, Engine(self.world, settings))
+            self.audit = audit.run(self.world, Engine(self.world, settings)) + [anomalies.audit_check(result)]
             self._write_item_checks(result)
             self.tips = self._load_tips()
         log(f'Recomputed ({reason}) in {time.time() - t:.1f}s: {len(result["opportunities"])} opportunities')
