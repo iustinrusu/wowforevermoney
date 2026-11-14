@@ -398,6 +398,9 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-14** Tests no longer overwrite the cached Classic node loot (data/classicdb/nodes.json): node spots
+  return early when no herb or ore node is known.
+
 - **2026-11-14** Sale price basis "lower of the lowest listing and the usual sale price" (default, set as the user's
   setting), "up to" line in the tables, Settings option explained. Tests: 175.
 

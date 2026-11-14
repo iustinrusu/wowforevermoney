@@ -724,6 +724,8 @@ class Engine:
             for o in qi.get('objectDrops') or []:
                 if nodes.node_kind((q.objects.get(o) or {}).get('name', ''), herb_names):
                     main.setdefault(o, iid)
+        if not main:
+            return []         # no herb or ore nodes known (and never rebuild the node cache for an empty list)
         loot = nodes.load_or_build(set(main)) or {}
         forever = wowhead_items.object_yields(getattr(self.w, 'forever_pages', None) or {})
         value_of = lambda iid: self.fish_value(iid, best_use)
