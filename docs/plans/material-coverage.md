@@ -113,7 +113,8 @@ and 1b find no bulk source, read the top 100 at one page a minute** (step 3).
    6357).
 6. **Got-away follow-ups.** Gear checked 2026-11-14 from Forever tooltips (Wowhead's tooltip service): 14 of 15
    bonuses match (all lures, poles, hat, boots); Darkwood Fishing Pole has no Forever tooltip (Classic +15, labelled);
-   Aquadynamic Fish Attractor lasts 5 min, the other lures 10 (`fishing.LURE_MINUTES`). Left: lure cost per hour.
+   Aquadynamic Fish Attractor lasts 5 min, the other lures 10 (`fishing.LURE_MINUTES`). Lure cost per hour done
+   2026-11-14 (`Engine.fishing_lure`, `fishing.lure_pays`): a spot uses your best lure only where it pays.
    Earlier: partly done 2026-11-14: `Engine.fishing_bonus` = best pole + best lure + fishing hat and
    boots found in bags, bank and equipped (`fishing.FISHING_GEAR`, Classic values, an id counts only if Forever's
    name matches); a number in Settings overrides. Left: confirm each value from its Forever tooltip (the tooltip

@@ -222,6 +222,26 @@ class FishingBonusFromYourThings(unittest.TestCase):
         self.assertEqual(bonus, 75 + 20 + 5)       # Bright Baubles beats Shiny Bauble; Big Iron beats Strong
         self.assertEqual(parts, ['Bright Baubles +75', 'Big Iron Fishing Pole +20', 'Lucky Fishing Hat +5'])
 
+    def test_best_lure_and_when_it_pays(self):
+        from wfm.fishing import best_lure, lure_pays
+        self.assertEqual(best_lure({6529, 6532, 6365}, self.items(6529, 6532, 6365)), (6532, 75))   # not the pole
+        self.assertIsNone(best_lure({6365}, self.items(6365)))
+        # 1s 50c a catch; the lure lifts catches from 120 to 200 an hour: +80 x 150c = 120s, vs 6 lures at 25s = 150s
+        self.assertFalse(lure_pays(150, 120, 200, 15000))
+        self.assertTrue(lure_pays(150, 120, 200, 6 * 1500))      # 6 lures at 15s = 90s < 120s: worth it
+        self.assertFalse(lure_pays(150, 200, 200, 0))            # nothing gets away already: no lure, even free
+
+    def test_engine_lure_cost_per_hour(self):
+        w = make_world({6532: {'numAuctions': 4, 'minBuyout': 2400, 'marketValue': 2500}})
+        w.gamedata.items.update(self.items(6532, 6366))
+        w.syndicator = {'Kel-Realm': {'name': 'Kel', 'mail': {}, 'auctions': [], 'equipped': {6366: 1}}}
+        w.inventory = {'Kel-Realm': {6532: 3}}
+        w.profile = {'active': 'Kel'}
+        lure = Engine(w, dict(SETTINGS)).fishing_lure()
+        # Bright Baubles: 10 minutes each -> 6 an hour at the 24s lowest listing = 1g 44s an hour
+        self.assertEqual((lure['name'], lure['bonus'], lure['cost_per_hour']), ('Bright Baubles', 75, 6 * 2400))
+        self.assertIsNone(Engine(w, dict(SETTINGS, fishing_skill_bonus=40)).fishing_lure())   # typed bonus: unknown
+
     def test_a_value_not_confirmed_in_forever_says_so(self):
         from wfm.fishing import skill_bonus
         bonus, parts = skill_bonus({6366, 6530}, self.items(6366, 6530))

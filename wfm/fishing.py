@@ -264,8 +264,23 @@ FISHING_GEAR = {
     19972: ('Lucky Fishing Hat', 'head', 5), 19969: ("Nat Pagle's Extreme Anglin' Boots", 'feet', 5),
 }
 FOREVER_CONFIRMED = {6529, 6530, 6811, 6532, 7307, 6533, 6256, 12225, 6365, 6367, 19022, 19970, 19972, 19969}
-# how long one lure lasts (Forever tooltips, 2026-11-14): for the lure cost per hour, not counted yet
+# how long one lure lasts (Forever tooltips, 2026-11-14): lures used an hour = 60 / minutes
 LURE_MINUTES = {6529: 10, 6530: 10, 6811: 10, 6532: 10, 7307: 10, 6533: 5}
+
+
+def best_lure(have: set[int], items: dict) -> tuple[int, int] | None:
+    """(item id, bonus) of the strongest lure among `have` whose Forever name matches, or None."""
+    lures = [(g[2], iid) for iid in have if (g := FISHING_GEAR.get(iid)) and g[1] == 'lure'
+             and items.get(iid) is not None and items[iid].name == g[0]]
+    if not lures:
+        return None
+    bonus, iid = max(lures)
+    return iid, bonus
+
+
+def lure_pays(value_per_catch: float, catches_without: float, catches_with: float, cost_per_hour: float) -> bool:
+    """Use the lure only where the extra fish it keeps are worth more than the lures it burns in an hour."""
+    return catches_with > catches_without and value_per_catch * (catches_with - catches_without) > cost_per_hour
 
 
 def skill_bonus(have: set[int], items: dict) -> tuple[int, list[str]]:

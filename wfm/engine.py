@@ -826,6 +826,27 @@ class Engine:
         bonus, parts = fishing.skill_bonus(have, self.gd.items)
         return bonus, ('from your things: ' + ', '.join(parts) + ' (values from Forever tooltips)') if parts else             'nothing in your bags, bank or gear raises Fishing'
 
+    def fishing_lure(self) -> dict | None:
+        """The best lure the character you play has (bags, bank), what it adds and what it costs an hour (lures used
+        an hour x the cheapest price, vendor or AH). None when the bonus is typed in Settings or you have no lure."""
+        if self.s.get('fishing_skill_bonus') not in (None, ''):
+            return None
+        syn = getattr(self.w, 'syndicator', None) or {}
+        key = plan.character_key(syn, (getattr(self.w, 'profile', None) or {}).get('active') or '')
+        if not key:
+            return None
+        have = set((getattr(self.w, 'inventory', None) or {}).get(key) or {}) | set(syn[key].get('equipped') or {})
+        best = fishing.best_lure(have, self.gd.items)
+        if not best:
+            return None
+        iid, bonus = best
+        minutes = fishing.LURE_MINUTES.get(iid, 10)
+        q = self.cheapest(iid)
+        each = q.value if q else 0
+        return {'item_id': iid, 'name': self.name(iid), 'bonus': bonus, 'minutes': minutes, 'per_hour': 60 / minutes,
+                'each': each, 'cost_per_hour': int(round(each * 60 / minutes)),
+                'price_source': q.source if q else 'no known price'}
+
     def fish_value(self, iid: int, best_use: dict[int, dict]) -> int:
         """What one looted item is worth: the best of selling, crafting and opening it (see valuation.py)."""
         return self.valuer(best_use).worth(iid)
@@ -843,6 +864,10 @@ class Engine:
         # effective skill = your Fishing skill + what your pole, gear and lure add: the got-away roll uses it
         bonus, bonus_from = self.fishing_bonus()
         skill = int(self.profs.get('Fishing') or 0) + bonus
+        # the lure is a choice per spot (used only where it pays: see _fishing_row), so it starts out of the skill
+        self._lure = self.fishing_lure()
+        if self._lure:
+            skill -= self._lure['bonus']
         seasons = fishing.forever_seasons(cf, getattr(self.w, 'forever_fishing', None)) if cf else {}
         spots = fishing.build_spots(cf, self.gd, seasons=seasons) if cf else {}
         # fish whose season is over (by Forever catches, else the Classic calendar) don't count in Forever data
@@ -953,6 +978,16 @@ class Engine:
         unknown_containers = [r for r in rows if 'contents_unknown' in r['value_flags'] and r['share'] >= 0.005]
 
         keep, keep_src = model.keep(zone, zone_skill, skill, use_zone=forever)
+        lure, lure_info, lure_cost = getattr(self, '_lure', None), None, 0
+        if lure:
+            keep_l, src_l = model.keep(zone, zone_skill, skill + lure['bonus'], use_zone=forever)
+            no_lure, with_lure = model.catches_per_hour(keep), model.catches_per_hour(keep_l)
+            used = fishing.lure_pays(value, no_lure, with_lure, lure['cost_per_hour'])
+            lure_info = {**lure, 'used': used, 'gph_without': int(value * no_lure),
+                         'gph_with': int(value * with_lure - lure['cost_per_hour'])}
+            if used:
+                keep, keep_src, lure_cost = keep_l, src_l, lure['cost_per_hour']
+                skill += lure['bonus']
         cph, pace = model.catches_per_hour(keep), model.pace_source
         doable = keep > 0
         classic_items = {i for s in zone_spots for i in s.shares}
@@ -1005,6 +1040,8 @@ class Engine:
             flags.append('forever_change')
         if zone_skill is not None and keep < 1:
             flags.append('classic_getaway')
+        if lure_info and lure_info['used']:
+            flags.append('lure_cost')
         flags.append('assumed_rate')
         if spot and spot.dungeon:
             flags.append('dungeon')
@@ -1018,14 +1055,16 @@ class Engine:
             title, key = f'Classic table: {spot.label(several)}', f'fish:{zid}:{spot.areas[0]}'
         return Opportunity(
             kind='fishing_spot', key=key, item_id=top, title=title, profit_unit=int(value), cost_unit=0,
-            units_day=0, daily=0, gph=round(value * cph) if doable else None, doable=doable,
+            units_day=0, daily=0, gph=round(value * cph - lure_cost) if doable else None, doable=doable,
             needs='' if doable else f'Fishing {zone_skill} (Classic zone skill)', profession='Fishing', preferred=True,
             flags=flags,
             detail={'zone': zone, 'zone_id': zid, 'forever': forever,
                     'classic_spot': spot.label(several) if spot else None,
                     'subzones': spot.names if spot else [], 'areas': spot.areas if spot else [],
                     'zone_skill': zone_skill, 'your_skill': skill,
-                    'skill_bonus': self.fishing_bonus()[0], 'skill_bonus_from': self.fishing_bonus()[1], 'keep': round(keep, 3), 'keep_source': keep_src,
+                    'skill_bonus': self.fishing_bonus()[0] - (lure['bonus'] if lure and not lure_info['used'] else 0),
+                    'skill_bonus_from': self.fishing_bonus()[1], 'lure': lure_info,
+                    'keep': round(keep, 3), 'keep_source': keep_src,
                     'landed_share': model.landed_share, 'casts_per_hour': round(model.casts_per_hour),
                     'catches_per_hour': round(cph), 'pace_source': pace,
                     'coverage': round(spot.coverage, 3) if spot else None,
@@ -1041,7 +1080,7 @@ class Engine:
                     'pool_loot': pool_rows[:8], 'pool_share': round(sum(fc['pool'].values()) / fc['n_all'], 4)
                     if forever and fc['n_all'] else 0,
                     'value_with_pools': value_with_pools,
-                    'gph_with_pools': round(value_with_pools * cph) if value_with_pools and doable else None,
+                    'gph_with_pools': round(value_with_pools * cph - lure_cost) if value_with_pools and doable else None,
                     'sources': (o.sources if forever else []) + (['Classic (cMaNGOS classic-db)'] if spot else []),
                     'new_in_forever': new_fish, 'classic_missing': missing, 'confirmed_by': confirmed_by,
                     'dungeon': bool(spot and spot.dungeon)})

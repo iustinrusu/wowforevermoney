@@ -24,6 +24,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-14 Lures: used only where they pay, and their cost counts (user OK'd).** The best lure in your bags/bank
+  (`Engine.fishing_lure`) is a choice per fishing spot: gold/hour with and without it, the lure kept only when the
+  extra fish it keeps are worth more than the lures burned an hour (60 / minutes x the cheapest price, vendor or AH);
+  then that cost comes off gold/hour (flag `lure_cost`, drawer line "Lure"). A bonus typed in Settings has no known
+  lure: no cost. On the user's main (Fishing 232, Bright Baubles at 2s 45c): Tanaris 5g 36s/h with it (1g 76s
+  without, 14s 70c of lures); Dustwallow and Stranglethorn keep every fish already, so no lure, no cost.
 - **2026-11-14 Never skip a check on an assumption (user: "we need to check everything in order to be extremely
   accurate").** Claude skipped Cured Heavy Hide in the reading order as "almost certainly crafted"; the user had it
   read (it was crafted-only, but that is now confirmed by its page, not guessed). Read every item in the queue's order;
@@ -407,6 +413,8 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Lure cost per hour in fishing gold/hour, lure used only where it pays. Tests: 178.
 
 - **2026-11-14** Fishing gear bonuses confirmed from Forever tooltips (14 of 15; the Darkwood pole stays labelled
   Classic); fishing pool reading list (26 object pages) in the material-coverage plan. Tests: 176.
