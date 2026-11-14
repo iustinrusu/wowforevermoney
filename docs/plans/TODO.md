@@ -8,7 +8,7 @@ tight: finish the current piece, commit, update this list, and set a reminder th
 1. [ ] **Plan for today** on the main page (the user's priority): `docs/plans/todays-plan.md`
 2. [ ] **Own Forever loot tables**: per-mob and per-node loot logging in ForeverMoneyBridge, then measured yields
        replace Classic ones: `docs/plans/forever-data-next.md`, section 1
-3. [ ] **Wowhead Forever reads**, about 7 pages per session: `docs/plans/forever-data-next.md`, section 2
+3. [ ] **Wowhead Forever reads**, about 5 pages per session, 30-60 s apart: `docs/plans/forever-data-next.md`, section 2
 4. [ ] **Mob farming**: `docs/plans/forever-data-next.md`, section 3
 5. [ ] **Forever loot addons** (only if the user installed one through CurseForge) and **GatherLite node
        locations** (ask before downloading the UiMap tables): `docs/plans/forever-data-next.md`, sections 4-5

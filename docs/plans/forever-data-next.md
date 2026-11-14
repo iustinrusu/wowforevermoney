@@ -20,7 +20,10 @@ mobs, skinning, herbalism and mining (fishing already records sources/pools). Th
 Bump the addon version; keep Checks.lua untouched; test the Lua with a careful read (no game here) and tell the
 user to /reload twice.
 
-## 2. Wowhead Forever, slowly (about 7 pages per session; it returned 403 after 7 on 2026-11-14)
+## 2. Wowhead Forever, slowly (it returned 403 after 7 pages at ~11 s spacing on 2026-11-14)
+Pace (user discussion 2026-11-14): never try to get around the blocking (no proxies, faked browsers or borrowed
+sessions); just read politely: about 5 pages per session, 30-60 s apart, stop at the first 403 and wait at least
+a day, spread the list over several days, and only re-read pages whose data is getting old.
 Use the compact extract from the project log (top 40 rows, outof >= 50, skip `classicEra`), collect in the tab's
 localStorage and read it out once; make the stop check THROW on a non-Forever page so a batch halts at once.
 Order: skinning items left (4235 Heavy Hide, 8169 Thick Hide, 8171 Rugged Hide, 15417 Devilsaur Leather,
