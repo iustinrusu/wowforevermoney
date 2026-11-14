@@ -390,7 +390,8 @@ moved into `forever-data-next.md`.
 
 ## Open items
 
-- User's idea (2026-11-14): a Dungeons (and raids) view. Claude's view in the change log entry of that day; not decided.
+- User's idea (2026-11-14): a Dungeons (and raids) view. Claude's view in the change log entry of that day; the user
+  said "not yet" (2026-11-14): ask again before building it.
 - Re-read later the 22 pages Wowhead has no Forever rows for yet (Data health lists them after the queue).
 - Mob values are floors until mobs' own pages (Drops tab: coins aside, every drop) are read; nodes are complete once
   their own pages are read (wowhead_items supports `npc=` and `object=` pages).

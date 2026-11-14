@@ -20,7 +20,7 @@ tight: finish the current piece, commit, update this list, and set a reminder th
 4. [ ] (first version done 2026-11-14: Gathering -> Mob farming, one row per mob, drops read so far = a floor; left:
        mobs' own pages for complete loot, coins) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with drop rates from Wowhead Forever
        ("Dropped by", material-coverage step 4) and the kills-per-hour setting, never your own logged time
-4b. [ ] **Dungeons view (user's idea, 2026-11-14; decide with the user first)**: a "run <dungeon>" row = trash +
+4b. [ ] **Dungeons view (user's idea, 2026-11-14; asked later the same day: "not yet". Ask again before building)**: a "run <dungeon>" row = trash +
        bosses from their own Wowhead Forever pages, your share of a group's loot, runs per hour from Settings, the
        instance limit; dungeon mob rows already exist (flag `dungeon`). Raids later, if at all (shared raid loot).
 5. [ ] **Forever loot addons** (only if the user installed one through CurseForge) and **GatherLite node
