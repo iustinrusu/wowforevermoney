@@ -27,7 +27,8 @@ memory of the project, not the chat.
 - **Addons update almost daily.** Anything read from an addon is re-read automatically when its files change.
 - **Wowhead:** never bulk-scrape or get around their bot blocking (pages return 403 to scripts). Allowed:
   linking to Wowhead, the public tooltip API (slow, cached), and reading a short list of pages in the
-  browser pane when asked.
+  browser pane when asked. The user's decision (2026-11-14): if no bulk Forever source exists, read the top 100 of
+  the coverage queue at one page a minute, stopping at the first block (`docs/plans/material-coverage.md`).
 - **Downloads:** ask first (file name, source, size).
 - **Usage limits:** when usage is getting tight, don't interrupt a task midway: finish the current piece,
   commit it, write the remaining steps into a plan file in `docs/plans/` (and note them in the project log),

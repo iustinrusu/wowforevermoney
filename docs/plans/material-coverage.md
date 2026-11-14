@@ -22,18 +22,23 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   Done 2026-11-14 (setting `fishing_skill_bonus`); follow-ups in step 6.
 
 ## Order to work in (decided with the user, 2026-11-14)
-Wowhead stays at the polite pace (about 5 pages a session; the user asked about one page a minute non-stop and
-agreed not to: that is bulk scraping against Wowhead's blocking and CLAUDE.md's rule, and it could get the user's
-own connection blocked). Reading the top of the queue is enough: the top 10 / 30 / 50 / 100 material pages cover
-37% / 59% / 72% / 88% of the uncovered traded material value (331 materials uncovered). Target: the top 50.
+The user's goal: all the Forever data, the only way to accurate numbers. Reading the top of the queue covers most of
+the value: the top 10 / 30 / 50 / 100 material pages cover 37% / 59% / 72% / 88% of the uncovered traded material
+value (331 materials uncovered). Claude advised a slow pace (bulk reading goes against Wowhead's blocking and, as
+far as known, its terms, and could block the user's own connection); the user decided (2026-11-14): **if steps 1
+and 1b find no bulk source, read the top 100 at one page a minute** (step 3).
 1. **Other Forever data sources first** (step 7 below): one web search for WoW: Forever loot databases, exports or
    addons with Forever loot data; ask before downloading anything. A bulk source would replace most page reading.
+   1b. Draft a short email for the user to send to Wowhead asking for Forever data access (personal gold tool).
 2. **Item-page data format and its use** (no Wowhead needed): a tracked `data/wowhead_forever_items.json` with each
    read page's source tabs (dropped-by, skinned-from, mined/gathered-from, fished-in, contained-in), its ids passed to
    `coverage.audit` as `pages`, and the engine using it: value per kill for mob drops, node yields replacing Classic
    ones. Test data: the 5 pages already saved in the Wowhead tab's localStorage (`wfm_pages`).
-3. **Every session, first: read 5 pages from the top of the coverage queue** (Data health), then the 7 skinning
-   items left (step 2 below).
+3. **Read the top 100 of the coverage queue at one page a minute** (user's decision; only if no bulk source), then
+   the 7 skinning items left (step 2 below). In the built-in browser as now; stop at the first 403 or challenge page
+   and never get around a block (no other browser, proxy or sign-in); keep each page in the tab's localStorage
+   (`wfm_pages`), read out and save to data/ every 10 pages, and check usage every 10 pages. If it gets blocked,
+   back off (30 min, 2 h, next day) and fall back to about 5 pages a session.
 4. **Pools** (step 3 below): first find the Forever pool objects' Wowhead pages (e.g. from a zone's fishing tab or
    an item's "Fished in"/"Contained in" tab, which names the pool), then read them.
 5. **Mob farming** (to-do item 4), then the rest of the to-do list.

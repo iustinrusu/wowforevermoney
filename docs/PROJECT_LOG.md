@@ -44,10 +44,11 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 - **2026-11-14 Pools are undercounted (user's hunch, checked).** "With pools" only counts pool loot that appears in
   Wowhead's per-zone fishing counts (Tanaris 3.6% of catches, Stranglethorn 12.9%); pool objects' own contents
   (Floating Debris materials) were never read. Fix: docs/plans/material-coverage.md step 3.
-- **2026-11-14 Wowhead pace stays polite; read the top 50, not everything (user agreed).** One page a minute
-  non-stop would be bulk scraping against Wowhead's blocking and could block the user's own connection. The top
-  50 material pages cover 72% of the uncovered traded material value. Order: other Forever sources, item-page data
-  format, 5 top pages a session, pools, mob farming (docs/plans/material-coverage.md).
+- **2026-11-14 Wowhead: the user decided on one page a minute for the top 100, if no bulk source exists.** Goal
+  (user): all the Forever data. Claude advised a slow pace (against Wowhead's blocking and, as far as known, its
+  terms; could block the user's connection); the user chose speed. The top 100 material pages cover 88% of the
+  uncovered traded value. Order: bulk-source search + an email to Wowhead asking for data access, item-page data
+  format, then the top 100 at one a minute (stop at the first block), pools, mob farming.
 - **2026-11-14 Every material needs Forever source data: top priority (user).** docs/plans/material-coverage.md.
   Coverage audit (`wfm/coverage.py`, Data health): a traded (region sold/day >= 1) looted item = Questie (Forever)
   drop/object sources, or a trade good of a gathered kind, or anything in a fishing table (Classic tables only hint
