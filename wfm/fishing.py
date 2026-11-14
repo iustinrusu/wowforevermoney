@@ -250,8 +250,9 @@ def catch_model(obs: dict[str, Obs], zone_skill_of, setting_casts: float) -> Cat
     return CatchModel(landed_share, keep_by_zone, keep_by_skill, setting_casts, 'setting')
 
 
-# Items that raise Fishing skill: item id -> (name, kind, bonus). Values are WoW Classic's; each item only counts if
-# Forever's item table has the same name under that id (Forever may still change a value: check the tooltip).
+# Items that raise Fishing skill: item id -> (name, kind, bonus). Each item only counts if Forever's item table has the
+# same name under that id. FOREVER_CONFIRMED: bonus read from the item's WoW: Forever tooltip (Wowhead's tooltip
+# service, 2026-11-14): all matched the Classic values. Darkwood Fishing Pole has no Forever tooltip: Classic value.
 FISHING_GEAR = {
     6529: ('Shiny Bauble', 'lure', 25), 6530: ('Nightcrawlers', 'lure', 50), 6811: ('Aquadynamic Fish Lens', 'lure', 50),
     6532: ('Bright Baubles', 'lure', 75), 7307: ('Flesh Eating Worm', 'lure', 75),
@@ -262,11 +263,15 @@ FISHING_GEAR = {
     19970: ('Arcanite Fishing Pole', 'pole', 35),
     19972: ('Lucky Fishing Hat', 'head', 5), 19969: ("Nat Pagle's Extreme Anglin' Boots", 'feet', 5),
 }
+FOREVER_CONFIRMED = {6529, 6530, 6811, 6532, 7307, 6533, 6256, 12225, 6365, 6367, 19022, 19970, 19972, 19969}
+# how long one lure lasts (Forever tooltips, 2026-11-14): for the lure cost per hour, not counted yet
+LURE_MINUTES = {6529: 10, 6530: 10, 6811: 10, 6532: 10, 7307: 10, 6533: 5}
 
 
 def skill_bonus(have: set[int], items: dict) -> tuple[int, list[str]]:
     """Fishing skill your things add: the best pole, the best lure and each fishing gear slot found among `have`
-    (item ids in your bags, bank and equipped). Returns (bonus, ['Bright Baubles +75', ...])."""
+    (item ids in your bags, bank and equipped). Returns (bonus, ['Bright Baubles +75', ...]); a value not confirmed
+    from its Forever tooltip says so ('Darkwood Fishing Pole +15 (WoW Classic value)')."""
     best: dict[str, tuple[int, str]] = {}
     for iid in have:
         g = FISHING_GEAR.get(iid)
@@ -275,6 +280,6 @@ def skill_bonus(have: set[int], items: dict) -> tuple[int, list[str]]:
             continue
         name, kind, bonus = g
         if bonus > best.get(kind, (-1, ''))[0]:
-            best[kind] = (bonus, name)
-    parts = [f'{n} +{b}' for b, n in sorted(best.values(), reverse=True) if b > 0]
+            best[kind] = (bonus, name if iid in FOREVER_CONFIRMED else f'{name} +{bonus} (WoW Classic value)')
+    parts = [n if n.endswith('value)') else f'{n} +{b}' for b, n in sorted(best.values(), reverse=True) if b > 0]
     return sum(b for b, _ in best.values()), parts

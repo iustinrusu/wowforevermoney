@@ -824,7 +824,7 @@ class Engine:
             return 0, 'no bags read (needs Syndicator)'
         have = set((getattr(self.w, 'inventory', None) or {}).get(key) or {}) | set(syn[key].get('equipped') or {})
         bonus, parts = fishing.skill_bonus(have, self.gd.items)
-        return bonus, ('from your things: ' + ', '.join(parts) + ' (WoW Classic values)') if parts else             'nothing in your bags, bank or gear raises Fishing'
+        return bonus, ('from your things: ' + ', '.join(parts) + ' (values from Forever tooltips)') if parts else             'nothing in your bags, bank or gear raises Fishing'
 
     def fish_value(self, iid: int, best_use: dict[int, dict]) -> int:
         """What one looted item is worth: the best of selling, crafting and opening it (see valuation.py)."""

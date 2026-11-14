@@ -222,6 +222,12 @@ class FishingBonusFromYourThings(unittest.TestCase):
         self.assertEqual(bonus, 75 + 20 + 5)       # Bright Baubles beats Shiny Bauble; Big Iron beats Strong
         self.assertEqual(parts, ['Bright Baubles +75', 'Big Iron Fishing Pole +20', 'Lucky Fishing Hat +5'])
 
+    def test_a_value_not_confirmed_in_forever_says_so(self):
+        from wfm.fishing import skill_bonus
+        bonus, parts = skill_bonus({6366, 6530}, self.items(6366, 6530))
+        self.assertEqual(bonus, 15 + 50)
+        self.assertEqual(parts, ['Nightcrawlers +50', 'Darkwood Fishing Pole +15 (WoW Classic value)'])
+
     def test_an_id_with_another_name_in_forever_does_not_count(self):
         from wfm.fishing import skill_bonus
         items = self.items(6532)

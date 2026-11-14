@@ -86,7 +86,16 @@ and 1b find no bulk source, read the top 100 at one page a minute** (step 3).
    7286 Black Whelp Scale, 8165 Worn Dragonscale, 15412 Green Dragonscale, 15419 Warbear Leather,
    15423 Chimera Leather, plus any skinnable material the audit lists. Then set `skins_partial` per spot only when
    an unread skinnable item could come from its mobs (so it disappears once all are read).
-3. **Pools.** Find the Forever pool objects (Floating Debris, Floating Wreckage, Oily Blackmouth School, Firefin
+3. **Pools.** Reading list ready 2026-11-14 (QuestieDB Forever objects checked against the Classic fishing holes; pool
+   variants of one name have different loot tables per tier, so every id gets its own page,
+   `https://www.wowhead.com/forever/object=<id>`), in this order: Floating Debris 180655; Floating Wreckage 180662,
+   180685, 180751, 180901; possibly Forever-only: Strange Debris 693670 (Durotar), Shipwreck Debris 186283 (Dustwallow
+   Marsh), School of Fish 180184 (Elwynn); Oily Blackmouth School 180582, 180664, 180682, 180750, 180900; Firefin
+   Snapper School 180657, 180683, 180752, 180902; Stonescale Eel Swarm 180712; Greater Sagefish School 180684; Sagefish
+   School 180656, 180663; Oil Spill 180661; Patch of Elemental Water 180753; School of Deviate Fish 180658; School of
+   Tastyfish 180248; Muddy Churning Waters 180369 (Zul'Gurub). 26 pages. QuestieDB has spawn points for only 9 of
+   them (pools move), so zones come from the pages. The reader stores object pages as `object=<id>`; their "Contains"
+   tab feeds `wowhead_items.object_yields` (complete). Original brief: Find the Forever pool objects (Floating Debris, Floating Wreckage, Oily Blackmouth School, Firefin
    Snapper School, Stonescale Eel Swarm, Greater Sagefish School, Oil Spill, any Forever-only pool) and read each
    object page's "Contains" tab (opened N times, rows with count and stack). Save as
    `data/wowhead_forever_pools.json` (tracked). Model: gold/hour with pools = open water + pools fished per hour
@@ -102,7 +111,10 @@ and 1b find no bulk source, read the top 100 at one page a minute** (step 3).
    Wetlands 11, Moonglade 493, Winterspring 618, Eastern Plaguelands 139, Burning Steppes 46, Silithus 1377,
    Forever-only zones); containers Data health lists as "contents unknown" (13881, 21243, 8366, 13874, 13875, 6355,
    6357).
-6. **Got-away follow-ups.** Partly done 2026-11-14: `Engine.fishing_bonus` = best pole + best lure + fishing hat and
+6. **Got-away follow-ups.** Gear checked 2026-11-14 from Forever tooltips (Wowhead's tooltip service): 14 of 15
+   bonuses match (all lures, poles, hat, boots); Darkwood Fishing Pole has no Forever tooltip (Classic +15, labelled);
+   Aquadynamic Fish Attractor lasts 5 min, the other lures 10 (`fishing.LURE_MINUTES`). Left: lure cost per hour.
+   Earlier: partly done 2026-11-14: `Engine.fishing_bonus` = best pole + best lure + fishing hat and
    boots found in bags, bank and equipped (`fishing.FISHING_GEAR`, Classic values, an id counts only if Forever's
    name matches); a number in Settings overrides. Left: confirm each value from its Forever tooltip (the tooltip
    API, `wfm/tooltips.py`), lure cost per hour, more gear. Original brief: Fill `fishing_skill_bonus` automatically: the equipped pole and fishing gear

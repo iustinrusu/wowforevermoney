@@ -300,6 +300,11 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-14: Fishing gear bonuses in WoW: Forever (Wowhead tooltip service, item tooltips): Shiny Bauble +25,
+  Nightcrawlers +50, Aquadynamic Fish Lens +50, Bright Baubles +75, Flesh Eating Worm +75 (10 min each),
+  Aquadynamic Fish Attractor +100 (5 min); Blump Family +3, Strong +5, Big Iron +20, Nat Pagle's FC-5000 +25,
+  Arcanite +35 poles; Lucky Fishing Hat +5, Nat Pagle's Boots +5. Same as Classic. Darkwood Fishing Pole (6366): no
+  Forever tooltip (404). QuestieDB (Forever) knows all 23 Classic fishing-pool objects, with spawns for only 9.
 - 2026-11-14 price sweep (7,460 priced items, user's request "check all item pricings"): 27 sell quotes are over 3x
   their references (median of realm/region listing averages and the usual sale price), all lone listings with no
   recorded sales (hard to sell: out of suggestions); 730 under a third (walls valued at actual sales, real cheap
@@ -402,6 +407,9 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Fishing gear bonuses confirmed from Forever tooltips (14 of 15; the Darkwood pole stays labelled
+  Classic); fishing pool reading list (26 object pages) in the material-coverage plan. Tests: 176.
 
 - **2026-11-14** Wowhead after the back-off: 6 more item pages (Powerful Mojo, Living Essence, Heavy Thorium Ore,
   Turtle Meat, Arthas' Tears, Cured Heavy Hide) at 2+ minutes apart, no block; 82 item pages in all.
