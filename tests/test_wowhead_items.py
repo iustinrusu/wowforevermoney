@@ -204,6 +204,28 @@ class MobFarmingTests(unittest.TestCase):
         self.assertEqual(e.time_value_source, 'default')
 
 
+class UpsideTests(unittest.TestCase):
+    """Rows priced at the lower of the two prices show "up to" the profit at the lowest listing."""
+
+    def test_vendor_flip_up_to(self):
+        from tests.test_engine import MAT_VENDOR, SETTINGS, make_world
+        from wfm.engine import Engine
+        prices = {MAT_VENDOR: {'numAuctions': 5, 'minBuyout': 100, 'marketValue': 100, 'regionMarketValue': 90,
+                               'regionSale': 50, 'regionSoldPerDay': 10, 'regionSalePercent': 0.5}}
+        e = Engine(make_world(prices), dict(SETTINGS, sale_price_basis='lower'))
+        o = next(o for o in e.vendor_flips() if o.item_id == MAT_VENDOR)
+        e.add_upside(o)
+        # vendor price 10c; usual sale 50c -> 47c after the 5% cut: 37c each; lowest listing 100c -> 95c: 85c
+        self.assertEqual(o.profit_unit, 37)
+        self.assertEqual((o.detail['upside']['profit_unit'], o.detail['upside']['price']), (85, 100))
+        self.assertEqual(o.detail['upside']['daily'], int(85 * o.units_day))
+        e2 = Engine(make_world(prices), dict(SETTINGS, sale_price_basis='min_buyout'))
+        o2 = next(o for o in e2.vendor_flips() if o.item_id == MAT_VENDOR)
+        e2.add_upside(o2)
+        self.assertEqual(o2.profit_unit, 85)
+        self.assertNotIn('upside', o2.detail)
+
+
 class SkinningFromItemPagesTests(unittest.TestCase):
     def test_a_mob_of_unknown_level_is_not_doable(self):
         from wfm import skinning

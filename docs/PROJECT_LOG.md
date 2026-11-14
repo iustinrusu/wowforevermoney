@@ -24,6 +24,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-14 Profit is worked out at the lower of the lowest listing and the usual sale price (user's decision;
+  supersedes the 2026-11-13 "sale price = current lowest buyout").** Setting `sale_price_basis` = `lower` (new
+  default; `min_buyout` and `actual_sales` remain). Why: 119 of 703 crafts and flips made a profit only at the lowest
+  listing and lost money at the usual sale price (Bronze Tube flip +5s vs -3s). Tables show the profit at the lowest
+  listing as a muted "up to ..." line under Profit each and Profit a day (`detail.upside`, hover explains), so a realm
+  premium stays visible (Arcanite Bar: 20g 64s each, up to 50g 41s). "Occasional big flips" drops its "At average
+  sale" column on this basis. No "sells for less" flag when the price used already is the usual sale price.
 - **2026-11-14 Freak sales are not a price (user: "the numbers seem fishy").** Masterwork Target Dummy was the #1 craft
   at 608g profit each: nothing listed on the realm, so the app sold at TSM's region average sale price, 642g 62s
   (1.25 sales a day), while its region listing average is 11g 25s. Sales normally average below listings (median
@@ -367,9 +374,6 @@ moved into `forever-data-next.md`.
 
 ## Open items
 
-- User's question (2026-11-14): show both the lowest listing and the usual sale price, and which one "Profit a day"
-  uses. Claude's recommendation: show both; profit a day at the lower of the two (the existing 'actual_sales' basis is
-  close). Waiting for the user's choice.
 - User's idea (2026-11-14): a Dungeons (and raids) view. Claude's view in the change log entry of that day; not decided.
 - Re-read later the 22 pages Wowhead has no Forever rows for yet (Data health lists them after the queue).
 - Mob values are floors until mobs' own pages (Drops tab: coins aside, every drop) are read; nodes are complete once
@@ -393,6 +397,9 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Sale price basis "lower of the lowest listing and the usual sale price" (default, set as the user's
+  setting), "up to" line in the tables, Settings option explained. Tests: 175.
 
 - **2026-11-14** Sale averages far above listings (freak sales) no longer price an item when nothing is listed
   (`sale_price_outlier`); Masterwork Target Dummy craft 608g -> 8g 54s profit each. Tests: 172.

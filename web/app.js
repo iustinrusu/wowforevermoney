@@ -134,8 +134,10 @@ function oppTable(rows, opts = {}) {
   if (st) rows = [...rows].sort((a, b) => ((sortVal(a) ?? -1e18) < (sortVal(b) ?? -1e18) ? -1 : 1) * (st.dir));
   const numeric = new Set(['profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells', 'cooldown', 'profit_avg', 'every', 'effort']);
   const HT = {units_day: 'How many you can expect to sell (or make) a day: what the whole region buys a day x your share (Settings, 20%), capped by your gold, vendor stock and ingredients. Under 1 means less than one a day.',
-    daily: 'Profit each x sales a day: what this earns on an average day if you keep doing it.',
-    profit_unit: 'Profit on one, after the AH cut, at the current lowest listing.',
+    daily: 'Profit each x sales a day: what this earns on an average day if you keep doing it. "up to": the same at the current lowest listing.',
+    profit_unit: STATE.settings.sale_price_basis === 'min_buyout' ? 'Profit on one, after the AH cut, at the current lowest listing.'
+      : STATE.settings.sale_price_basis === 'actual_sales' ? 'Profit on one, after the AH cut, at what it actually sells for (never above the realm listing average or the region average sale price).'
+      : 'Profit on one, after the AH cut, at the lower of the current lowest listing and its usual sale price across the region: what you can count on. "up to" below it: if it sells at the current lowest listing instead.',
     profit_avg: "Profit on one if it sells at the region's average sale price instead of the lowest listing.",
     every: 'How long one sale takes on average at your share of the region\'s sales.',
     effort: 'Estimated minutes of play a day: posting auctions (and reposting the ones that expire), buying ingredients, crafting, one vendor trip. Below it: what that time earns per hour.',
@@ -154,6 +156,10 @@ function oppTable(rows, opts = {}) {
       if (c === 'units_day') return `<td class="num">${o.units_day >= 1 || !o.units_day ? num(o.units_day) : `1 every ${daysText(1 / o.units_day)}`}</td>`;
       if (c === 'effort') { const ef = (o.detail || {}).effort; return ef ? `<td class="num" title="About ${ef.minutes} minutes of play a day; earns ${moneyText(ef.per_hour)} per hour of your time">~${num(ef.minutes, ef.minutes < 10 ? 1 : 0)} min<div class="pill">${esc(moneyText(ef.per_hour))}/h</div></td>` : '<td class="num pill">–</td>'; }
       if (c === 'every') return `<td class="num">${o.units_day > 0 ? (o.units_day >= 1 ? `${num(o.units_day, 1)} a day` : daysText(1 / o.units_day)) : '–'}</td>`;
+      if ((c === 'profit_unit' || c === 'daily') && (o.detail || {}).upside) {
+        const u = o.detail.upside;
+        return `<td class="num">${money(o[c])}<div class="pill" title="${esc(`If it sells at the current lowest listing (${moneyText(u.price)}) instead of its usual price (${moneyText(u.price_used)}). Listings this far above usual sales may sit unsold, so the number above is what you can count on.`)}">up to ${esc(moneyText(c === 'daily' ? u.daily : u.profit_unit))}</div></td>`;
+      }
       if (c === 'profit_avg') { const v = (o.detail || {}).profit_at_avg_sale; return `<td class="num">${v === undefined ? '<span class="pill">–</span>' : money(v)}</td>`; }
       if (c === 'sells') { const l = (o.detail || {}).liquidity; return l ? `<td class="num" title="${esc(l.why || 'sells well')}">${num(l.sold_per_day, 0)}/day<div class="pill">${l.sale_rate === null || l.sale_rate === undefined ? '' : (l.sale_rate * 100).toFixed(0) + '% sell · '}${l.listed} listed</div></td>` : '<td class="num pill">–</td>'; }
       if (c === 'kind') return `<td>${esc(KIND[o.kind] || o.kind)}</td>`;
@@ -425,7 +431,7 @@ const VIEWS = {
       <div class="panel"><h2>Daily routines <small>crafts and vendor flips you can do today: each sells about once a day or more, ranked by profit a day</small></h2>${oppTable(t.now || [])}</div>
       <div class="panel"><h2>Occasional big flips <small>worth a lot per sale, but you'd sell less than one a day</small></h2>
         <div class="hint">These sell slowly: list one and expect to wait. Each shows the profit at the lowest listing and at what it actually sells for across the region, which is often less. Ranked by profit per sale and how sure the numbers are.</div>
-        ${oppTable(t.slow || [], {cols: ['title', 'profit_unit', 'profit_avg', 'cost_unit', 'every', 'sells', 'flags'], empty: 'No slow, valuable flips right now.'})}</div>
+        ${oppTable(t.slow || [], {cols: ['title', 'profit_unit'].concat(STATE.settings.sale_price_basis === 'lower' ? [] : ['profit_avg'], ['cost_unit', 'every', 'sells', 'flags']), empty: 'No slow, valuable flips right now.'})}</div>
       <div class="panel"><h2>Fishing & farming spots <small>gold per hour: open water, and with the pools you come across</small></h2>${oppTable(withPools(t.hourly || []), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false, heads: {profit_unit: 'Per catch / each'}})}
         <div class="hint">${POOL_HINT}</div>
         <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. Catches per hour use ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
@@ -608,7 +614,7 @@ const VIEWS = {
       <div>Ore nodes per hour</div><div><input type="number" id="s-oph" value="${s.ore_nodes_per_hour || 40}"> <span class="pill">until ForeverMoneyBridge has 10+ minutes of your mining</span></div>
       <div>Your time is worth</div><div><input type="number" step="0.5" id="s-tv" value="${s.time_value_gold || ''}" placeholder="auto"> gold an hour <span class="pill">blank = half your best measured farming. Routines that earn less than their time is worth are marked "not worth your time"</span></div>
       <div>Kills per hour</div><div><input type="number" id="s-kph" value="${s.kills_per_hour || 60}"> <span class="pill">mobs you kill (and skin) in an hour of farming: used for skinning and mob farming gold per hour</span></div>
-      <div>AH sale price</div><div><select id="s-basis"><option value="min_buyout" ${s.sale_price_basis !== 'actual_sales' ? 'selected' : ''}>current lowest buyout (what you'd list at)</option><option value="actual_sales" ${s.sale_price_basis === 'actual_sales' ? 'selected' : ''}>what items actually sell for (more conservative)</option></select> <span class="pill">nothing listed: the average sale price either way</span></div>
+      <div>AH sale price</div><div><select id="s-basis"><option value="lower" ${!['min_buyout', 'actual_sales'].includes(s.sale_price_basis) ? 'selected' : ''}>the lower of the lowest listing and its usual sale price (what you can count on)</option><option value="min_buyout" ${s.sale_price_basis === 'min_buyout' ? 'selected' : ''}>current lowest buyout (what you'd list at)</option><option value="actual_sales" ${s.sale_price_basis === 'actual_sales' ? 'selected' : ''}>what items actually sell for (most conservative)</option></select> <span class="pill">nothing listed: the usual sale price in every case. With the first choice, tables show "up to" the profit at the lowest listing</span></div>
       <div>Fishing drop rates</div><div><label class="chk"><input type="checkbox" id="s-ownrates" ${s.own_logs_for_rates ? 'checked' : ''}> also use my own catch logs</label> <span class="pill">off: Wowhead Forever's big samples only; your logs still give your pace and got-away rate</span></div>
       <div>Fishing pools</div><div><label class="chk"><input type="checkbox" id="s-pools" ${s.fishing_pools ? 'checked' : ''}> count pool loot in gold/hour</label> <span class="pill">off: open water only; trunks, Stranglekelp and Rumsey Rum from pools shown as a bonus, since pools have to be found first</span></div>
       <div>Unverified recipes</div><div><label class="chk"><input type="checkbox" id="s-unver" ${s.include_unverified_recipes ? 'checked' : ''}> include</label></div>

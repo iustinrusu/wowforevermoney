@@ -41,7 +41,7 @@ def ah_buy(p: dict | None) -> Quote | None:
     return None
 
 
-SALE_BASES = ('min_buyout', 'actual_sales')
+SALE_BASES = ('lower', 'min_buyout', 'actual_sales')
 ODD_LISTINGS, ODD_LOW, ODD_HIGH = 3, 0.5, 2.0    # few listings outside half..double the recent average: looks off
 WALL = 3.0       # lowest listing over 3x the region's average sale price: nobody pays it, value at actual sales
 SALE_OUTLIER = 3.0   # nothing listed and the region's sale average over 3x its listing average: freak sales
@@ -59,8 +59,11 @@ def usual_sale(p: dict | None) -> int:
 def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
     """The price you'd sell one unit for on your realm's AH (before the AH cut).
 
-    basis 'min_buyout' (default, the user's choice): the current lowest buyout, which is what you'd list at.
-    basis 'actual_sales' (more conservative): never above the realm's usual listing price or the region's
+    basis 'lower' (the default, the user's choice 2026-11-14): the lower of the current lowest buyout and the item's
+    usual sale price (region average): what you can count on. List above the lowest listing and you are undercut;
+    count on more than buyers usually pay and 119 of 703 crafts and flips "made a profit" that was a loss.
+    basis 'min_buyout': the current lowest buyout, which is what you'd list at (the user's choice until 2026-11-14).
+    basis 'actual_sales' (most conservative): never above the realm's usual listing price or the region's
     average *sale* price, since listings can sit unsold (Raw Winter Squid: lowest 3.80s, sells for ~2.50s).
 
     Nothing listed: there's no lowest buyout to match, so the average sale price is used, never the realm's
@@ -86,6 +89,8 @@ def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
             # sells for 1s 90c, which made a 9g "flip"). The lowest listing is only a sale price if things sell near it.
             value, source = sale, 'average sale price (region): every listing is far above what it sells for'
             flags.append('listed_far_above_sales')
+        if basis == 'lower' and sale and sale < value:
+            value, source = sale, 'usual sale price (region average): below the lowest listing'
     else:
         flags.append('none_listed')
         # A sale average far above every listing is a few freak sales on a rarely traded item (Masterwork Target

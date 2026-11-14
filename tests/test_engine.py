@@ -50,6 +50,19 @@ class PricingTests(unittest.TestCase):
         self.assertEqual(ah_buy({'regionMarketValue': 90}).flags, ('no_realm_data',))
         self.assertIsNone(ah_buy({}))
 
+    def test_the_lower_of_the_lowest_listing_and_the_usual_sale(self):
+        # the user's basis since 2026-11-14: what you can count on
+        p = {'numAuctions': 5, 'minBuyout': 140, 'marketValue': 140, 'regionMarketValue': 120, 'regionSale': 55,
+             'regionSoldPerDay': 10, 'regionSalePercent': 0.5}
+        q = ah_sell(p, 'lower')
+        self.assertEqual(q.value, 55)                                   # Bronze Tube: listed 14s, sells for ~5s
+        self.assertNotIn('sells_lower', q.flags)                        # already priced at what it sells for
+        self.assertIn('sells_lower', ah_sell(p, 'min_buyout').flags)
+        p2 = {**p, 'minBuyout': 40, 'marketValue': 45}
+        self.assertEqual(ah_sell(p2, 'lower').value, 40)                # the lowest listing when it is lower
+        wall = {**p, 'minBuyout': 100000}
+        self.assertIn('listed_far_above_sales', ah_sell(wall, 'lower').flags)
+
     def test_freak_sales_are_not_a_price(self):
         # Masterwork Target Dummy, 2026-11-14 (raw TSM): nothing listed, region sale average 642g 62s from 1.25
         # sales a day, region listing average 11g 25s -> the app showed a 608g craft profit

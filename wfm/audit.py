@@ -104,11 +104,15 @@ def run(world, engine) -> list[dict]:
               f'sells for {p["regionSale"]}c' for i, p in prices.items()
               if p.get('regionSale') and p.get('regionSoldPerDay', 0) >= 1
               and min(p.get('minBuyout') or 10**12, p.get('marketValue') or 10**12) > 1.5 * p['regionSale']]
-    basis = world.settings.snapshot().get('sale_price_basis', 'min_buyout')
-    out.append(_check('Listings far above actual sales', 'pass' if basis == 'actual_sales' else 'warn',
-                      f'{len(capped)} actively traded items are listed 1.5x+ above what they actually sell for '
-                      f'(flag "sells for less"). Sale price basis: '
-                      f'{"actual sales, so they are valued at what they sell for" if basis == "actual_sales" else "lowest buyout, so these may not sell at the price shown"}.',
+    basis = world.settings.snapshot().get('sale_price_basis', 'lower')
+    safe = basis in ('actual_sales', 'lower')
+    out.append(_check('Listings far above actual sales', 'pass' if safe else 'warn',
+                      f'{len(capped)} actively traded items are listed 1.5x+ above what they actually sell for. '
+                      f'Sale price basis: '
+                      + ('the lower of the lowest listing and the usual sale price, so they are valued at what they '
+                         'usually sell for ("up to" shows the lowest listing)' if basis == 'lower' else
+                         'actual sales, so they are valued at what they sell for' if basis == 'actual_sales' else
+                         'lowest buyout, so these may not sell at the price shown (flag "sells for less")') + '.',
                       capped))
 
     # 10. Questie vendor items have a vendor price.

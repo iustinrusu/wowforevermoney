@@ -112,7 +112,7 @@ class Engine:
         self.q = world.questie
         self.su = world.skillup
         self.cut = float(settings.get('ah_cut', 0.05))
-        self.sale_basis = settings.get('sale_price_basis', 'min_buyout')   # see pricing.ah_sell
+        self.sale_basis = settings.get('sale_price_basis', 'lower')   # see pricing.ah_sell
         self.share = float(settings.get('market_share', 0.2))
         self.gold = float(settings.get('gold', 0)) * COPPER_PER_GOLD
         self.time_value = DEFAULT_TIME_VALUE
@@ -1181,12 +1181,29 @@ class Engine:
             if liq and sale and o.kind in ('craft', 'vendor_flip') and o.detail.get('sell_channel') != 'vendor':
                 per = o.detail.get('product_count') or 1
                 o.detail['profit_at_avg_sale'] = int(int(sale * (1 - self.cut)) * per - o.cost_unit)
+            self.add_upside(o)
         top = self.top_picks(all_opps)
         return {'opportunities': all_opps, 'best_use': best_use, 'top': top,
                 'plan': plan.build(all_opps, top, self.my_holdings(self.valuer(best_use)), self.time_value,
                                    self.share, self.cut, int(self.gold)),
                 'time_value': self.time_value, 'time_value_source': self.time_value_source,
                 'undervalued': self.undervaluation_watch()}
+
+    def add_upside(self, o: Opportunity) -> None:
+        """Priced at the lower of the lowest listing and the usual sale price: what the row would make if it sold at
+        the current lowest listing instead ("up to" in the tables). Crafts and vendor flips sold on the AH only."""
+        if self.sale_basis != 'lower' or o.kind not in ('craft', 'vendor_flip') or o.detail.get('sell_channel', 'AH') != 'AH':
+            return
+        p = self.price(o.item_id)
+        hi, used = ah_sell(p, 'min_buyout'), ah_sell(p, 'lower')
+        if not hi or not used or hi.value <= used.value:
+            return
+        per = o.detail.get('product_count') or 1
+        each = o.profit_unit + int((proceeds(hi, self.cut) - proceeds(used, self.cut)) * per)
+        if each <= o.profit_unit:
+            return
+        o.detail['upside'] = {'profit_unit': each, 'daily': int(each * o.units_day), 'price': hi.value,
+                              'price_used': used.value, 'source': hi.source}
 
     def my_holdings(self, valuer: valuation.Valuer, now: float | None = None) -> dict:
         """What the character you play holds (bags, bank, mailbox, auctions that ended), each valued: plan.py's input.
