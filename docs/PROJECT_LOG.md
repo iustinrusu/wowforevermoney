@@ -280,6 +280,9 @@ The user is firm that the data must be correct and accurate. In order:
 
 ## Open items
 
+- **Next: `docs/plans/todays-plan.md`** (user priority, 2026-11-14): "Do these now" becomes a smart plan for today
+  (cash in bags, cooldowns, routines with exact instructions, one farming session, one big flip, one goal).
+  Postponed at 82% usage; reminder 2026-11-14 10:00.
 - **Next plan: `docs/plans/forever-data-next.md`** (reminder 2026-11-14 10:00): own per-mob/per-node loot
   logging in the addon, remaining Wowhead reads, mob farming, Forever loot addons (user installs via CurseForge),
   GatherLite node locations, review. Forever data sources checked 2026-11-14: Wowhead Forever (best, rate
