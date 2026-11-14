@@ -24,6 +24,11 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-14 A product that doesn't sell adds nothing to its ingredients (user: "ironweb spider silk price is
+  wrong").** Ironweb Spider Silk showed "worth 18g 11s if crafted" (vs about 30s on the AH): `best_uses` took the
+  Delicate Arcanite Converter at its 71g 71c region sale price, but the region sells 0 a day (15 listed, 0% sell).
+  Now a recipe whose product is hard to sell or has no sales data on the AH is left out of an ingredient's crafted
+  worth (vendor-sold products still count). Ironweb Spider Silk: 29s 25c (its best remaining recipe loses money).
 - **2026-11-14 Lures: used only where they pay, and their cost counts (user OK'd).** The best lure in your bags/bank
   (`Engine.fishing_lure`) is a choice per fishing spot: gold/hour with and without it, the lure kept only when the
   extra fish it keeps are worth more than the lures burned an hour (60 / minutes x the cheapest price, vendor or AH);
@@ -416,6 +421,9 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Ingredients' "worth if crafted" ignores products that do not sell (Ironweb Spider Silk 18g 11s ->
+  29s 25c). Tests: 180.
 
 - **2026-11-14** Plan for today: item names in step titles link to Wowhead Forever (with icon and quality colour),
   like the tables (user's nitpick). Tests: 179.

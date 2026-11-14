@@ -304,6 +304,21 @@ class EngineTests(unittest.TestCase):
         self.assertIn('more_with_skill', v.flags)
         self.assertEqual(v.if_skilled['value'], 950)
 
+    def test_a_product_that_never_sells_adds_nothing_to_its_ingredients(self):
+        # Ironweb Spider Silk, 2026-11-14: "worth 18g 11s if crafted" into a Delicate Arcanite Converter that the whole
+        # region sold 0 of a day (15 listed, 0% sell); on the AH the silk goes for about 30s
+        recipe = Recipe(spell_id=500, name='Converter', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                        product_count=1, reagents=[(FISH, 1)], trivial_low=140, trivial_high=180, min_rank=1)
+        converter = {'numAuctions': 15, 'minBuyout': 809900, 'marketValue': 758941, 'regionMarketValue': 669304,
+                     'regionSale': 717113, 'regionSoldPerDay': 0.0, 'regionSalePercent': 0.0}
+        silk = {'numAuctions': 435, 'minBuyout': 3079, 'marketValue': 3436, 'regionSale': 3100, 'regionSoldPerDay': 86}
+        best = Engine(make_world({FISH: silk, PRODUCT: converter}, [recipe]), dict(SETTINGS)).best_uses()
+        self.assertNotIn(FISH, best)
+        # the same recipe counts once the product sells
+        selling = {**converter, 'regionSoldPerDay': 5.0, 'regionSalePercent': 0.4}
+        best = Engine(make_world({FISH: silk, PRODUCT: selling}, [recipe]), dict(SETTINGS)).best_uses()
+        self.assertIn(FISH, best)
+
     def test_recipe_cooldown_caps_crafts_per_day(self):
         # Transmute: Arcanite has a 47-hour cooldown in Forever's SpellCooldowns: about 0.51 a day, not ~10
         arcanite = Recipe(spell_id=500, name='Transmute', profession='Cooking', skill_line=185, product_id=PRODUCT,

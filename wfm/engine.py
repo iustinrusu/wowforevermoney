@@ -482,10 +482,15 @@ class Engine:
         now. What something is worth to you today uses the doable one (a recipe needing more skill would
         overstate it); the other shows what levelling would add."""
         best: dict[int, dict] = {}
+        min_spd = float(self.s.get('min_sold_per_day', 0.5))
         for r in self.gd.recipes:
             if r.profession not in PROFESSIONS or r.spell_id not in self.su.thresholds:
                 continue
             unit_val, channel, _ = self.sell_value(r.product_id)
+            if channel == 'AH' and {'hard_to_sell', 'no_sales_data'} & set(liquidity(self.price(r.product_id), min_spd)['flags']):
+                # a product that (barely) never sells adds nothing to its ingredients: Delicate Arcanite Converter
+                # (0 sold a day in the region) made Ironweb Spider Silk "worth 18g 11s if crafted" instead of ~30s
+                continue
             revenue = unit_val * r.product_count
             costs = {}
             ok = True
