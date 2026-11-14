@@ -138,3 +138,27 @@ details.how { background: rgba(110,168,254,.05); border: 1px solid #22304a; bord
 .empty { text-align: center; padding: 18px 0; }
 a[data-wowhead] ins, a[data-wowhead] span.iconsmall { margin-right: 4px; vertical-align: middle; }
 @media (max-width: 700px) { .brand small { display: none; } nav button .ti { font-size: 16px; } }
+
+/* ---------- plan for today ---------- */
+.panel.plan { border-color: var(--trim); box-shadow: 0 0 0 1px rgba(232,192,96,.12) inset, 0 6px 24px rgba(0,0,0,.3); }
+.plan-list { display: flex; flex-direction: column; gap: 8px; }
+.plan-card { display: grid; grid-template-columns: 34px 1fr; gap: 10px; background: var(--panel2); border: 1px solid var(--line);
+             border-radius: 10px; padding: 10px 12px; cursor: pointer; transition: border-color .15s; }
+.plan-card:hover { border-color: var(--gold); }
+.plan-card.top1 { border-left: 3px solid var(--gold); } .plan-card.top2 { border-left: 3px solid var(--silver); }
+.plan-card.top3 { border-left: 3px solid var(--copper); }
+.plan-card.goal { border-style: dashed; }
+.plan-rank { padding-top: 2px; text-align: center; }
+.plan-goal-badge { font-size: 18px; }
+.plan-label { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; }
+.plan-title { font-weight: 700; font-size: 14.5px; margin: 1px 0 3px; color: var(--text); }
+.plan-why { color: #c3cad6; font-size: 13px; line-height: 1.45; }
+.plan-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.chip { display: inline-flex; align-items: baseline; gap: 5px; background: #141820; border: 1px solid var(--line); border-radius: 12px;
+        padding: 2px 9px; font-size: 12.5px; white-space: nowrap; }
+.chip small { color: var(--muted); font-size: 11px; }
+details.plan-items { margin-top: 6px; font-size: 12.5px; }
+details.plan-items summary { cursor: pointer; color: var(--accent); width: max-content; }
+details.plan-items table { margin-top: 4px; }
+@media (max-width: 700px) { .plan-card { grid-template-columns: 26px 1fr; padding: 8px; } .chip { white-space: normal; } }
+.grid2 > * { min-width: 0; }      /* grid items may shrink below their table width (the table scrolls instead) */

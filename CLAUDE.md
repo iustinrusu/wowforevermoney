@@ -80,6 +80,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/world.py` | loads every source, tracks freshness, reloads on file change |
 | `wfm/pricing.py` | buy/sell quotes and flags; money formatting |
 | `wfm/engine.py` | all opportunity calculations and top-pick sections |
+| `wfm/plan.py` | "Your plan for today": cash-in, cooldowns, routines, snipe, farming, big flip, goal as ranked steps |
 | `wfm/history.py` | SQLite price history: every realm scan for 14 days, then daily candles for a year |
 | `wfm/market.py` | Market tab: one item's history, trends and market signals (sentiment) |
 | `wfm/investments.py` | Investments tab: curated list (`data/investments.json`), trends, vendor floor, progression gauge |

@@ -24,6 +24,21 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-14 Your plan for today (user: "Do these now should be our main attraction... think like a pro").**
+  `wfm/plan.py` (pure functions, tests/test_plan.py) builds `result['plan']` (in `/api/state`), shown as numbered
+  cards at the top of Top picks. Sources: cash-in from what the character you play holds (`Engine.my_holdings`:
+  Syndicator bags, bank, mail, and auctions past their end time, which sold or came back), cooldown crafts
+  (>= 20 h, doable, one per shared cooldown), Daily routines (top 'now'), snipes (count half: the listing may be
+  gone), the best Forever-backed farming hour, one big flip (>= 1g at the lower of lowest-listing and usual-sale
+  profit). Value today = gain x confidence - minutes x time value; <= 0 dropped; caps: 3 routines, 1 farm, 1 big
+  flip, 2 of anything else; best 8 by value. **Shown in order of gold per hour of your time, not by value**
+  (deviation from the brief: by value the 1-hour farm, worth the most in total, was always #1, while a 2-minute
+  snipe or a 5-minute routine earns 3-10x more per hour and should be done first). List quantity per item =
+  what sells in about 2 days at your share. Things you probably use yourself are named but never counted: class 0
+  consumables (except raw fish/meat that recipes use: Raw Winter Squid is "food" in the data), spell reagents
+  (15/1: Flash Powder, Thieves' Tools), profession tools (weapon subclass 14/20: Skinning Knife, fishing poles);
+  found on the user's bags (29 Instant Poison III, Skinning Knife and Flash Powder were first listed for sale).
+  Gear stays out of the vendor junk pile. "Do these now" was renamed "Daily routines".
 - **2026-11-13 Seasons from Forever catches.** A seasonal fish counts as in season if it appears in Wowhead Forever
   counts read in the last 14 days; its opposite season is then off. No recent evidence -> Classic calendar,
   labelled. Forever rows drop out-of-season fish from their counts. Now: winter (Winter Squid caught, no Summer Bass).
@@ -264,10 +279,13 @@ moved into `forever-data-next.md`.
 - The to-do list (`docs/plans/TODO.md`) holds the planned work; below are smaller known gaps.
 - Not valued yet: coins inside containers, disenchanting (the user has an Enchanting alt), quest rewards for
   quest items (e.g. Savage Coast Blue Sailfin), lockpicking boxes beyond their contents.
+- Plan for today: whether a cooldown is ready is unknown (the step says "if it is ready"); snipes come from the last
+  scan; items on the AH list can include gear you would rather keep (the step says so).
 - Not modelled: AH deposits and the cost of unsold listings; recipe learn cost is shown, not subtracted; bulk-buy
   cost uses only the lowest listing; vendors with faction '' are treated as accessible; effort uses estimates.
 - Tips for the remaining top picks (only Frilled Lichen 249399 is done).
-- Verify in game after the user /reloads: addon 1.4.1 saves gold correctly (1.4.0 saved 0 on logout); vendor-price
+- Verify in game after the user /reloads: addon 1.4.1 saves gold correctly (1.4.0 saved 0 on logout; still unchecked on
+  2026-11-14: the saved file predates the 1.4.1 install); vendor-price
   recording at a vendor; fishing `sources`/`pools` (does GetLootSourceInfo give the pool's object id?).
 - Fishing pace is the 240 casts/hour setting until ForeverMoneyBridge has 10+ minutes of timed fishing.
 - No JavaScript syntax check in the tests (no Node on this PC): check the browser console after editing
@@ -277,6 +295,10 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-14** Plan for today on Top picks (`wfm/plan.py`, `Engine.my_holdings`, plan cards with medals, chips and
+  "How this plan is made"); "Do these now" renamed "Daily routines"; narrow screens no longer scroll sideways
+  (`.grid2 > * { min-width: 0 }`). On the user's data: 8 steps, ~25g expected for ~1.4 hours. Tests: 137.
 
 - **2026-11-14** Docs cleanup for new sessions: stale plan sections replaced by a pointer to docs/plans/TODO.md,
   open items pruned, setup updated, missing Wowhead fishing/container reads added to the plan, new standing rules

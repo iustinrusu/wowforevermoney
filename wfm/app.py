@@ -196,6 +196,7 @@ class App:
             'realms': pd.realms() if pd else [], 'client_build': self.world.client_build,
             'counts': counts, 'audit_summary': audit.summary(self.audit),
             'top': {sec: [self.opp_view(by[k]) for k in keys if k in by] for sec, keys in r['top'].items()},
+            'plan': r.get('plan'), 'time_value_source': r.get('time_value_source'),
             'events': self.events.recent(20),
             'professions_available': sorted({rc.profession for rc in self.world.gamedata.recipes}) if self.world.gamedata else [],
         }

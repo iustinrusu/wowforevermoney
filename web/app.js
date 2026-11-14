@@ -341,6 +341,69 @@ const withPools = (rows) => rows.map((o) => ({...o, gph_pools: o.detail && o.det
 const ifAffordable = (rows) => rows.map((o) => ({...o, daily: (o.detail && o.detail.daily_if_affordable !== undefined) ? o.detail.daily_if_affordable : o.daily}));
 const POOL_HINT = '"Gold / hour with pools" adds the trunks, Stranglekelp and Rumsey Rum from the pools you come across. It doesn\'t count the time spent finding pools, so treat it as a ceiling.';
 
+// ---------- plan for today ----------
+const PLAN_ICON = {cash_ah: '💰', cash_open: '📦', cash_vendor: '🪙', cooldown: '⏳', routine: '🔁', snipe: '🎯', farm: '🌿', big_flip: '💎', goal: '🎓'};
+const minsText = (m) => m >= 60 ? `${num(m / 60, 1)} hour${m === 60 ? '' : 's'}` : `${num(m, m < 10 ? 1 : 0)} min`;
+const PLAN_HOW = `<b>How this plan is made.</b> It works like a seasoned gold-maker's checklist. First, <b>cash in what you already have</b>: things in your bags, bank and mailbox that sell on the auction house (only as many as the market buys in about two days at your share), containers worth more opened, and junk a vendor pays for. Then <b>cooldown crafts</b> of a profession you have, your best <b>daily routines</b> (crafts and vendor flips that sell about once a day or more), a <b>snipe</b> if one was listed far below its usual price at the last scan, one <b>farming hour</b> backed by Forever data (never Classic loot tables), and one <b>occasional big flip</b>.<br><br>Each step gets a value for today: what it should earn, times how sure we are (snipes count half, because the listing may be gone), minus the minutes it takes times what your time is worth. Steps that are not worth their time are left out, each kind is limited (at most three routines and one farming hour) so the plan stays varied, and the best eight make the list. They are shown in order of <b>gold per hour of your time</b>: quick wins first, the long farming hour last. The long-term goal at the end is not ranked against the rest. Things you probably use yourself (potions, food, poisons, Flash Powder, your Skinning Knife) are never counted as things to sell.`;
+function planItems(a) {
+  const rows = a.items || [];
+  if (!rows.length) return '';
+  const n = rows.length + (a.more || 0);
+  const more = a.more ? `<div class="pill">and ${a.more} more (see the My bags tab)</div>` : '';
+  let head, body;
+  if (a.type === 'cash_ah') {
+    head = '<th>Item</th><th class="num" title="How many to list now, of how many you have">List</th><th class="num" title="Price to list each at: today\'s lowest listing, or the usual sale price where nobody pays the listing">List at</th><th class="num" title="What you get for them after the AH cut">You get</th>';
+    body = rows.map((r) => `<tr><td>${itemLink(r.item_id, r.name, r.quality)}</td><td class="num">${r.count}${r.have > r.count ? ` of ${r.have}` : ''}</td><td class="num">${money(r.list_at)}</td><td class="num">${money(r.total)}</td></tr>`).join('');
+  } else if (a.type === 'cash_open') {
+    head = '<th>Container</th><th class="num">How many</th><th class="num" title="Expected value of the contents at today\'s prices">Worth opened</th><th>Mostly holds</th>';
+    body = rows.map((r) => `<tr><td>${itemLink(r.item_id, r.name, r.quality)}${r.locked ? ' <span class="flag">locked</span>' : ''}</td><td class="num">${r.count}</td><td class="num">${money(r.total)}</td><td>${esc((r.contents || []).join(', '))}</td></tr>`).join('');
+  } else {
+    head = '<th>Item</th><th class="num">How many</th><th class="num" title="What a vendor pays for all of them">Vendor pays</th>';
+    body = rows.map((r) => `<tr><td>${itemLink(r.item_id, r.name, r.quality)}</td><td class="num">${r.count}</td><td class="num">${money(r.total)}</td></tr>`).join('');
+  }
+  return `<details class="plan-items"><summary>Show the ${n} item${n === 1 ? '' : 's'}</summary><div class="tablewrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${more}</details>`;
+}
+function planCard(a, goal) {
+  const chip = (label, val, tip) => `<span class="chip" title="${esc(tip)}"><small>${label}</small>${val}</span>`;
+  const expected = Math.round(a.gain * a.confidence);
+  const chips = goal ? chip('Per day, once unlocked', money(a.gain), 'What this recipe would earn a day once you have the skill and the gold for it') : [
+    chip('Expected', money(expected), `What this should earn: ${moneyText(a.gain)} if the numbers hold, times how sure we are (${Math.round(a.confidence * 100)}%).`),
+    chip('Time', minsText(a.minutes), 'Estimated minutes of play, including posting and reposting auctions, buying, crafting and walking to a vendor.'),
+    a.per_hour ? chip('Per hour of your time', money(a.per_hour), 'Expected gold divided by the time it takes: how well this pays for your time.') : '',
+    a.gold_needed ? chip('Gold needed', money(a.gold_needed), 'Gold you spend up front (ingredients or the item to resell); you get it back when it sells.') : '',
+    chip('How sure', `${Math.round(a.confidence * 100)}%`, 'How much we trust these numbers: data quality, how well it sells, and for snipes the chance the listing is gone.'),
+  ].join('');
+  const badge = goal ? '<span class="plan-goal-badge">🎓</span>' : (a.rank <= 3 ? `<span class="medal m${a.rank}" title="#${a.rank}">${a.rank}</span>` : `<span class="rank">${a.rank}</span>`);
+  return `<div class="plan-card${goal ? ' goal' : ''}${a.rank && a.rank <= 3 ? ' top' + a.rank : ''}" data-key="${esc(a.key || '')}" data-item="${a.item_id || ''}" data-type="${esc(a.type)}">
+    <div class="plan-rank">${badge}</div>
+    <div class="plan-body"><div class="plan-label">${PLAN_ICON[a.type] || ''} ${esc(a.label)}</div>
+      <div class="plan-title">${esc(a.title)}</div><div class="plan-why">${esc(a.why)}</div>
+      <div class="plan-chips">${chips}</div>${planItems(a)}</div></div>`;
+}
+function planPanel(p) {
+  if (!p) return '';
+  const acts = p.actions || [];
+  const tv = STATE.time_value_source;
+  const sum = acts.length ? `About <b>${money(p.total_gain)}</b> expected for about <b>${minsText(p.total_minutes)}</b> of play, in ${acts.length} steps.` : 'Nothing is worth your time right now: check back after the next price update.';
+  const gold = p.gold_needed ? ` The steps need ${money(p.gold_needed)} up front${p.short_of_gold ? `, more than the ${money(p.gold_now)} you have: do them in order and reinvest as things sell` : ` (you have ${money(p.gold_now)})`}.` : '';
+  const timeNote = ` Your time is counted at ${money(p.time_value)} an hour${tv ? ` (${esc(tv)})` : ''}.`;
+  const bags = p.holdings_found ? '' : '<div class="hint">⚠ Your bags are not read (needs the Syndicator addon), so the "cash in what you have" steps are missing.</div>';
+  return `<div class="panel plan"><h2>Your plan for today <small>the best things to do now, quick wins first</small></h2>
+    <div class="hint">${sum}${gold}${timeNote} Click a step for its full numbers.</div>${bags}
+    <details class="how"><summary>How this plan is made</summary><div>${PLAN_HOW}</div></details>
+    <div class="plan-list">${acts.map((a) => planCard(a)).join('')}</div>
+    ${p.goal ? `<h3>Long-term goal <small>not ranked against the steps above</small></h3><div class="plan-list">${planCard(p.goal, true)}</div>` : ''}</div>`;
+}
+function wirePlan() {
+  document.querySelectorAll('#view .plan-card').forEach((el) => el.onclick = (e) => {
+    if (e.target.closest('a, details')) return;
+    const k = el.dataset.key;
+    if (el.dataset.type.startsWith('cash_')) { TAB = 'bags'; localStorage.setItem('tab', TAB); render(); return; }
+    const row = k && Object.values(STATE.top || {}).flat().find((o) => o.key === k);
+    if (row) openOpp(row); else if (+el.dataset.item) openItem(+el.dataset.item);
+  });
+}
+
 // ---------- views ----------
 const VIEWS = {
   async top() {
@@ -352,8 +415,9 @@ const VIEWS = {
     const unknown = (!who || noProfs) ? `<div class="panel" style="border-color:#e8c060">⚠ ${!who ? "Your character isn't detected yet" : 'No professions are known for your character'}, so the profession picks below are empty or incomplete. In WoW: at the character screen click <b>AddOns</b>, tick <b>ForeverMoneyBridge</b> (and "Load out of date AddOns" if it says out of date), log in and type <b>/reload</b>. The app picks it up within seconds. Or type your professions in <b>Settings</b>.</div>` : '';
     return `${stale}${unknown}
       <div class="hint">${who ? `Playing <b>${esc(who)}</b> (detected)` : 'Using your manual settings'}: ${num(e.gold, 2)}g to invest, level ${e.level}, realm ${esc(e.realm)}. Everything updates when TSM syncs or you log out / /reload. Click any row for details.</div>
+      ${planPanel(STATE.plan)}
       <details class="how"><summary>How to read this page</summary><div>Every list is <b>ranked</b>: 🥇🥈🥉 mark the best three, and the order weighs expected profit, how sure the numbers are, how well the item sells, what you would lose if it doesn't sell, and whether you can do it now. <b>Click any row</b> for the full numbers and "Why it's ranked here". The coloured <b>notes</b> explain warnings: hover one to read it. <b>Per day</b> assumes you sell a realistic share of what the whole region buys each day (Settings). Prices follow your realm's lowest listing, except where nobody actually pays that.</div></details>
-      <div class="panel"><h2>Do these now <small>daily routines you can do today: each sells about once a day or more, ranked by profit a day</small></h2>${oppTable(t.now || [])}</div>
+      <div class="panel"><h2>Daily routines <small>crafts and vendor flips you can do today: each sells about once a day or more, ranked by profit a day</small></h2>${oppTable(t.now || [])}</div>
       <div class="panel"><h2>Occasional big flips <small>worth a lot per sale, but you'd sell less than one a day</small></h2>
         <div class="hint">These sell slowly: list one and expect to wait. Each shows the profit at the lowest listing and at what it actually sells for across the region, which is often less. Ranked by profit per sale and how sure the numbers are.</div>
         ${oppTable(t.slow || [], {cols: ['title', 'profit_unit', 'profit_avg', 'cost_unit', 'every', 'sells', 'flags'], empty: 'No slow, valuable flips right now.'})}</div>
@@ -553,6 +617,7 @@ async function render() {
   const view = $('#view');
   try { view.innerHTML = await VIEWS[TAB](); } catch (e) { view.innerHTML = `<div class="panel">Could not load: ${esc(e.message)}</div>`; }
   wireView();
+  wirePlan();
   refreshTooltips();
 }
 

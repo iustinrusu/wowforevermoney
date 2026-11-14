@@ -6,8 +6,9 @@ step, commit and push each finished piece, tick it off here and note it in docs/
 tight: finish the current piece, commit, update this list, and set a reminder that runs nothing.
 
 0. [ ] **Quick check, needs the user in game** (/reload once): addon 1.4.1 saves gold (compare with Syndicator in
-       the app's purse), and see the project log's open items for the other in-game checks.
-1. [ ] **Plan for today** on the main page (the user's priority): `docs/plans/todays-plan.md`
+       the app's purse), and see the project log's open items for the other in-game checks. Checked 2026-11-14:
+       not yet possible, the saved file is older than the 1.4.1 install.
+1. [x] **Plan for today** on the main page (the user's priority): `docs/plans/todays-plan.md` (done 2026-11-14)
 2. [ ] **Own Forever loot tables**: per-mob and per-node loot logging in ForeverMoneyBridge, then measured yields
        replace Classic ones: `docs/plans/forever-data-next.md`, section 1
 3. [ ] **Wowhead Forever reads**, about 5 pages per session, 30-60 s apart: `docs/plans/forever-data-next.md`, section 2

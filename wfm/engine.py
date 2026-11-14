@@ -10,7 +10,7 @@ import re
 import time
 from dataclasses import asdict, dataclass, field
 
-from . import fishing, gamedata, nodes, pricing, skinning, valuation
+from . import fishing, gamedata, nodes, plan, pricing, skinning, valuation
 from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
@@ -64,7 +64,7 @@ VENDOR_TRIP_SECONDS = 120    # go to a vendor and back, once a day
 POST_STACK = 5               # stackable items are posted a few at a time
 TIME_VALUE_SHARE = 0.5       # AH and crafting time is worth half of what your best farming earns an hour
 DEFAULT_TIME_VALUE = 20000   # 2g an hour until you have measured farming
-DAILY_ROUTINE = 1.0         # "Do these now" needs about one sale a day or more; slower = occasional flip
+DAILY_ROUTINE = 1.0         # "Daily routines" (was "Do these now") need about one sale a day or more; slower = occasional flip
 
 COOLDOWN_MIN_MS = 10 * 60 * 1000   # a recipe cooldown of 10+ minutes limits how many you can make a day
 
@@ -370,6 +370,7 @@ class Engine:
                 flags=flags,
                 detail={'recipe_spell': r.spell_id, 'recipe': r.name, 'mats': mats, 'revenue': revenue,
                         'sell_channel': channel, 'sell_source': q.source if q else 'vendor',
+                        'sell_price': q.value if (q and channel == 'AH') else None,
                         'product_count': r.product_count, 'skill_required': req, 'skill_exact': exact,
                         'thresholds': self.su.thresholds.get(r.spell_id), 'learn': self.learn_cost(r),
                         'req_level': product.req_level if product else 0,
@@ -1067,9 +1068,53 @@ class Engine:
             if liq and sale and o.kind in ('craft', 'vendor_flip') and o.detail.get('sell_channel') != 'vendor':
                 per = o.detail.get('product_count') or 1
                 o.detail['profit_at_avg_sale'] = int(int(sale * (1 - self.cut)) * per - o.cost_unit)
-        return {'opportunities': all_opps, 'best_use': best_use, 'top': self.top_picks(all_opps),
+        top = self.top_picks(all_opps)
+        return {'opportunities': all_opps, 'best_use': best_use, 'top': top,
+                'plan': plan.build(all_opps, top, self.my_holdings(self.valuer(best_use)), self.time_value,
+                                   self.share, self.cut, int(self.gold)),
                 'time_value': self.time_value, 'time_value_source': self.time_value_source,
                 'undervalued': self.undervaluation_watch()}
+
+    def my_holdings(self, valuer: valuation.Valuer, now: float | None = None) -> dict:
+        """What the character you play holds (bags, bank, mailbox, auctions that ended), each valued: plan.py's input.
+
+        From Syndicator, which saves on /reload or logout. An auction past its end time either sold or came back to
+        the mailbox; it counts as mail unless Syndicator already recorded that mail.
+        """
+        syn = getattr(self.w, 'syndicator', None) or {}
+        key = plan.character_key(syn, (getattr(self.w, 'profile', None) or {}).get('active') or '')
+        if not key:
+            return {'found': False, 'items': [], 'ended_auctions': 0}
+        c = syn[key]
+        now = time.time() if now is None else now
+        counts = dict((getattr(self.w, 'inventory', None) or {}).get(key) or {})
+        mail = dict(c.get('mail') or {})
+        ended: dict[int, int] = {}
+        for a in c.get('auctions') or []:
+            if a.get('expires') and a['expires'] < now:
+                ended[a['item']] = ended.get(a['item'], 0) + a.get('count', 1)
+        for iid, n in ended.items():
+            mail[iid] = max(mail.get(iid, 0), n)
+        min_spd = float(self.s.get('min_sold_per_day', 0.5))
+        reagents = {m for r in self.gd.recipes for m, _ in r.reagents}
+        items = []
+        for iid in set(counts) | set(mail):
+            it = self.gd.items.get(iid)
+            if not it:
+                continue
+            v = valuer.value(iid)
+            _, _, q = self.sell_value(iid)
+            liq = liquidity(self.price(iid), min_spd)
+            flags = list(v.flags) + (list(q.flags) if q and v.channel == 'AH' else [])
+            items.append({'item_id': iid, 'name': it.name, 'quality': it.quality, 'class_id': it.class_id, 'subclass_id': it.subclass_id,
+                          'stack': it.stack, 'count': counts.get(iid, 0) + mail.get(iid, 0),
+                          'in_mail': mail.get(iid, 0), 'value': v.value, 'channel': v.channel, 'flags': flags,
+                          'confidence': confidence(flags), 'sold_per_day': liq['sold_per_day'],
+                          'sale_rate': liq['sale_rate'], 'liquidity_flags': liq['flags'], 'locked': it.locked,
+                          'reagent': iid in reagents,
+                          'contents': [x['name'] for x in v.contents[:3]]})
+        return {'found': True, 'items': items, 'ended_auctions': sum(1 for a in c.get('auctions') or []
+                                                                     if a.get('expires') and a['expires'] < now)}
 
     @staticmethod
     def _one_per_cooldown(ranked: list[Opportunity]) -> list[Opportunity]:
