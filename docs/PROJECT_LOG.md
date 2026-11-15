@@ -24,6 +24,18 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-15 Everloot cross-check (to-do 2c).** 4 requests to `everloot.app/api/rollups/drops?limit=500&offset=N`
+  (220 KB, CC BY-SA 4.0, generic User-Agent), saved as `data/everloot/drops_1..4.json` (not committed); `wfm/everloot.py`
+  reads them (loaded with the Wowhead pages, re-read when the files change) and compares each rate with the Wowhead
+  Forever counts for the same mob or object and item (item pages' Dropped by / Pick pocketed / Skinned from and object
+  tabs, preferred in that order; mobs' and objects' own pages). A gap = both sides 30+ loots, one rate 1.5x+ the other
+  and 3+ standard errors apart. Data health entry "Drop rates: Wowhead Forever vs Everloot", credited. Not used in any
+  row. First result: 1,807 rates (1,606 mob, 201 object); 34 pairs in both; the 10 with 30+ loots on each side all
+  agree within chance (median ratio 1.04); 24 too small to judge, and 19 of those are higher on Everloot (median 1.63x,
+  median 15 loot windows): a rate only exists once the item dropped, so small samples lean high. Claude's
+  recommendation for the open question (fill gaps where Wowhead has nothing?): only from Everloot rates with 30+ loot
+  windows, labelled, out of Top picks until Wowhead confirms; never from smaller samples.
+
 - **2026-11-15 Crafted worth counts only for what a recipe can use a day (to-do 2b, the user's yes to C7).**
   `valuation.capped_total`: an ingredient worth more crafted counts at its crafted worth for up to N a day (N =
   `doable_units_per_day` from `best_uses`: what the product's market takes at your share, or the cooldown, in units
@@ -466,6 +478,9 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-15** Everloot cross-check of drop rates on Data health (`wfm/everloot.py`, `audit.everloot_check`; to-do 2c).
+  Tests: 202.
 
 - **2026-11-15** Crafted worth capped at what a recipe can use a day (`valuation.capped_total`, `Valuer.worth_for` /
   `unit_worth`, `Engine.loot_worth`; to-do 2b). Tests: 196 (tests/test_crafted_cap.py).

@@ -26,7 +26,9 @@ tight: finish the current piece, commit, update this list, and set a reminder th
 2b. [x] (done 2026-11-15: valuation.capped_total, every quantity and hourly row; see the project log)
        **"Worth if crafted" only for what can be made and sold a day** (user's yes, 2026-11-15):
        `docs/plans/decided-2026-11-15.md`, section 2b
-2c. [ ] **Everloot cross-check of drop rates** (user's yes, 2026-11-15; download approved: 4 requests, about 200 KB):
+2c. [x] (done 2026-11-15: Data health "Drop rates: Wowhead Forever vs Everloot"; 10 of 10 comparable pairs agree;
+       the open question for the user, fill gaps from Everloot?, is in the checklist, C8)
+       **Everloot cross-check of drop rates** (user's yes, 2026-11-15; download approved: 4 requests, about 200 KB):
        `docs/plans/decided-2026-11-15.md`, section 2c
 3. [-] ~~Own Forever loot tables from the addon~~: cancelled by the user (2026-11-14): loot tables come from online
        sources only, never our own logs. ForeverMoneyBridge stays at 1.4.1.

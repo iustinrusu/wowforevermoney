@@ -5,7 +5,7 @@ Run on every recompute (shown on the Data health page) and from the command line
 """
 from __future__ import annotations
 
-from . import coverage, wowhead_items
+from . import coverage, everloot, wowhead_items
 from .engine import PROFESSIONS
 
 
@@ -214,7 +214,41 @@ def run(world, engine) -> list[dict]:
                              for r in cov['read_no_data']]))
     except Exception as e:          # never let a check break the audit
         out.append(_check('Forever source data for every material', 'warn', f'Could not work it out: {e}'))
+
+    # Everloot: a second Forever source for drop rates (player uploads), compared with the Wowhead pages read (2c)
+    try:
+        out.append(everloot_check(getattr(world, 'everloot', None) or {}, getattr(world, 'forever_pages', None) or {},
+                                  engine.name, q))
+    except Exception as e:          # never let a check break the audit
+        out.append(_check('Drop rates: Wowhead Forever vs Everloot', 'warn', f'Could not work it out: {e}'))
     return out
+
+
+def everloot_check(ev: dict, pages: dict, item_name, q=None) -> dict:
+    """The Data health entry: how well Everloot's rates agree with the Wowhead Forever counts for the same pairs."""
+    name = 'Drop rates: Wowhead Forever vs Everloot'
+    if not ev.get('rates'):
+        return _check(name, 'info', 'No Everloot data saved (data/everloot/drops_*.json). ' + everloot.CREDIT)
+    c = everloot.compare(ev, pages)
+    n = c['counts']
+
+    def label(kind, i):
+        if kind == 'item':
+            return item_name(i)
+        rec = ((q.npcs if kind == 'npc' else q.objects).get(i) if q else None) or {}
+        return rec.get('name') or f'{"mob" if kind == "npc" else "object"} {i}'
+
+    detail = (f"Everloot (everloot.app) collects WoW: Forever loot from players' uploads: {c['everloot_rates']:,} public "
+              f"drop rates (data of {c['as_of'] or '?'}). {len(c['pairs'])} of them are for a mob or object and item "
+              f"that the Wowhead Forever pages read so far also count. Compared only where both sides looted at least "
+              f"{everloot.MIN_LOOTS} times: {n['agree']} agree within chance, {n['gap']} are far apart (at least "
+              f"{everloot.GAP_RATIO:g} times apart and {everloot.GAP_Z:g}+ standard errors: listed first); "
+              f"{n['small']} pairs have too few loots on one side to say. Everloot's rates are not used in any number "
+              f"yet: this check shows whether the two sources agree before they could fill each other's gaps. "
+              + everloot.CREDIT)
+    shown = [p for p in c['pairs'] if p['verdict'] != 'small']
+    return _check(name, 'warn' if n['gap'] else 'pass', detail,
+                  [('Far apart: ' if p['verdict'] == 'gap' else 'Agree within chance: ') + everloot.describe(p, label) for p in shown])
 
 
 def summary(results: list[dict]) -> dict:

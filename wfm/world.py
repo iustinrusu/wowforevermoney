@@ -21,6 +21,7 @@ WOWHEAD_FISHING = DATA / 'wowhead_forever_fishing.json'
 WOWHEAD_CONTAINERS = DATA / 'wowhead_forever_containers.json'
 from . import profile as profile_mod
 from . import skinning as skinning_mod
+from . import everloot as everloot_mod
 from . import wowhead_items
 from .questie import QuestieDB, load_drop_rates, load_questie
 from .skillup import SkillUpData, load_skillup
@@ -82,6 +83,7 @@ class World:
         self.forever_containers: dict = {}   # item id -> what it contains in Forever (Wowhead, read by hand)
         self.forever_skinning: dict = {}     # Wowhead Forever "Skinned from" counts (read by hand)
         self.forever_pages: dict = {}        # Wowhead Forever item/object/npc pages (wowhead_items.py)
+        self.everloot: dict = {}             # Everloot drop rates (everloot.py): cross-checked, not used in rows
         self.inventory: dict = {}
         self.hotfix_info: dict = {}
         self.profile: dict = {'characters': {}, 'active': None, 'activity': {}}
@@ -296,6 +298,8 @@ class World:
         self.forever_pages = wowhead_items.load()
         # item pages read in full add their "Skinned from" rows to the skinning snapshot (an item page wins)
         self.forever_skinning = wowhead_items.merge_skinning(skinning_mod.load(), self.forever_pages)
+        self.everloot = everloot_mod.load()          # a second source, cross-checked on Data health only
+        st.files += [str(f) for f in everloot_mod.files()]
         st.loaded_at = int(time.time())
         st.file_time = _mtime([p, WOWHEAD_CONTAINERS, skinning_mod.SNAPSHOT, wowhead_items.SNAPSHOT]) or None
         dates = sorted({v.get('checked', '') for v in list(self.forever_fishing.values()) + list(self.forever_containers.values())}
@@ -403,7 +407,7 @@ class World:
         'angler': ('_load_angler', lambda self: [self._sv('ForeverAngler.lua') or '']),
         'classicdb': ('_load_classic', lambda self: [classicdb.CACHE]),
         'checks': ('_load_checks', lambda self: [WOWHEAD_FISHING, WOWHEAD_CONTAINERS, skinning_mod.SNAPSHOT,
-                                                 wowhead_items.SNAPSHOT]),
+                                                 wowhead_items.SNAPSHOT, *everloot_mod.files()]),
         'inventory': ('_load_inventory', lambda self: [self._sv('Syndicator.lua') or '']),
         'profile': ('_load_profile', lambda self: [self._sv('ForeverMoneyBridge.lua') or '',
                                                    self._sv('TradeSkillMaster.lua') or '']),
