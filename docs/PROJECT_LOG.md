@@ -557,6 +557,10 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Farm meter 1.5.3 (user): looted containers count 0 until opened (the app lists the 523 openable items
+  in Prices.lua as `containers`); the window shows "Not opened yet: N containers (about X inside)" and /fmb stop
+  reminds you to open them. Tests: 239.
+
 - **2026-11-15** Farm meter 1.5.1/1.5.2 after the user's first test (fishing loot wasn't counted: loot windows didn't
   reach the meter in WoW: Forever): items now from the player's own loot messages (LOOT_ITEM_SELF(_MULTIPLE) turned
   into patterns: any language), gold from loot money messages paired with the gold change, `/fmb debug` prints what
