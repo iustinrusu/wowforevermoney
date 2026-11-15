@@ -24,8 +24,9 @@ The project is public on GitHub: github.com/iustinrusu/wowforevermoney.
 - **Or:** on the repo page click **Code > Download ZIP** and unzip it somewhere simple, for example
   `Documents\WoWForeverMoney`. The Market charts then start empty and fill in as the app records prices.
 
-Not included: the Wowhead Forever data read by hand for the author's own use (drop, skinning and fishing counts in
-`data/wowhead_forever_*.json`). The app works without them; spots that need them show less until you add your own.
+The Wowhead Forever data (drop, skinning and fishing counts read by hand) comes encrypted, for friends only: ask
+Iustin for the **data key**, then paste it in **Settings > Shared data key** and save. The app unlocks the data and
+keeps it up to date with each update. Without the key the app still works, with less Forever data.
 
 ## 3. Start it
 

@@ -21,6 +21,7 @@ WOWHEAD_FISHING = DATA / 'wowhead_forever_fishing.json'
 WOWHEAD_CONTAINERS = DATA / 'wowhead_forever_containers.json'
 from . import profile as profile_mod
 from . import skinning as skinning_mod
+from . import datapack as datapack_mod
 from . import everloot as everloot_mod
 from . import gatherlite as gatherlite_mod
 from . import wowhead_items
@@ -306,6 +307,8 @@ class World:
 
     def _load_checks(self):
         st = self.status.setdefault('checks', SourceStatus('checks', 'Wowhead Forever pages (read by hand): fishing, containers, skinning, item sources'))
+        # the shared pack (encrypted, in the repository) unlocks into data/ when the data key is set in Settings
+        self.pack_status = datapack_mod.unpack(self.settings.snapshot().get('data_key') or '')
         p = WOWHEAD_FISHING
         st.files = [str(p)]
         data = json.loads(p.read_text(encoding='utf-8')) if p.exists() else {}
@@ -430,7 +433,7 @@ class World:
         'gatherlite': ('_load_gatherlite', lambda self: [gatherlite_mod.data_file(self.paths.addons) or '']),
         'classicdb': ('_load_classic', lambda self: [classicdb.CACHE]),
         'checks': ('_load_checks', lambda self: [WOWHEAD_FISHING, WOWHEAD_CONTAINERS, skinning_mod.SNAPSHOT,
-                                                 wowhead_items.SNAPSHOT, *everloot_mod.files()]),
+                                                 wowhead_items.SNAPSHOT, datapack_mod.PACK, *everloot_mod.files()]),
         'inventory': ('_load_inventory', lambda self: [self._sv('Syndicator.lua') or '']),
         'profile': ('_load_profile', lambda self: [self._sv('ForeverMoneyBridge.lua') or '',
                                                    self._sv('TradeSkillMaster.lua') or '']),

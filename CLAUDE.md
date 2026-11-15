@@ -51,7 +51,8 @@ memory of the project, not the chat.
   push each finished piece of work without asking (the user's standing permission for this project,
   2026-11-14). Never commit `data/` (caches, price history, logs, settings) except the
   hand-curated `data/tips.json` and `data/investments.json` (the Wowhead Forever pages, `data/wowhead_forever_*.json`,
-  stay local since the repo went public on 2026-11-15: never commit them; the starter price history
+  stay local since the repo went public on 2026-11-15: never commit them; friends get them through the encrypted
+  `data/wowhead_forever.pack` (`wfm/datapack.py`, key = setting `data_key`, rebuilt by `.githooks/pre-commit`); the starter price history
   `data/market_seed.json.gz` is not on main: `.githooks/pre-push` replaces the branch `market-data` with one commit
   holding only the latest file on every push; enable per clone with `git config core.hooksPath .githooks`), and never commit the WoW account folder
   number or other account identifiers.

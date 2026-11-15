@@ -1,4 +1,5 @@
 data/*
+!data/wowhead_forever.pack
 !data/tips.json
 !data/investments.json
 __pycache__/

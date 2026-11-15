@@ -214,6 +214,7 @@ class App:
             'effective': effective, 'detected': detected, 'characters': chars,
             'active_character': self.settings.snapshot().get('character') or self.world.profile.get('active'),
             'last_played': self.world.profile.get('active'),
+            'pack_status': getattr(self.world, 'pack_status', ''),
             'realms': pd.realms() if pd else [], 'client_build': self.world.client_build,
             'counts': counts, 'audit_summary': audit.summary(self.audit),
             'top': {sec: [self.opp_view(by[k]) for k in keys if k in by] for sec, keys in r['top'].items()},
@@ -484,9 +485,12 @@ class App:
         allowed = {'auto_detect', 'character', 'gold_scope', 'realm', 'faction', 'gold', 'level', 'professions', 'preferred', 'switch_bonus', 'ah_cut',
                    'market_share', 'min_sold_per_day', 'show_other_professions', 'include_unverified_recipes',
                    'farm_rates', 'watchlist', 'alerts', 'stale_hours', 'casts_per_hour', 'fishing_skill_bonus', 'kills_per_hour', 'time_value_gold', 'herb_nodes_per_hour', 'ore_nodes_per_hour',
-                   'own_logs_for_rates', 'fishing_pools', 'sale_price_basis'}
+                   'own_logs_for_rates', 'fishing_pools', 'sale_price_basis', 'data_key'}
         clean = {k: v for k, v in changes.items() if k in allowed}
         new = self.settings.update(clean)
+        if 'data_key' in clean:             # a new key: unlock the shared Wowhead data now
+            with self.world.lock:
+                self.world._load_checks()
         if 'realm' in clean:
             with self.world.lock:
                 self.world._load_tsm()

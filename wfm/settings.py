@@ -35,6 +35,8 @@ DEFAULTS = {
     # Drop rates come from Wowhead Forever's large samples. Your own catch logs are small, mix pools with open
     # water and can be incomplete, so they're only used for your pace and got-away rate unless you turn this on.
     'own_logs_for_rates': False,
+    # Key that unlocks the shared Wowhead Forever data (data/wowhead_forever.pack): from the app's author. Local only.
+    'data_key': '',
     # Sale price on the AH: 'lower' = the lower of the current lowest buyout and the usual sale price, what you can
     # count on (the user's choice, 2026-11-14); 'min_buyout' = the current lowest buyout, what you'd list at;
     # 'actual_sales' = never above the realm's listing average or what it actually sells for (most conservative).

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Before a commit: rebuild the encrypted Wowhead data pack (data/wowhead_forever.pack) from the local files when what
+# they hold changed, and add it to the commit. Only where the data key is set (the author's PC); never blocks a commit.
+[ -f data/settings.json ] || exit 0
+PY="${LOCALAPPDATA}/Programs/Python/Python313/python.exe"
+[ -x "$PY" ] || PY=$(command -v python3 || command -v python) || exit 0
+"$PY" -m wfm.datapack pack >/dev/null 2>&1 && git add data/wowhead_forever.pack 2>/dev/null
+exit 0

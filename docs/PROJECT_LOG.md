@@ -557,6 +557,13 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Wowhead data shared with friends only (user: "this repo is only for me and my friends"; Claude advised
+  against plain obfuscation on a public repo, so it is encrypted instead): `data/wowhead_forever.pack` (43 KB) holds the
+  four files, sealed with the passphrase in the local setting `data_key` (PBKDF2-SHA256 200k rounds, SHA-256 counter
+  keystream, HMAC-SHA256; standard library only). The app unlocks it into data/ on start when the key is set (Settings
+  > Shared data key); `.githooks/pre-commit` rebuilds it when the local files change. The user gives friends the key.
+  Tests: 231.
+
 - **2026-11-15** Repository made ready to go public (user: "fix all"). Checked every commit on both branches: no
   character names, account number, BattleTags, passwords or keys. Fixed, with a history rewrite and force push (backup
   bundle kept outside the repo): commit email now `iustinrusu@users.noreply.github.com` (also `git config user.email`;
