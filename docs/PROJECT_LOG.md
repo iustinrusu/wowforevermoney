@@ -557,6 +557,8 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Addon 1.5.8: the session total is the big headline, gold an hour the muted line under it (user).
+
 - **2026-11-15** Addon 1.5.7: shown as "Gold Ever After" (TOC title, window, chat messages; the folder and saved
   variables keep the name ForeverMoneyBridge so no data is lost); commands `/gea` (start, stop, pause, resume,
   debug), `/fmb` still works. The unopened-containers line had the same anchor bug as the top items (fixed in

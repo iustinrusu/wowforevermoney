@@ -34,13 +34,14 @@ local function elapsed()
   return math.max(0, now - session.start - session.pausedFor)
 end
 
-local function money(c)
+local function money(c, plain)       -- plain: no coin colours (for muted text)
   c = math.floor(c or 0)
   local g, si, co = math.floor(c / 10000), math.floor(c / 100) % 100, c % 100
   local parts = {}
-  if g > 0 then parts[#parts + 1] = "|cffffd700" .. g .. "g|r" end
-  if si > 0 then parts[#parts + 1] = "|cffc7c7cf" .. si .. "s|r" end
-  if co > 0 or #parts == 0 then parts[#parts + 1] = "|cffeda55f" .. co .. "c|r" end
+  local function part(v, unit, colour) return plain and (v .. unit) or ("|cff" .. colour .. v .. unit .. "|r") end
+  if g > 0 then parts[#parts + 1] = part(g, "g", "ffd700") end
+  if si > 0 then parts[#parts + 1] = part(si, "s", "c7c7cf") end
+  if co > 0 or #parts == 0 then parts[#parts + 1] = part(co, "c", "eda55f") end
   return table.concat(parts, " ")
 end
 
@@ -67,8 +68,10 @@ local function refresh()
   local value, sources, rows = totals()
   local total = value + session.money
   win.title:SetText("Gold Ever After |cff999999· farm meter" .. (session.paused and " (paused)" or "") .. "|r")
-  win.rate:SetText(secs >= 60 and (money(total / secs * 3600) .. " |cffaaaaaaan hour|r") or "|cff888888-- an hour|r")
-  win.total:SetText("Total " .. money(total) .. (secs < 60 and "  |cff888888(gold an hour after the first minute)|r" or ""))
+  -- headline: the session's total, big; gold an hour under it, muted (the user's choice)
+  win.rate:SetText(money(total) .. " |cffaaaaaatotal|r")
+  win.total:SetText(secs >= 60 and ("|cffaaaaaa" .. money(total / secs * 3600, true) .. " an hour|r")
+    or "|cff888888Gold an hour after the first minute|r")
   win.kv[1]:SetText(string.format("%d:%02d", secs / 60, secs % 60))
   win.kv[2]:SetText(money(value))
   win.kv[3]:SetText(money(session.money))
