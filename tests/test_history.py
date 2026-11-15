@@ -30,3 +30,34 @@ class StarterHistoryTests(unittest.TestCase):
                 self.assertEqual([(x['ts'] // DAY, bool(x.get('starter'))) for x in s], [(98, True), (99, False)])
         finally:
             _t.time = real
+
+
+class SeedBranchTests(unittest.TestCase):
+    def test_fetch_seed_from_the_market_data_branch(self):
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        from wfm.history import fetch_seed
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            g = lambda repo, *a: subprocess.run(['git', '-C', str(repo), *a], capture_output=True, check=True, text=True)
+            origin = d / 'origin'
+            origin.mkdir()
+            g(origin, 'init', '-q')
+            (origin / 'market_seed.json.gz').write_bytes(b'seed-bytes')
+            blob = g(origin, 'hash-object', '-w', 'market_seed.json.gz').stdout.strip()
+            # bytes, not text: Windows text mode would add a carriage return to the file name
+            tree = subprocess.run(['git', '-C', str(origin), 'mktree'],
+                                  input=f'100644 blob {blob}\tmarket_seed.json.gz\n'.encode(),
+                                  capture_output=True, check=True).stdout.decode().strip()
+            commit = g(origin, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit-tree', tree, '-m', 'seed').stdout.strip()
+            g(origin, 'update-ref', 'refs/heads/market-data', commit)
+            clone = d / 'clone'
+            clone.mkdir()
+            g(clone, 'init', '-q')
+            g(clone, 'remote', 'add', 'origin', str(origin))
+            out = d / 'market_seed.json.gz'
+            self.assertEqual(fetch_seed(repo=clone, path=out), 'updated')
+            self.assertEqual(out.read_bytes(), b'seed-bytes')
+            self.assertEqual(fetch_seed(repo=clone, path=out), 'fresh')          # at most once a day
+            self.assertEqual(fetch_seed(repo=d / 'nogit', path=d / 'x.gz'), 'no git')

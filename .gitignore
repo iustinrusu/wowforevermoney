@@ -2,7 +2,6 @@ data/*
 !data/tips.json
 !data/investments.json
 !data/wowhead_forever_*.json
-!data/market_seed.json.gz
 __pycache__/
 *.pyc
 .pytest_cache/

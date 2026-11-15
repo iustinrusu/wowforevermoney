@@ -19,7 +19,7 @@ from . import market as market_mod
 from . import profile as profile_mod
 from .alerts import EventLog, desktop_notify, diff_runs
 from .engine import Engine
-from .history import KEEP_DAYS, History
+from .history import KEEP_DAYS, History, fetch_seed
 from .paths import DATA, ROOT, WEB, GamePaths, find_wow_dir
 from .pricing import ah_sell, fmt_money, proceeds
 from .settings import Settings
@@ -49,6 +49,8 @@ class App:
                              'Set "wow_dir" in data/settings.json.')
         self.world = World(GamePaths(wow), self.settings, log)
         self.history = History()
+        # starter price history for the Market charts of a new install (from the git branch market-data, daily)
+        threading.Thread(target=lambda: log(f'Starter price history: {fetch_seed()}'), daemon=True).start()
         self.events = EventLog()
         self.result: dict | None = None
         self.generated_at = 0

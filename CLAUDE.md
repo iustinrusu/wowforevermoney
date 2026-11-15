@@ -50,9 +50,9 @@ memory of the project, not the chat.
 - **Git:** remote is https://github.com/iustinrusu/wowforevermoney.git (branch `main`). Always commit and
   push each finished piece of work without asking (the user's standing permission for this project,
   2026-11-14). Never commit `data/` (caches, price history, logs, settings) except the
-  hand-curated `data/tips.json`, `data/investments.json` and `data/wowhead_forever_*.json`, and the starter price history
-  `data/market_seed.json.gz` (refreshed automatically before a commit, at most once a day, by `.githooks/pre-commit`;
-  enable per clone with `git config core.hooksPath .githooks`; by hand: `python -m wfm.history seed`), and never commit the WoW account folder
+  hand-curated `data/tips.json`, `data/investments.json` and `data/wowhead_forever_*.json`, (the starter price history
+  `data/market_seed.json.gz` is not on main: `.githooks/pre-push` replaces the branch `market-data` with one commit
+  holding only the latest file on every push; enable per clone with `git config core.hooksPath .githooks`), and never commit the WoW account folder
   number or other account identifiers.
 
 ## Run, test, audit

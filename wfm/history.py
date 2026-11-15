@@ -1,9 +1,11 @@
 """Price history in SQLite: one row per item each time TSM delivers a new realm scan.
 
 TSM's data file only holds averages (14-day, recent, long-term), not a time series, so the app keeps its own.
-A new install has none, so the app ships a starter history (data/market_seed.json.gz, daily candles made from the
-author's snapshots, refreshed with `python -m wfm.history seed`): charts use it for days before your own history
-of an item begins, marked "starter" and labelled with its realm and date.
+A new install has none, so the app gets a starter history (data/market_seed.json.gz, daily candles made from the
+author's snapshots): charts use it for days before your own history of an item begins, marked "starter" and labelled
+with its realm and date. It lives on the git branch `market-data`, one commit holding only the latest file, replaced
+on every push by the author's pre-push hook (so old copies never pile up in the repository); the app fetches it from
+there once a day (`fetch_seed`). `python -m wfm.history seed` writes it by hand.
 Every snapshot is kept for FULL_DAYS; older days are folded into one daily candle per item (open, high, low,
 close of the lowest listing, plus the day's average listings, realm average, region sale price and sold/day),
 kept for KEEP_DAYS. Snapshots only exist for times the app was running.
@@ -13,6 +15,7 @@ from __future__ import annotations
 import gzip
 import json
 import sqlite3
+import subprocess
 import sys
 import threading
 import time
@@ -25,8 +28,34 @@ FULL_DAYS = 14       # every snapshot (about hourly) for two weeks
 KEEP_DAYS = 365      # then one daily candle per item for a year
 SERIES_COLS = ('ts', 'min_buyout', 'num_auctions', 'market', 'region_market', 'region_sale', 'sold_per_day')
 SEED = DATA / 'market_seed.json.gz'
-SEED_DAYS = 30       # the starter history keeps the last 30 days
+SEED_DAYS = 14       # the starter history: the last two weeks (the user's choice, 2026-11-15; about 2 MB)
 _CANDLE = ('open', 'high', 'low', 'close', 'num_auctions', 'market', 'region_market', 'region_sale', 'sold_per_day')
+
+
+SEED_BRANCH = 'market-data'
+
+
+def fetch_seed(repo=None, path=None, max_age_hours: float = 20) -> str:
+    """Get the latest starter history from the git branch `market-data` (one commit, the latest file only) into data/,
+    at most once a day. Quiet on any failure (no git, no network, a ZIP download): returns what happened."""
+    from .paths import ROOT
+    repo, path = repo or ROOT, path or SEED
+    try:
+        if path.exists() and time.time() - path.stat().st_mtime < max_age_hours * 3600:
+            return 'fresh'
+        if not (repo / '.git').exists():
+            return 'no git'
+        run = lambda *a, **k: subprocess.run(['git', '-C', str(repo), *a], capture_output=True, timeout=60, **k)
+        run('fetch', '--quiet', 'origin', f'{SEED_BRANCH}:refs/remotes/origin/{SEED_BRANCH}')
+        r = run('show', f'origin/{SEED_BRANCH}:market_seed.json.gz')
+        if r.returncode != 0 or not r.stdout:
+            return 'not on the branch'
+        tmp = path.with_suffix('.part')
+        tmp.write_bytes(r.stdout)
+        tmp.replace(path)
+        return 'updated'
+    except (OSError, subprocess.SubprocessError):
+        return 'failed'
 
 
 def load_seed(path=None) -> dict:

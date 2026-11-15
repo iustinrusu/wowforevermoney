@@ -557,6 +557,13 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Starter price history moved off main (user: "keep the freshest snapshot only" to avoid bloat) and cut
+  to two weeks (user's suggestion; matches the 14 days of full snapshots; about 2 MB). It lives on the branch
+  `market-data`: one commit with only the latest `market_seed.json.gz`, replaced by `.githooks/pre-push` on every push
+  from the user's PC (built from the user's local snapshots); the old copies become unreferenced. The app fetches it
+  from that branch at start, at most once a day (`history.fetch_seed`; quiet without git, e.g. a ZIP download). The one
+  400 KB copy committed earlier stays in main's history. Tests: 229.
+
 - **2026-11-15** Starter price history for new installs (user: the Market tab charts are empty after a fresh install).
   `data/market_seed.json.gz` (tracked): daily candles per item from the author's snapshots, last 30 days (7,103 items,
   3 days = 400 KB on 2026-11-15; about 4 MB at 30 days), used by `History.series` only for days before your own
