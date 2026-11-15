@@ -15,6 +15,9 @@ list), pace as in CLAUDE.md; (b) item 7: strategy item 3 (vertical integration),
 (d) item 4: mobs' own pages (part of the Wowhead budget). 2a, C8 (Everloot fills mob-drop gaps), C9 and item 5 were done the
 same night; nothing waits on the user.
 
+1b. [ ] **FIRST NEXT SESSION: realm prices, own materials, three profit views** (the user's decisions, 2026-11-15):
+       `docs/plans/realm-prices-and-profit-views.md`. Then continue with (a)-(d) above.
+
 0. [x] **Quick check, needs the user in game** (done 2026-11-14: 1.4.1's gold = Syndicator's on both characters) (/reload once): addon 1.4.1 saves gold (compare with Syndicator in
        the app's purse), and see the project log's open items for the other in-game checks. Checked 2026-11-14:
        not yet possible, the saved file is older than the 1.4.1 install.

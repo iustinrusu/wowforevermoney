@@ -24,6 +24,16 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-15 Realm prices; three profit views; own materials (user, after asking why Tailoring and Leatherworking
+  earn so little).** "Prices should be based on my realm, because I play on a realm": the default sale price becomes
+  the realm's lowest listing, replacing the 2026-11-14 "lower of lowest listing and region usual sale" (region data
+  stays for how fast things sell; walls become a warning, not the price). No tracking of the user's own sales. Profit
+  shown as an average day, a good day (one sale of each high-value item at the realm price, labelled optimistic) and
+  with materials you gather (what crafting adds over selling them raw, plus the farming time). Not built yet: plan
+  `docs/plans/realm-prices-and-profit-views.md`, first item next session. Checked the same day: Mooncloth makes
+  13g 67s each but has a 95 h cooldown in Forever (~3g 45s a day; 25g 29s each at the realm's 28g listing); Devilsaur
+  Leggings 20g profit each at ~65g, but the region sells 1 every 3 days and 3% of listings sell (hard to sell).
+
 - **2026-11-15 History rewritten (to-do 2a done).** At the user's word ("do the script yourself") Claude ran
   `data/rewrite_history.sh`: 76 commits rewritten, force-pushed with a lease; origin/main has no mention of the name.
   New first commit 73e3f39 (was 0b17b50). Backup: `data/before-rewrite.bundle`. GitHub may still serve old commits
