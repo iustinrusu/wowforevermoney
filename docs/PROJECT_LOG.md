@@ -547,6 +547,11 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Fix: the page was blank (user: "it seems broken"). The Everloot label in the mob drop list had a bare
+  apostrophe ("players' uploads") inside a quoted string: a script syntax error that stops the whole page. Reworded;
+  every tab rendered in the browser afterwards. Lesson: after any web/app.js edit, load the page and render every view
+  (no Node here for a syntax check), and avoid apostrophes in quoted label text.
+
 - **2026-11-15** History rewritten without the character name; Everloot fills mob-drop gaps (flag `everloot`).
   Tests: 222.
 

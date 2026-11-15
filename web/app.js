@@ -806,7 +806,7 @@ function oppDetail(o) {
       <div>Drops worth</div><div>${money(d.drop_value)} a kill</div>
       ${d.skin_value ? `<div>Skin worth</div><div>${money(d.skin_value)} a skin ${d.can_skin ? '' : `<span class="needs">not counted: needs Skinning ${d.skin_needed}</span>`}</div>` : ''}</div>
       <h3>Drops counted <small>chance per kill × average stack, at current prices</small></h3><table><thead><tr><th>Item</th><th class="num">Per kill</th><th class="num">Worth each</th><th class="num">Seen</th></tr></thead><tbody>
-      ${d.drops.map((x) => `<tr class="row" data-item="${x.item_id}"><td>${itemLink(x.item_id, x.name)}${x.source === 'Everloot' ? ' <span class="flag warn" title="Rate from Everloot (players' uploads, CC BY-SA 4.0): Wowhead Forever has none for this mob yet">Everloot</span>' : ''}</td><td class="num">${num(x.per_kill, 3)}</td><td class="num">${money(x.value)}</td><td class="num">${num(x.count, 0)} of ${num(x.looted, 0)}</td></tr>`).join('')}</tbody></table>
+      ${d.drops.map((x) => `<tr class="row" data-item="${x.item_id}"><td>${itemLink(x.item_id, x.name)}${x.source === 'Everloot' ? ' <span class="flag warn" title="Rate from Everloot (uploaded by players, CC BY-SA 4.0): Wowhead Forever has none for this mob yet">Everloot</span>' : ''}</td><td class="num">${num(x.per_kill, 3)}</td><td class="num">${money(x.value)}</td><td class="num">${num(x.count, 0)} of ${num(x.looted, 0)}</td></tr>`).join('')}</tbody></table>
       <p class="note">Only items whose Wowhead Forever pages are read are counted (materials first); coins, gray items and gear are not, so a kill is worth more than this.</p>`;
   }
   if (o.kind === 'realm_dip') {
