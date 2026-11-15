@@ -557,6 +557,11 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Farm meter 1.5.4 (user: "skinning counts as kills"): each loot window is classified by its source and
+  the spell just cast (by spell id, every rank, plus this client's names): kills, skins, picked (Pick Pocket), fish,
+  nodes (Herb Gathering/Mining), chests (objects without a gathering spell), opened (containers from bags),
+  disenchanted. The same corpse or chest opened again isn't counted twice. The window lists only the non-zero kinds.
+
 - **2026-11-15** Farm meter 1.5.3 (user): looted containers count 0 until opened (the app lists the 523 openable items
   in Prices.lua as `containers`); the window shows "Not opened yet: N containers (about X inside)" and /fmb stop
   reminds you to open them. Tests: 239.

@@ -63,7 +63,9 @@ local function refresh()
   lines[2]:SetText("Items: " .. money(value) .. "   Gold looted: " .. money(session.money))
   lines[3]:SetText("Total: " .. money(total) .. "   Per hour: " .. (perHour and money(perHour) or "after 1 min"))
   local l = session.loots
-  lines[4]:SetText(string.format("Kills %d  ·  Fish %d  ·  Nodes %d  ·  Opened %d", l.mobs or 0, l.fishing or 0, l.nodes or 0, l.containers or 0))
+  local parts = {}
+  for _, k in ipairs(ORDER) do if (l[k] or 0) > 0 then parts[#parts + 1] = LABEL[k] .. " " .. l[k] end end
+  lines[4]:SetText(#parts > 0 and table.concat(parts, "  ·  ") or "Nothing looted yet")
   for i = 1, 4 do
     local r = rows[i]
     if r then
@@ -130,7 +132,7 @@ local function makeWindow()
 end
 
 local function start()
-  session = { start = GetTime(), paused = false, pausedFor = 0, money = 0, items = {}, unopened = {}, loots = {}, zone = GetRealZoneText and GetRealZoneText() or "?" }
+  session = { start = GetTime(), paused = false, pausedFor = 0, money = 0, items = {}, unopened = {}, loots = {}, seen = {}, zone = GetRealZoneText and GetRealZoneText() or "?" }
   lastMoney = GetMoney()
   makeWindow():Show()
   win.pause:SetText("Pause")
@@ -185,27 +187,63 @@ if C_Container and C_Container.UseContainerItem then hooksecurefunc(C_Container,
 if UseContainerItem then hooksecurefunc("UseContainerItem", rememberUse) end
 local moneyChatAt, moneyDelta = 0, nil
 
+-- What kind of loot a window is: the loot source (a creature, an object, an item) plus the spell you just cast.
+-- Spells by id (every rank), turned into this client's names too, so it works in any language.
+local CAST_SPELLS = {
+  skins = { 8613, 8617, 8618, 10768 },                               -- Skinning
+  nodes = { 2366, 2368, 3570, 11993, 2575, 2576, 3564, 10248 },     -- Herb Gathering, Mining
+  pickpocket = { 921 },                                              -- Pick Pocket
+  disenchant = { 13262 },                                            -- Disenchant
+}
+local spellKind, nameKind = {}, { ["Skinning"] = "skins", ["Herb Gathering"] = "nodes", ["Mining"] = "nodes",
+                                  ["Pick Pocket"] = "pickpocket", ["Disenchant"] = "disenchant" }
+for kind, ids in pairs(CAST_SPELLS) do
+  for _, id in ipairs(ids) do
+    spellKind[id] = kind
+    local name = GetSpellInfo and GetSpellInfo(id)
+    if name then nameKind[name] = kind end
+  end
+end
+local lastCast = { kind = nil, t = 0 }
+local CAST_WINDOW = 10
+local LABEL = { mobs = "Kills", skins = "Skins", pickpocket = "Picked", fishing = "Fish", nodes = "Nodes",
+                chests = "Chests", containers = "Opened", disenchant = "Disenchanted" }
+local ORDER = { "mobs", "skins", "pickpocket", "fishing", "nodes", "chests", "containers", "disenchant" }
+
 local function noteWindow()
   if windowCounted then return end
   windowCounted = true
   local guid = GetLootSourceInfo and GetLootSourceInfo(1) or ""
   local kind = strsplit("-", guid or "")
-  if kind == "Item" then
-    -- a container opened from your bags: its contents count; if it was looted in this session it was counted at its
-    -- "worth opened" value, so it comes back out (the real contents replace the estimate, never both)
-    windowKind = "container"
-    session.loots.containers = (session.loots.containers or 0) + 1
+  local cast = (GetTime() - lastCast.t <= CAST_WINDOW) and lastCast.kind or nil
+  lastCast.kind = nil
+  local what
+  if IsFishingLoot and IsFishingLoot() then
+    what = "fishing"
+  elseif kind == "Item" then
+    what = (cast == "disenchant") and "disenchant" or "containers"
+  elseif kind == "GameObject" then
+    what = (cast == "nodes") and "nodes" or "chests"
+  else
+    what = (cast == "skins" or cast == "pickpocket") and cast or "mobs"
+  end
+  windowKind = what
+  -- the same corpse or chest opened again (loot left behind): not another kill
+  if guid ~= "" and what ~= "containers" and what ~= "disenchant" then
+    local key = guid .. "|" .. what
+    if session.seen[key] then say("looted again (not counted twice):", what) return end
+    session.seen[key] = true
+  end
+  session.loots[what] = (session.loots[what] or 0) + 1
+  if what == "containers" then
+    -- a container opened from your bags: its contents count; it leaves the "not opened yet" list
     local id = lastUsed.id and GetTime() - lastUsed.t <= 3 and lastUsed.id
     if id and (session.unopened[id] or 0) > 0 then
       session.unopened[id] = session.unopened[id] - 1
       if session.unopened[id] == 0 then session.unopened[id] = nil end
     end
-    say("container opened: its contents count")
-    return
   end
-  windowKind = (IsFishingLoot and IsFishingLoot()) and "fishing" or (kind == "GameObject" and "nodes" or "mobs")
-  session.loots[windowKind] = (session.loots[windowKind] or 0) + 1
-  say("loot window:", windowKind)
+  say("loot window:", what)
 end
 
 local function addMoney(delta)
@@ -217,7 +255,16 @@ local ev = CreateFrame("Frame")
 for _, e in ipairs({ "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "CHAT_MSG_LOOT", "CHAT_MSG_MONEY", "PLAYER_MONEY" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
-ev:SetScript("OnEvent", function(_, event, msg)
+ev:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
+  if event == "UNIT_SPELLCAST_SUCCEEDED" then
+    if msg == "player" then
+      local name = spellId and GetSpellInfo and GetSpellInfo(spellId)
+      local k = (spellId and spellKind[spellId]) or (name and nameKind[name])
+      if k then lastCast.kind, lastCast.t = k, GetTime() end
+    end
+    return
+  end
   if not session or session.paused then
     lastMoney = GetMoney()
     return
