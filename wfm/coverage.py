@@ -50,7 +50,9 @@ def expected_kinds(item, questie_item: dict, is_product: bool, is_reagent: bool,
     elif item.class_id == TRADE_GOODS and item.subclass_id in KIND_OF_SUBCLASS:
         kind = KIND_OF_SUBCLASS[item.subclass_id]
         bought = bool(q.get('vendors')) and not kinds
-        crafted = is_product and not kinds and kind not in ('skinning', 'herbalism')   # bars, bolts
+        # bars and bolts are made, never mined or dropped as such: only the sources Questie lists count (a bar found in
+        # chests is looted from objects, not mined: Truesilver Bar was expected "mined" and could never be covered)
+        crafted = is_product and kind not in ('skinning', 'herbalism')
         if not (bought or crafted):
             kinds.add(kind)
     if kinds & {'mining', 'herbalism'}:

@@ -385,7 +385,7 @@ class App:
                 _, _, q = eng.sell_value(iid)
                 action = v.how[:1].upper() + v.how[1:]
                 if v.channel == 'open' and v.contents:
-                    action += ': ' + ', '.join(c['name'] for c in v.contents[:3])
+                    action += ': ' + ', '.join(c['name'] for c in v.contents[:3]) + (', and more' if len(v.contents) > 3 else '')
                 worth = valuer.worth_for(iid, n)      # a capped craft: crafted worth only for what a day takes
                 total += worth
                 rows.append({'item_id': iid, 'name': it.name, 'quality': it.quality, 'count': n, 'action': action,

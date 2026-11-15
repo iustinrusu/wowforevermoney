@@ -40,6 +40,12 @@ class CoverageTests(unittest.TestCase):
         for crafted_or_bought in (BAR, THREAD, ELIXIR):
             self.assertNotIn(crafted_or_bought, rows)
 
+    def test_a_smelted_bar_found_in_chests_is_looted_from_objects_not_mined(self):
+        q = {**QUESTIE, BAR: {'objectDrops': [77]}}                   # Truesilver Bar: smelted, and in chests
+        rows = {r['item_id']: r for r in coverage.audit(ITEMS, PRICES, q, RECIPES, None, None, set(),
+                                                        fish_hint={FISH, SQUID})['queue']}
+        self.assertEqual(rows[BAR]['kinds'], ['objects'])
+
     def test_materials_first_then_by_traded_value(self):
         order = [r['item_id'] for r in self.run_audit()['queue']]
         self.assertEqual(order[-1], GLOVES, 'gear after every material')

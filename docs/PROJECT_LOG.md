@@ -366,6 +366,15 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-15 review (to-do 6), on the user's data with the main's professions and as played: an independent
+  recomputation from raw TSM rows (sale = min(lowest listing, region sale) after the cut; ingredients at the cheaper of
+  vendor and lowest listing) matches the engine to the copper for the top 37 crafts and 35 vendor flips (the rest of
+  the top 40 take a special price path: odd listings, walls, nothing listed, freak sales). Invariants over all ~2,420
+  rows: no Top pick carries an excluding flag, no doable Top pick outside the later-on sections, every cooldown cap
+  holds, no negative gold/hour, none over 50g/h, every plan step has a positive value. "Farm X" rows' units a day is
+  your 20% share of the market, not a farming rate (by design; ranking and Top picks use gold/hour for them).
+  Pricing code reread: walls, freak sales, odd listings and unlisted ingredients are all handled and flagged.
+
 - 2026-11-14: Fishing gear bonuses in WoW: Forever (Wowhead tooltip service, item tooltips): Shiny Bauble +25,
   Nightcrawlers +50, Aquadynamic Fish Lens +50, Bright Baubles +75, Flesh Eating Worm +75 (10 min each),
   Aquadynamic Fish Attractor +100 (5 min); Blump Family +3, Strong +5, Big Iron +20, Nat Pagle's FC-5000 +25,
@@ -478,6 +487,12 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-15** Review of the 2026-11-13/14 work (to-do 6): recomputation and invariants pass (Verified facts); one
+  bug fixed: a smelted bar also found in chests (Truesilver, Silver, Gold Bar) was expected "mined from veins" and could
+  never count as covered (coverage 79 -> 82 of 346 materials); container lists say they show the top contents only.
+  Known, not changed: a shared transmute cooldown keeps the best recipe only, not the best mix of days (the user has no
+  Alchemy). Tests: 203.
 
 - **2026-11-15** Everloot cross-check of drop rates on Data health (`wfm/everloot.py`, `audit.everloot_check`; to-do 2c).
   Tests: 202.

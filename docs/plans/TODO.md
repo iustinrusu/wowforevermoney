@@ -42,7 +42,8 @@ tight: finish the current piece, commit, update this list, and set a reminder th
        the UiMap tables, with file name and size): `docs/plans/forever-data-next.md`, section 5. And keep an open
        mind to new addons: recommend any good Forever addon found (loot addons: section 4); the user installs them
        through CurseForge.
-6. [ ] **Review** of the 2026-11-13/14 work: `docs/plans/forever-data-next.md`, section 6
+6. [x] (done 2026-11-15: recomputation and invariants pass, one coverage bug fixed; project log)
+       **Review** of the 2026-11-13/14 work: `docs/plans/forever-data-next.md`, section 6
 7. [ ] **Strategy features**, items 1-10 (profession advisor, levelling planner and niches first):
        `docs/plans/strategy-features.md`
 8. [ ] **Dungeons view** (the user's idea; 2026-11-15: build it, at a lower priority): a "run <dungeon>" row = trash +

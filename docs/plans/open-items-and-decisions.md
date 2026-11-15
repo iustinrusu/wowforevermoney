@@ -23,7 +23,7 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 
 ## B. Work left that needs no Wowhead
 
-- [ ] B1. Review of the 2026-11-13/14 work (to-do item 6, `docs/plans/forever-data-next.md` section 6).
+- [x] B1. (done 2026-11-15) Review of the 2026-11-13/14 work (to-do item 6, `docs/plans/forever-data-next.md` section 6).
 - [ ] B2. Strategy features (to-do item 7, `docs/plans/strategy-features.md`): profession advisor, levelling
       planner, niches first.
 - [ ] B3. Not counted in profits yet: AH deposits and listings that don't sell; buying several of an ingredient

@@ -369,7 +369,7 @@ function planItems(a) {
     head = '<th>Item</th><th class="num" title="How many to list now, of how many you have">List</th><th class="num" title="Price to list each at: today\'s lowest listing, or the usual sale price where nobody pays the listing">List at</th><th class="num" title="What you get for them after the AH cut">You get</th>';
     body = rows.map((r) => `<tr><td>${itemLink(r.item_id, r.name, r.quality)}</td><td class="num">${r.count}${r.have > r.count ? ` of ${r.have}` : ''}</td><td class="num">${money(r.list_at)}</td><td class="num">${money(r.total)}</td></tr>`).join('');
   } else if (a.type === 'cash_open') {
-    head = '<th>Container</th><th class="num">How many</th><th class="num" title="Expected value of the contents at today\'s prices">Worth opened</th><th>Mostly holds</th>';
+    head = '<th>Container</th><th class="num">How many</th><th class="num" title="Expected value of the contents at today\'s prices">Worth opened</th><th title="The three contents worth the most per opening; Worth opened counts every content Forever data lists">Mostly holds</th>';
     body = rows.map((r) => `<tr><td>${itemLink(r.item_id, r.name, r.quality)}${r.locked ? ' <span class="flag">locked</span>' : ''}</td><td class="num">${r.count}</td><td class="num">${money(r.total)}</td><td>${esc((r.contents || []).join(', '))}</td></tr>`).join('');
   } else {
     head = '<th>Item</th><th class="num">How many</th><th class="num" title="What a vendor pays for all of them">Vendor pays</th>';
