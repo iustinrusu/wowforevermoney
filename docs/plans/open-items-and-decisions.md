@@ -33,7 +33,7 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       rewards, lockboxes beyond their contents.
 - [ ] B5. Pool catches: the addon records which pool a catch came from by itself (no fishing logged yet on
       2026-11-15). After the user next fishes, check the saved file has `pools` entries (moved from D3).
-- [ ] B6. The user's decisions of 2026-11-15, briefed in `docs/plans/decided-2026-11-15.md`: remove the character
+- [x] B6. (all three done 2026-11-15) The user's decisions of 2026-11-15, briefed in `docs/plans/decided-2026-11-15.md`: remove the character
       names from GitHub's history (C5: done 2026-11-15, history rewritten and force-pushed), crafted
       worth capped by what can be made a day (C7: done 2026-11-15), Everloot cross-check (C2: done 2026-11-15).
 
