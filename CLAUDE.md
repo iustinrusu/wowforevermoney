@@ -32,7 +32,8 @@ memory of the project, not the chat.
   the coverage queue at one page a minute, stopping at the first block (`docs/plans/material-coverage.md`).
   Pace from 2026-11-15 (the user left it to Claude, after one 403 at page 77 that lifted within 30 minutes):
   one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session.
-- **Downloads:** ask first (file name, source, size).
+- **Downloads:** approved by the user (2026-11-15: "I approve downloads too"): no need to ask first; say afterwards
+  what was downloaded (file name, source, size), in chat and in the project log. Addons stay the user's (CurseForge).
 - **Usage limits:** when usage is getting tight, don't interrupt a task midway: finish the current piece,
   commit it, write the remaining steps into a plan file in `docs/plans/` (and note them in the project log),
   and set a one-time reminder for after the limit resets. The user said this should always be done.
@@ -91,6 +92,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/advisor.py` | profession advisor (Professions tab): each profession now, at full skill, cost to get there |
 | `wfm/everloot.py` | Everloot drop rates (player uploads, CC BY-SA): cross-checked against Wowhead on Data health |
 | `wfm/niches.py` | Niches tab: items that sell every day, are thinly listed, and you can supply |
+| `wfm/gatherlite.py` | GatherLite's Forever node and pool positions per zone (UiMap tables), compared with QuestieDB |
 | `wfm/plan.py` | "Your plan for today": cash-in, cooldowns, routines, snipe, farming, big flip, goal as ranked steps |
 | `wfm/history.py` | SQLite price history: every realm scan for 14 days, then daily candles for a year |
 | `wfm/market.py` | Market tab: one item's history, trends and market signals (sentiment) |

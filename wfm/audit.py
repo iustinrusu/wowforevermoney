@@ -5,7 +5,7 @@ Run on every recompute (shown on the Data health page) and from the command line
 """
 from __future__ import annotations
 
-from . import coverage, everloot, wowhead_items
+from . import coverage, everloot, gatherlite, wowhead_items
 from .engine import PROFESSIONS
 
 
@@ -214,6 +214,28 @@ def run(world, engine) -> list[dict]:
                              for r in cov['read_no_data']]))
     except Exception as e:          # never let a check break the audit
         out.append(_check('Forever source data for every material', 'warn', f'Could not work it out: {e}'))
+
+    # GatherLite: a second Forever source for where nodes, chests and pools are (QuestieDB is the first)
+    try:
+        gl = getattr(world, 'gatherlite', None) or {}
+        if gl.get('nodes'):
+            c = gatherlite.compare(gl, q.objects if q else {}, engine.name)
+            pools = [r for r in c['only_gatherlite'] if 'School' in r['name'] or 'Debris' in r['name']
+                     or 'Wreckage' in r['name']]
+            out.append(_check('Node positions: QuestieDB vs GatherLite', 'info',
+                              f"GatherLite (an addon, generated from Wowhead's Forever maps) lists {gl.get('points', 0):,} "
+                              f"positions for {gl.get('objects', 0)} herbs, veins, chests and pools: {c['gatherlite']:,} distinct "
+                              f"after merging repeats of the same node (points closer than {gatherlite.MERGE:g} of the "
+                              f"map), against {c['questie']:,} QuestieDB spawns for the same objects. They differ zone by "
+                              f"zone: GatherLite has Forever-only zones and more chests, QuestieDB has dungeons. Herb and "
+                              f"ore spots still count nodes from QuestieDB. {len(c['only_gatherlite'])} objects only "
+                              f"GatherLite places, {len(pools)} of them fishing pools: "
+                              + ', '.join(f"{r['name']} ({r['gatherlite']})" for r in pools[:6]) + '.',
+                              [f"{r['name']} ({r['object']}): GatherLite {r['gatherlite']:,}, QuestieDB {r['questie']:,}"
+                               + (f"; zones only GatherLite has: {', '.join(engine.gd.zones.get(z, str(z)) for z in r['zones_only_gatherlite'][:5])}"
+                                  if r['zones_only_gatherlite'] else '') for r in c['rows']]))
+    except Exception as e:          # never let a check break the audit
+        out.append(_check('Node positions: QuestieDB vs GatherLite', 'warn', f'Could not work it out: {e}'))
 
     # Everloot: a second Forever source for drop rates (player uploads), compared with the Wowhead pages read (2c)
     try:

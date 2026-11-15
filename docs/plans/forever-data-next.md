@@ -63,6 +63,8 @@ fishing pools QuestieDB has no spawns for (Oily Blackmouth School 180750: 214 po
 before counting. Still needed for zones: UiMap and UiMapAssignment from wago.tools (build 1.60.1.70938; the server
 streams them without a size; estimate well under 1 MB together): the user's yes first (checklist C9).
 Use when built: node density per zone for herb/ore spots (only weights which nodes count), and where pools spawn (A3).
+Built 2026-11-15 (`wfm/gatherlite.py`, Data health "Node positions: QuestieDB vs GatherLite"; project log): 23,589
+distinct nodes after merging; not used in rows yet (the two follow-ups above).
 
 ## 6. Review
 Adversarial review of everything built on 2026-11-13/14 (pricing WALL and liquidity, ranking, history compaction,

@@ -24,6 +24,20 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-15 Downloads approved (user: "I approve downloads too").** No need to ask before a download; say what was
+  downloaded afterwards (name, source, size). Addons stay the user's (CurseForge). CLAUDE.md updated. First use:
+  UiMap.csv (3 KB) and UiMapAssignment.csv (7 KB) from wago.tools, build 1.60.1.70938 (now in `gamedata.TABLES`).
+- **2026-11-15 GatherLite node positions (to-do 5, checklist C9).** `wfm/gatherlite.py` reads the addon's
+  `plugins/database/data/forever.lua` (generated from Wowhead's Forever maps), turns map ids into zones (UiMapAssignment:
+  each zone map has one area, Questie's zone id), and merges points closer than 0.005 of the map (one node recorded a
+  few times): 34,326 positions -> 23,589 nodes for 76 objects, all maps mapped. A source in World (re-read when the
+  file changes) and a Data health entry "Node positions: QuestieDB vs GatherLite" (info). Not used in rows yet. Found:
+  QuestieDB has 25,171 spawns for the same objects; GatherLite has zones QuestieDB lacks (Forever-only zones such as
+  Riverglades and Shen'dralas; Mithril and Gold in Felwood; Silver in Feralas and Tanaris), QuestieDB has dungeons;
+  3 fishing pools only GatherLite places (Oily Blackmouth School 214 in the Barrens, Silverpine, Hillsbrad, Loch
+  Modan...; Firefin Snapper 150; Sagefish 124). Follow-ups: node spots could count the larger of the two per zone;
+  pool zones feed the pool model (checklist A3).
+
 - **2026-11-15 Niches tab (strategy item 10).** `wfm/niches.py`, `/api/niches`, `History.sold_out`: an item is a niche
   when your share of the region's sales is 1+ a day, half or more of its listings sell, your realm lists at most 10
   and under a day of the region's sales, the lowest listing is 90%+ of the usual sale price (or nothing listed), and a
@@ -523,6 +537,8 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-15** GatherLite node positions (`wfm/gatherlite.py`, Data health entry); UiMap tables downloaded. Tests: 221.
 
 - **2026-11-15** Niches tab (`wfm/niches.py`); farming rows skip vendor-sold items. Tests: 217.
 

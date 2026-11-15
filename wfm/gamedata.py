@@ -11,7 +11,7 @@ from pathlib import Path
 from .paths import DATA
 
 TABLES = ['ItemSparse', 'Item', 'SkillLine', 'SkillLineAbility', 'SpellEffect', 'SpellReagents', 'SpellName',
-          'AreaTable', 'SpellCooldowns', 'SpellCategories', 'SpellCategory']
+          'AreaTable', 'SpellCooldowns', 'SpellCategories', 'SpellCategory', 'UiMap', 'UiMapAssignment']
 USER_AGENT = 'WoWForeverMoney/0.1 (personal gold tool)'
 CREATE_ITEM = '24'
 ITEM_FLAG_HAS_LOOT = 0x4   # ItemSparse Flags_0: the item can be opened (has its own loot)

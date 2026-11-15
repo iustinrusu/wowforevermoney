@@ -22,6 +22,7 @@ WOWHEAD_CONTAINERS = DATA / 'wowhead_forever_containers.json'
 from . import profile as profile_mod
 from . import skinning as skinning_mod
 from . import everloot as everloot_mod
+from . import gatherlite as gatherlite_mod
 from . import wowhead_items
 from .questie import QuestieDB, load_drop_rates, load_questie
 from .skillup import SkillUpData, load_skillup
@@ -85,6 +86,7 @@ class World:
         self.forever_pages: dict = {}        # Wowhead Forever item/object/npc pages (wowhead_items.py)
         self.everloot: dict = {}             # Everloot drop rates (everloot.py): cross-checked, not used in rows
         self.known_crafts: dict = {}         # character -> recipe spells it knows (TSM crafting data)
+        self.gatherlite: dict = {}           # GatherLite node positions per object and zone (gatherlite.py)
         self.inventory: dict = {}
         self.hotfix_info: dict = {}
         self.profile: dict = {'characters': {}, 'active': None, 'activity': {}}
@@ -192,6 +194,23 @@ class World:
             st.note = f'Its data was generated for build {self.skillup.source_build}; your client is {cb}.'
         else:
             st.status, st.note = 'ok', ''
+        self.version += 1
+
+    def _load_gatherlite(self):
+        st = self.status.setdefault('gatherlite', SourceStatus('gatherlite', 'GatherLite node positions (Forever)'))
+        f = gatherlite_mod.data_file(self.paths.addons)
+        st.files = [str(f)] if f else []
+        if not f or not self.gamedata:
+            st.status, st.note = 'missing', 'GatherLite is not installed (optional: node and pool positions).'
+            self.gatherlite = {}
+            return
+        self.gatherlite = gatherlite_mod.load(self.paths.addons, gamedata.build_dir(self.gamedata.build))
+        st.file_time, st.loaded_at, st.status = int(f.stat().st_mtime), int(time.time()), 'ok'
+        st.version = self.paths.addon_version('GatherLite')
+        g = self.gatherlite
+        st.note = (f"{g.get('objects', 0)} nodes, chests and pools, {g.get('points', 0):,} positions "
+                   f"({sum(sum(z.values()) for z in (g.get('nodes') or {}).values()):,} distinct after merging repeats). "
+                   'Compared with QuestieDB on Data health.')
         self.version += 1
 
     def _load_angler(self):
@@ -408,6 +427,7 @@ class World:
         'questie': ('_load_questie', lambda self: [self.paths.questie_toc, self.paths.questie_drops]),
         'skillup': ('_load_skillup', lambda self: [self.paths.skillup_data]),
         'angler': ('_load_angler', lambda self: [self._sv('ForeverAngler.lua') or '']),
+        'gatherlite': ('_load_gatherlite', lambda self: [gatherlite_mod.data_file(self.paths.addons) or '']),
         'classicdb': ('_load_classic', lambda self: [classicdb.CACHE]),
         'checks': ('_load_checks', lambda self: [WOWHEAD_FISHING, WOWHEAD_CONTAINERS, skinning_mod.SNAPSHOT,
                                                  wowhead_items.SNAPSHOT, *everloot_mod.files()]),

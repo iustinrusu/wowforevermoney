@@ -13,8 +13,8 @@ done that night: 2b, 2c, 6, 7 items 1, 2 and 10, and 20 Wowhead pages (the sessi
 (a) item 2: 20 more Wowhead pages (Kingsblood 3356, Iridescent Pearl 5500, the 4 skinning items, then the pools
 list), pace as in CLAUDE.md; (b) item 7: strategy item 3 (vertical integration), then 4-9; (c) item 8, Dungeons;
 (d) item 4: mobs' own pages (part of the Wowhead budget). Waiting on the user: 2a (run `sh data/rewrite_history.sh`,
-the session's safety check blocked the force push), checklist C8 (Everloot to fill gaps?) and C9 (GatherLite map
-tables download, item 5).
+the session's safety check blocked the force push) and checklist C8 (Everloot to fill gaps?). C9 and item 5 were done
+the same night after the user approved downloads.
 
 0. [x] **Quick check, needs the user in game** (done 2026-11-14: 1.4.1's gold = Syndicator's on both characters) (/reload once): addon 1.4.1 saves gold (compare with Syndicator in
        the app's purse), and see the project log's open items for the other in-game checks. Checked 2026-11-14:
@@ -43,8 +43,8 @@ tables download, item 5).
        mobs' own pages for complete loot, coins) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with drop rates from Wowhead Forever
        ("Dropped by", material-coverage step 4) and the kills-per-hour setting, never your own logged time
 4b. Moved to item 8 (the user, 2026-11-15: build it, at a lower priority).
-5. [ ] (2026-11-15: compared with QuestieDB without a download, see forever-data-next.md section 5; waits for
-       the user's yes to the two map tables, checklist C9)
+5. [x] (done 2026-11-15: wfm/gatherlite.py, Data health entry; map tables downloaded after the user's yes. Left as
+       follow-ups: node spots could count the larger of QuestieDB and GatherLite per zone; pool zones for the pool model)
        **GatherLite node locations** (installed; the user, 2026-11-15: "could be useful"; ask before downloading
        the UiMap tables, with file name and size): `docs/plans/forever-data-next.md`, section 5. And keep an open
        mind to new addons: recommend any good Forever addon found (loot addons: section 4); the user installs them
