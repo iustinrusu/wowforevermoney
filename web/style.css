@@ -162,3 +162,6 @@ details.plan-items summary { cursor: pointer; color: var(--accent); width: max-c
 details.plan-items table { margin-top: 4px; }
 @media (max-width: 700px) { .plan-card { grid-template-columns: 26px 1fr; padding: 8px; } .chip { white-space: normal; } }
 .grid2 > * { min-width: 0; }      /* grid items may shrink below their table width (the table scrolls instead) */
+
+/* levelling planner: recipe colours as the game shows them */
+.pill.lvl-orange { color: #ff8040; } .pill.lvl-yellow { color: #e0c020; } .pill.lvl-green { color: #40c040; } .pill.lvl-grey { color: #909090; }

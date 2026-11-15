@@ -309,6 +309,34 @@ class App:
             'tip': self.tips.get(str(iid)),
         }
 
+    CRAFTING = ('Alchemy', 'Blacksmithing', 'Cooking', 'Enchanting', 'Engineering', 'First Aid', 'Leatherworking',
+                'Tailoring')
+
+    def levelling(self, qs) -> dict:
+        """The cheapest way to 300 in a crafting profession, for the character you play (Engine.levelling)."""
+        s = self.effective_settings()[0]
+        profs = s.get('professions') or {}
+        mine = [p for p in self.CRAFTING if p in profs]
+        prof = (qs.get('profession') or [''])[0] or (mine[0] if mine else 'Leatherworking')
+        if prof not in self.CRAFTING:
+            return {'error': f'Not a crafting profession: {prof}'}
+        try:
+            skill = int((qs.get('skill') or [''])[0] or profs.get(prof) or 1)
+        except ValueError:
+            skill = int(profs.get(prof) or 1)
+        skill = max(1, min(skill, 300))
+        # recipes the character you play knows (TSM's crafting data): no learning cost for those
+        active = ((self.world.profile or {}).get('active') or '')
+        kc = getattr(self.world, 'known_crafts', None) or {}
+        known = kc.get(active) or next((v for k, v in kc.items() if active and k.split(' ')[0] == active.split(' ')[0]),
+                                       set())
+        crafts = [o for o in (self.result or {}).get('opportunities', []) if o.kind == 'craft']
+        out = Engine(self.world, s).levelling(prof, skill, known=known, crafts=crafts)
+        out['professions'] = list(self.CRAFTING)
+        out['yours'] = {p: profs[p] for p in mine}
+        out['known_source'] = 'TSM crafting data' if known else 'none found (TSM records the recipes a character knows)'
+        return out
+
     def investments(self) -> dict:
         s = self.effective_settings()[0]
         gd = self.world.gamedata
@@ -487,6 +515,8 @@ def make_handler(app: App):
                     return self._json(app.purse())
                 if url.path == '/api/market':
                     return self._json(app.market(int(qs.get('id', ['0'])[0])))
+                if url.path == '/api/levelling':
+                    return self._json(app.levelling(qs))
                 if url.path == '/api/investments':
                     return self._json(app.investments())
                 if url.path == '/api/inventory':

@@ -59,3 +59,14 @@ class ProfileTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class KnownCraftsTests(unittest.TestCase):
+    def test_recipes_each_character_knows_from_tsm(self):
+        db = {'f@Horde - PvP@internalData@crafts': {
+                  'c:3275': {'name': 'Linen Bandage', 'players': {'Testchar Alpha': {'maxRecipeQuality': 1}}},
+                  'c:2152': {'name': 'Light Armor Kit', 'players': {'Testchar Alpha': {}, 'Alt Beta': {}}},
+                  'oddkey': {'players': {'Alt Beta': {}}}},
+              's@Testchar Alpha - Horde - PvP@internalData@money': 5}
+        self.assertEqual(profile.known_crafts(db), {'Testchar Alpha': {3275, 2152}, 'Alt Beta': {2152}})
+        self.assertEqual(profile.known_crafts({}), {})

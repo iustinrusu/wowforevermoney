@@ -9,7 +9,7 @@ data first, anything from Classic history labelled as speculation, plain-languag
    gold per hour now (gathering) and per day (crafting), what the next skill milestones unlock (e.g. Leatherworking
    265: Devilsaur Gauntlets), the switching cost (skill you'd lose, time and gold to level the new one), and a
    short "now vs later" verdict: gathering pays most early, crafting captures the margin and the phase demand.
-2. **Levelling planner** for a crafting profession: the cheapest path from your skill to a target (SkillUpForever
+2. **Done 2026-11-15** (Crafting tab, "Levelling a profession"; project log). **Levelling planner** for a crafting profession: the cheapest path from your skill to a target (SkillUpForever
    thresholds for orange/yellow/green, current AH prices, selling what you craft to offset the cost), with total
    gold, time, and what it unlocks. Your own gathered materials count at what they'd sell for.
 3. **Vertical integration**: when you gather an ingredient yourself (skin, mine, pick), show the craft both ways:

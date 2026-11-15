@@ -419,6 +419,31 @@ function wirePlan() {
 }
 
 // ---------- views ----------
+// Levelling planner (strategy item 2): the cheapest path from your skill to 300 in a crafting profession
+async function levellingPanel() {
+  const prof = sessionStorage.getItem('levelProf') || '';
+  const skill = sessionStorage.getItem('levelSkill') || '';
+  const d = await api(`/api/levelling?profession=${encodeURIComponent(prof)}&skill=${encodeURIComponent(skill)}`);
+  if (d.error) return `<div class="panel"><h2>Levelling a profession</h2><div class="hint">${esc(d.error)}</div></div>`;
+  const opts = d.professions.map((p) => `<option value="${esc(p)}" ${p === d.profession ? 'selected' : ''}>${esc(p)}${d.yours[p] !== undefined ? ` (you: ${d.yours[p]})` : ''}</option>`).join('');
+  const mats = (st) => st.mats.map((m) => `${m.count}× ${itemLink(m.item_id, m.name)}${m.own ? ' <span class="pill" title="You gather this yourself: counted at what you would get for selling it">yours</span>' : ''}`).join(', ');
+  const rows = d.steps.map((st) => `<tr><td class="num">${st.from}–${st.to}</td><td>${itemLink(st.product_id, st.recipe)}<div class="hint">${mats(st)}</div></td>
+    <td><span class="pill lvl-${st.color}" title="Its colour when you start this stretch">${esc(st.color)}</span></td><td class="num">${num(st.crafts, 1)}</td>
+    <td class="num">${money(st.per_craft)}</td><td class="num">${money(st.cost)}</td><td class="num">${money(st.cumulative)}</td>
+    <td>${st.learn ? `${money(st.learn)} <span class="pill">${esc(st.learn_how)}</span>` : ''}</td></tr>`).join('');
+  const unlocks = d.unlocks.length ? `<h3>What it unlocks on the way</h3><table><thead><tr><th class="num">Skill</th><th>Craft</th><th class="num" title="Profit a day once you have the skill (and the gold), from the Crafting table">Profit a day</th><th class="num" title="The path's total cost from your skill to this one (a minus: you would earn that much on the way)">Cost to get there</th></tr></thead><tbody>${d.unlocks.map((u) => `<tr class="row" data-item="${u.item_id}"><td class="num">${u.skill}</td><td>${esc(u.title)}</td><td class="num">${money(u.daily)}</td><td class="num">${u.cost_to_reach == null ? '–' : money(u.cost_to_reach)}</td></tr>`).join('')}</tbody></table>` : '';
+  const ench = d.profession === 'Enchanting' ? `<div class="hint">⚠ Enchantments make no item, so they are not in the game's recipe tables this tool reads: the path below has only the Enchanting crafts that make an item (rods, wands, oils), and stops early. Plan Enchanting by hand for now.</div>` : '';
+  const end = ench + (d.stuck_at ? `<div class="hint">⚠ The path stops at <b>${d.stuck_at}</b>: no recipe you can learn (a trainer recipe, or a pattern on the AH or from a vendor) gives a skill point there. Patterns that only drop are not counted unless TSM shows you already know them.</div>` : '');
+  return `<div class="panel" id="levelling"><h2>Levelling a profession <small>the cheapest path from your skill to 300, at today's prices</small></h2>
+    <div class="controls"><select id="lp">${opts}</select> <label class="chk">from skill <input id="ls" type="number" min="1" max="300" value="${d.skill}" style="width:5em"></label></div>
+    <div class="hint">${d.steps.length ? `From ${d.skill} to <b>${d.reached}</b>: about <b>${num(d.crafts, 0)} crafts</b> and <b>${money(d.total)}</b> in all (learning recipes: ${money(d.learn_total)}). A minus means you would earn that much: the products sell for more than the ingredients.` : 'Nothing to plan from here.'} Recipes you know: ${d.known} (${esc(d.known_source)}).</div>
+    ${end}
+    ${d.steps.length ? `<table><thead><tr><th class="num">Skill</th><th>Recipe</th><th>Colour</th><th class="num" title="Expected crafts for this stretch: a yellow or green recipe does not always give a point">Crafts</th><th class="num" title="Ingredients minus what one product sells for (a minus: each craft makes money)">Each craft</th><th class="num" title="Expected cost of this stretch, learning cost included">Cost</th><th class="num" title="Total from your skill to the end of this stretch">Total so far</th><th>Learn</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+    ${unlocks}
+    <details class="how"><summary>How this is worked out</summary><div>For every skill point, the recipe with the lowest expected cost for that point: the cost of one craft (ingredients at the cheapest of vendor and AH; a material you gather yourself${d.own_materials.length ? ` (${esc(d.own_materials.join(', '))})` : ''} at what you would get for selling it) minus what the product sells for, divided by the chance that the craft gives a point. The chance follows the WoW Classic rule (not checked for Forever): orange always, then from yellow to grey (grey − skill) ÷ (grey − yellow), grey never; the colours are SkillUpForever's Forever thresholds. A recipe's learning cost (trainer fee, or the pattern on the AH or from a vendor) counts once, the first time the path uses it, and not at all for recipes TSM shows you know. A product counts at its AH price only for as many as your share of a week's sales takes (${num(STATE.settings.market_share * 100, 0)}% of the region's), the rest at its vendor price. Not counted: training the next rank at the trainer (Journeyman, Expert, Artisan) and the level it needs, AH deposits, and buying many of one ingredient (each at the lowest listing). Patterns that only drop are left out unless you know them. ${d.options} recipes considered.</div></details>
+  </div>`;
+}
+
 const VIEWS = {
   async top() {
     const t = STATE.top || {};
@@ -454,7 +479,8 @@ const VIEWS = {
       <div class="controls"><select id="cp"><option value="">All professions</option>${[...new Set(profs)].map((p) => `<option ${p === sel ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
       <label class="chk"><input type="checkbox" id="cd" ${doable ? 'checked' : ''}> only what I can craft now</label>
       <label class="chk" title="Hides items that barely sell: under 1 a day in the whole region, under 1 in 10 listings selling, or over 10 days of sales already listed on your realm"><input type="checkbox" class="sells-only" ${sellsOnly ? 'checked' : ''}> hide items that barely sell</label></div>
-      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'effort', 'sells', 'cooldown', 'flags']})}</div>`;
+      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'effort', 'sells', 'cooldown', 'flags']})}</div>
+      ${await levellingPanel()}`;
   },
   async flips() {
     const sellsOnly = sessionStorage.getItem('sellsOnly') !== '0', hide = sellsOnly ? '&hide=hard_to_sell,no_sales_data' : '';
@@ -641,6 +667,10 @@ async function render() {
 
 function wireView() {
   document.querySelectorAll('#view tr.row[data-item]').forEach((tr) => { if (!tr.dataset.key) tr.onclick = (e) => { if (!e.target.closest('a') && tr.dataset.item) openItem(+tr.dataset.item); }; });
+  if (TAB === 'craft' && $('#lp')) {
+    $('#lp').onchange = (e) => { sessionStorage.setItem('levelProf', e.target.value); sessionStorage.removeItem('levelSkill'); render(); };
+    $('#ls').onchange = (e) => { sessionStorage.setItem('levelSkill', e.target.value); render(); };
+  }
   if (TAB === 'craft') { $('#cp').onchange = (e) => { sessionStorage.setItem('craftProf', e.target.value); render(); }; $('#cd').onchange = (e) => { sessionStorage.setItem('craftDoable', e.target.checked ? '1' : ''); render(); }; }
   document.querySelectorAll('.sells-only').forEach((c) => c.onchange = (e) => { sessionStorage.setItem('sellsOnly', e.target.checked ? '1' : '0'); render(); });
   if (TAB === 'market') wireMarket();

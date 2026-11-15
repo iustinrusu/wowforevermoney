@@ -84,6 +84,7 @@ class World:
         self.forever_skinning: dict = {}     # Wowhead Forever "Skinned from" counts (read by hand)
         self.forever_pages: dict = {}        # Wowhead Forever item/object/npc pages (wowhead_items.py)
         self.everloot: dict = {}             # Everloot drop rates (everloot.py): cross-checked, not used in rows
+        self.known_crafts: dict = {}         # character -> recipe spells it knows (TSM crafting data)
         self.inventory: dict = {}
         self.hotfix_info: dict = {}
         self.profile: dict = {'characters': {}, 'active': None, 'activity': {}}
@@ -381,7 +382,9 @@ class World:
         bridge_path, tsm_path = self._sv('ForeverMoneyBridge.lua'), self._sv('TradeSkillMaster.lua')
         st.files = [str(p) for p in (bridge_path, tsm_path) if p]
         bridge = profile_mod.read_bridge(bridge_path)
-        tsm_chars = profile_mod.read_tsm_characters(tsm_path)
+        tsm_db = profile_mod.read_tsm_db(tsm_path)
+        tsm_chars = profile_mod.read_tsm_characters(tsm_path, tsm_db)
+        self.known_crafts = profile_mod.known_crafts(tsm_db)      # recipes each character knows (TSM)
         self.profile = profile_mod.build_profile(bridge, tsm_chars, self._char_mtimes())
         self._merge_money()
         st.loaded_at = int(time.time())

@@ -12,9 +12,8 @@ tight: finish the current piece, commit, update this list, and set a reminder th
        the app's purse), and see the project log's open items for the other in-game checks. Checked 2026-11-14:
        not yet possible, the saved file is older than the 1.4.1 install.
 1. [x] **Plan for today** on the main page (the user's priority): `docs/plans/todays-plan.md` (done 2026-11-14)
-2. [ ] (in progress: 2026-11-14 the data format, coverage, node yields, mob rows and 82 item pages are done;
-       2 minutes apart, at most 20 a session: the 22 left of the top 100, the 4 skinning items, pools, Javnir Nashak;
-       see the plan's Progress section)
+2. [ ] (in progress: 102 item pages read by 2026-11-15; 2 minutes apart, at most 20 a session: 3356 and 5500 left
+       of the top 100, then the 4 skinning items, pools, Javnir Nashak; see the plan's Progress section)
        **TOP PRIORITY: Forever source data for every material** (fixes "some skins not counted", pool loot,
        mob drops, node yields; the user's top priority for data accuracy, 2026-11-14): `docs/plans/material-coverage.md`.
        It replaces the old Wowhead-reads item (same slow pace). Work in the order at the top of that file: other
@@ -44,7 +43,9 @@ tight: finish the current piece, commit, update this list, and set a reminder th
        through CurseForge.
 6. [x] (done 2026-11-15: recomputation and invariants pass, one coverage bug fixed; project log)
        **Review** of the 2026-11-13/14 work: `docs/plans/forever-data-next.md`, section 6
-7. [ ] **Strategy features**, items 1-10 (profession advisor, levelling planner and niches first):
+7. [ ] (2026-11-15: item 2, the levelling planner, done first: the advisor's switching cost needs it; next item 1,
+       the profession advisor, then 10, niches)
+       **Strategy features**, items 1-10 (profession advisor, levelling planner and niches first):
        `docs/plans/strategy-features.md`
 8. [ ] **Dungeons view** (the user's idea; 2026-11-15: build it, at a lower priority): a "run <dungeon>" row = trash +
        bosses from their own Wowhead Forever pages, your share of a group's loot, runs per hour from Settings, the

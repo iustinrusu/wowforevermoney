@@ -10,7 +10,8 @@ are done or decided (with the date). Don't drop an item without the user's say.
 Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session (the exact reading order:
 `docs/plans/material-coverage.md`, Progress section).
 
-- [ ] A1. The rest of the top 100 coverage queue: 22 item pages, Moss Agate (1206) first.
+- [ ] A1. The rest of the top 100 coverage queue: 2 item pages left (Kingsblood 3356, Iridescent Pearl 5500; 20 read
+      on 2026-11-15).
 - [ ] A2. The 4 skinning items left: Black Whelp Scale (7286), Worn Dragonscale (8165), Green Dragonscale (15412),
       Chimera Leather (15423). Then "some skins not counted" goes away.
 - [ ] A3. 26 fishing-pool object pages, debris and wreckage first (list in the plan, step 3). Answers whether floating

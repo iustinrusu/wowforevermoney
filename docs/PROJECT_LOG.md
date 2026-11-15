@@ -24,6 +24,22 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-15 Levelling planner first among the strategy features (to-do 7, item 2 of strategy-features.md).** Built
+  before the profession advisor (item 1) because the advisor's switching cost is a levelling cost. `wfm/levelling.py`:
+  for every skill point the recipe with the lowest expected cost (one craft's ingredients minus what the product
+  sells for, divided by the skill-up chance; WoW Classic chance rule, labelled; SkillUpForever's Forever colours),
+  a learning cost once (trainer fee or pattern on the AH/vendor; none for recipes TSM shows the character knows:
+  `profile.known_crafts` reads TSM's `internalData@crafts`); patterns that only drop are left out unless known;
+  products at their AH price only for a week of your market share, the rest at vendor price; materials your own
+  gathering profession provides at their sale price. Where SkillUpForever stores 0/1 as the orange threshold the
+  engine's estimate (yellow - 40) is used (Heavy Scorpid Bracers looked craftable from skill 1 at first). Crafting
+  tab panel "Levelling a profession" (profession, from skill, the path with crafts, cost, total so far, learning
+  cost; what it unlocks with the cost to get there). On the user's data with the main's professions: Leatherworking
+  161 -> 300 about 274 crafts and 1,169g (it earns about 62g up to 224; 255-300 cost the most: Dragonscale
+  recipes at 3-44g a craft); Cooking 225 stops at 280 (no buyable recipe beyond); First Aid 225 -> 300 about 18g.
+  Not counted: rank training and its level, AH deposits, buying many of one ingredient. Enchanting can't be planned
+  (enchantments make no item, so they are not in the recipe tables): the panel says so.
+
 - **2026-11-15 Everloot cross-check (to-do 2c).** 4 requests to `everloot.app/api/rollups/drops?limit=500&offset=N`
   (220 KB, CC BY-SA 4.0, generic User-Agent), saved as `data/everloot/drops_1..4.json` (not committed); `wfm/everloot.py`
   reads them (loaded with the Wowhead pages, re-read when the files change) and compares each rate with the Wowhead
@@ -487,6 +503,10 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-15** Levelling planner (`wfm/levelling.py`, `Engine.levelling`, `/api/levelling`, Crafting tab panel);
+  recipes each character knows from TSM. Wowhead Forever: 9 more item pages (102 in all; 20 this session, 2 minutes
+  apart, no block). Tests: 209.
 
 - **2026-11-15** Review of the 2026-11-13/14 work (to-do 6): recomputation and invariants pass (Verified facts); one
   bug fixed: a smelted bar also found in chests (Truesilver, Silver, Gold Bar) was expected "mined from veins" and could

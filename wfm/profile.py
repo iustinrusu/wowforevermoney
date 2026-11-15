@@ -18,10 +18,32 @@ ADDON_NAME = 'ForeverMoneyBridge'
 _TSM_KEY = re.compile(r'^s@(.+?) - (Horde|Alliance) - (.+?)@internalData@(money|playerProfessions)$')
 
 
-def read_tsm_characters(path: Path | None) -> dict[str, dict]:
+def read_tsm_db(path: Path | None) -> dict:
     if not path or not path.exists():
         return {}
-    data = parse_assignments(path.read_text(encoding='utf-8', errors='replace')).get('TradeSkillMasterDB') or {}
+    return parse_assignments(path.read_text(encoding='utf-8', errors='replace')).get('TradeSkillMasterDB') or {}
+
+
+def known_crafts(db: dict) -> dict[str, set[int]]:
+    """character name (as TSM writes it) -> recipe spell ids that character knows, from TSM's crafting data
+    ("f@<faction - realm>@internalData@crafts": {"c:<spell>": {players: {name: ...}}})."""
+    out: dict[str, set[int]] = {}
+    for key, crafts in (db or {}).items():
+        if not str(key).endswith('@internalData@crafts') or not isinstance(crafts, dict):
+            continue
+        for ck, c in crafts.items():
+            m = re.match(r'^c:(\d+)$', str(ck))
+            if not m or not isinstance(c, dict):
+                continue
+            for name in (c.get('players') or {}):
+                out.setdefault(str(name), set()).add(int(m.group(1)))
+    return out
+
+
+def read_tsm_characters(path: Path | None, db: dict | None = None) -> dict[str, dict]:
+    data = db if db is not None else read_tsm_db(path)
+    if not data:
+        return {}
     chars: dict[str, dict] = {}
     for key, value in data.items():
         m = _TSM_KEY.match(str(key))

@@ -11,6 +11,7 @@ import time
 from dataclasses import asdict, dataclass, field
 
 from . import anomalies, fishing, gamedata, nodes, plan, pricing, skinning, valuation, wowhead_items
+from . import levelling as levelling_mod
 from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
@@ -289,6 +290,74 @@ class Engine:
                 best = {'how': 'recipe item', 'item_id': scroll, 'name': self.name(scroll), 'cost': None,
                         'source': 'drop / not on AH'}
         return best
+
+    def levelling(self, profession: str, skill: int | None = None, known: set[int] | None = None,
+                  crafts: list | None = None) -> dict:
+        """The cheapest way from your skill to 300 in a crafting profession (levelling.py), and what it unlocks on the
+        way (crafts: this run's craft rows, for their profit once you have the skill)."""
+        skill = int(skill if skill is not None else (self.profs.get(profession) or 1))
+        min_spd = float(self.s.get('min_sold_per_day', 0.5))
+        own_kinds = {sub for sub, prof in GATHER_PROFESSION.items() if prof in self.profs}
+        options = []
+        for r in self.gd.recipes:
+            th = self.su.thresholds.get(r.spell_id)
+            if r.profession != profession or not th or len(th) < 4 or not th[3]:
+                continue
+            # SkillUpForever stores 0/1 as the orange threshold when it doesn't know it: the engine's estimate then
+            # (yellow - 40), never "craftable from skill 1" (Heavy Scorpid Bracers needs 255)
+            orange = int(th[0]) if th[0] and th[0] > 1 else self.required_skill(r)[0]
+            colors = (orange, int(th[1]), int(th[2]), int(th[3]))
+            mats, cost, ok = [], 0, True
+            for mid, cnt in r.reagents:
+                it = self.gd.items.get(mid)
+                q = self.cheapest(mid)
+                own = bool(it and it.class_id == 7 and it.subclass_id in own_kinds)
+                each = q.value if q else None
+                if own:          # a material you gather yourself costs what you'd get for selling it
+                    sold = self.sell_value(mid)[0]
+                    each = sold if sold > 0 else each
+                if each is None:
+                    ok = False
+                    break
+                mats.append((mid, cnt, int(each), own))
+                cost += each * cnt
+            if not ok:
+                continue
+            item = self.gd.items.get(r.product_id)
+            q = ah_sell(self.price(r.product_id), self.sale_basis)
+            sells = q and item and item.bonding != 1 and not ({'hard_to_sell', 'no_sales_data'} &
+                                                            set(liquidity(self.price(r.product_id), min_spd)['flags']))
+            ah_value = int(proceeds(q, self.cut) * r.product_count) if sells else 0
+            learn = self.learn_cost(r)
+            if learn is None:                # starting recipes (orange at 1) come with the profession
+                learn_cost = 0 if orange <= 1 else None
+            else:                            # a recipe item that is not on the AH (a drop) can't be bought
+                learn_cost = None if learn.get('cost') is None else int(learn['cost'])
+            options.append(levelling_mod.Option(
+                spell_id=r.spell_id, name=r.name, colors=colors, ingredients=int(cost),
+                ah_value=ah_value, vendor_value=int(vendor_sell(item) * r.product_count),
+                ah_cap=sold_per_day(self.price(r.product_id)) * self.share * levelling_mod.WEEK / max(r.product_count, 1),
+                learn=learn_cost,
+                learn_how=(learn or {}).get('how', 'starting recipe' if orange <= 1 else ''), product_id=r.product_id,
+                mats=mats))
+        out = levelling_mod.plan(options, skill, known=known)
+        for st in out['steps']:
+            st['product'] = self.name(st['product_id'])
+            st['mats'] = [{'item_id': m, 'name': self.name(m), 'count': c, 'each': e, 'own': own}
+                          for m, c, e, own in st['mats']]
+        unlocks = []
+        for o in crafts or []:
+            req = o.detail.get('skill_required') or 0
+            if o.kind == 'craft' and o.profession == profession and skill < req <= levelling_mod.MAX_SKILL \
+                    and not (set(o.flags) & {'hard_to_sell', 'no_sales_data', 'price_check_fails', 'unverified_recipe'}):
+                at = next((st['cumulative'] for st in out['steps'] if st['to'] >= req), None)
+                unlocks.append({'skill': req, 'title': o.title, 'item_id': o.item_id, 'key': o.key,
+                                'daily': int(o.detail.get('daily_if_affordable', o.daily) or 0),
+                                'profit_unit': o.profit_unit, 'cost_to_reach': at})
+        unlocks.sort(key=lambda u: -u['daily'])
+        out.update(profession=profession, unlocks=unlocks[:12], options=len(options),
+                   known=len(known or ()), own_materials=sorted(GATHER_PROFESSION[k] for k in own_kinds))
+        return out
 
     # ---------- opportunity builders ----------
     def crafts(self) -> list[Opportunity]:
