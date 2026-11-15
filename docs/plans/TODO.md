@@ -8,6 +8,14 @@ Each item points to a plan file with the full brief. Follow CLAUDE.md's standing
 step, commit and push each finished piece, tick it off here and note it in docs/PROJECT_LOG.md. If usage gets
 tight: finish the current piece, commit, update this list, and set a reminder that runs nothing.
 
+**Where it stands (2026-11-15, end of a night session; stopped at 80% of the weekly usage with 4 days left):**
+done that night: 2b, 2c, 6, 7 items 1, 2 and 10, and 20 Wowhead pages (the session's limit). Next, in order:
+(a) item 2: 20 more Wowhead pages (Kingsblood 3356, Iridescent Pearl 5500, the 4 skinning items, then the pools
+list), pace as in CLAUDE.md; (b) item 7: strategy item 3 (vertical integration), then 4-9; (c) item 8, Dungeons;
+(d) item 4: mobs' own pages (part of the Wowhead budget). Waiting on the user: 2a (run `sh data/rewrite_history.sh`,
+the session's safety check blocked the force push), checklist C8 (Everloot to fill gaps?) and C9 (GatherLite map
+tables download, item 5).
+
 0. [x] **Quick check, needs the user in game** (done 2026-11-14: 1.4.1's gold = Syndicator's on both characters) (/reload once): addon 1.4.1 saves gold (compare with Syndicator in
        the app's purse), and see the project log's open items for the other in-game checks. Checked 2026-11-14:
        not yet possible, the saved file is older than the 1.4.1 install.
