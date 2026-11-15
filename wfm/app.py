@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, urlparse
 from . import anomalies, audit
 from . import advisor as advisor_mod
 from . import niches as niches_mod
+from . import sniper as sniper_mod
 from . import investments as investments_mod
 from . import market as market_mod
 from . import profile as profile_mod
@@ -342,6 +343,16 @@ class App:
         rows = niches_mod.build(self.world.prices, supply, float(s.get('market_share', 0.2)), stats, names=eng.name)
         return {'rows': rows[:60], 'scans': len(self.history.scans(10000)), 'solid_scans': niches_mod.SOLID_SCANS}
 
+    def sniper(self) -> dict:
+        """Items worth adding to TSM's Sniper, from our own snapshots (sniper.py)."""
+        w, eng = self.world, Engine(self.world, self.effective_settings()[0])
+        gd = w.gamedata
+        vendor = {i: it.sell_price for i, it in gd.items.items()
+                  if it.sell_price and 'sell_price' not in getattr(it, 'untrusted', ())} if gd else {}
+        rows = sniper_mod.build(self.history.listing_rows(), w.prices, vendor, eng.name, cut=eng.cut)
+        return {'rows': rows[:60], 'scans': len(self.history.scans(10000)),
+                'tsm_items': ','.join(f"i:{r['item_id']}" for r in rows[:60])}
+
     def professions(self) -> dict:
         """Profession advisor: every primary profession now and at full skill, and the cost of getting there."""
         s = self.effective_settings()[0]
@@ -552,6 +563,8 @@ def make_handler(app: App):
                     return self._json(app.market(int(qs.get('id', ['0'])[0])))
                 if url.path == '/api/niches':
                     return self._json(app.niches())
+                if url.path == '/api/sniper':
+                    return self._json(app.sniper())
                 if url.path == '/api/professions':
                     return self._json(app.professions())
                 if url.path == '/api/levelling':

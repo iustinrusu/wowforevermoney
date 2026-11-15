@@ -557,6 +557,14 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Snipes removed (user: "snipes have to be done in game, fast, not using old data"): no snipe steps in the
+  plan, no Snipes section in Top picks or snipe alerts, and the run no longer builds AH->vendor or cheap-relist rows
+  (TSM data is up to an hour old: the listing is usually gone; TSM's Sniper scans live). Instead the Flips tab lists
+  items "Worth adding to your TSM Sniper" (`wfm/sniper.py`, `/api/sniper`): items our snapshots caught under 60% of
+  their normal price (the lower of their median lowest listing and usual sale price; the listing average made items
+  that always list low look like snipes) at least twice, that sell 1+ a day, or listed below the vendor price; with
+  the price to snipe at and an item list to import into a TSM group. Tests: 234.
+
 - **2026-11-15** Consistency review (user: the plan showed Barbaric Bracers at 23g/h while Crafting showed 99s a day).
   Cause: an hourly figure for things done once (plan: expected gold / minutes = 23g 19s; Crafting's time column:
   profit a day / minutes = 32g 84s, two definitions) reads like an income. Now no hourly figure anywhere except real

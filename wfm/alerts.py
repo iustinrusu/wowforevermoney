@@ -32,12 +32,6 @@ def diff_runs(prev: dict | None, cur: dict, settings: dict, names) -> list[dict]
                 events.append({'ts': now, 'type': 'new_top', 'key': key, 'item_id': o.item_id,
                                'text': f'New top pick: {o.title} (~{fmt_money(o.daily)}/day)',
                                'important': o.daily >= min_daily})
-        for key in cur['top'].get('snipes', [])[:5]:
-            if key not in prev_by:
-                o = cur_by[key]
-                events.append({'ts': now, 'type': 'snipe', 'key': key, 'item_id': o.item_id,
-                               'text': f'{o.title}: {fmt_money(o.profit_unit)} profit on one listing',
-                               'important': o.profit_unit >= min_daily / 5})
         # a newly looted/caught item the app can't value properly: say so instead of silently undervaluing it
         before = {(u['item_id'], u['issue']) for u in prev.get('undervalued', [])}
         for u in cur.get('undervalued', []):

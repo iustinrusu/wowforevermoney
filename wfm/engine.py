@@ -1303,7 +1303,8 @@ class Engine:
         best_use = self.best_uses()
         # your loot log per zone (no gold/hour); fishing logs feed the fishing spots below
         logged = [o for o in self.activity_zones(best_use) if o.kind != 'fishing_zone']
-        all_opps = (self.crafts() + self.vendor_flips() + self.ah_to_vendor() + self.realm_dips()
+        # no snipe rows (AH -> vendor, cheap relists): one-off listings in hour-old data (the user, 2026-11-15)
+        all_opps = (self.crafts() + self.vendor_flips()
                     + self.gathering(best_use) + logged + self.fishing_spots(best_use)
                     + self.skinning_spots(best_use) + self.node_spots(best_use) + self.mob_spots(best_use))
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
@@ -1565,5 +1566,4 @@ class Engine:
                 (o for o in later if not o.doable and 'other_profession' not in o.flags), key=later_key, reverse=True))[:n]],
             'switch': [o.key for o in self._one_per_cooldown(sorted(stretch, key=later_key, reverse=True))[:5]],
             'hourly': self._varied(sorted(hourly, key=key, reverse=True), n, per_kind=5),
-            'snipes': [o.key for o in sorted(speculative, key=lambda o: ('cant_afford' in o.flags, -o.score))[:n]],
         }

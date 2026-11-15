@@ -5,7 +5,8 @@ A pro doesn't scroll one long list sorted by profit a day. They run a checklist,
    opened, sell junk to a vendor, collect auctions that ended.
 2. Daily cooldowns of a profession you have (one per shared cooldown).
 3. Daily routines: the best crafts and vendor flips that sell about once a day or more.
-4. One snipe: a listing far below what the item sells for, if it is still there.
+4. (No snipes since 2026-11-15: TSM data is up to an hour old, so the listing is usually gone; the Flips tab lists
+   items worth adding to TSM's Sniper instead.)
 5. One farming session: the best gathering or farming hour backed by Forever data (never Classic yields).
 6. One occasional big flip: worth a lot per sale, sells less than once a day.
 7. One long-term goal, shown last and not ranked against the rest.
@@ -378,7 +379,6 @@ def build(opps: list, top: dict, holdings: dict, time_value: int, share: float, 
     # top-pick rows are clean already; checked again so Classic-only or unsellable rows can never slip in
     pick = lambda sec, n: [by[k] for k in (top.get(sec) or []) if k in by and _clean(by[k])][:n]
     actions += [routine(o, time_value) for o in pick('now', 6)]
-    actions += [snipe(o) for o in pick('snipes', 3)]
     actions += [farm(o) for o in pick('hourly', 4)]
     actions += [a for a in (big_flip(o) for o in pick('slow', 4)) if a]
     kept = finish(actions, time_value)

@@ -406,7 +406,9 @@ class EngineTests(unittest.TestCase):
                                 'regionSale': 800, 'regionSoldPerDay': 10, 'regionSalePercent': 0.5}}
         r = Engine(make_world(prices), dict(SETTINGS)).run()
         self.assertNotIn('dip:%d' % CHEAP_SNIPE, r['top']['now'])
-        self.assertIn('dip:%d' % CHEAP_SNIPE, r['top']['snipes'])
+        # no snipes any more (the user, 2026-11-15): one-off listings in hour-old data are usually gone
+        self.assertNotIn('snipes', r['top'])
+        self.assertFalse([o for o in r['opportunities'] if o.kind in ('realm_dip', 'ah_to_vendor')])
 
 
 class HistoryTests(unittest.TestCase):
