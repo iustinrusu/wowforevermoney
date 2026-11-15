@@ -557,6 +557,15 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Repository made ready to go public (user: "fix all"). Checked every commit on both branches: no
+  character names, account number, BattleTags, passwords or keys. Fixed, with a history rewrite and force push (backup
+  bundle kept outside the repo): commit email now `iustinrusu@users.noreply.github.com` (also `git config user.email`;
+  the user should turn on "Keep my email addresses private" on GitHub); the local user folder path removed
+  (`.claude/launch.json` untracked, two old plan docs); the Wowhead Forever page files (`data/wowhead_forever_*.json`)
+  removed from all history and kept local (a dataset taken from Wowhead's pages shouldn't be published; friends get
+  less Forever data). Install guide rewritten for a public repo. `update.bat`: pulls the latest main (explains what to
+  do for ZIP folders). GitHub may serve old commits by hash for a while; GitHub Support can purge cached views.
+
 - **2026-11-15** Starter price history moved off main (user: "keep the freshest snapshot only" to avoid bloat) and cut
   to two weeks (user's suggestion; matches the 14 days of full snapshots; about 2 MB). It lives on the branch
   `market-data`: one commit with only the latest `market_seed.json.gz`, replaced by `.githooks/pre-push` on every push
