@@ -557,6 +557,12 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Farm meter 1.5.1/1.5.2 after the user's first test (fishing loot wasn't counted: loot windows didn't
+  reach the meter in WoW: Forever): items now from the player's own loot messages (LOOT_ITEM_SELF(_MULTIPLE) turned
+  into patterns: any language), gold from loot money messages paired with the gold change, `/fmb debug` prints what
+  is counted. Opened containers count (user): their contents count, and a container looted in the same session comes
+  back out when opened (contents replace its estimated worth, never both).
+
 - **2026-11-15** Farm meter, ForeverMoneyBridge 1.5.0 (user's request; `addon/ForeverMoneyBridge/Meter.lua`): `/fmb start`
   shows a window and starts a session, `/fmb stop` saves it (ForeverMoneyBridgeDB.meter.sessions, last 50) and hides
   it, `/fmb pause` / `/fmb resume`. Counts what loot windows from mobs, fishing and nodes show (not containers opened

@@ -63,7 +63,7 @@ local function refresh()
   lines[2]:SetText("Items: " .. money(value) .. "   Gold looted: " .. money(session.money))
   lines[3]:SetText("Total: " .. money(total) .. "   Per hour: " .. (perHour and money(perHour) or "after 1 min"))
   local l = session.loots
-  lines[4]:SetText(string.format("Kills looted %d  ·  Fish %d  ·  Nodes %d", l.mobs or 0, l.fishing or 0, l.nodes or 0))
+  lines[4]:SetText(string.format("Kills %d  ·  Fish %d  ·  Nodes %d  ·  Opened %d", l.mobs or 0, l.fishing or 0, l.nodes or 0, l.containers or 0))
   for i = 1, 4 do
     local r = rows[i]
     if r then
@@ -166,6 +166,14 @@ local LOOT_ONE = LOOT_ITEM_SELF and pattern(LOOT_ITEM_SELF)
 local LOOT_MANY = LOOT_ITEM_SELF_MULTIPLE and pattern(LOOT_ITEM_SELF_MULTIPLE)
 
 local windowKind, windowCounted, skipUntil = nil, false, 0
+local lastUsed = { id = nil, t = 0 }                   -- the item you last used from your bags (a container)
+local function rememberUse(bag, slot)
+  local id = C_Container and C_Container.GetContainerItemID and C_Container.GetContainerItemID(bag, slot)
+    or (GetContainerItemID and GetContainerItemID(bag, slot))
+  if id then lastUsed.id, lastUsed.t = id, GetTime() end
+end
+if C_Container and C_Container.UseContainerItem then hooksecurefunc(C_Container, "UseContainerItem", rememberUse) end
+if UseContainerItem then hooksecurefunc("UseContainerItem", rememberUse) end
 local moneyChatAt, moneyDelta = 0, nil
 
 local function noteWindow()
@@ -174,9 +182,18 @@ local function noteWindow()
   local guid = GetLootSourceInfo and GetLootSourceInfo(1) or ""
   local kind = strsplit("-", guid or "")
   if kind == "Item" then
+    -- a container opened from your bags: its contents count; if it was looted in this session it was counted at its
+    -- "worth opened" value, so it comes back out (the real contents replace the estimate, never both)
     windowKind = "container"
-    skipUntil = math.huge                              -- loot from a container you opened: not counted
-    say("container opened: its contents are skipped")
+    session.loots.containers = (session.loots.containers or 0) + 1
+    local id = lastUsed.id and GetTime() - lastUsed.t <= 3 and lastUsed.id
+    if id and (session.items[id] or 0) > 0 then
+      session.items[id] = session.items[id] - 1
+      if session.items[id] == 0 then session.items[id] = nil end
+      say("container opened: counted its contents instead of the container itself")
+    else
+      say("container opened: its contents count")
+    end
     return
   end
   windowKind = (IsFishingLoot and IsFishingLoot()) and "fishing" or (kind == "GameObject" and "nodes" or "mobs")
@@ -202,7 +219,6 @@ ev:SetScript("OnEvent", function(_, event, msg)
     pcall(noteWindow)
   elseif event == "LOOT_CLOSED" then
     windowCounted = false
-    if windowKind == "container" then skipUntil = GetTime() + 1 end
     windowKind = nil
   elseif event == "CHAT_MSG_LOOT" then
     if GetTime() <= skipUntil then return end
