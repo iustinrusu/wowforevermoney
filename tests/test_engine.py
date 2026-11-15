@@ -106,9 +106,34 @@ class PricingTests(unittest.TestCase):
     def test_wall_makes_the_short_staff_flip_realistic(self):
         w = make_world({LIMITED: {'numAuctions': 10, 'minBuyout': 100000, 'marketValue': 286, 'regionSale': 1900,
                                   'regionSoldPerDay': 20, 'regionSalePercent': 1.0}})
-        o = next(o for o in Engine(w, dict(SETTINGS)).vendor_flips() if o.item_id == LIMITED)
+        o = next(o for o in Engine(w, dict(SETTINGS, sale_price_basis='lower')).vendor_flips() if o.item_id == LIMITED)
         self.assertEqual(o.profit_unit, int(1900 * 0.95) - 1000)     # vendor price 10s: 8s 5c, not 9g
         self.assertIn('listed_far_above_sales', o.flags)
+
+    def test_realm_prices_keep_the_realm_listing_and_warn(self):
+        # the user's choice (2026-11-15): your realm's lowest listing; region sales only warn
+        mooncloth = {'numAuctions': 43, 'minBuyout': 280000, 'marketValue': 285203, 'regionSale': 157700,
+                     'regionMarketValue': 273930, 'regionSoldPerDay': 5.45, 'regionSalePercent': 0.218}
+        q = ah_sell(mooncloth, 'realm')
+        self.assertEqual((q.value, q.source), (280000, 'lowest listing'))
+        self.assertIn('sells_lower', q.flags)                        # 15g 77s usual sale < 70% of 28g
+        self.assertEqual(ah_sell(mooncloth, 'lower').value, 157700)  # the old rule
+        wall = {'numAuctions': 10, 'minBuyout': 100000, 'marketValue': 286, 'regionSale': 1900, 'regionSoldPerDay': 20}
+        q = ah_sell(wall, 'realm')
+        self.assertEqual(q.value, 100000)                            # the price stays, the flag warns
+        self.assertIn('listed_far_above_sales', q.flags)
+        q = ah_sell({'marketValue': 5000, 'regionSale': 3000, 'regionSoldPerDay': 4}, 'realm')
+        self.assertEqual((q.value, q.source), (5000, 'realm market value (none listed now)'))
+
+    def test_realm_prices_show_the_profit_at_the_usual_sale_and_keep_walls_out_of_top_picks(self):
+        w = make_world({LIMITED: {'numAuctions': 10, 'minBuyout': 100000, 'marketValue': 286, 'regionSale': 1900,
+                                  'regionSoldPerDay': 20, 'regionSalePercent': 1.0}})
+        e = Engine(w, dict(SETTINGS))                                    # realm is the default
+        o = next(o for o in e.vendor_flips() if o.item_id == LIMITED)
+        self.assertEqual(o.profit_unit, int(100000 * 0.95) - 1000)
+        e.add_upside(o)
+        self.assertEqual(o.detail['at_usual']['profit_unit'], int(1900 * 0.95) - 1000)
+        self.assertNotIn(o.key, [k for keys in e.top_picks([o]).values() if isinstance(keys, list) for k in keys])
 
     def test_sell_at_lowest_buyout_by_default(self):
         # The user's rule: you list at the current lowest buyout, so that's the sale price.

@@ -557,6 +557,12 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Realm prices (part 1 of docs/plans/realm-prices-and-profit-views.md): `sale_price_basis` = `realm`
+  (default and the user's setting): the realm's lowest listing; nothing listed -> realm market value first; walls keep
+  their price, flagged and out of Top picks; rows show "at usual" (the profit at the region's usual sale). On the
+  user's data 395 of 970 craft/flip rows changed: Mooncloth 13g 78s -> 24g 45s each, Devilsaur Leggings 20g 51s ->
+  21g 44s. Tests: 224.
+
 - **2026-11-15** Fix: the page was blank (user: "it seems broken"). The Everloot label in the mob drop list had a bare
   apostrophe ("players' uploads") inside a quoted string: a script syntax error that stops the whole page. Reworded;
   every tab rendered in the browser afterwards. Lesson: after any web/app.js edit, load the page and render every view

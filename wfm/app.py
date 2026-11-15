@@ -295,7 +295,7 @@ class App:
                                   'observed_share': f['observed_share'], 'count': f['count'],
                                   'zone_skill': o.detail.get('zone_skill'), 'flags': o.flags, 'pools': f['pools']})
         fished_in.sort(key=lambda x: ('classic_unconfirmed' in x['flags'], -x['share']))     # Forever data first
-        q = ah_sell(w.prices.get(iid), self.effective_settings()[0].get('sale_price_basis', 'lower'))
+        q = ah_sell(w.prices.get(iid), self.effective_settings()[0].get('sale_price_basis', 'realm'))
         return {
             'id': iid, 'name': it.name if it else self.name(iid), 'quality': it.quality if it else 1,
             'category': it.category if it else '', 'item_level': it.item_level if it else None,
@@ -371,7 +371,7 @@ class App:
         return investments_mod.build(
             investments_mod.load_list(), gd.items if gd else {}, gd.recipes if gd else [], self.world.prices,
             lambda iid: self.history.series(iid, days=KEEP_DAYS), s.get('watchlist'), float(s.get('ah_cut', 0.05)),
-            s.get('sale_price_basis', 'lower'))
+            s.get('sale_price_basis', 'realm'))
 
     def market(self, iid: int) -> dict:
         gd = self.world.gamedata
@@ -400,7 +400,7 @@ class App:
                 if a['expires'] and a['expires'] < now:
                     expired += 1            # expired: back in the mailbox, which Syndicator records as mail
                     continue
-                q = ah_sell(w.prices.get(a['item']), s.get('sale_price_basis', 'lower'))
+                q = ah_sell(w.prices.get(a['item']), s.get('sale_price_basis', 'realm'))
                 value += proceeds(q, eng.cut) * a['count'] or valuer.worth_for(a['item'], a['count'])
                 n += 1
             return value, n, expired

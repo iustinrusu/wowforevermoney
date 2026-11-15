@@ -38,7 +38,8 @@ DEFAULTS = {
     # Sale price on the AH: 'lower' = the lower of the current lowest buyout and the usual sale price, what you can
     # count on (the user's choice, 2026-11-14); 'min_buyout' = the current lowest buyout, what you'd list at;
     # 'actual_sales' = never above the realm's listing average or what it actually sells for (most conservative).
-    'sale_price_basis': 'lower',
+    # 'realm' (the user's choice, 2026-11-15) = your realm's lowest listing; region data only says how fast it sells.
+    'sale_price_basis': 'realm',
     # Pools (Floating Wreckage/Debris, schools) have to be found first, so gold/hour counts open water only;
     # pool loot (trunks, Stranglekelp, Rumsey Rum) is shown as a bonus unless you turn this on.
     'fishing_pools': False,

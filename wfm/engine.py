@@ -114,7 +114,7 @@ class Engine:
         self.q = world.questie
         self.su = world.skillup
         self.cut = float(settings.get('ah_cut', 0.05))
-        self.sale_basis = settings.get('sale_price_basis', 'lower')   # see pricing.ah_sell
+        self.sale_basis = settings.get('sale_price_basis', 'realm')   # see pricing.ah_sell
         self.share = float(settings.get('market_share', 0.2))
         self.gold = float(settings.get('gold', 0)) * COPPER_PER_GOLD
         self.time_value = DEFAULT_TIME_VALUE
@@ -1348,9 +1348,19 @@ class Engine:
     def add_upside(self, o: Opportunity) -> None:
         """Priced at the lower of the lowest listing and the usual sale price: what the row would make if it sold at
         the current lowest listing instead ("up to" in the tables). Crafts and vendor flips sold on the AH only."""
-        if self.sale_basis != 'lower' or o.kind not in ('craft', 'vendor_flip') or o.detail.get('sell_channel', 'AH') != 'AH':
+        if self.sale_basis not in ('lower', 'realm') or o.kind not in ('craft', 'vendor_flip') \
+                or o.detail.get('sell_channel', 'AH') != 'AH':
             return
         p = self.price(o.item_id)
+        if self.sale_basis == 'realm':
+            # realm prices: the "may sell for less" line, at the region's usual sale price
+            lo, used = ah_sell(p, 'lower'), ah_sell(p, 'realm')
+            if lo and used and lo.value < used.value:
+                per = o.detail.get('product_count') or 1
+                each = o.profit_unit - int((proceeds(used, self.cut) - proceeds(lo, self.cut)) * per)
+                o.detail['at_usual'] = {'profit_unit': each, 'daily': int(each * o.units_day), 'price': lo.value,
+                                        'price_used': used.value}
+            return
         hi, used = ah_sell(p, 'min_buyout'), ah_sell(p, 'lower')
         if not hi or not used or hi.value <= used.value:
             return
@@ -1442,6 +1452,8 @@ class Engine:
         bonus = float(self.s.get('switch_bonus', 1.5))
         bad = {'price_check_fails', 'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
                'event_vendor'}
+        if self.sale_basis == 'realm':
+            bad.add('listed_far_above_sales')     # realm prices: a listing 3x+ above what sells is not a pick
 
         def clean(o, allow_unaffordable=False):
             return not (set(o.flags) & (bad - {'cant_afford'} if allow_unaffordable else bad))

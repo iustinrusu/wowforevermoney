@@ -41,7 +41,7 @@ def ah_buy(p: dict | None) -> Quote | None:
     return None
 
 
-SALE_BASES = ('lower', 'min_buyout', 'actual_sales')
+SALE_BASES = ('realm', 'lower', 'min_buyout', 'actual_sales')
 ODD_LISTINGS, ODD_LOW, ODD_HIGH = 3, 0.5, 2.0    # few listings outside half..double the recent average: looks off
 WALL = 3.0       # lowest listing over 3x the region's average sale price: nobody pays it, value at actual sales
 SALE_OUTLIER = 3.0   # nothing listed and the region's sale average over 3x its listing average: freak sales
@@ -59,7 +59,11 @@ def usual_sale(p: dict | None) -> int:
 def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
     """The price you'd sell one unit for on your realm's AH (before the AH cut).
 
-    basis 'lower' (the default, the user's choice 2026-11-14): the lower of the current lowest buyout and the item's
+    basis 'realm' (the default, the user's choice 2026-11-15: "I play on a realm, not on the region"): your realm's
+    lowest listing, what you'd list at. Region data only says how fast it sells: a listing far above what sells in the
+    region keeps its price but is flagged (listed_far_above_sales, sells_lower) and kept out of Top picks. Nothing
+    listed: the realm's listing average first, then the region's sale and listing averages.
+    basis 'lower' (the user's choice 2026-11-14 until 2026-11-15): the lower of the current lowest buyout and the item's
     usual sale price (region average): what you can count on. List above the lowest listing and you are undercut;
     count on more than buyers usually pay and 119 of 703 crafts and flips "made a profit" that was a loss.
     basis 'min_buyout': the current lowest buyout, which is what you'd list at (the user's choice until 2026-11-14).
@@ -84,7 +88,9 @@ def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
             flags.append('price_looks_off')
         if basis == 'actual_sales' and mv and mv < value:
             value, source = mv, 'realm market value'
-        if sale and value > WALL * sale:
+        if sale and value > WALL * sale and basis == 'realm':
+            flags.append('listed_far_above_sales')      # realm prices: a warning, not a different price
+        elif sale and value > WALL * sale:
             # A wall of listings far above anything that sells is not a price (Short Staff: 10 listings at 10g,
             # sells for 1s 90c, which made a 9g "flip"). The lowest listing is only a sale price if things sell near it.
             value, source = sale, 'average sale price (region): every listing is far above what it sells for'
@@ -105,7 +111,10 @@ def ah_sell(p: dict | None, basis: str = 'min_buyout') -> Quote | None:
             flags.append('no_realm_data')
         if freak:
             flags.append('sale_price_outlier')
-        value, source = options[0] if sale else min(options)
+        if basis == 'realm' and p.get('marketValue'):
+            value, source = int(p['marketValue']), 'realm market value (none listed now)'
+        else:
+            value, source = options[0] if sale else min(options)
     if sale and sale < 0.7 * value:
         flags.append('sells_lower')       # listed well above what it actually sells for: it may sit unsold
     if basis == 'actual_sales' and sale and sale < value:
