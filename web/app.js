@@ -964,8 +964,10 @@ function connect() {
   const es = new EventSource('/api/stream');
   es.addEventListener('update', async (e) => {
     const data = JSON.parse(e.data);
-    const rb = $('#refresh-now'); if (rb.disabled) { rb.disabled = false; rb.textContent = 'Refresh now'; toast('Refreshed. Prices are from the latest TSM download.'); }
+    const rb = $('#refresh-now'), refreshed = rb.disabled;
+    if (refreshed) { rb.disabled = false; rb.textContent = 'Refresh now'; }
     await loadState();
+    if (refreshed) toast(refreshMessage());
     if (!['settings', 'search'].includes(TAB)) render();
     (data.events || []).forEach((ev) => {
       toast(ev.text);
@@ -974,6 +976,21 @@ function connect() {
   });
   es.addEventListener('tick', async () => { await loadState(); });
   es.onerror = () => { $('#status').textContent = 'Lost connection to the app. Is it still running?'; };
+}
+
+// After "Refresh now": prices come from the TSM app's sync; bags, gold and professions only update when the addons save,
+// which happens on /reload or logout in game. Say when that last happened and recommend a /reload when it's been a while.
+const RELOAD_AFTER_MIN = 10;
+function refreshMessage() {
+  const f = (n) => (STATE.freshness || []).find((x) => x.name === n) || {};
+  const saved = Math.max(f('inventory').file_time || 0, f('profile').file_time || 0);
+  const tsm = f('tsm');
+  const prices = `Prices are from TSM's last download (${tsm.data_time ? ago(tsm.data_time) : 'unknown'}; the TSM desktop app updates them about hourly).`;
+  if (!saved) return `Refreshed. ${prices} Your bags and gold aren't read yet: they need Syndicator or ForeverMoneyBridge, saved by a /reload in game.`;
+  const mins = (Date.now() / 1000 - saved) / 60;
+  return mins > RELOAD_AFTER_MIN
+    ? `Refreshed. Your bags, gold and professions were last saved in game ${ago(saved)}: type /reload in game to save them now, then refresh again. ${prices}`
+    : `Refreshed. Your bags, gold and professions were saved in game ${ago(saved)}. ${prices}`;
 }
 
 $('#refresh-now').onclick = async () => {

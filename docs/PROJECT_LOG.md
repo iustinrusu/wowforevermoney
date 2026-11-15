@@ -557,6 +557,10 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** "Refresh now" says when your in-game data was last saved (Syndicator / ForeverMoneyBridge files) and
+  recommends a /reload when that was over 10 minutes ago (user's idea); prices are said to come from the TSM app's
+  sync, which a /reload doesn't change. Button hover text explains it too.
+
 - **2026-11-15** Snipes removed (user: "snipes have to be done in game, fast, not using old data"): no snipe steps in the
   plan, no Snipes section in Top picks or snipe alerts, and the run no longer builds AH->vendor or cheap-relist rows
   (TSM data is up to an hour old: the listing is usually gone; TSM's Sniper scans live). Instead the Flips tab lists
