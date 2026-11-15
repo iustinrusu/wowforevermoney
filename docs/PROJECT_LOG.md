@@ -557,6 +557,15 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Farm meter, ForeverMoneyBridge 1.5.0 (user's request; `addon/ForeverMoneyBridge/Meter.lua`): `/fmb start`
+  shows a window and starts a session, `/fmb stop` saves it (ForeverMoneyBridgeDB.meter.sessions, last 50) and hides
+  it, `/fmb pause` / `/fmb resume`. Counts what loot windows from mobs, fishing and nodes show (not containers opened
+  from bags) and gold looted while a loot window is open. Prices: `Prices.lua`, written by the app after each
+  recompute (`profile.write_prices`, `App._write_prices`: Valuer.value for 17,317 items, 220 KB), so the meter matches
+  My bags exactly (checked: 9 of 9 single items equal); fallbacks for missing items: TSM in game (first(DBMinBuyout,
+  DBMarket) after the 5% cut), then the vendor price, counted in the window. Prices.lua and Checks.lua are never
+  overwritten by an addon install. Not tested in game yet (no WoW here): the user tries it. Tests: 239.
+
 - **2026-11-15** Seasonal fish: no "how sure" discount while recent Forever catches confirm the season (flag
   `seasonal_confirmed`, a note that the spot is worth less once the season ends); the 10% discount stays only for
   seasons from the Classic calendar. User's question: Feralas ranked above Tanaris (4g 73s vs 5g 19s an hour)

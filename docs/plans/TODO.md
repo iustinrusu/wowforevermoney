@@ -17,7 +17,7 @@ same night; nothing waits on the user.
 
 1a. [ ] **FIRST, IN A NEW CHAT AFTER THE USAGE RESET (19 Nov): comprehensive review** (UI, UX, logic, accuracy,
        how all systems work together; the user's request, 2026-11-15): `docs/plans/comprehensive-review.md`.
-1c. [ ] **Farm meter in ForeverMoneyBridge** (the user, 2026-11-15; prices must match the app's):
+1c. [x] (built 2026-11-15, addon 1.5.0; untested in game until the user tries it) **Farm meter in ForeverMoneyBridge** (the user, 2026-11-15; prices must match the app's):
        `docs/plans/farm-meter.md`. After the comprehensive review, or alongside it.
 1b. [x] (done 2026-11-15, the user said "do it now") **Realm prices, own materials, three profit views** (the user's decisions, 2026-11-15):
        `docs/plans/realm-prices-and-profit-views.md`. Then continue with (a)-(d) above.

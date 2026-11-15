@@ -70,3 +70,22 @@ class KnownCraftsTests(unittest.TestCase):
               's@Testchar Alpha - Horde - PvP@internalData@money': 5}
         self.assertEqual(profile.known_crafts(db), {'Testchar Alpha': {3275, 2152}, 'Alt Beta': {2152}})
         self.assertEqual(profile.known_crafts({}), {})
+
+
+class MeterPricesTests(unittest.TestCase):
+    def test_prices_table_and_install_keeps_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            addons = Path(d, 'AddOns')
+            src = Path(d, 'src'); src.mkdir()
+            for name, text in (('ForeverMoneyBridge.toc', '## Version: 1.5.0\n'), ('Prices.lua', 'ForeverMoneyBridge_Prices = {made=0, items={}}\n'),
+                               ('Checks.lua', 'ForeverMoneyBridge_Checks = {}\n')):
+                Path(src, name).write_text(text, encoding='utf-8')
+            profile.install_addon(src, addons, log=lambda m: None)
+            self.assertTrue(profile.write_prices(addons, {2589: 95, 4306: 0, 2592: 140}, 1_800_000_000))
+            text = (addons / 'ForeverMoneyBridge' / 'Prices.lua').read_text(encoding='utf-8')
+            self.assertIn('ForeverMoneyBridge_Prices = {made=1800000000, items={[2589]=95,[2592]=140}}', text)
+            self.assertFalse(profile.write_prices(addons, {2589: 95, 2592: 140}, 1_800_000_999))   # same values
+            Path(src, 'Meter.lua').write_text('-- new file', encoding='utf-8')
+            profile.install_addon(src, addons, log=lambda m: None)                               # an update
+            self.assertIn('[2589]=95', (addons / 'ForeverMoneyBridge' / 'Prices.lua').read_text(encoding='utf-8'))
+            self.assertTrue((addons / 'ForeverMoneyBridge' / 'Meter.lua').exists())

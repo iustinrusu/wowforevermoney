@@ -103,6 +103,7 @@ class App:
             self.result, self.generated_at = result, int(time.time())
             self.audit = audit.run(self.world, Engine(self.world, settings)) + [anomalies.audit_check(result)]
             self._write_item_checks(result)
+            self._write_prices(result, settings)
             self.tips = self._load_tips()
         log(f'Recomputed ({reason}) in {time.time() - t:.1f}s: {len(result["opportunities"])} opportunities')
         if events:
@@ -151,6 +152,21 @@ class App:
             except Exception:
                 log('Watcher error:\n' + traceback.format_exc())
             self._settings_dirty.wait(POLL_SECONDS)
+
+    def _write_prices(self, result, settings):
+        """The farm meter's prices (ForeverMoneyBridge Prices.lua): the app's value of every item that has a price,
+        so the meter in game and the app never disagree."""
+        try:
+            gd = self.world.gamedata
+            if not gd or not self.world.paths:
+                return
+            valuer = Engine(self.world, settings).valuer(result.get('best_use') or {})
+            ids = set(self.world.prices) | {i for i, it in gd.items.items() if it.sell_price}
+            values = {i: valuer.value(i).value for i in ids if i in gd.items}
+            if profile_mod.write_prices(self.world.paths.addons, values, int(time.time())):
+                log(f'Farm meter prices updated ({sum(1 for v in values.values() if v > 0):,} items)')
+        except Exception as e:      # never let the meter's file break a recompute
+            log(f'Farm meter prices not written: {e}')
 
     def _write_item_checks(self, result):
         """Ask the addon to verify, in game, the items behind the current recommendations (and disagreements)."""

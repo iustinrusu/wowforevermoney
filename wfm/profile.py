@@ -135,6 +135,32 @@ def apply(settings: dict, profile: dict) -> tuple[dict, dict]:
 CHECKS_FILE = 'Checks.lua'
 
 
+PRICES_FILE = 'Prices.lua'
+APP_WRITTEN = (CHECKS_FILE, PRICES_FILE)     # files the app writes into the installed addon: never overwritten
+
+
+def prices_lua(values: dict[int, int], made: int) -> str:
+    """The farm meter's price table: what the app values each item at (copper per unit, as on My bags)."""
+    body = ','.join(f'[{int(i)}]={int(v)}' for i, v in sorted(values.items()) if v > 0)
+    return ('-- Written by the WoW Forever Money app: what it values each item at (copper per unit, the same values as\n'
+            "-- the app's My bags). The farm meter (/fmb start) uses them. Refreshed when the app recalculates;\n"
+            '-- WoW reads it on login or /reload.\n'
+            f'ForeverMoneyBridge_Prices = {{made={int(made)}, items={{{body}}}}}\n')
+
+
+def write_prices(addons_dir: Path, values: dict[int, int], made: int) -> bool:
+    """Write Prices.lua into the installed addon when the values changed. True if written."""
+    dest = addons_dir / ADDON_NAME / PRICES_FILE
+    if not dest.parent.exists():
+        return False
+    old = dest.read_text(encoding='utf-8') if dest.exists() else ''
+    new = prices_lua(values, made)
+    if old.split('items=', 1)[-1] == new.split('items=', 1)[-1]:
+        return False                         # same values: keep the file (and its date)
+    dest.write_text(new, encoding='utf-8')
+    return True
+
+
 def write_item_checks(addons_dir: Path, ids: list[int]) -> bool:
     """Tell the addon which items to look up in game (read on the next login or /reload). True if changed."""
     dest = addons_dir / ADDON_NAME / CHECKS_FILE
@@ -154,7 +180,7 @@ def install_addon(src: Path, addons_dir: Path, log=print) -> bool:
     src_toc, dest_toc = src / f'{ADDON_NAME}.toc', dest / f'{ADDON_NAME}.toc'
     ver = lambda p: (re.search(r'## Version:\s*(\S+)', p.read_text(encoding='utf-8')) or [None, ''])[1] if p.exists() else ''
     # Checks.lua is written by the app (the items to verify in game): never overwrite it with the empty default
-    files = [f for f in src.iterdir() if not (f.name == CHECKS_FILE and (dest / f.name).exists())]
+    files = [f for f in src.iterdir() if not (f.name in APP_WRITTEN and (dest / f.name).exists())]
     if dest_toc.exists() and ver(dest_toc) == ver(src_toc) and \
             all((dest / f.name).exists() and (dest / f.name).read_bytes() == f.read_bytes() for f in files):
         return False
