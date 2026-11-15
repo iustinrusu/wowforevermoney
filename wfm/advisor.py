@@ -54,7 +54,16 @@ def crafting(prof: str, opps: list) -> dict:
                                   key=lambda o: -o.daily))[:TOP_CRAFTS]
     full = one_per_cooldown(sorted(rows, key=lambda o: -(o.detail.get('daily_if_affordable', o.daily) or 0)))[:TOP_CRAFTS]
     pick = lambda os_, f: [{'title': o.title, 'key': o.key, 'daily': int(f(o) or 0)} for o in os_]
-    return {'now': pick(now, lambda o: o.daily), 'full': pick(full, lambda o: o.detail.get('daily_if_affordable', o.daily)),
+    # a good day (optimistic): one sale of each of its best crafts today, slow ones too; big sales: worth a lot each
+    # but selling less than once a day (Devilsaur Leggings), so the average day hides them
+    sellable = [o for o in opps if o.kind == 'craft' and o.profession == prof
+                and not (BAD - {'cant_afford', 'hard_to_sell'}) & set(o.flags)]
+    good = one_per_cooldown(sorted(sellable, key=lambda o: -(o.detail.get('good_day') or 0)))[:TOP_CRAFTS]
+    big = sorted((o for o in sellable if (o.units_day or 0) < 1 and o.profit_unit > 0), key=lambda o: -o.profit_unit)[:3]
+    return {'good_day': sum(int(o.detail.get('good_day') or 0) for o in good),
+            'big_sales': [{'title': o.title, 'key': o.key, 'profit_unit': int(o.profit_unit),
+                           'days_per_sale': round(1 / o.units_day) if o.units_day else None} for o in big],
+            'now': pick(now, lambda o: o.daily), 'full': pick(full, lambda o: o.detail.get('daily_if_affordable', o.daily)),
             'now_daily': sum(int(o.daily or 0) for o in now),
             'full_daily': sum(int(o.detail.get('daily_if_affordable', o.daily) or 0) for o in full)}
 

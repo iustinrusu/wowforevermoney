@@ -12,7 +12,7 @@ data first, anything from Classic history labelled as speculation, plain-languag
 2. **Done 2026-11-15** (Crafting tab, "Levelling a profession"; project log). **Levelling planner** for a crafting profession: the cheapest path from your skill to a target (SkillUpForever
    thresholds for orange/yellow/green, current AH prices, selling what you craft to offset the cost), with total
    gold, time, and what it unlocks. Your own gathered materials count at what they'd sell for.
-3. **Vertical integration**: when you gather an ingredient yourself (skin, mine, pick), show the craft both ways:
+3. **Done 2026-11-15** ("With your own materials" column; project log). **Vertical integration**: when you gather an ingredient yourself (skin, mine, pick), show the craft both ways:
    ingredients bought on the AH, and your own ingredients at what you'd get for selling them, plus the gathering
    time. Shows when skin -> craft beats selling the leather.
 4. **Server phase tracker**: from the progression gauge (cloth tiers, Runecloth share) and price history, estimate

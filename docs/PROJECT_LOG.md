@@ -557,6 +557,16 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Profit views (parts 2-3 of docs/plans/realm-prices-and-profit-views.md): Crafting tab columns "On a
+  good day" (one sale today at the realm price, even for slow sellers; optimistic) and "With your own materials"
+  (product minus the materials still bought; "adds" = over selling the gatherable ones raw; gold an hour of farming +
+  crafting from the best Forever-backed spot per material, `Engine.gather_rates`; materials never free; crafted
+  materials such as Cured Rugged Hide and items an everyday vendor sells are not gatherable, event vendors like the
+  Darkmoon Faire's Lhara don't count as vendors, also for "Farm X" rows). Professions tab: "On a good day" per
+  profession and a "Big sales" line (worth a lot, under one a day). With realm prices as played: Tailoring 22g 66s a
+  day at 300, 40g 71s on a good day (Mooncloth 24g 45s each, 1 every 4 days); Leatherworking 9g 18s, 47g 96s on a good
+  day (Devilsaur Leggings 21g 44s each). Tests: 226.
+
 - **2026-11-15** Realm prices (part 1 of docs/plans/realm-prices-and-profit-views.md): `sale_price_basis` = `realm`
   (default and the user's setting): the realm's lowest listing; nothing listed -> realm market value first; walls keep
   their price, flagged and out of Top picks; rows show "at usual" (the profit at the region's usual sale). On the

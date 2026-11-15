@@ -5,9 +5,11 @@ from types import SimpleNamespace
 from wfm import advisor
 
 
-def row(kind, title, gph=None, daily=0, prof=None, doable=True, needs='', flags=(), full=None):
+def row(kind, title, gph=None, daily=0, prof=None, doable=True, needs='', flags=(), full=None, profit=0, units=1.0):
     return SimpleNamespace(kind=kind, title=title, key=title, gph=gph, daily=daily, profession=prof, doable=doable,
-                           needs=needs, flags=list(flags), detail={'daily_if_affordable': full if full is not None else daily})
+                           needs=needs, flags=list(flags), profit_unit=profit, units_day=units,
+                           detail={'daily_if_affordable': full if full is not None else daily,
+                                   'good_day': int(profit * max(units, 1))})
 
 
 class FakeEngine:
@@ -27,6 +29,7 @@ OPPS = [
     row('craft', 'Craft B', daily=1000, prof='Leatherworking'),
     row('craft', 'Craft C', daily=0, prof='Leatherworking', doable=False, full=9000),
     row('craft', 'Craft Junk', daily=99999, prof='Leatherworking', flags=['hard_to_sell']),
+    row('craft', 'Craft Leggings', daily=1300, prof='Leatherworking', flags=['hard_to_sell'], profit=200000, units=0.0667),
     row('craft', 'Craft Pots', daily=0, prof='Alchemy', doable=False, full=20000),
     row('craft', 'Transmute A', daily=0, prof='Alchemy', doable=False, full=15000),
     row('craft', 'Transmute B', daily=0, prof='Alchemy', doable=False, full=12000),
@@ -63,6 +66,13 @@ class AdvisorTests(unittest.TestCase):
 
     def test_a_shared_cooldown_counts_once(self):
         self.assertEqual(self.rows['Alchemy']['craft']['full_daily'], 20000 + 15000)    # not + 12000 as well
+
+    def test_good_day_and_big_sales(self):
+        lw = self.rows['Leatherworking']['craft']
+        self.assertEqual(lw['good_day'], 200000)                      # one leggings sale today; the others profit 0 here
+        self.assertEqual(lw['big_sales'][0], {'title': 'Craft Leggings', 'key': 'Craft Leggings',
+                                              'profit_unit': 200000, 'days_per_sale': 15})
+        self.assertEqual(lw['now_daily'], 4000)                       # the average day still leaves it out
 
     def test_yours_first(self):
         self.assertEqual(set(self.order[:2]), {'Skinning', 'Leatherworking'})

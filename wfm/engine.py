@@ -615,8 +615,8 @@ class Engine:
             is_fish = bool(FISH_WORDS.search(item.name)) and item.class_id in (0, 7, 15) and item.quality <= 2
             if not is_fish and not (item.class_id == 7 and item.subclass_id in GATHER_SOURCE):
                 continue
-            if not is_fish and self.vendor_price(iid):
-                continue          # a vendor sells it (Silken Thread): you'd buy it, not farm it
+            if not is_fish and self.sold_by_vendor(iid):
+                continue          # a vendor sells it (Silken Thread): you'd buy it, not farm it (event vendors aside)
             p = self.price(iid)
             if not p:
                 continue
@@ -1306,6 +1306,7 @@ class Engine:
                     + self.gathering(best_use) + logged + self.fishing_spots(best_use)
                     + self.skinning_spots(best_use) + self.node_spots(best_use) + self.mob_spots(best_use))
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
+        self.profit_views(all_opps)
         for o in all_opps:
             # anything you'd sell on the AH: does it actually sell? (hard to sell: never suggested)
             if (o.kind in ('craft', 'vendor_flip', 'gather', 'realm_dip')
@@ -1344,6 +1345,74 @@ class Engine:
                                    self.share, self.cut, int(self.gold)),
                 'time_value': self.time_value, 'time_value_source': self.time_value_source, 'anomalies': checks,
                 'undervalued': self.undervaluation_watch()}
+
+    def sold_by_vendor(self, iid: int) -> bool:
+        """A vendor you can use any day sells it (a Darkmoon Faire or other event vendor doesn't count)."""
+        vp = self.vendor_price(iid)
+        return bool(vp) and any(not v.get('event') for v in (vp[1] or [{}]))
+
+    def gather_rates(self, opps: list) -> dict[int, dict]:
+        """item -> the best Forever-backed spot that gives it: units an hour and the spot (skinning, mob, herb and ore
+        rows at the Settings paces; never your own logged time). For "with your own materials"."""
+        best: dict[int, dict] = {}
+
+        def put(iid, per_hour, o):
+            if per_hour > 0 and per_hour > best.get(iid, {}).get('per_hour', 0):
+                best[iid] = {'per_hour': per_hour, 'spot': o.title, 'key': o.key}
+        for o in opps:
+            if not o.gph or {'classic_yields', 'classic_unconfirmed', 'small_sample', 'elite', 'dungeon'} & set(o.flags):
+                continue
+            d = o.detail
+            if o.kind == 'mob_spot':
+                for x in d.get('drops') or []:
+                    put(x['item_id'], x['per_kill'] * d.get('kills_per_hour', 60), o)
+            elif o.kind == 'skin_spot':
+                ph = d.get('skins_per_hour', 60)
+                usable = [m for m in d.get('mobs') or [] if m.get('can_skin') and m.get('can_kill')] or d.get('mobs') or []
+                for m in usable[:1]:
+                    for x in m.get('items') or []:
+                        put(x['item_id'], x['share'] * ph, o)
+            elif o.kind in ('herb_spot', 'mine_spot'):
+                ph = d.get('nodes_per_hour', 40)
+                for n in (d.get('nodes') or [])[:1]:
+                    for x in n.get('items') or []:
+                        if x.get('source') == 'forever':
+                            put(x['item_id'], x['per_node'] * ph, o)
+        return best
+
+    def profit_views(self, opps: list) -> None:
+        """Two more views of each craft (the user's request, 2026-11-15), in its details:
+        good_day: one sale today at your realm's price even if it sells less than once a day (labelled optimistic);
+        own: with the materials you could gather yourself counted at what they'd sell for (never as free), what
+        crafting adds over selling them raw, and the farming time from the best Forever-backed spot for each."""
+        rates = self.gather_rates(opps)
+        for o in opps:
+            if o.kind != 'craft':
+                continue
+            d = o.detail
+            d['good_day'] = int(o.profit_unit * max(o.units_day or 0, 1))
+            revenue, own, bought, hours, own_names, unknown = d.get('revenue', 0), 0, 0, 0.0, [], []
+            for m in d.get('mats') or []:
+                it = self.gd.items.get(m['item_id'])
+                crafted_only = it and it.name.startswith(('Cured ', 'Bolt of '))      # made, not gathered
+                gatherable = (it and not crafted_only and not self.sold_by_vendor(m['item_id'])
+                              and (it.class_id == 7 and it.subclass_id in GATHER_SOURCE or m['item_id'] in rates))
+                if gatherable:
+                    sold = self.sell_value(m['item_id'])[0]
+                    own += sold * m['count']
+                    own_names.append(m['name'])
+                    r = rates.get(m['item_id'])
+                    if r:
+                        hours += m['count'] / r['per_hour']
+                    else:
+                        unknown.append(m['name'])
+                else:
+                    bought += m['unit'] * m['count']
+            if own_names:
+                farmed = revenue - bought            # gold per craft if you farm the gatherable materials
+                d['own'] = {'materials': own_names, 'mats_value': int(own), 'adds': int(revenue - bought - own),
+                            'per_craft': int(farmed), 'hours': round(hours, 2) if not unknown else None,
+                            'gph': int(farmed / hours) if hours and not unknown else None, 'no_rate': unknown}
 
     def add_upside(self, o: Opportunity) -> None:
         """Priced at the lower of the lowest listing and the usual sale price: what the row would make if it sold at

@@ -448,3 +448,28 @@ class HistoryTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ProfitViewTests(unittest.TestCase):
+    def test_good_day_and_own_materials(self):
+        from types import SimpleNamespace as NS
+        from wfm.engine import Opportunity
+        prices = {MAT_AH: {'numAuctions': 5, 'minBuyout': 100, 'marketValue': 100, 'regionSoldPerDay': 50}}
+        e = Engine(make_world(prices), dict(SETTINGS))
+        mats = [{'item_id': MAT_AH, 'name': 'Raw Meat', 'count': 3, 'unit': 100},           # gatherable (trade good 7/0? see below)
+                {'item_id': MAT_VENDOR, 'name': 'Vendor Spice', 'count': 1, 'unit': 10}]     # a vendor sells it: bought
+        e.gd.items[MAT_AH].subclass_id = 8                                                  # meat: gatherable
+        slow = Opportunity(kind='craft', key='c1', item_id=PRODUCT, title='Craft Tasty Dish', profit_unit=500,
+                           cost_unit=310, units_day=0.2, daily=100, detail={'revenue': 810, 'mats': mats})
+        spot = Opportunity(kind='mob_spot', key='m1', item_id=MAT_AH, title='Kill boars', profit_unit=0, cost_unit=0,
+                           units_day=0, daily=0, gph=5000, detail={'kills_per_hour': 60,
+                                                                    'drops': [{'item_id': MAT_AH, 'per_kill': 0.5}]})
+        e.profit_views([slow, spot])
+        self.assertEqual(slow.detail['good_day'], 500)                 # one sale today though it sells 0.2 a day
+        own = slow.detail['own']
+        self.assertEqual(own['materials'], ['Raw Meat'])
+        self.assertEqual(own['mats_value'], 3 * 95)                    # sold raw: 100 after the 5% cut
+        self.assertEqual(own['per_craft'], 810 - 10)                   # product minus what you still buy
+        self.assertEqual(own['adds'], 810 - 10 - 3 * 95)               # over selling the meat raw
+        self.assertEqual(own['hours'], 0.1)                            # 3 meat at 30 an hour (0.5 a kill x 60)
+        self.assertEqual(own['gph'], 8000)                             # 800 per craft / 0.1 h
