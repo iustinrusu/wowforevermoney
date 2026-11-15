@@ -557,6 +557,12 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Seasonal fish: no "how sure" discount while recent Forever catches confirm the season (flag
+  `seasonal_confirmed`, a note that the spot is worth less once the season ends); the 10% discount stays only for
+  seasons from the Classic calendar. User's question: Feralas ranked above Tanaris (4g 73s vs 5g 19s an hour)
+  only because of that discount; now Tanaris is first. Farm meter planned: `docs/plans/farm-meter.md` (prices from an
+  app-written table so they match the app). Tests: 238.
+
 - **2026-11-15** Update on start (user's request): run.py pulls the latest main first (`wfm/updater.py`, fast-forward
   only; setting `auto_update`, on by default, Settings > Updates; `--no-update` skips it) and, when new code arrived,
   runs itself again as a child process (exec on Windows would end start.bat's wait early). A ZIP folder, no git, no

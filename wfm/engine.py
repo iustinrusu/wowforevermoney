@@ -982,6 +982,7 @@ class Engine:
         if self._lure:
             skill -= self._lure['bonus']
         seasons = fishing.forever_seasons(cf, getattr(self.w, 'forever_fishing', None)) if cf else {}
+        self._seasons_confirmed = bool(seasons)       # recent Forever catches say which seasons are on
         spots = fishing.build_spots(cf, self.gd, seasons=seasons) if cf else {}
         # fish whose season is over (by Forever catches, else the Classic calendar) don't count in Forever data
         out_of_season = set()
@@ -1148,7 +1149,10 @@ class Engine:
         if forever and 0 < n < fishing.PRIOR_CATCHES:
             flags.append('small_sample')
         if value and seasonal_value / value >= 0.1:
-            flags.append('seasonal')
+            # in season by recent Forever catches: the value is right for now, no discount (only a note that it drops
+            # when the season ends); by the Classic calendar only: a 10% "how sure" discount (Tanaris ranked under
+            # Feralas for that while earning more, 2026-11-15)
+            flags.append('seasonal_confirmed' if getattr(self, '_seasons_confirmed', False) else 'seasonal')
         if new_fish or missing:
             flags.append('forever_change')
         if zone_skill is not None and keep < 1:

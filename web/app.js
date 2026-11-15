@@ -60,6 +60,7 @@ const FLAGS = {
   forever_only: ['good', 'Forever only', 'A zone Classic does not have; entirely from Forever data'],
   wowhead_forever: ['good', 'Wowhead Forever', 'Uses WoW: Forever counts (catches, drops, skins or gathers) read by hand from Wowhead Forever pages'],
   forever_change: ['warn', 'differs from Classic', 'Your Forever catches include fish Classic does not list here, or lack a common Classic fish'],
+  seasonal_confirmed: ['', 'seasonal fish', 'Part of the value is a seasonal fish that recent Forever catches show is in season now: counted as it is today, but this spot is worth less once the season ends'],
   seasonal: ['', 'seasonal', 'Part of the value is a seasonal fish (Classic schedule; Forever may differ)'],
   lure_cost: ['', 'lure cost counted', 'Your best lure keeps more fish here than it costs, so gold per hour assumes you use it and takes the lures you burn in an hour off (details: which lure, how many, what they cost)'],
   classic_getaway: ['warn', 'some fish get away', "Your effective fishing skill (skill + the pole, gear and lure bonus in Settings) is below what this zone needs to keep every fish, so some get away (the game's rule, with WoW Classic zone skills). A lure raises it"],

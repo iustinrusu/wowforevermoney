@@ -1,0 +1,36 @@
+# Plan: farm meter in ForeverMoneyBridge (the user's request, 2026-11-15)
+
+"Build into our addon if possible, but as long as all items are priced correctly." Postponed at 93% of the weekly
+usage; do it in a new chat after the reset (after or alongside docs/plans/comprehensive-review.md). Claude can't run
+WoW: the user tests in game; ask them for screenshots or the saved file after a session.
+
+## The key point: prices must match the app exactly
+TSM's in-game price API alone would value items differently from the app (realm lowest listing vs walls and freak
+sales, soulbound items, things that don't sell, crafted worth with its daily cap, containers' contents). So:
+- The app writes a price table into the addon folder, the way it already writes Checks.lua
+  (`profile.write_item_checks`): `addon/ForeverMoneyBridge/Prices.lua` in the WoW AddOns folder, generated after each
+  recompute: item id -> copper per unit as the app values it (`Valuer.value`, the same as My bags), plus how it's
+  valued (AH, vendor, open it, crafted) and the time it was written. Only items that can be looted (trade goods,
+  fish, gear, containers, coins aside), to keep it small; check the size.
+- WoW reads addon files only at login or /reload, so the table is as fresh as the last /reload: show its age in the
+  meter, and fall back for items missing from it: TSM_API custom price "first(DBMinBuyout, DBMarket)" when TSM is
+  loaded, else the vendor price (GetItemInfo's sellPrice), each labelled in the meter (so it's clear which prices
+  are the app's).
+- Raw gold looted counts as is.
+
+## The meter
+- A small movable window (`/fmb meter` toggles it; remembers its position): Start / Pause / Reset; session time
+  (only while running), gold looted, items looted and their value, total, and gold per hour; the top 5 items by value;
+  a line saying which prices were used (app table age, TSM fallback count, vendor fallback count).
+- Counts loot from LOOT_READY / CHAT_MSG_LOOT (the addon already logs loot; reuse it) and money from PLAYER_MONEY
+  changes while a loot window is open (+1 s), as drafted on 2026-11-14 (no language-dependent text parsing).
+- Kills, skins and fishing catches counted too, so a session can be compared with the app's estimate for that spot.
+- Saves finished sessions in ForeverMoneyBridgeDB (zone, minutes, value, gold/hour) for the user to look back on.
+- The app still never uses these sessions as farming rates (user's rule, 2026-11-14); it may show them on the
+  Gathering tab as "your sessions" if the user wants.
+
+## Tests
+- Python: the price-table writer (format, item selection, values equal to Valuer.value, size).
+- Lua: a small pure function for the session maths (value, gold/hour, fallbacks) that can be checked with a Lua
+  interpreter if one is available; otherwise by hand with the user's first session.
+- Bump the addon version (1.5.0) and note it in the project log; the app copies the addon into AddOns on start.
