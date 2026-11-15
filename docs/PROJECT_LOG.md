@@ -557,6 +557,15 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Consistency review (user: the plan showed Barbaric Bracers at 23g/h while Crafting showed 99s a day).
+  Cause: an hourly figure for things done once (plan: expected gold / minutes = 23g 19s; Crafting's time column:
+  profit a day / minutes = 32g 84s, two definitions) reads like an income. Now no hourly figure anywhere except real
+  hourly activities (farming); the plan still orders steps by expected gold per minute of your time (`order_per_hour`).
+  Second mismatch fixed: Niches' profit a day now is the row's own (capped) figure. A cross-view check on real data
+  (plan vs rows, niches vs rows, Professions vs Crafting, item drawer vs tables, levelling planner vs Crafting, purse
+  vs My bags, plan item values vs holdings) finds 0 differences; the planner values products with no recorded sales
+  at vendor price where Crafting shows the listing (flagged "no sales data"): different on purpose. Tests: 232.
+
 - **2026-11-15** Tables on narrow windows (user: "datatables are not responsive"): under 700 px every table with
   headers becomes a list of cards (`labelTables` in app.js labels each value with its column, the first column is the
   card's title; style.css). Before, a 1,400 px table sat in a 326 px scroll box. Checked at 375 px and at desktop width.

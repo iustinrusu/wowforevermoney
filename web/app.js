@@ -177,7 +177,7 @@ function oppTable(rows, opts = {}) {
       if (c === 'cooldown') { const dd = o.detail || {}, h = dd.cooldown_hours; return h ? `<td class="num" title="${esc(dd.cooldown_group ? 'Shared cooldown: ' + dd.cooldown_group : 'Recipe cooldown from the game data')}">${h >= 1 ? num(h, 0) + ' h' : num(h * 60, 0) + ' min'}${dd.cooldown_group ? ' 🔗' : ''}<div class="pill">max ${num(24 / h, h > 12 ? 2 : 0)}/day</div></td>` : '<td class="num pill">–</td>'; }
       if (c === 'flags') return `<td>${flagHtml(o.flags)}</td>`;
       if (c === 'units_day') return `<td class="num">${o.units_day >= 1 || !o.units_day ? num(o.units_day) : `1 every ${daysText(1 / o.units_day)}`}</td>`;
-      if (c === 'effort') { const ef = (o.detail || {}).effort; return ef ? `<td class="num" title="About ${ef.minutes} minutes of play a day; earns ${moneyText(ef.per_hour)} per hour of your time">~${num(ef.minutes, ef.minutes < 10 ? 1 : 0)} min<div class="pill">${esc(moneyText(ef.per_hour))}/h</div></td>` : '<td class="num pill">–</td>'; }
+      if (c === 'effort') { const ef = (o.detail || {}).effort; return ef ? `<td class="num" title="About ${ef.minutes} minutes of play a day for its profit a day (posting, reposting, buying, crafting, a vendor trip). No hourly figure: the market only takes so many, so more time would not earn more.">~${num(ef.minutes, ef.minutes < 10 ? 1 : 0)} min</td>` : '<td class="num pill">–</td>'; }
       if (c === 'every') return `<td class="num">${o.units_day > 0 ? (o.units_day >= 1 ? `${num(o.units_day, 1)} a day` : daysText(1 / o.units_day)) : '–'}</td>`;
       if ((c === 'profit_unit' || c === 'daily') && (o.detail || {}).at_usual) {
         const u = o.detail.at_usual;
@@ -415,7 +415,7 @@ function planCard(a, goal) {
   const chips = goal ? chip('Per day, once unlocked', money(a.gain), 'What this recipe would earn a day once you have the skill and the gold for it') : [
     chip('Expected', money(expected), `What this should earn: ${moneyText(a.gain)} if the numbers hold, times how sure we are (${Math.round(a.confidence * 100)}%).`),
     chip('Time', minsText(a.minutes), 'Estimated minutes of play, including posting and reposting auctions, buying, crafting and walking to a vendor.'),
-    a.per_hour ? chip('Per hour of your time', money(a.per_hour), 'Expected gold divided by the time it takes: how well this pays for your time.') : '',
+    a.type === 'farm' ? chip('Gold an hour', money(a.gain), 'This step is an hour of farming: what that hour earns at the paces in Settings.') : '',
     a.gold_needed ? chip('Gold needed', money(a.gold_needed), 'Gold you spend up front (ingredients or the item to resell); you get it back when it sells.') : '',
     chip('How sure', `${Math.round(a.confidence * 100)}%`, 'How much we trust these numbers: data quality, how well it sells, and for snipes the chance the listing is gone.'),
   ].join('');
@@ -804,7 +804,7 @@ function oppDetail(o) {
     <div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
     ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>${d.price_check ? `<div class="hint">⚠ Second opinion: ${esc(d.price_check.text)}</div>` : ''}`;
   const ef = d.effort;
-  if (ef) html += `<h3>Your time</h3><div class="kv"><div>About</div><div>${num(ef.minutes, 1)} minutes a day (${num(ef.posts, 0)} auction posts incl. reposts, ingredients, crafting, a vendor trip: estimates)</div><div>Earns</div><div>${money(ef.per_hour)} per hour of your time</div><div>Your time is worth</div><div>${money(ef.time_value)} an hour <span class="pill">half your best measured farming; change it in Settings</span></div></div>`;
+  if (ef) html += `<h3>Your time</h3><div class="kv"><div>About</div><div>${num(ef.minutes, 1)} minutes a day (${num(ef.posts, 0)} auction posts incl. reposts, ingredients, crafting, a vendor trip: estimates)</div><div>For</div><div>${money(o.daily)} a day (its profit a day: more time would not sell more)</div><div>Your time is worth</div><div>${money(ef.time_value)} an hour <span class="pill">half your best measured farming; change it in Settings</span></div></div>`;
   const rk = d.rank;
   if (rk) {
     const f = (v) => `×${(+v).toFixed(2)}`;

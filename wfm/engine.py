@@ -1257,8 +1257,9 @@ class Engine:
                 seconds += VENDOR_TRIP_SECONDS
         else:
             seconds += VENDOR_TRIP_SECONDS
-        minutes = seconds / 60
-        return {'minutes': round(minutes, 1), 'per_hour': int(o.daily / (minutes / 60)) if minutes else None,
+        minutes = round(seconds / 60, 1)
+        # while you do it: the day's profit over the minutes it takes (the plan shows the same figure)
+        return {'minutes': minutes, 'per_hour': int(o.daily / (minutes / 60)) if minutes else None,
                 'time_value': self.time_value, 'cost': int(minutes / 60 * self.time_value),
                 'posts': round(posts, 1)}
 

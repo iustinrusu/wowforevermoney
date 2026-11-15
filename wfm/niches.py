@@ -63,7 +63,10 @@ def build(prices: dict, supply: dict[int, list], share: float, stats: dict[int, 
                     'sale_rate': round(rate, 2), 'listed': listed, 'days_listed': None if days is None else round(days, 2),
                     'sale': int(sale), 'lowest': low, 'sold_out': round(st.get('sold_out', 0), 2),
                     'scans': st.get('scans', 0), 'thin_supply': thin, 'how': best, 'ways': ways[:4],
-                    'profit_day': int(best['profit_unit'] * yours), 'why': '; '.join(why)})
+                    # the row's own profit a day where it has one (capped by your gold and the ingredients' market,
+                    # as on the Crafting and Flips tabs), so the same item never shows two different figures
+                    'profit_day': int(best['daily']) if best.get('daily') else int(best['profit_unit'] * yours),
+                    'why': '; '.join(why)})
     # profit a day at your share, a thin-supply sign first among similar ones; what you can do now before the rest
     out.sort(key=lambda r: (not r['how'].get('doable'), -(r['profit_day'] * (1.25 if r['thin_supply'] else 1.0))))
     return out

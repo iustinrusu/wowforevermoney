@@ -32,6 +32,11 @@ class NicheTests(unittest.TestCase):
         self.assertTrue(thin['thin_supply'])
         self.assertIn('sold out in 50% of our 100 snapshots', thin['why'])
 
+    def test_profit_a_day_is_the_rows_own_figure(self):
+        # the same item must not show two "profit a day" figures (Niches vs Crafting): use the row's capped daily
+        rows = niches.build({GOOD: PRICES[GOOD]}, {GOOD: [dict(WAY, daily=450)]}, 0.2)
+        self.assertEqual(rows[0]['profit_day'], 450)
+
     def test_few_snapshots_are_said_so(self):
         rows = niches.build({GOOD: PRICES[GOOD]}, {GOOD: [dict(WAY)]}, 0.2, {GOOD: {'scans': 23, 'sold_out': 0.0}})
         self.assertIn('too few snapshots', rows[0]['why'])

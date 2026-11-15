@@ -348,7 +348,10 @@ def finish(actions: list[dict], time_value: int) -> list[dict]:
     for a in actions:
         a['time_cost'] = int(a['minutes'] / 60 * time_value)
         a['value'] = int(a['gain'] * a['confidence'] - a['time_cost'])
-        a['per_hour'] = int(a['gain'] * a['confidence'] / (a['minutes'] / 60)) if a['minutes'] else None
+        # shown: the gain over the minutes it takes, the same figure as the tables' "Time a day" (no sureness in it);
+        # the order uses the expected gain (sureness included), kept apart so the two never get mixed up
+        a['per_hour'] = int(a['gain'] / (a['minutes'] / 60)) if a['minutes'] else None
+        a['order_per_hour'] = int(a['gain'] * a['confidence'] / (a['minutes'] / 60)) if a['minutes'] else 0
     kept, seen, keys = [], {}, set()
     for a in sorted(actions, key=lambda a: -a['value']):
         if a['value'] <= 0 or (a['key'] and a['key'] in keys):
@@ -361,7 +364,7 @@ def finish(actions: list[dict], time_value: int) -> list[dict]:
         if len(kept) == MAX_ACTIONS:
             break
     # quick wins first, the long farming session last: order by gold per hour of your time
-    kept.sort(key=lambda a: -(a['per_hour'] or 0))
+    kept.sort(key=lambda a: -(a['order_per_hour'] or 0))
     for i, a in enumerate(kept, 1):
         a['rank'] = i
     return kept
