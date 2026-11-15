@@ -24,6 +24,15 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-15 The user's answers to the checklist** (`docs/plans/open-items-and-decisions.md`): Dungeons view yes,
+  at a lower priority (to-do 8); Everloot cross-check yes, download approved (to-do 2c); no more addons for now,
+  Wowhead data is enough (to-do 5 cancelled); remove the character names from GitHub's history, force push
+  approved (to-do 2a); keep Claude's guesses for the Settings assumptions (60 kills/h, 40 herb and 40 ore nodes/h,
+  240 casts/h, 20% market share); crafted worth capped by what can be made a day (to-do 2b); the Wowhead email
+  won't be sent; no in-game check list for the user (they /reload often): Claude reads the saved file instead
+  (2026-11-15: 23 vendors recorded with prices; no fishing logged yet, so no pool entries).
+  Briefs: `docs/plans/decided-2026-11-15.md`.
+
 - **2026-11-14 Price checks every run (user: "we need a system to detect these errors").** `wfm/anomalies.py`:
   (1) a second opinion on every craft and vendor flip: profit with each price capped at what is typical (the median
   of the realm and region listing averages and the usual sale price; an ingredient from 1-3 listings at under half
@@ -413,7 +422,8 @@ moved into `forever-data-next.md`.
 - Re-read later the 22 pages Wowhead has no Forever rows for yet (Data health lists them after the queue).
 - Mob values are floors until mobs' own pages (Drops tab: coins aside, every drop) are read; nodes are complete once
   their own pages are read (wowhead_items supports `npc=` and `object=` pages).
-- Everloot as a second source to cross-check rates (ask before downloading; CC BY-SA, keep in data/ uncommitted).
+- Everloot as a second source to cross-check rates: the user's yes and the download approved 2026-11-15 (to-do 2c;
+  CC BY-SA, keep in data/ uncommitted).
 - The to-do list (`docs/plans/TODO.md`) holds the planned work; below are smaller known gaps.
 - Not valued yet: coins inside containers, disenchanting (the user has an Enchanting alt), quest rewards for
   quest items (e.g. Savage Coast Blue Sailfin), lockpicking boxes beyond their contents.
@@ -427,7 +437,8 @@ moved into `forever-data-next.md`.
   recording at a vendor; fishing `sources`/`pools` (does GetLootSourceInfo give the pool's object id?).
 - No JavaScript syntax check in the tests (no Node on this PC): check the browser console after editing
   `web/app.js`; tests/test_web.py catches broken flag labels and names declared twice.
-- Is Javnir Nashak (Green Firework vendor, Durotar) permanent or event-only? Questie gives no hint.
+- Is Javnir Nashak (Green Firework vendor, Durotar) permanent or event-only? Questie gives no hint; Claude reads
+  his Wowhead Forever page in a reading session (checklist A7).
 - The user's character name was in tests until 2026-11-14 and is still in the first commit (0b17b50); removing it
   from history needs a force push (the user's decision).
 
