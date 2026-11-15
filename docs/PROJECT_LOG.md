@@ -557,6 +557,12 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Done for today (user's idea): a ✓ on plan steps and on craft, flip and farming rows opens "Did you list
+  all N suggested for today, or fewer?" (`wfm/done.py`, `/api/done`, `Engine.apply_done`). All: flag `done_today`,
+  out of Top picks and the plan, the next best moves up; fewer: the row keeps what's left today. Per character, reset
+  daily at 4:00 local (`done.DAY_STARTS`); "Done today" list with Undo on Top picks; done rows greyed in tables.
+  Not done yet: ticking automatically from Syndicator's auctions after a /reload. Tests: 236.
+
 - **2026-11-15** Planned: a comprehensive review in a new chat after the usage reset (user's request):
   `docs/plans/comprehensive-review.md`, first on the to-do list. The cross-view check is kept as
   `tools/consistency_check.py` (0 problems today).

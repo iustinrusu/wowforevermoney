@@ -1341,10 +1341,11 @@ class Engine:
                 per = o.detail.get('product_count') or 1
                 o.detail['profit_at_avg_sale'] = int(int(sale * (1 - self.cut)) * per - o.cost_unit)
             self.add_upside(o)
+        self.apply_done(all_opps)
         top = self.top_picks(all_opps)
         return {'opportunities': all_opps, 'best_use': best_use, 'top': top,
                 'plan': plan.build(all_opps, top, self.my_holdings(self.valuer(best_use)), self.time_value,
-                                   self.share, self.cut, int(self.gold)),
+                                   self.share, self.cut, int(self.gold), self.s.get('done_today') or {}),
                 'time_value': self.time_value, 'time_value_source': self.time_value_source, 'anomalies': checks,
                 'undervalued': self.undervaluation_watch()}
 
@@ -1419,6 +1420,21 @@ class Engine:
                 d['own'] = {'materials': own_names, 'mats_value': int(own), 'adds': int(revenue - bought - own),
                             'per_craft': int(farmed), 'hours': round(hours, 2) if not unknown else None,
                             'gph': int(farmed / hours) if hours and not unknown else None, 'no_rate': unknown}
+
+    def apply_done(self, opps: list) -> None:
+        """What you ticked as done today (done.py): all of it -> flag 'done_today' (out of Top picks and the plan, the
+        next best moves up); part of it -> the row keeps what's left for today."""
+        ticks = self.s.get('done_today') or {}
+        for o in opps:
+            t = ticks.get(o.key)
+            if not t:
+                continue
+            o.detail['done_today'] = t
+            if t['done'] >= t['of']:
+                o.flags.append('done_today')
+            elif o.units_day:
+                o.units_day = round(max(0.0, o.units_day - t['done']), 2)
+                o.daily = int(o.profit_unit * o.units_day)
 
     def add_upside(self, o: Opportunity) -> None:
         """Priced at the lower of the lowest listing and the usual sale price: what the row would make if it sold at
@@ -1529,6 +1545,7 @@ class Engine:
                'event_vendor'}
         if self.sale_basis == 'realm':
             bad.add('listed_far_above_sales')     # realm prices: a listing 3x+ above what sells is not a pick
+        bad.add('done_today')                     # done for today: the next best takes its place
 
         def clean(o, allow_unaffordable=False):
             return not (set(o.flags) & (bad - {'cant_afford'} if allow_unaffordable else bad))

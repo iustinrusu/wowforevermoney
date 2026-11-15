@@ -182,3 +182,12 @@ details.plan-items table { margin-top: 4px; }
   table.cardable > tbody > tr > td.card-title { display: block; text-align: left; font-weight: 600; padding-bottom: 6px; }
   .tablewrap { overflow-x: visible; }
 }
+
+/* done for today */
+.tick { margin-right: 6px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2);
+  color: var(--good); cursor: pointer; font-size: 12px; line-height: 18px; }
+.tick:hover { border-color: var(--good); }
+tr.done td { opacity: .45; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; max-width: 420px; width: calc(100% - 32px); }
+.modal-box h3 { margin: 0 0 6px; }

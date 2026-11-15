@@ -98,6 +98,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/niches.py` | Niches tab: items that sell every day, are thinly listed, and you can supply |
 | `wfm/gatherlite.py` | GatherLite's Forever node and pool positions per zone (UiMap tables), compared with QuestieDB |
 | `wfm/sniper.py` | Flips tab: items worth adding to TSM's Sniper, from our snapshots (no snipe suggestions) |
+| `wfm/done.py` | done for today: ticks per character and day; the next best takes the place |
 | `wfm/plan.py` | "Your plan for today": cash-in, cooldowns, routines, snipe, farming, big flip, goal as ranked steps |
 | `wfm/history.py` | SQLite price history: every realm scan for 14 days, then daily candles for a year |
 | `wfm/market.py` | Market tab: one item's history, trends and market signals (sentiment) |

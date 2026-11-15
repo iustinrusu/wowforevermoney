@@ -48,6 +48,7 @@ const FLAGS = {
   price_looks_off: ['warn', 'price looks off', "Only a few listings, far from the realm's recent average: valued at the recent average until more listings confirm the new price"],
   old_snapshot: ['warn', 'old Wowhead data', 'The Wowhead Forever counts for this zone are over 30 days old: re-read the zone page'],
   everloot: ['warn', 'Everloot rates', 'Some drop rates here come from Everloot (everloot.app, players\' uploads, CC BY-SA 4.0), where the Wowhead Forever pages read have none: only rates from 30+ loot windows, one item per drop. Kept out of Top picks until a Wowhead Forever page confirms them'],
+  done_today: ['', 'done today', 'You ticked this as done for today: it leaves the plan and Top picks until tomorrow, and the next best takes its place. Untick it in the Done today list on Top picks'],
   craft_limited_demand: ['warn', 'limited demand', 'Valued by crafting it into something whose market only takes a limited number a day (or whose recipe has a cooldown). The crafted worth counts only for that many a day; every one beyond that counts at its sale price, in this row and everywhere else'],
   more_with_skill: ['', 'more with skill', "A recipe you can't make yet would make it worth more (see details); valued at what you can do now"],
   event_vendor: ['bad', 'event vendor', 'Every vendor selling it is event-only (Darkmoon Faire, holidays) or has no known location: check it is there now. Kept out of Top picks'],
@@ -166,12 +167,13 @@ function oppTable(rows, opts = {}) {
     effort: 'Estimated minutes of play a day: posting auctions (and reposting the ones that expire), buying ingredients, crafting, one vendor trip. Below it: what that time earns per hour.',
     flags: 'Warnings and facts about this row. Hover one, or read the list under the table.', ...(opts.headTips || {})};
   const head = cols.map((c) => c === 'rank' ? `<th data-k="rank" class="rk" title="${esc(RANK_TIP)}">#</th>` : `<th data-k="${c}" class="${numeric.has(c) ? 'num' : ''}"${HT[c] ? ` title="${esc(HT[c])}"` : ''}>${H[c] || c}${HT[c] ? ' <span class="qmark">?</span>' : ''}</th>`).join('');
+  rows.forEach((o) => { ROWS[o.key] = o; });
   const body = rows.map((o) => {
     const cells = cols.map((c) => {
       if (c === 'title') {
         const name = o.name || o.title;
         const label = ['fishing_zone', 'fishing_spot', 'skin_spot', 'herb_spot', 'mine_spot', 'farm_zone', 'mob_spot'].includes(o.kind) ? esc(o.title) : esc(o.title).replace(esc(name), itemLink(o.item_id, name, o.quality));
-        return `<td>${label}${o.needs ? `<div class="needs">needs ${esc(o.needs)}</div>` : ''}${o.tip ? `<div class="pill">💡 ${esc(o.tip)}</div>` : ''}</td>`;
+        return `<td>${tickButton(o.key, o.kind)}${label}${o.needs ? `<div class="needs">needs ${esc(o.needs)}</div>` : ''}${o.tip ? `<div class="pill">💡 ${esc(o.tip)}</div>` : ''}${doneNote(o)}</td>`;
       }
       if (c === 'rank') return rankCell(ranks.get(o.key));
       if (c === 'cooldown') { const dd = o.detail || {}, h = dd.cooldown_hours; return h ? `<td class="num" title="${esc(dd.cooldown_group ? 'Shared cooldown: ' + dd.cooldown_group : 'Recipe cooldown from the game data')}">${h >= 1 ? num(h, 0) + ' h' : num(h * 60, 0) + ' min'}${dd.cooldown_group ? ' 🔗' : ''}<div class="pill">max ${num(24 / h, h > 12 ? 2 : 0)}/day</div></td>` : '<td class="num pill">–</td>'; }
@@ -200,7 +202,7 @@ function oppTable(rows, opts = {}) {
       if (c === 'profession') return `<td>${esc(o.profession || '')}</td>`;
       return `<td class="num">${money(o[c])}</td>`;
     }).join('');
-    return `<tr class="row ${o.doable ? '' : 'notdoable'}" data-key="${esc(o.key)}" data-item="${o.item_id}">${cells}</tr>`;
+    return `<tr class="row ${o.doable ? '' : 'notdoable'}${(o.flags || []).includes('done_today') ? ' done' : ''}" data-key="${esc(o.key)}" data-item="${o.item_id}">${cells}</tr>`;
   }).join('');
   const exp = opts.export !== false ? `<button class="btn" data-export="${id}">Copy item list for TSM</button>` : '';
   setTimeout(() => wireTable(id, rows, {...opts, ranks}), 0);
@@ -422,7 +424,7 @@ function planCard(a, goal) {
   const badge = goal ? '<span class="plan-goal-badge">🎓</span>' : (a.rank <= 3 ? `<span class="medal m${a.rank}" title="#${a.rank}">${a.rank}</span>` : `<span class="rank">${a.rank}</span>`);
   return `<div class="plan-card${goal ? ' goal' : ''}${a.rank && a.rank <= 3 ? ' top' + a.rank : ''}" data-key="${esc(a.key || '')}" data-item="${a.item_id || ''}" data-type="${esc(a.type)}">
     <div class="plan-rank">${badge}</div>
-    <div class="plan-body"><div class="plan-label">${PLAN_ICON[a.type] || ''} ${esc(a.label)}</div>
+    <div class="plan-body"><div class="plan-label">${goal ? '' : tickButton(a.key || `plan:${a.type}:${a.title}`, a.type, a)}${PLAN_ICON[a.type] || ''} ${esc(a.label)}</div>
       <div class="plan-title">${a.item_name ? esc(a.title).replace(esc(a.item_name), itemLink(a.item_id, a.item_name, a.quality)) : esc(a.title)}</div><div class="plan-why">${esc(a.why)}</div>
       <div class="plan-chips">${chips}</div>${planItems(a)}</div></div>`;
 }
@@ -476,6 +478,50 @@ async function levellingPanel() {
   </div>`;
 }
 
+// ---------- done for today (done.py): tick a suggestion, the next best takes its place ----------
+const ROWS = {};
+const TICK_KINDS = new Set(['craft', 'vendor_flip', 'routine', 'cooldown', 'big_flip', 'farm', 'cash_ah', 'cash_vendor',
+  'cash_open', 'cash_mail', 'fishing_spot', 'skin_spot', 'herb_spot', 'mine_spot', 'mob_spot']);
+const tickButton = (key, kind, plan) => key && TICK_KINDS.has(kind)
+  ? `<button class="tick" data-tick="${esc(key)}" ${plan ? `data-plan="${esc(JSON.stringify({title: plan.title, count: plan.count || plan.quantity || null, kind}))}"` : ''} title="Done for today: it leaves the plan and Top picks, and the next best takes its place">✓</button>` : '';
+const doneNote = (o) => { const t = (o.detail || {}).done_today; return t && t.done < t.of ? `<div class="pill">done today: ${num(t.done, 0)} of ${num(t.of, 0)}; ${num(o.units_day, 1)} left</div>` : ''; };
+function tickDialog(key, plan) {
+  const o = ROWS[key];
+  const title = (plan && plan.title) || (o && o.title) || key;
+  const sells = o && ['craft', 'vendor_flip'].includes(o.kind);
+  const rec = sells ? Math.max(1, Math.round(o.units_day || 1)) : (plan && plan.count) || 1;
+  const box = document.createElement('div');
+  box.className = 'modal';
+  box.innerHTML = `<div class="modal-box"><h3>Done for today?</h3><div>${esc(title)}</div>
+    ${sells ? `<p>Did you list all <b>${rec}</b> suggested for today, or fewer?</p>
+      <div class="controls"><button class="btn" data-all>All ${rec}</button> <label class="chk">or <input type="number" min="0" max="${rec}" value="${Math.max(0, rec - 1)}" style="width:5em"> of ${rec}</label> <button class="btn" data-some>That many</button></div>`
+      : `<p>Mark it done: it leaves the plan and Top picks until tomorrow, and the next best takes its place.</p><div class="controls"><button class="btn" data-all>Done</button></div>`}
+    <div class="controls"><button class="btn" data-cancel>Cancel</button></div></div>`;
+  document.body.appendChild(box);
+  const close = () => box.remove();
+  const send = async (done) => {
+    close();
+    await api('/api/done', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({key, done, of: rec, title})});
+    toast(done >= rec ? `Done for today: ${title}. The next best takes its place.` : `Noted ${done} of ${rec}: ${rec - done} left for today.`);
+  };
+  box.querySelector('[data-all]').onclick = () => send(rec);
+  const some = box.querySelector('[data-some]');
+  if (some) some.onclick = () => send(Math.max(0, Math.min(rec, +box.querySelector('input').value || 0)));
+  box.querySelector('[data-cancel]').onclick = close;
+  box.onclick = (e) => { if (e.target === box) close(); };
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tick]');
+  if (b) { e.preventDefault(); e.stopPropagation(); tickDialog(b.dataset.tick, b.dataset.plan ? JSON.parse(b.dataset.plan) : null); return; }
+  const u = e.target.closest('[data-untick]');
+  if (u) { e.preventDefault(); api('/api/done', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({key: u.dataset.untick, undo: true})}).then(() => toast('Back on the list.')); }
+}, true);
+function donePanel() {
+  const d = Object.entries(STATE.done_today || {});
+  if (!d.length) return '';
+  return `<details class="how"><summary>Done today (${d.length})</summary><ul>${d.map(([k, t]) => `<li>${esc(t.title || k)}${t.done < t.of ? ` (${num(t.done, 0)} of ${num(t.of, 0)})` : ''} <button class="btn" data-untick="${esc(k)}">Undo</button></li>`).join('')}</ul><div class="hint">Ticks reset each day at ${num(STATE.day_starts || 4, 0)}:00.</div></details>`;
+}
+
 const VIEWS = {
   async top() {
     const t = STATE.top || {};
@@ -487,6 +533,7 @@ const VIEWS = {
     return `${stale}${unknown}
       <div class="hint">${who ? `Playing <b>${esc(who)}</b> (detected)` : 'Using your manual settings'}: ${num(e.gold, 2)}g to invest, level ${e.level}, realm ${esc(e.realm)}. Everything updates when TSM syncs or you log out / /reload. Click any row for details.</div>
       ${planPanel(STATE.plan)}
+      ${donePanel()}
       <details class="how"><summary>How to read this page</summary><div>Every list is <b>ranked</b>: 🥇🥈🥉 mark the best three, and the order weighs expected profit, how sure the numbers are, how well the item sells, what you would lose if it doesn't sell, and whether you can do it now. <b>Click any row</b> for the full numbers and "Why it's ranked here". The coloured <b>notes</b> explain warnings: hover one to read it. <b>Per day</b> assumes you sell a realistic share of what the whole region buys each day (Settings). Prices follow your realm's lowest listing, except where nobody actually pays that.</div></details>
       <div class="panel"><h2>Daily routines <small>crafts and vendor flips you can do today: each sells about once a day or more, ranked by profit a day</small></h2>${oppTable(t.now || [])}</div>
       <div class="panel"><h2>Occasional big flips <small>worth a lot per sale, but you'd sell less than one a day</small></h2>

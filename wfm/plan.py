@@ -46,7 +46,7 @@ TOOL_SUBCLASSES = (14, 20)         # weapon subclasses: Skinning Knife, Mining P
 TYPE_LABEL = {'cash_ah': 'Cash in', 'cash_open': 'Cash in', 'cash_vendor': 'Cash in', 'cooldown': 'Cooldown',
               'routine': 'Daily routine', 'snipe': 'Snipe', 'farm': 'Farming', 'big_flip': 'Big flip',
               'goal': 'Long-term goal'}
-BAD_FLAGS = {'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe',
+BAD_FLAGS = {'done_today', 'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe',
              'above_region', 'black_market', 'event_vendor', 'classic_unconfirmed', 'classic_yields',
              'price_check_fails'}
 
@@ -371,7 +371,8 @@ def finish(actions: list[dict], time_value: int) -> list[dict]:
     return kept
 
 
-def build(opps: list, top: dict, holdings: dict, time_value: int, share: float, cut: float, gold_now: int) -> dict:
+def build(opps: list, top: dict, holdings: dict, time_value: int, share: float, cut: float, gold_now: int,
+          done_today: dict | None = None) -> dict:
     """The whole plan: ranked actions, the long-term goal, totals."""
     by = {o.key: o for o in opps}
     actions = cash_in(holdings.get('items') or [], share, cut, holdings.get('ended_auctions') or 0)
@@ -381,6 +382,8 @@ def build(opps: list, top: dict, holdings: dict, time_value: int, share: float, 
     actions += [routine(o, time_value) for o in pick('now', 6)]
     actions += [farm(o) for o in pick('hourly', 4)]
     actions += [a for a in (big_flip(o) for o in pick('slow', 4)) if a]
+    ticks = done_today or {}
+    actions = [a for a in actions if not (a.get('key') in ticks and ticks[a['key']]['done'] >= ticks[a['key']]['of'])]
     kept = finish(actions, time_value)
     needed = sum(a['gold_needed'] for a in kept)
     return {

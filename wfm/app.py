@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import anomalies, audit
 from . import advisor as advisor_mod
+from . import done as done_mod
 from . import niches as niches_mod
 from . import sniper as sniper_mod
 from . import investments as investments_mod
@@ -71,8 +72,20 @@ class App:
             return {}
 
     def effective_settings(self) -> tuple[dict, dict]:
-        """Manual settings with detected character data (level, gold, faction, professions) applied on top."""
-        return profile_mod.apply(self.settings.snapshot(), self.world.profile)
+        """Manual settings with detected character data (level, gold, faction, professions) applied on top, plus
+        what you ticked as done for today (done.py) for the character the app plans for."""
+        eff, det = profile_mod.apply(self.settings.snapshot(), self.world.profile)
+        eff['done_today'] = done_mod.today(self.character())
+        return eff, det
+
+    def character(self) -> str:
+        return self.settings.snapshot().get('character') or (self.world.profile or {}).get('active') or ''
+
+    def mark_done(self, body: dict) -> dict:
+        items = done_mod.mark(self.character(), str(body.get('key') or ''), body.get('done') or 0, body.get('of') or 0,
+                              str(body.get('title') or ''), bool(body.get('undo')))
+        self._settings_dirty.set()          # recalculate: the next best takes the freed place
+        return {'done_today': items}
 
     def recompute(self, reason: str):
         with self.lock:
@@ -216,6 +229,8 @@ class App:
             'active_character': self.settings.snapshot().get('character') or self.world.profile.get('active'),
             'last_played': self.world.profile.get('active'),
             'pack_status': getattr(self.world, 'pack_status', ''),
+            'done_today': done_mod.today(self.character()),
+            'day_starts': done_mod.DAY_STARTS,
             'realms': pd.realms() if pd else [], 'client_build': self.world.client_build,
             'counts': counts, 'audit_summary': audit.summary(self.audit),
             'top': {sec: [self.opp_view(by[k]) for k in keys if k in by] for sec, keys in r['top'].items()},
@@ -613,6 +628,8 @@ def make_handler(app: App):
                 body = json.loads(self.rfile.read(length) or b'{}')
                 if url.path == '/api/settings':
                     return self._json(app.update_settings(body))
+                if url.path == '/api/done':
+                    return self._json(app.mark_done(body))
                 if url.path == '/api/refresh':
                     app._force.set()
                     app._settings_dirty.set()   # wakes the watcher immediately
