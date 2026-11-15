@@ -151,37 +151,78 @@ local function stop()
   if win then win:Hide() end
 end
 
--- loot: count what the window shows (not from things opened from bags), and gold looted while it is open
+-- loot: your own "You receive loot: ..." chat messages (matched with the game's own templates, so any language),
+-- gold from "You loot ..." money messages matched with the gold change, and loot windows only to tell what kind of
+-- loot it was and to skip containers opened from your bags (with auto loot the window can be gone before it's read).
+local debug = false
+local function say(...) if debug then print("|cffe8c060Farm meter|r", ...) end end
+
+local function pattern(fmt)            -- "You receive loot: %s." -> "^You receive loot: (.+)%.$"
+  fmt = fmt:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
+  fmt = fmt:gsub("%%%%s", "(.+)"):gsub("%%%%d", "(%%d+)")
+  return "^" .. fmt .. "$"
+end
+local LOOT_ONE = LOOT_ITEM_SELF and pattern(LOOT_ITEM_SELF)
+local LOOT_MANY = LOOT_ITEM_SELF_MULTIPLE and pattern(LOOT_ITEM_SELF_MULTIPLE)
+
+local windowKind, windowCounted, skipUntil = nil, false, 0
+local moneyChatAt, moneyDelta = 0, nil
+
+local function noteWindow()
+  if windowCounted then return end
+  windowCounted = true
+  local guid = GetLootSourceInfo and GetLootSourceInfo(1) or ""
+  local kind = strsplit("-", guid or "")
+  if kind == "Item" then
+    windowKind = "container"
+    skipUntil = math.huge                              -- loot from a container you opened: not counted
+    say("container opened: its contents are skipped")
+    return
+  end
+  windowKind = (IsFishingLoot and IsFishingLoot()) and "fishing" or (kind == "GameObject" and "nodes" or "mobs")
+  session.loots[windowKind] = (session.loots[windowKind] or 0) + 1
+  say("loot window:", windowKind)
+end
+
+local function addMoney(delta)
+  session.money = session.money + delta
+  say("gold looted:", money(delta))
+end
+
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("LOOT_OPENED")
-ev:RegisterEvent("LOOT_CLOSED")
-ev:RegisterEvent("PLAYER_MONEY")
-ev:SetScript("OnEvent", function(_, event)
+for _, e in ipairs({ "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "CHAT_MSG_LOOT", "CHAT_MSG_MONEY", "PLAYER_MONEY" }) do
+  pcall(ev.RegisterEvent, ev, e)
+end
+ev:SetScript("OnEvent", function(_, event, msg)
   if not session or session.paused then
     lastMoney = GetMoney()
     return
   end
-  if event == "LOOT_OPENED" then
-    local guid = GetLootSourceInfo and GetLootSourceInfo(1) or ""
-    local kind = strsplit("-", guid or "")
-    if kind == "Item" then return end                       -- opening a clam or a trunk from your bags
-    local what = (IsFishingLoot and IsFishingLoot()) and "fishing" or (kind == "GameObject" and "nodes" or "mobs")
-    session.loots[what] = (session.loots[what] or 0) + 1
-    for slot = 1, (GetNumLootItems and GetNumLootItems() or 0) do
-      local link = GetLootSlotLink and GetLootSlotLink(slot)
-      local id = link and tonumber(link:match("item:(%d+)"))
-      local _, _, quantity = GetLootSlotInfo(slot)
-      if id then session.items[id] = (session.items[id] or 0) + (quantity or 1) end
-    end
-    lootOpenUntil = math.huge
+  if event == "LOOT_READY" or event == "LOOT_OPENED" then
+    pcall(noteWindow)
   elseif event == "LOOT_CLOSED" then
-    lootOpenUntil = GetTime() + 1
+    windowCounted = false
+    if windowKind == "container" then skipUntil = GetTime() + 1 end
+    windowKind = nil
+  elseif event == "CHAT_MSG_LOOT" then
+    if GetTime() <= skipUntil then return end
+    local link, n = nil, 1
+    if LOOT_MANY then link, n = msg:match(LOOT_MANY) end
+    if not link and LOOT_ONE then link = msg:match(LOOT_ONE) end
+    local id = link and tonumber(link:match("item:(%d+)"))
+    if not id then return end                          -- someone else's loot, or a quest or crafted item
+    n = tonumber(n) or 1
+    session.items[id] = (session.items[id] or 0) + n
+    say("item:", link, "x" .. n, money(price(id) * n))
+  elseif event == "CHAT_MSG_MONEY" then
+    if moneyDelta then addMoney(moneyDelta); moneyDelta = nil else moneyChatAt = GetTime() end
   elseif event == "PLAYER_MONEY" then
     local now = GetMoney()
-    if lastMoney and now > lastMoney and GetTime() <= lootOpenUntil then
-      session.money = session.money + (now - lastMoney)    -- gold from a loot window (not sales, mail or quests)
-    end
+    local delta = lastMoney and now - lastMoney or 0
     lastMoney = now
+    if delta <= 0 then return end
+    if GetTime() - moneyChatAt <= 2 then addMoney(delta); moneyChatAt = 0 else moneyDelta = delta
+      if C_Timer then C_Timer.After(2, function() moneyDelta = nil end) end end   -- not loot (a sale, mail, a quest) unless a message follows
   end
 end)
 
@@ -197,6 +238,9 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
     session.paused, session.pausedAt = true, GetTime()
     win.pause:SetText("Resume")
     refresh()
+  elseif cmd == "debug" then
+    debug = not debug
+    print("|cffe8c060Farm meter|r debug " .. (debug and "on: what the meter counts is printed here" or "off"))
   elseif cmd == "resume" and session and session.paused then
     session.pausedFor = session.pausedFor + (GetTime() - session.pausedAt)
     session.paused = false
@@ -205,6 +249,6 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
     refresh()
   else
     if original then original(msg) end
-    print("|cffe8c060Farm meter|r: /fmb start, /fmb pause, /fmb resume, /fmb stop.")
+    print("|cffe8c060Farm meter|r: /fmb start, /fmb pause, /fmb resume, /fmb stop, /fmb debug.")
   end
 end
