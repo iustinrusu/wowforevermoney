@@ -1,8 +1,8 @@
 ## Interface: 16001
-## Title: |cffe8c060ForeverMoneyBridge|r
-## Notes: Saves your level, gold, professions, real vendor prices, and what you loot where (with time spent) for the WoW Forever Money app. Farm meter: /fmb start, /fmb stop. Written on logout or /reload.
+## Title: |cffe8c060Gold Ever After|r
+## Notes: Saves your level, gold, professions, real vendor prices, and what you loot where (with time spent) for the WoW Forever Money app. Farm meter: /gea start, /gea stop (also /fmb). Written on logout or /reload.
 ## Author: WoWForeverMoney
-## Version: 1.5.6
+## Version: 1.5.7
 ## SavedVariables: ForeverMoneyBridgeDB
 
 Checks.lua

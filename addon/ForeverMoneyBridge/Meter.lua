@@ -1,4 +1,4 @@
--- ForeverMoneyBridge farm meter: /fmb start shows it and starts a session, /fmb stop saves it and hides it.
+-- Gold Ever After farm meter (in the ForeverMoneyBridge addon): /gea start shows it and starts a session, /gea stop saves it and hides it.
 -- Prices: the WoW Forever Money app's own values (Prices.lua, the same as the app's My bags), so the meter and the
 -- app agree. An item missing from that table falls back to TSM's price (lowest listing, else market, after the 5% AH
 -- cut), then to the vendor price; the window says how many fallbacks were used. Counts what loot windows from mobs,
@@ -66,7 +66,7 @@ local function refresh()
   local secs = elapsed()
   local value, sources, rows = totals()
   local total = value + session.money
-  win.title:SetText(session.paused and "Farm meter |cff999999(paused)|r" or "Farm meter")
+  win.title:SetText("Gold Ever After |cff999999· farm meter" .. (session.paused and " (paused)" or "") .. "|r")
   win.rate:SetText(secs >= 60 and (money(total / secs * 3600) .. " |cffaaaaaaan hour|r") or "|cff888888-- an hour|r")
   win.total:SetText("Total " .. money(total) .. (secs < 60 and "  |cff888888(gold an hour after the first minute)|r" or ""))
   win.kv[1]:SetText(string.format("%d:%02d", secs / 60, secs % 60))
@@ -239,7 +239,7 @@ local function start()
   makeWindow():Show()
   win.pause:SetText("Pause")
   refresh()
-  print("|cffe8c060Farm meter|r started. /fmb pause, /fmb stop.")
+  print("|cffe8c060Gold Ever After|r started. /gea pause, /gea stop.")
 end
 
 local function stop()
@@ -247,7 +247,7 @@ local function stop()
   local boxes = 0
   for _, n in pairs(session.unopened) do boxes = boxes + n end
   if boxes > 0 then
-    print(string.format("|cffe8c060Farm meter|r: %d container%s not opened yet, so not counted. Open them and they count in your next session (or /fmb start again first).", boxes, boxes == 1 and "" or "s"))
+    print(string.format("|cffe8c060Gold Ever After|r: %d container%s not opened yet, so not counted. Open them and they count in your next session (or /gea start again first).", boxes, boxes == 1 and "" or "s"))
   end
   local secs = elapsed()
   local value = totals()
@@ -258,7 +258,7 @@ local function stop()
     items = session.items, money = session.money, value = value, total = total,
     perHour = secs > 0 and math.floor(total / secs * 3600) or 0, pricesMade = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0 })
   while #m.sessions > 50 do table.remove(m.sessions) end
-  print(string.format("|cffe8c060Farm meter|r stopped: %s in %d min%s. Saved.", money(total), secs / 60,
+  print(string.format("|cffe8c060Gold Ever After|r stopped: %s in %d min%s. Saved.", money(total), secs / 60,
     secs >= 60 and (" (" .. money(total / secs * 3600) .. " an hour)") or ""))
   session = nil
   if win then win:Hide() end
@@ -268,7 +268,7 @@ end
 -- gold from "You loot ..." money messages matched with the gold change, and loot windows only to tell what kind of
 -- loot it was and to skip containers opened from your bags (with auto loot the window can be gone before it's read).
 local debug = false
-local function say(...) if debug then print("|cffe8c060Farm meter|r", ...) end end
+local function say(...) if debug then print("|cffe8c060Gold Ever After|r", ...) end end
 
 local function pattern(fmt)            -- "You receive loot: %s." -> "^You receive loot: (.+)%.$"
   fmt = fmt:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
@@ -401,21 +401,21 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
   end
 end)
 
--- /fmb start | stop | pause | resume; anything else goes to the addon's own /fmb (snapshot)
+-- /gea start | stop | pause | resume; anything else goes to the addon's own /gea (snapshot)
 local original = SlashCmdList.FOREVERMONEYBRIDGE
 SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
   local cmd = strlower(strtrim(msg or ""))
   if cmd == "start" then
     start()
   elseif cmd == "stop" then
-    if session then stop() else print("|cffe8c060Farm meter|r is not running. /fmb start") end
+    if session then stop() else print("|cffe8c060Gold Ever After|r is not running. /gea start") end
   elseif cmd == "pause" and session and not session.paused then
     session.paused, session.pausedAt = true, GetTime()
     win.pause:SetText("Resume")
     refresh()
   elseif cmd == "debug" then
     debug = not debug
-    print("|cffe8c060Farm meter|r debug " .. (debug and "on: what the meter counts is printed here" or "off"))
+    print("|cffe8c060Gold Ever After|r debug " .. (debug and "on: what the meter counts is printed here" or "off"))
   elseif cmd == "resume" and session and session.paused then
     session.pausedFor = session.pausedFor + (GetTime() - session.pausedAt)
     session.paused = false
@@ -424,6 +424,6 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
     refresh()
   else
     if original then original(msg) end
-    print("|cffe8c060Farm meter|r: /fmb start, /fmb pause, /fmb resume, /fmb stop, /fmb debug.")
+    print("|cffe8c060Gold Ever After|r: /gea start, /gea pause, /gea resume, /gea stop, /gea debug.")
   end
 end

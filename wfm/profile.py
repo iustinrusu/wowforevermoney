@@ -144,7 +144,7 @@ def prices_lua(values: dict[int, int], made: int, containers=()) -> str:
     body = ','.join(f'[{int(i)}]={int(v)}' for i, v in sorted(values.items()) if v > 0)
     boxes = ','.join(f'[{int(i)}]=true' for i in sorted(containers))     # count as 0 until opened
     return ('-- Written by the WoW Forever Money app: what it values each item at (copper per unit, the same values as\n'
-            "-- the app's My bags). The farm meter (/fmb start) uses them. Refreshed when the app recalculates;\n"
+            "-- the app's My bags). The farm meter (/gea start) uses them. Refreshed when the app recalculates;\n"
             '-- WoW reads it on login or /reload.\n'
             f'ForeverMoneyBridge_Prices = {{made={int(made)}, items={{{body}}}, containers={{{boxes}}}}}\n')
 

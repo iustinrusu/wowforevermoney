@@ -269,8 +269,9 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
   end
 end)
 
-SLASH_FOREVERMONEYBRIDGE1 = "/fmb"
+SLASH_FOREVERMONEYBRIDGE1 = "/gea"     -- Gold Ever After
+SLASH_FOREVERMONEYBRIDGE2 = "/fmb"     -- the old name, still works
 SlashCmdList.FOREVERMONEYBRIDGE = function()
   snapshot()
-  print("|cffe8c060ForeverMoneyBridge|r: snapshot taken. Type /reload to write it to disk for the app.")
+  print("|cffe8c060Gold Ever After|r: snapshot taken. Type /reload to write it to disk for the app.")
 end

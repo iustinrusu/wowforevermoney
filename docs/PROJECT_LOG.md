@@ -557,6 +557,11 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Addon 1.5.7: shown as "Gold Ever After" (TOC title, window, chat messages; the folder and saved
+  variables keep the name ForeverMoneyBridge so no data is lost); commands `/gea` (start, stop, pause, resume,
+  debug), `/fmb` still works. The unopened-containers line had the same anchor bug as the top items (fixed in
+  1.5.6); Big-mouth Clam (7973) is in the meter's container list.
+
 - **2026-11-15** Farm meter 1.5.6 after the user's screenshots: the top items never showed (a second RIGHT anchor gave
   rows below the window's middle a negative height; now one anchor each, widths set from the window on resize);
   money shows only non-zero parts in gold/silver/copper colours ("33c", not "0g 0s 33c"); a dash instead of the
