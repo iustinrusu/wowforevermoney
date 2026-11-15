@@ -19,7 +19,10 @@ sales, soulbound items, things that don't sell, crafted worth with its daily cap
 - Raw gold looted counts as is.
 
 ## The meter
-- A small movable window (`/fmb meter` toggles it; remembers its position): Start / Pause / Reset; session time
+- Slash commands (the user, 2026-11-15): `/fmb start` starts a session and shows the window; `/fmb stop` ends the
+  session (saved) and hides the window; `/fmb pause` / `/fmb resume`; `/fmb` alone prints the commands. The window
+  only appears while a session runs.
+- A small movable window (remembers its position; also Pause and Stop buttons): session time
   (only while running), gold looted, items looted and their value, total, and gold per hour; the top 5 items by value;
   a line saying which prices were used (app table age, TSM fallback count, vendor fallback count).
 - Counts loot from LOOT_READY / CHAT_MSG_LOOT (the addon already logs loot; reuse it) and money from PLAYER_MONEY
@@ -34,3 +37,10 @@ sales, soulbound items, things that don't sell, crafted worth with its daily cap
 - Lua: a small pure function for the session maths (value, gold/hour, fallbacks) that can be checked with a Lua
   interpreter if one is available; otherwise by hand with the user's first session.
 - Bump the addon version (1.5.0) and note it in the project log; the app copies the addon into AddOns on start.
+
+## Addon install and updates (checked 2026-11-15)
+Already works: on every start the app copies each ForeverMoneyBridge file that differs into WoW's AddOns folder
+(`profile.install_addon`, compares content, not only the version), and update-on-start pulls new addon code first, so
+a new meter version reaches the game on the next app start plus a /reload. To add: remove files from the AddOns copy
+that were deleted from the addon (none so far), and support subfolders if the meter adds any (copy2 on a folder
+fails today).
