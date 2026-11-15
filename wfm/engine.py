@@ -506,17 +506,20 @@ class Engine:
             have = self.profs.get(r.profession)
             can = have is not None and have >= req
             # how many crafts a day the product's market takes at your share (and its cooldown allows)
-            crafts = sold_per_day(self.price(r.product_id)) * self.share / max(r.product_count, 1)
+            # (a product sold to a vendor has no market limit: the usual sanity cap of MAX_UNITS_PER_DAY)
+            crafts = self.demand_per_day(r.product_id, channel) / max(r.product_count, 1)
             per_cooldown = cooldown_per_day(r)
-            if per_cooldown is not None:
-                crafts = min(crafts, per_cooldown)
+            cap_by = 'market'
+            if per_cooldown is not None and per_cooldown < crafts:
+                crafts, cap_by = per_cooldown, 'cooldown'
+
             for mid, cnt in r.reagents:
                 if self.vendor_price(mid):
                     continue   # vendor mats aren't "your" materials
                 val = (revenue - (sum(costs.values()) - costs[mid])) / cnt
                 entry = {'value': int(val), 'recipe': r.name, 'product': self.name(r.product_id),
                          'profession': r.profession, 'doable': can, 'skill': req,
-                         'units_per_day': round(crafts * cnt, 2)}
+                         'units_per_day': round(crafts * cnt, 2), 'cap_by': cap_by}
                 cur = best.get(mid)
                 if cur is None:
                     cur = best[mid] = dict(entry, doable_value=None, doable_recipe=None, doable_profession=None)
@@ -524,7 +527,10 @@ class Engine:
                     cur.update(entry)
                 if can and (cur['doable_value'] is None or val > cur['doable_value']):
                     cur['doable_value'], cur['doable_recipe'], cur['doable_profession'] = int(val), r.name, r.profession
-                    cur['doable_units_per_day'] = round(crafts * cnt, 2)   # what the product's market absorbs
+                    # what the product's market absorbs at your share (or the cooldown allows), in units of this
+                    # ingredient: crafted worth holds only for that many a day (valuation.capped_total)
+                    cur['doable_units_per_day'] = round(crafts * cnt, 2)
+                    cur['doable_cap_by'] = cap_by
         return best
 
     def gathering(self, best_use: dict[int, dict]) -> list[Opportunity]:
@@ -544,20 +550,26 @@ class Engine:
                 continue
             sell, channel, q = self.sell_value(iid)
             use = best_use.get(iid)
-            value, how = sell, f'Sell ({channel})'
+            demand = sold_per_day(p) * self.share
+            rate = rates.get(iid)
+            value, how, cap = sell, f'Sell ({channel})', None
             if use and (use.get('doable_value') or 0) > value:
                 value, how = use['doable_value'], f"{use['doable_profession']}: {use['doable_recipe']}"
+                cap = use.get('doable_units_per_day')
+                if cap is not None and cap < valuation.CRAFT_DEMAND:
+                    how += f' (crafted worth for up to {valuation.per_day_text(cap)}; the rest sold)'
             if value <= 0:
                 continue
+            # crafted worth only for as many a day as the recipe can use; the rest at the sale price (2026-11-15)
+            daily = valuation.capped_total(value, cap, sell, demand)
+            unit = daily / demand if demand > 0 else valuation.capped_total(value, cap, sell, 1)
             source = 'Fishing' if is_fish else GATHER_SOURCE.get(item.subclass_id, 'Gathering')
             prof = 'Fishing' if is_fish else GATHER_PROFESSION.get(item.subclass_id)
             doable = prof is None or prof in self.profs
-            demand = sold_per_day(p) * self.share
-            rate = rates.get(iid)
             out.append(Opportunity(
                 kind='gather', key=f'gather:{iid}', item_id=iid, title=f'Farm {item.name}',
-                profit_unit=value, cost_unit=0, units_day=round(demand, 2), daily=int(value * demand),
-                gph=int(value * rate) if rate else None, doable=doable,
+                profit_unit=int(unit), cost_unit=0, units_day=round(demand, 2), daily=int(daily),
+                gph=int(valuation.capped_total(value, cap, sell, rate)) if rate else None, doable=doable,
                 needs='' if doable else f'Learn {prof}', profession=prof, preferred=prof in self.preferred,
                 flags=list(q.flags) if q else [],
                 detail={'source': source, 'best_use': how, 'sell_value': sell, 'craft_use': use,
@@ -615,7 +627,7 @@ class Engine:
         skill = self.profs.get('Skinning')
         # pace is the setting only: your logged skinning time includes questing and travel (user, 2026-11-14)
         per_hour = float(self.s.get('kills_per_hour', 60) or 60)
-        value_of = lambda iid: self.fish_value(iid, best_use)
+        value_of = lambda iid, share=1.0: self.loot_worth(iid, best_use, share, per_hour)
         # skinning items Wowhead Forever pages are not read for yet (the flag goes once all are read)
         not_read = list(((getattr(self.w, 'forever_skinning', None) or {}).get('not_read') or {}).values())
         out = []
@@ -635,11 +647,11 @@ class Engine:
                     needs = f'Skinning {sp["skill_needed"]} (you have {skill}; Classic rule)'
                 else:
                     needs = f'level {max(1, sp["min_level"] - skinning.LEVEL_REACH)}+ (you are {level})'
-            best_item = max(top[0]['items'], key=lambda i: top[0]['items'][i] * value_of(i)) if top else 0
+            best_item = max(top[0]['items'], key=lambda i: top[0]['items'][i] * value_of(i, top[0]['items'][i])) if top else 0
             mobs = [{'npc': m['npc'], 'name': m['name'], 'levels': f"{m['min_level']}-{m['max_level']}",
                      'skinned': m['skinned'], 'value': m['value'], 'skill_needed': m['skill_needed'],
                      'can_skin': m['can_skin'], 'can_kill': m['can_kill'],
-                     'items': sorted(({'item_id': i, 'name': self.name(i), 'share': round(s, 3), 'value': value_of(i)}
+                     'items': sorted(({'item_id': i, 'name': self.name(i), 'share': round(s, 3), 'value': value_of(i, s)}
                                       for i, s in m['items'].items()), key=lambda x: -x['share'] * x['value'])}
                     for m in sp['mobs'][:12]]
             out.append(Opportunity(
@@ -665,20 +677,25 @@ class Engine:
         level = int(self.s.get('level', 1) or 1)
         skill = self.profs.get('Skinning')
         per_hour = float(self.s.get('kills_per_hour', 60) or 60)    # the setting only, never your logged time
-        value_of = lambda iid: self.fish_value(iid, best_use)
         out = []
         for npc, m in mobs.items():
             qn = (q.npcs.get(npc) if q else None) or {}
+            sk = skins.get(npc)
+            skin_need = skinning.skill_needed(sk['max_level']) if sk else None
+            can_skin = bool(sk) and skill is not None and skill >= skin_need
+            # what one kill gives of each item (drops, and the skin if you can skin it): an hour's loot sets how many
+            # of an item count at its crafted worth (loot_worth)
+            per_kill = dict(m['items'])
+            if can_skin:
+                for i, share in sk['items'].items():
+                    per_kill[i] = per_kill.get(i, 0) + share
+            skin_items = (sk or {}).get('items') or {}
+            value_of = lambda i: self.loot_worth(i, best_use, per_kill.get(i) or skin_items.get(i, 0), per_hour)
             drops = sorted(({'item_id': i, 'name': self.name(i), 'per_kill': round(c, 4), 'value': value_of(i),
                              'count': m['counts'][i][0], 'looted': m['counts'][i][1]} for i, c in m['items'].items()),
                            key=lambda d: -d['per_kill'] * d['value'])
             drop_value = sum(d['per_kill'] * d['value'] for d in drops)
-            sk = skins.get(npc)
-            skin_value, skin_need = 0.0, None
-            if sk:
-                skin_need = skinning.skill_needed(sk['max_level'])
-                skin_value = sum(share * value_of(i) for i, share in sk['items'].items())
-            can_skin = bool(sk) and skill is not None and skill >= skin_need
+            skin_value = sum(share * value_of(i) for i, share in skin_items.items())
             value = drop_value + (skin_value if can_skin else 0)
             if value <= 0:
                 continue
@@ -734,7 +751,10 @@ class Engine:
             return []         # no herb or ore nodes known (and never rebuild the node cache for an empty list)
         loot = nodes.load_or_build(set(main)) or {}
         forever = wowhead_items.object_yields(getattr(self.w, 'forever_pages', None) or {})
-        value_of = lambda iid: self.fish_value(iid, best_use)
+        # nodes an hour (the settings only, never your logged time): an hour's loot sets how many of an item count at
+        # its crafted worth (loot_worth)
+        node_rate = {'herbalism': float(self.s.get('herb_nodes_per_hour', 40) or 40),
+                     'mining': float(self.s.get('ore_nodes_per_hour', 40) or 40)}
         node_list = []
         for oid, iid in main.items():
             ob = q.objects.get(oid) or {}
@@ -745,11 +765,13 @@ class Engine:
             fy = forever.get(oid)
             uses = float((classic or {}).get('uses') or 1.0)
             items, src = nodes.combine(classic_items, fy, uses, iid)
-            value = sum(c * value_of(i) for i, c in items.items())
-            classic_value = sum(c * value_of(i) for i, c in items.items() if src[i] != 'forever')
+            rate = node_rate.get(nodes.node_kind(ob.get('name', ''), herb_names), 40.0)
+            worth = {i: self.loot_worth(i, best_use, c, rate) for i, c in items.items()}
+            value = sum(c * worth[i] for i, c in items.items())
+            classic_value = sum(c * worth[i] for i, c in items.items() if src[i] != 'forever')
             node_list.append({'id': oid, 'name': ob.get('name', ''), 'kind': nodes.node_kind(ob.get('name', ''), herb_names),
                               'skill': nodes.node_skill(ob.get('name', '')), 'zones': zones, 'classic_loot': bool(classic),
-                              'items': items, 'sources': src, 'value': int(value), 'uses': uses,
+                              'items': items, 'sources': src, 'value': int(value), 'uses': uses, 'worth': worth,
                               'forever_share': round(1 - classic_value / value, 3) if value > 0 else 0.0,
                               'forever_looted': (fy or {}).get('looted', 0),
                               'forever_complete': bool((fy or {}).get('complete')),
@@ -759,7 +781,7 @@ class Engine:
         for kind, prof, label, setting in (('herbalism', 'Herbalism', 'Gather herbs in', 'herb_nodes_per_hour'),
                                            ('mining', 'Mining', 'Mine in', 'ore_nodes_per_hour')):
             skill = self.profs.get(prof)
-            per_hour = float(self.s.get(setting, 40) or 40)     # the setting only, never your logged time
+            per_hour = node_rate[kind]
             for sp in nodes.spots([n for n in node_list if n['kind'] == kind], lambda z: gd.zones.get(z, f'zone {z}'), skill):
                 if sp['value'] <= 0:
                     continue
@@ -785,7 +807,7 @@ class Engine:
                     flags.append('yield_unknown')
                 needs = '' if sp['doable'] else (f'Learn {prof}' if skill is None else
                                                  f'{prof} {sp["skill_needed"]} (you have {skill}; Classic rule)')
-                best_item = max(top[0]['items'], key=lambda i: top[0]['items'][i] * value_of(i)) if top else 0
+                best_item = max(top[0]['items'], key=lambda i: top[0]['items'][i] * top[0]['worth'][i]) if top else 0
                 out.append(Opportunity(
                     kind='herb_spot' if kind == 'herbalism' else 'mine_spot', key=f'{kind}:{sp["zone_id"]}',
                     item_id=best_item, title=f'{label} {sp["zone"]}: ' + ', '.join(n['name'] for n in top),
@@ -800,7 +822,7 @@ class Engine:
                                        'forever_looted': n['forever_looted'], 'forever_complete': n['forever_complete'],
                                        'gathers_per_node': n['uses'],
                                        'items': sorted(({'item_id': i, 'name': self.name(i), 'per_node': round(c, 2),
-                                                         'value': value_of(i), 'source': n['sources'].get(i, 'classic')}
+                                                         'value': n['worth'][i], 'source': n['sources'].get(i, 'classic')}
                                                         for i, c in n['items'].items()),
                                                        key=lambda x: -x['per_node'] * x['value'])[:6]}
                                       for n in sp['nodes'][:10]],
@@ -856,6 +878,12 @@ class Engine:
     def fish_value(self, iid: int, best_use: dict[int, dict]) -> int:
         """What one looted item is worth: the best of selling, crafting and opening it (see valuation.py)."""
         return self.valuer(best_use).worth(iid)
+
+    def loot_worth(self, iid: int, best_use: dict[int, dict], per_loot: float, per_hour: float) -> int:
+        """An item's average worth in an hour's loot: it comes per_loot times per loot (catch, kill, skin, node) at
+        per_hour loots an hour. Crafted worth counts only for as many as its recipe can use a day (an hour of
+        farming a day); the rest at the sale price (the user's decision, 2026-11-15: valuation.capped_total)."""
+        return int(self.valuer(best_use).unit_worth(iid, per_loot * per_hour))
 
     def fishing_spots(self, best_use: dict[int, dict]) -> list[Opportunity]:
         """Fishing, zone by zone, Forever data first.
@@ -931,12 +959,10 @@ class Engine:
             return (matched.get(name) or spots[zid][0]).skill if zid is not None else None
 
         model = fishing.catch_model(obs, zone_skill_of, float(self.s.get('casts_per_hour', 240)))
-        values: dict[int, int] = {}
-
-        def val(iid):
-            if iid not in values:
-                values[iid] = self.fish_value(iid, best_use)
-            return values[iid]
+        def val(iid, per_hour=0.0):
+            """An item's worth in an hour's catches (per_hour of it): crafted worth only for as many as its recipe
+            can use a day (loot_worth)."""
+            return self.loot_worth(iid, best_use, per_hour, 1.0)
 
         out = []
         for name, o in obs.items():
@@ -963,9 +989,11 @@ class Engine:
         items = fc['items'] if forever else {}
         observed = {i: c / n for i, c in items.items()} if n else {}
         rows, value, classic_value, observed_value, seasonal_value = [], 0.0, 0.0, 0.0, 0.0
+        keep, keep_src = model.keep(zone, zone_skill, skill, use_zone=forever)
+        cph0 = model.catches_per_hour(keep)       # catches an hour without a lure: how many of each item an hour gives
         for iid in set(classic) | set(observed):
-            v = 0 if iid in quest else val(iid)
             share = w * observed.get(iid, 0.0) + (1 - w) * classic.get(iid, 0.0)
+            v = 0 if iid in quest else val(iid, share * cph0)
             value += share * v
             classic_value += classic.get(iid, 0.0) * v
             observed_value += observed.get(iid, 0.0) * v
@@ -983,7 +1011,6 @@ class Engine:
         rows.sort(key=lambda r: -(r['share'] * r['value']))
         unknown_containers = [r for r in rows if 'contents_unknown' in r['value_flags'] and r['share'] >= 0.005]
 
-        keep, keep_src = model.keep(zone, zone_skill, skill, use_zone=forever)
         lure, lure_info, lure_cost = getattr(self, '_lure', None), None, 0
         if lure:
             keep_l, src_l = model.keep(zone, zone_skill, skill + lure['bonus'], use_zone=forever)
@@ -1011,11 +1038,12 @@ class Engine:
         # pool loot: what the Forever data says it adds per catch, kept out of the headline unless counted
         pool_rows, pool_value, value_with_pools = [], 0.0, None
         if forever and fc['pool'] and fc['n_all']:
-            for i, c in sorted(fc['pool'].items(), key=lambda kv: -kv[1] * val(kv[0])):
+            per = lambda i, c: val(i, c / fc['n_all'] * cph)      # its worth at an hour's catches of it
+            for i, c in sorted(fc['pool'].items(), key=lambda kv: -kv[1] * per(*kv)):
                 pool_rows.append({'item_id': i, 'name': self.name(i), 'count': c, 'share': round(c / fc['n_all'], 4),
-                                  'value': val(i)})
-                pool_value += c / fc['n_all'] * val(i)
-            open_part = sum(c / fc['n_all'] * val(i) for i, c in fc['items_all'].items() if i not in fc['pool'])
+                                  'value': per(i, c)})
+                pool_value += c / fc['n_all'] * per(i, c)
+            open_part = sum(c / fc['n_all'] * per(i, c) for i, c in fc['items_all'].items() if i not in fc['pool'])
             value_with_pools = int(open_part + pool_value)
         if forever and o.wh_fished >= fishing.WOWHEAD_CONFIRM:
             confirmed_by.append('Wowhead Forever')
@@ -1285,9 +1313,11 @@ class Engine:
             _, _, q = self.sell_value(iid)
             liq = liquidity(self.price(iid), min_spd)
             flags = list(v.flags) + (list(q.flags) if q and v.channel == 'AH' else [])
+            n = counts.get(iid, 0) + mail.get(iid, 0)
+            each = int(valuer.worth_for(iid, n) / n) if n else v.value    # a capped craft: the average over the stack
             items.append({'item_id': iid, 'name': it.name, 'quality': it.quality, 'class_id': it.class_id, 'subclass_id': it.subclass_id,
                           'stack': it.stack, 'count': counts.get(iid, 0) + mail.get(iid, 0),
-                          'in_mail': mail.get(iid, 0), 'value': v.value, 'channel': v.channel, 'flags': flags,
+                          'in_mail': mail.get(iid, 0), 'value': each, 'channel': v.channel, 'flags': flags,
                           'confidence': confidence(flags), 'sold_per_day': liq['sold_per_day'],
                           'sale_rate': liq['sale_rate'], 'liquidity_flags': liq['flags'], 'locked': it.locked,
                           'reagent': iid in reagents,

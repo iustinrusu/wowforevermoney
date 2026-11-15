@@ -13,12 +13,17 @@ openable item without known contents is flagged (its value is only a floor) inst
 
 Contents data is Forever only: your own opened containers (ForeverMoneyBridge) plus Wowhead Forever counts
 read by hand. Values follow current prices, so they move with every TSM update.
+
+Crafted worth holds only for as many units a day as the recipe can use (the user's decision, 2026-11-15): its
+cooldown and what the product's market takes at your share. Every unit beyond that is worth the next best channel
+(usually its sale price). Thorium Bar: 21g 65s through Transmute: Arcanite, for 1 every 2 days; the rest at 17s.
+So a quantity is valued with `worth_for` (a bag of 20, an hour's loot), never as one unit's worth x the count.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .pricing import usual_sale
+from .pricing import fmt_money, usual_sale
 
 OPEN_DEPTH = 2              # a container inside a container is valued; deeper than that isn't
 WORTH_OPENING = 1.2         # flag "open it" when opening beats selling by 20%+
@@ -35,6 +40,29 @@ class Value:
     contents: list = field(default_factory=list)    # for 'open': top contents [{item_id, per_open, value}]
     contents_source: str = ''
     if_skilled: dict | None = None      # a recipe you can't make yet that would be worth more
+    crafted: int = 0                     # craft channel: what one unit is worth crafted (before the daily cap)
+    craft_cap: float | None = None       # craft channel: units a day the recipe can use at that worth
+    beyond: int = 0                      # craft channel: what each unit beyond the cap is worth (next best channel)
+    cap_by: str = ''                     # 'cooldown' or 'market': what sets the cap
+
+
+def capped_total(crafted: float, cap: float | None, beyond: float, qty: float) -> float:
+    """qty units in a day: crafted worth for up to `cap` of them, `beyond` for the rest (cap None = no limit)."""
+    if qty <= 0:
+        return 0.0
+    if cap is None:
+        return crafted * qty
+    made = min(qty, max(cap, 0.0))
+    return crafted * made + beyond * (qty - made)
+
+
+def per_day_text(n: float) -> str:
+    """0.5 -> '1 every 2 days', 3.4 -> '3.4 a day'."""
+    if n <= 0:
+        return 'none a day'
+    if n < 1:
+        return f'1 every {1 / n:.0f} days' if 1 / n < 10 else f'1 every {1 / n:.0f} days (rarely)'
+    return f'{n:.0f} a day' if n >= 10 else f'{n:.1f} a day'.replace('.0 a day', ' a day')
 
 
 def merge_contents(wowhead: dict | None, own: dict | None) -> dict[int, dict]:
@@ -80,7 +108,24 @@ class Valuer:
         return self._cache[key]
 
     def worth(self, iid: int) -> int:
+        """One unit's worth (a single unit of a capped craft counts at crafted worth only for its share of a day)."""
         return self.value(iid).value
+
+    def worth_for(self, iid: int, qty: float) -> int:
+        """What qty units are worth in a day: crafted worth only for as many as the recipe can use a day."""
+        v = self.value(iid)
+        if v.channel != 'craft':
+            return int(v.value * qty)
+        return int(capped_total(v.crafted, v.craft_cap, v.beyond, qty))
+
+    def unit_worth(self, iid: int, qty: float) -> float:
+        """Average worth of one unit when you get qty of them a day (an hour's loot: qty = per loot x loots an hour)."""
+        v = self.value(iid)
+        if v.channel != 'craft':
+            return float(v.value)
+        if qty <= 1e-9:
+            return float(v.crafted if (v.craft_cap or 0) > 0 else v.beyond)
+        return capped_total(v.crafted, v.craft_cap, v.beyond, qty) / qty
 
     def _value(self, iid: int, depth: int) -> Value:
         e = self.e
@@ -100,10 +145,8 @@ class Valuer:
         if vendor:
             channels['vendor'] = vendor
         use = self.best_use.get(iid)
-        if use and (use.get('doable_value') or 0) > 0:
-            channels['craft'] = int(use['doable_value'])      # only recipes you can make now
         if_skilled = None
-        if use and use['value'] > max([0] + list(channels.values())) and not use.get('doable'):
+        if use and use['value'] > max([0, use.get('doable_value') or 0] + list(channels.values())) and not use.get('doable'):
             if_skilled = {'value': int(use['value']), 'recipe': use['recipe'], 'profession': use['profession'],
                           'skill': use.get('skill')}
             flags.append('more_with_skill')
@@ -124,6 +167,13 @@ class Valuer:
                 flags.append('contents_unknown')
             if item.locked:
                 flags.append('locked')
+        crafted, cap, beyond, cap_by = 0, None, 0, ''
+        if use and (use.get('doable_value') or 0) > 0:     # only recipes you can make now
+            crafted, beyond = int(use['doable_value']), max([0] + list(channels.values()))
+            cap = use.get('doable_units_per_day')
+            cap_by = use.get('doable_cap_by') or 'market'
+            # one unit: crafted worth for the share of it the recipe can use a day, the rest at the next best channel
+            channels['craft'] = int(capped_total(crafted, cap, beyond, 1))
         if not channels:
             return Value(0, 'none', 'no known way to turn it into gold', tuple(flags + ['no_value']), {},
                          if_skilled=if_skilled)
@@ -134,4 +184,11 @@ class Valuer:
             flags.append('craft_limited_demand')    # beyond that many a day, it's worth its sale price
         how = {'AH': 'sell on the AH', 'vendor': 'sell to a vendor', 'open': 'open it',
                'craft': f"{use['doable_profession']}: {use['doable_recipe']}" if use else 'craft'}[best]
-        return Value(channels[best], best, how, tuple(flags), channels, contents[:12], source, if_skilled)
+        if best == 'craft' and cap is not None and cap < CRAFT_DEMAND:
+            why = "the recipe's cooldown" if cap_by == 'cooldown' else 'what its market takes at your share'
+            how += (f' (worth {fmt_money(crafted)} crafted, for up to {per_day_text(cap)}: {why}; the rest at '
+                    f'{fmt_money(beyond)} each)')
+        if best != 'craft':
+            crafted, cap, beyond, cap_by = 0, None, 0, ''
+        return Value(channels[best], best, how, tuple(flags), channels, contents[:12], source, if_skilled,
+                     crafted, cap, beyond, cap_by)

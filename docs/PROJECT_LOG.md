@@ -24,6 +24,26 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-15 Crafted worth counts only for what a recipe can use a day (to-do 2b, the user's yes to C7).**
+  `valuation.capped_total`: an ingredient worth more crafted counts at its crafted worth for up to N a day (N =
+  `doable_units_per_day` from `best_uses`: what the product's market takes at your share, or the cooldown, in units
+  of that ingredient; `doable_cap_by` says which; a vendor-sold product has the usual 200 a day), every unit beyond at
+  the next best channel (AH, vendor, open it). One unit of a capped craft = its share of a day (N < 1: N x crafted +
+  the rest at the sale price). Quantities use `Valuer.worth_for` (bags, bank, mail, purse, My bags) and hourly rows
+  `Engine.loot_worth` (an hour's loot = per loot x loots an hour from Settings, one hour of farming a day): fishing
+  (catches an hour without a lure), skinning, mob farming, herb and ore nodes, "Farm X" rows. The row's "how" says
+  "worth X crafted, for up to N a day: <cooldown or market>; the rest at Y each"; every Gathering view's "How this is
+  worked out" says it too. The crafted-worth price check is now a monitor ('info', no warning). On the user's data
+  with the main's professions: 88 hourly rows dropped, e.g. Kill Sunscale Scytheclaw 1g 83s/h -> 37s/h (43 Light
+  Leather an hour; its best Leatherworking product's market takes 2.15 a day: 3s 87c for 2, 29c for the rest), Skin
+  in Redridge 1g 67s -> 31s, Classic-table fishing 3g -> 1g 91s. Checked by hand. The app ran as the Enchanting alt
+  that night (the last character played), where nothing changed: its crafts can't use these ingredients.
+- **2026-11-15 History rewrite blocked at the push (to-do 2a).** The rewrite worked (66 commits, the name was only in
+  two test files of 40 commits, no commit message; final files byte-identical, no name left), but this session's
+  safety check refused the force push although the user had approved it. `main` was put back on the pushed history
+  (same files) and the rewrite saved as `data/rewrite_history.sh` (not committed: it holds the name), for the user to
+  run: it backs up, rewrites, checks, and force-pushes with a lease.
+
 - **2026-11-15 The user's answers to the checklist** (`docs/plans/open-items-and-decisions.md`): Dungeons view yes,
   at a lower priority (to-do 8); Everloot cross-check yes, download approved (to-do 2c); no more addons for now,
   Wowhead data is enough (to-do 5 cancelled); remove the character names from GitHub's history, force push
@@ -446,6 +466,9 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-15** Crafted worth capped at what a recipe can use a day (`valuation.capped_total`, `Valuer.worth_for` /
+  `unit_worth`, `Engine.loot_worth`; to-do 2b). Tests: 196 (tests/test_crafted_cap.py).
 
 - **2026-11-14** Price checks (`wfm/anomalies.py`): second opinion on crafts and flips, crafted-worth check, TSM data
   monitor, Data health entry, alerts, report command. Tests: 189.

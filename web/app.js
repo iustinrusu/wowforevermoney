@@ -47,7 +47,7 @@ const FLAGS = {
   listed_far_above_sales: ['warn', 'listings far above sales', 'Every listing on your realm is over 3x what it actually sells for across the region (a wall of wishful prices): valued at the region average sale price instead of the lowest listing'],
   price_looks_off: ['warn', 'price looks off', "Only a few listings, far from the realm's recent average: valued at the recent average until more listings confirm the new price"],
   old_snapshot: ['warn', 'old Wowhead data', 'The Wowhead Forever counts for this zone are over 30 days old: re-read the zone page'],
-  craft_limited_demand: ['warn', 'limited demand', 'Valued by crafting it into something whose market only absorbs a limited number per day; beyond that it is worth its sale price'],
+  craft_limited_demand: ['warn', 'limited demand', 'Valued by crafting it into something whose market only takes a limited number a day (or whose recipe has a cooldown). The crafted worth counts only for that many a day; every one beyond that counts at its sale price, in this row and everywhere else'],
   more_with_skill: ['', 'more with skill', "A recipe you can't make yet would make it worth more (see details); valued at what you can do now"],
   event_vendor: ['bad', 'event vendor', 'Every vendor selling it is event-only (Darkmoon Faire, holidays) or has no known location: check it is there now. Kept out of Top picks'],
   black_market: ['bad', 'black market vendor', 'Black Market agents charge more than the game-file price (e.g. Frilled Lichen: 4g 50s, not 1s 20c). Visit once to record the real price'],
@@ -472,7 +472,9 @@ const VIEWS = {
     const intro = `<div class="panel"><h2>Gathering <small>where your time earns the most, per hour</small></h2>
       <div class="hint">You can learn <b>two primary professions</b>: gathering ones (Herbalism, Mining, Skinning) or crafting ones (Alchemy, Blacksmithing, Enchanting, Engineering, Leatherworking, Tailoring). The <b>secondary professions</b> (Fishing, Cooking, First Aid) are open to everyone on top of those. Pick an activity; a number on the button is your skill.</div>
       <div class="gpills">${pills}</div></div>`;
-    const how = (text) => `<details class="how"><summary>How this is worked out</summary><div>${text}</div></details>`;
+    // every gathering view values loot the same way: crafted worth only for what a recipe can use a day (2026-11-15)
+    const CRAFT_CAP = " An item worth more crafted than sold counts at its crafted worth only for as many as its recipe can use a day (the recipe's cooldown, or what the product's market takes at your share); the rest of an hour's loot counts at its sale price. One hour of farming a day is assumed.";
+    const how = (text) => `<details class="how"><summary>How this is worked out</summary><div>${text}${CRAFT_CAP}</div></details>`;
     const measured = async (act) => (await api('/api/opps?kind=farm_zone&limit=200')).filter((o) => (o.detail || {}).activity === act);
     const doable = sessionStorage.getItem('gatherDoable') === '1';
     const onlyDoable = (rows) => doable ? rows.filter((o) => o.doable) : rows;

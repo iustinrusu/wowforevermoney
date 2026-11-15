@@ -19,9 +19,12 @@ tight: finish the current piece, commit, update this list, and set a reminder th
        mob drops, node yields; the user's top priority for data accuracy, 2026-11-14): `docs/plans/material-coverage.md`.
        It replaces the old Wowhead-reads item (same slow pace). Work in the order at the top of that file: other
        Forever data sources, the item-page data format, 5 top pages a session (target: top 50), pools, mob farming.
-2a. [ ] **Remove the user's character names from GitHub's history** (user's yes, 2026-11-15; force push approved):
+2a. [ ] (2026-11-15: the rewrite works, but the session's safety check blocked the force push; the user runs
+       `sh data/rewrite_history.sh` in Git Bash, ready and tested, not committed because it holds the name)
+       **Remove the user's character names from GitHub's history** (user's yes, 2026-11-15; force push approved):
        `docs/plans/decided-2026-11-15.md`, section 2a
-2b. [ ] **"Worth if crafted" only for what can be made and sold a day** (user's yes, 2026-11-15):
+2b. [x] (done 2026-11-15: valuation.capped_total, every quantity and hourly row; see the project log)
+       **"Worth if crafted" only for what can be made and sold a day** (user's yes, 2026-11-15):
        `docs/plans/decided-2026-11-15.md`, section 2b
 2c. [ ] **Everloot cross-check of drop rates** (user's yes, 2026-11-15; download approved: 4 requests, about 200 KB):
        `docs/plans/decided-2026-11-15.md`, section 2c

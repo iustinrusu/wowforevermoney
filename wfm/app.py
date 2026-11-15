@@ -335,7 +335,8 @@ class App:
         key = next((k for k, c in syn.items() if c['name'] == active.split('-')[0]), None)
 
         def worth(counts: dict[int, int]) -> int:
-            return sum(valuer.value(i).value * n for i, n in counts.items() if i in w.gamedata.items)
+            # a stack of something worth more crafted: crafted worth only for what the recipe can use a day
+            return sum(valuer.worth_for(i, n) for i, n in counts.items() if i in w.gamedata.items)
 
         def listed(auctions) -> tuple[int, int, int]:
             value = n = expired = 0
@@ -344,7 +345,7 @@ class App:
                     expired += 1            # expired: back in the mailbox, which Syndicator records as mail
                     continue
                 q = ah_sell(w.prices.get(a['item']), s.get('sale_price_basis', 'lower'))
-                value += (proceeds(q, eng.cut) or valuer.value(a['item']).value) * a['count']
+                value += proceeds(q, eng.cut) * a['count'] or valuer.worth_for(a['item'], a['count'])
                 n += 1
             return value, n, expired
 
@@ -385,9 +386,10 @@ class App:
                 action = v.how[:1].upper() + v.how[1:]
                 if v.channel == 'open' and v.contents:
                     action += ': ' + ', '.join(c['name'] for c in v.contents[:3])
-                total += v.value * n
+                worth = valuer.worth_for(iid, n)      # a capped craft: crafted worth only for what a day takes
+                total += worth
                 rows.append({'item_id': iid, 'name': it.name, 'quality': it.quality, 'count': n, 'action': action,
-                             'unit_value': v.value, 'total': v.value * n,
+                             'unit_value': int(worth / n) if n else v.value, 'total': worth,
                              'flags': list(q.flags if q and v.channel == 'AH' else ()) + list(v.flags)})
             rows.sort(key=lambda x: -x['total'])
             out.append({'character': char, 'total': total, 'items': rows})

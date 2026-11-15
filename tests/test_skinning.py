@@ -32,7 +32,7 @@ class Rules(unittest.TestCase):
 
 class Spots(unittest.TestCase):
     def spots(self, skill, level):
-        return {s['zone_id']: s for s in skinning.spots(skinning.mobs(SNAP), VALUE.get, lambda z: f'Z{z}', skill, level)}
+        return {s['zone_id']: s for s in skinning.spots(skinning.mobs(SNAP), lambda i, share=1.0: VALUE.get(i), lambda z: f'Z{z}', skill, level)}
 
     def test_value_per_skin_and_zones(self):
         s = self.spots(skill=275, level=42)

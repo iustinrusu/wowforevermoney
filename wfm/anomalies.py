@@ -11,7 +11,9 @@ Every run, three checks, each a generalization of a real error found that day:
    average), the Bronze Tube flip (+5s at the 14s listing, -3s at the usual ~5s).
 2. Crafted worth. An ingredient whose "worth if crafted" is over 5x its sale price (and 1g+ more) while the product's
    market takes less than one of it a day: the worth holds for a single craft, not for a stack (Thorium Bar 21g 65s
-   via Transmute: Arcanite, one every 47 hours; Ironweb Spider Silk 18g 11s via a product nobody bought).
+   via Transmute: Arcanite, one every 47 hours; Ironweb Spider Silk 18g 11s via a product nobody bought). Since
+   2026-11-15 every value counts crafted worth only for that many a day (valuation.capped_total), so this is a
+   monitor ('info'): it lists them so a wrong recipe or price behind a crafted worth still stands out.
 3. Data monitor. Counts in TSM's data that point at odd prices: freak sale averages, walls of listings far above
    sales, lone listings far above the region with no sales. Shown on Data health each run, so a jump stands out.
 
@@ -123,10 +125,13 @@ def check_crafted_worth(best_use: dict, sell_value, names) -> list[dict]:
             sale = sell_value(iid)
             if value > CRAFTED_FACTOR * max(sale, 1) and value - sale >= CRAFTED_MIN and units < 1:
                 recipe = u.get('doable_recipe') if which == 'doable' else u.get('recipe')
-                out.append({'check': 'crafted_worth', 'severity': 'warn' if which == 'doable' else 'info',
+                how = ('counted at that worth for that many a day only, the rest at the sale price' if which == 'doable'
+                       else "a recipe you can't make yet, so not counted")
+                out.append({'check': 'crafted_worth', 'severity': 'info',
                             'item_id': iid, 'key': f'value:{iid}', 'title': names(iid), 'impact': int(value - sale),
                             'text': f"{names(iid)}: worth {fmt_money(value)} crafted into {recipe}, but that market takes "
-                                    f"{units:.2f} a day at your share; otherwise it sells for {fmt_money(sale)}."})
+                                    f"{units:.2f} a day at your share ({how}); otherwise it sells for "
+                                    f"{fmt_money(sale)}."})
                 break
     return out
 
@@ -178,7 +183,8 @@ def audit_check(result: dict | None) -> dict:
               f"averages and the usual sale price): {len(high)} only pay at today's unusual prices (kept out of Top "
               f"picks and the plan), {sum(1 for f in warn if f['check'] == 'second_opinion')} make under a third as "
               f"much at typical prices. {sum(1 for f in fs if f['check'] == 'crafted_worth')} ingredients are worth far "
-              f"more crafted than sold, for under one a day. In TSM's data: {mon.get('freak_sales', 0)} freak sale "
+              f"more crafted than sold, for under one a day (counted at crafted worth for that many a day only). "
+              f"In TSM's data: {mon.get('freak_sales', 0)} freak sale "
               f"averages (ignored), {mon.get('walls', 0)} walls of listings far above sales (valued at sales), "
               f"{mon.get('lone_listings', 0)} lone listings far above the region with no sales.")
     return {'name': 'Price checks (second opinion)', 'status': status, 'detail': detail,

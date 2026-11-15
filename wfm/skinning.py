@@ -65,7 +65,8 @@ def spots(mob_table: dict[int, dict], value_of, zone_name, skill: int | None, le
         zone = next((z for z in m['zones'] if z > 0), None)
         if zone is None:
             continue
-        per_skin = sum(share * value_of(iid) for iid, share in m['items'].items())
+        # value_of(item, share per skin): an hour's skins set how many count at a crafted worth (Engine.loot_worth)
+        per_skin = sum(share * value_of(iid, share) for iid, share in m['items'].items())
         need = skill_needed(m['max_level'])
         known = bool(m['max_level'])          # a level Wowhead and Questie don't give: not counted as doable
         by_zone.setdefault(zone, []).append({**m, 'value': int(per_skin), 'skill_needed': need,

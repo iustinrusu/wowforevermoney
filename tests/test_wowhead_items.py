@@ -233,7 +233,7 @@ class SkinningFromItemPagesTests(unittest.TestCase):
                      'skinned': 500, 'items': {HIDE: 0.5}},
                  8: {'npc': 8, 'name': 'Known Boar', 'min_level': 30, 'max_level': 31, 'zones': [16732],
                      'skinned': 400, 'items': {HIDE: 0.4}}}
-        spot = skinning.spots(table, lambda i: 100, str, 300, 60)[0]
+        spot = skinning.spots(table, lambda i, share=1.0: 100, str, 300, 60)[0]
         mobs = {m['npc']: m for m in spot['mobs']}
         self.assertFalse(mobs[7]['can_kill'] or mobs[7]['can_skin'])
         self.assertTrue(mobs[8]['can_kill'] and mobs[8]['can_skin'])
