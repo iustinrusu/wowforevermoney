@@ -131,6 +131,12 @@ class History:
             cur = c.execute('SELECT item, min_buyout, num_auctions, market FROM prices WHERE ts=?', (row[0],))
             return {r[0]: {'minBuyout': r[1], 'numAuctions': r[2], 'marketValue': r[3]} for r in cur.fetchall()}
 
+    def sold_out(self) -> list[tuple]:
+        """(item, snapshots, snapshots with nothing listed) over the kept scans: how often each item was sold out."""
+        with self._lock, self._conn() as c:
+            return c.execute('SELECT item, COUNT(*), SUM(CASE WHEN num_auctions IS NULL OR num_auctions = 0 THEN 1 '
+                             'ELSE 0 END) FROM prices GROUP BY item').fetchall()
+
     def scans(self, limit: int = 50) -> list[dict]:
         with self._conn() as c:
             cur = c.execute('SELECT ts, realm, recorded FROM scans ORDER BY ts DESC LIMIT ?', (limit,))

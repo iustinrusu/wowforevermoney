@@ -614,6 +614,8 @@ class Engine:
             is_fish = bool(FISH_WORDS.search(item.name)) and item.class_id in (0, 7, 15) and item.quality <= 2
             if not is_fish and not (item.class_id == 7 and item.subclass_id in GATHER_SOURCE):
                 continue
+            if not is_fish and self.vendor_price(iid):
+                continue          # a vendor sells it (Silken Thread): you'd buy it, not farm it
             p = self.price(iid)
             if not p:
                 continue

@@ -32,7 +32,7 @@ data first, anything from Classic history labelled as speculation, plain-languag
    and the best day to list each of your items.
 9. **Demand trends**: weeks-long sold/day trends (needs more history) to spot rising demand early; feeds the
    Investments tab, the phase tracker and alerts.
-10. **Niches: steady demand, low supply** (user idea, 2026-11-14). A list of items that sell every day (TSM region
+10. **Done 2026-11-15** (Niches tab; project log). **Niches: steady demand, low supply** (user idea, 2026-11-14). A list of items that sell every day (TSM region
     sold/day) with most listings selling (sale rate), few listed on your realm (under a day of sales), often sold
     out in our own snapshots (nothing listed in many scans while sales continue: the best sign few people supply
     it), a price that holds (lowest listing near or above the average sale price, steady history), and a way for

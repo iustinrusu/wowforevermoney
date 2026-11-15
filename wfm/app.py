@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import anomalies, audit
 from . import advisor as advisor_mod
+from . import niches as niches_mod
 from . import investments as investments_mod
 from . import market as market_mod
 from . import profile as profile_mod
@@ -320,6 +321,23 @@ class App:
         return kc.get(active) or next((v for k, v in kc.items() if active and k.split(' ')[0] == active.split(' ')[0]),
                                       set())
 
+    NICHE_KINDS = {'craft': 'craft it', 'vendor_flip': 'buy it from a vendor', 'gather': 'gather it'}
+    NICHE_BAD = {'unverified_recipe', 'price_check_fails', 'event_vendor', 'black_market', 'not_worth_time'}
+
+    def niches(self) -> dict:
+        """Steady demand, low supply (niches.py): items that sell every day, are thinly listed, and you can supply."""
+        s = self.effective_settings()[0]
+        supply: dict[int, list] = {}
+        for o in (self.result or {}).get('opportunities', []):
+            if o.kind in self.NICHE_KINDS and not (self.NICHE_BAD & set(o.flags)):
+                supply.setdefault(o.item_id, []).append({'kind': self.NICHE_KINDS[o.kind], 'title': o.title,
+                                                         'key': o.key, 'profit_unit': o.profit_unit,
+                                                         'doable': o.doable, 'needs': o.needs})
+        stats = niches_mod.sold_out_stats(self.history.sold_out())
+        eng = Engine(self.world, s)
+        rows = niches_mod.build(self.world.prices, supply, float(s.get('market_share', 0.2)), stats, names=eng.name)
+        return {'rows': rows[:60], 'scans': len(self.history.scans(10000)), 'solid_scans': niches_mod.SOLID_SCANS}
+
     def professions(self) -> dict:
         """Profession advisor: every primary profession now and at full skill, and the cost of getting there."""
         s = self.effective_settings()[0]
@@ -525,6 +543,8 @@ def make_handler(app: App):
                     return self._json(app.purse())
                 if url.path == '/api/market':
                     return self._json(app.market(int(qs.get('id', ['0'])[0])))
+                if url.path == '/api/niches':
+                    return self._json(app.niches())
                 if url.path == '/api/professions':
                     return self._json(app.professions())
                 if url.path == '/api/levelling':

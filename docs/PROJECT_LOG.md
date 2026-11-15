@@ -24,6 +24,16 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-15 Niches tab (strategy item 10).** `wfm/niches.py`, `/api/niches`, `History.sold_out`: an item is a niche
+  when your share of the region's sales is 1+ a day, half or more of its listings sell, your realm lists at most 10
+  and under a day of the region's sales, the lowest listing is 90%+ of the usual sale price (or nothing listed), and a
+  craft, vendor or gathering row supplies it at a profit. The absolute "at most 10 listed" was added after the first
+  run: realm listings against region sales alone let Silk Cloth (1,132 listed) through. "Sold out" = share of our own
+  snapshots with nothing listed; under about a week of hourly scans (84) it is shown with its sample size and only
+  ranks a niche higher (23 scans on 2026-11-15). First run (main's professions): 5 niches, e.g. Tough Condor Meat,
+  Instant Poison IV, Red Whelp Scale. Also fixed on the way: "Farm X" rows no longer list items vendors sell
+  (Silken Thread: you'd buy it, not farm it).
+
 - **2026-11-15 Profession advisor (strategy item 1): a Professions tab.** `wfm/advisor.py`, `/api/professions`: one row
   per primary profession, yours first. Gathering: gold an hour now (a spot you can do today) and at full skill (the
   best spot that only needs more skill, not a higher level; Classic-yield spots shown only when nothing else, labelled
@@ -513,6 +523,8 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-15** Niches tab (`wfm/niches.py`); farming rows skip vendor-sold items. Tests: 217.
 
 - **2026-11-15** Professions tab: profession advisor + levelling planner (`wfm/advisor.py`). Tests: 214.
 

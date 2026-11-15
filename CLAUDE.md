@@ -90,6 +90,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/levelling.py` | levelling planner: cheapest path to 300 in a crafting profession |
 | `wfm/advisor.py` | profession advisor (Professions tab): each profession now, at full skill, cost to get there |
 | `wfm/everloot.py` | Everloot drop rates (player uploads, CC BY-SA): cross-checked against Wowhead on Data health |
+| `wfm/niches.py` | Niches tab: items that sell every day, are thinly listed, and you can supply |
 | `wfm/plan.py` | "Your plan for today": cash-in, cooldowns, routines, snipe, farming, big flip, goal as ranked steps |
 | `wfm/history.py` | SQLite price history: every realm scan for 14 days, then daily candles for a year |
 | `wfm/market.py` | Market tab: one item's history, trends and market signals (sentiment) |

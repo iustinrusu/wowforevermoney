@@ -511,6 +511,16 @@ const VIEWS = {
       <div class="panel"><h2>Buy on the AH, sell to a vendor</h2><div class="hint">Listings below what a vendor pays, at the last scan. TSM's Sniper catches these live in game.</div>${oppTable(av, {cols: ['title', 'profit_unit', 'cost_unit', 'flags']})}</div>
       <div class="panel"><h2>Cheap listings to relist</h2><div class="hint">Lowest listing under 60% of the lowest of realm market value, region market value and region average sale price. Speculative.</div>${oppTable(dip, {cols: ['title', 'profit_unit', 'cost_unit', 'flags']})}</div>`;
   },
+  async niches() {
+    const d = await api('/api/niches');
+    const rows = d.rows.map((r, i) => `<tr class="row" data-item="${r.item_id}">${rankCell(i + 1)}<td>${itemLink(r.item_id, r.name)}${r.thin_supply ? ' <span class="flag good" title="Often sold out in our own price snapshots while it keeps selling: few people supply it">thin supply</span>' : ''}<div class="hint">${esc(r.why)}</div></td>
+      <td>${esc(r.how.kind)}: ${esc(r.how.title)}${r.how.doable ? '' : ` <span class="pill">(${esc(r.how.needs || 'not yet')})</span>`}</td>
+      <td class="num">${money(r.how.profit_unit)}</td><td class="num">${num(r.sold_per_day, 1)}</td><td class="num">${money(r.profit_day)}</td></tr>`).join('');
+    return `<div class="panel"><h2>Niches <small>steady demand, low supply: items that sell every day, few are listed, and you can supply them</small></h2>
+      <div class="hint">From ${d.scans} price snapshots of our own${d.scans < d.solid_scans ? ` (about a week, ${d.solid_scans}, is needed before "sold out" means much: until then it only ranks a niche higher)` : ''}. What you can do now comes first.</div>
+      ${d.rows.length ? `<table><thead><tr><th>#</th><th>Item and why it qualifies</th><th>How you'd supply it</th><th class="num" title="Profit on one, from the Crafting, Flips or Gathering row">Profit each</th><th class="num" title="Your share of the region's sales a day: how many you could sell without flooding it">Sells a day (you)</th><th class="num">Profit a day</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="hint">No niche right now.</div>'}
+      <details class="how"><summary>How this is worked out</summary><div>An item counts when your share (${num(STATE.settings.market_share * 100, 0)}%) of the region's daily sales is at least one, at least half of its listings sell, your realm lists at most 10 and less than a day of the region's sales, the lowest listing is at least 90% of its usual sale price (or nothing is listed), and you can make or get it at a profit (a craft, a vendor that sells it, or something you gather). "Sold out" is how often our own snapshots saw nothing listed while it kept selling. Limits: TSM's counts come from TSM users only and are region-wide; TSM has no seller counts; a niche closes once others notice it.</div></details></div>`;
+  },
   async gather() {
     const profs = (STATE.effective || {}).professions || {};
     const has = (p) => p && profs[p] !== undefined;
