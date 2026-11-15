@@ -11,5 +11,6 @@ PY="${LOCALAPPDATA}/Programs/Python/Python313/python.exe"
 BLOB=$(git hash-object -w data/market_seed.json.gz) || exit 0
 TREE=$(printf '100644 blob %s\tmarket_seed.json.gz\n' "$BLOB" | git mktree) || exit 0
 COMMIT=$(git commit-tree "$TREE" -m "Starter price history, $(date -u +%Y-%m-%d)") || exit 0
-WFM_SEED_PUSH=1 git push --quiet --force "$1" "$COMMIT:refs/heads/market-data" || echo "market-data: not pushed"
+# pushed a little after your push, not during it (pushing both at once made GitHub reject yours)
+( sleep 20; WFM_SEED_PUSH=1 git push --quiet --force "$1" "$COMMIT:refs/heads/market-data" ) >/dev/null 2>&1 &
 exit 0
