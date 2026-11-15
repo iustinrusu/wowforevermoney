@@ -60,7 +60,7 @@ end
 local LABEL = { mobs = "Kills", skins = "Skins", pickpocket = "Picked", fishing = "Fish", nodes = "Nodes",
                 chests = "Chests", containers = "Opened", disenchant = "Disenchanted" }
 local ORDER = { "mobs", "skins", "pickpocket", "fishing", "nodes", "chests", "containers", "disenchant" }
-local ROWS = 5            -- top items shown
+local ROWS = 3            -- top items shown
 
 local function refresh()
   if not (win and session) then return end
@@ -79,17 +79,18 @@ local function refresh()
   for _, k in ipairs(ORDER) do if (l[k] or 0) > 0 then parts[#parts + 1] = LABEL[k] .. " " .. l[k] end end
   win.loots:SetText(#parts > 0 and table.concat(parts, "  ·  ") or "|cff999999Nothing looted yet|r")
   for i = 1, ROWS do
-    local r, row = rows[i], win.items[i]
-    if r then
-      local name, _, quality, _, _, _, _, _, _, icon = GetItemInfo(r.id)
-      local color = quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
-      row.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-      row.name:SetText(string.format("%s%s|r |cffaaaaaax%d|r", color and color.hex or "|cffffffff", name or ("item " .. r.id), r.n))
-      row.value:SetText(money(r.total))
-      row:Show()
-    else
-      row:Hide()
-    end
+    local r = rows[i]
+    local ok, err = pcall(function()
+      if r then
+        local name, _, quality = GetItemInfo(r.id)
+        local color = quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
+        local hex = (color and color.hex) or "|cffffffff"
+        win.items[i]:SetText(string.format("%d. %s%s|r |cffaaaaaax%d|r:  %s", i, hex, name or ("item " .. r.id), r.n, money(r.total)))
+      else
+        win.items[i]:SetText(i == 1 and "|cff888888Nothing yet|r" or "")
+      end
+    end)
+    if not ok then win.items[i]:SetText("|cffff6060" .. tostring(err) .. "|r") end
   end
   local boxes, inside = 0, 0
   for id, n in pairs(session.unopened) do boxes = boxes + n; inside = inside + price(id) * n end
@@ -173,23 +174,15 @@ local function makeWindow()
   -- top items with icons
   local head = text(win, "GameFontDisableSmall")
   head:SetPoint("TOPLEFT", win.loots, "BOTTOMLEFT", 0, -8)
-  head:SetText("Top items")
+  head:SetText("Top items (count, total)")
   win.items = {}
   prev = head
   for i = 1, ROWS do
-    local row = CreateFrame("Frame", nil, win)
-    row:SetHeight(16)
-    row:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -3)
-    row.icon = row:CreateTexture(nil, "ARTWORK")
-    row.icon:SetSize(14, 14)
-    row.icon:SetPoint("LEFT")
-    row.value = text(row, "GameFontHighlightSmall", "RIGHT")
-    row.value:SetPoint("RIGHT")
-    row.name = text(row, "GameFontHighlightSmall")
-    row.name:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
-    row.name:SetWordWrap(false)
-    win.items[i] = row
-    prev = row
+    local line = text(win, "GameFontHighlightSmall")
+    line:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -3)
+    line:SetWordWrap(false)
+    win.items[i] = line
+    prev = line
   end
 
   -- bottom: the container reminder and where the prices came from
@@ -219,11 +212,7 @@ local function makeWindow()
     for _, fs in ipairs({ win.rate, win.total, win.loots, win.remind }) do fs:SetWidth(w) end
     win.note:SetWidth(w - 12)
     for _, v in ipairs(win.kv) do v:SetWidth(w) end
-    for _, row in ipairs(win.items) do
-      row:SetWidth(w)
-      row.value:SetWidth(90)
-      row.name:SetWidth(math.max(40, w - 18 - 96))
-    end
+    for _, line in ipairs(win.items) do line:SetWidth(w) end
   end
   win:SetScript("OnSizeChanged", layout)
   layout()

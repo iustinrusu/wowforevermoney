@@ -557,6 +557,10 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Addon 1.5.9: top items still blank in game (the row-frame code failed silently each second); now three
+  plain numbered lines "1. Item x2:  4s 38c" (count and total value, most valuable first), filled inside a pcall so an
+  error shows in the line instead of a blank (user's request: top 3 with count and total).
+
 - **2026-11-15** Addon 1.5.8: the session total is the big headline, gold an hour the muted line under it (user).
 
 - **2026-11-15** Addon 1.5.7: shown as "Gold Ever After" (TOC title, window, chat messages; the folder and saved
