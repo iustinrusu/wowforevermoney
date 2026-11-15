@@ -31,7 +31,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   240 casts/h, 20% market share); crafted worth capped by what can be made a day (to-do 2b); the Wowhead email
   won't be sent; no in-game check list for the user (they /reload often): Claude reads the saved file instead
   (2026-11-15: 23 vendors recorded with prices; no fishing logged yet, so no pool entries).
-  Briefs: `docs/plans/decided-2026-11-15.md`.
+  Briefs: `docs/plans/decided-2026-11-15.md`. Then, the same day: GatherLite's node locations are wanted after
+  all (to-do 5), and keep an open mind to new addons (recommend good Forever ones; the user installs them).
+  Wowhead pace, left to Claude: one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session (the block of 2026-11-14 came after 76 pages in a row at one a
+  minute and lifted within 30 minutes; 5 pages 2 minutes apart went fine after it).
 
 - **2026-11-14 Price checks every run (user: "we need a system to detect these errors").** `wfm/anomalies.py`:
   (1) a second opinion on every craft and vendor flip: profit with each price capped at what is typical (the median

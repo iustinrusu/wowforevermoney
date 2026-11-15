@@ -7,8 +7,8 @@ are done or decided (with the date). Don't drop an item without the user's say.
 
 ## A. Work left on the top priority: Forever data for every material
 
-Wowhead pace since the 403 of 2026-11-14: about 5 pages a session, 2 minutes apart (details and the exact reading
-order: `docs/plans/material-coverage.md`, Progress section).
+Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session (the exact reading order:
+`docs/plans/material-coverage.md`, Progress section).
 
 - [ ] A1. The rest of the top 100 coverage queue: 22 item pages, Moss Agate (1206) first.
 - [ ] A2. The 4 skinning items left: Black Whelp Scale (7286), Worn Dragonscale (8165), Green Dragonscale (15412),
@@ -43,11 +43,13 @@ order: `docs/plans/material-coverage.md`, Progress section).
       Stratholme), no for raids (loot shared by 20-40); needs bosses' own Wowhead pages.
 - [x] C2. **Decided 2026-11-15: yes** (to-do 2c; the download approved as described). Everloot as a second source: download its drop rates (4 small requests, about 200 KB, CC BY-SA data, kept
       in data/ uncommitted) to cross-check our rates?
-- [ ] C3. Wowhead reading pace: stay at about 5 pages a session, or go back to one a minute until the next block
-      (the first block lifted within 30 minutes)? 2026-11-15: the user felt the sessions went well and asked what
-      we did (answered: 82 pages, one 403, lifted within 30 minutes); still about 5 a session until they say.
-- [x] C4. **Decided 2026-11-15: no more addons for now**; Wowhead data is enough (to-do 5 cancelled; GatherLite
-      stays installed but unread). Was: Forever loot addons and GatherLite node locations (to-do item 5): install any through CurseForge?
+- [x] C3. **Decided 2026-11-15 by Claude (the user: "it's up to you", based on how Wowhead went):** one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session.
+      Why: the one block came after 76 pages in a row at one a minute; 5 pages 2 minutes apart after it went
+      fine. Half that rate, and a quarter of that run per session, should stay clear of it. The ~53 pages left
+      (22 items, 4 skins, 26 pools, Javnir Nashak) take about 3 sessions.
+- [x] C4. **Decided 2026-11-15:** GatherLite's data could be useful (to-do 5: its node locations), and keep an open
+      mind to new addons: recommend any good Forever addon found (the user installs it through CurseForge). At
+      first that day: "if we can get by with just Wowhead data, let's not add more addons". Was: Forever loot addons and GatherLite node locations (to-do item 5): install any through CurseForge?
       GatherLite's node locations also need map tables downloaded (Claude asks with file name and size first).
 - [x] C5. **Decided 2026-11-15: yes, remove it** ("let's make it more secure"; force push approved): to-do 2a.
       Was: the user's character name in the first commit (0b17b50): remove it from GitHub's history (needs a force

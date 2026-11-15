@@ -13,7 +13,8 @@ tight: finish the current piece, commit, update this list, and set a reminder th
        not yet possible, the saved file is older than the 1.4.1 install.
 1. [x] **Plan for today** on the main page (the user's priority): `docs/plans/todays-plan.md` (done 2026-11-14)
 2. [ ] (in progress: 2026-11-14 the data format, coverage, node yields, mob rows and 82 item pages are done;
-       about 5 pages a session: the 22 left of the top 100, the 4 skinning items, pools; see the plan's Progress section)
+       2 minutes apart, at most 20 a session: the 22 left of the top 100, the 4 skinning items, pools, Javnir Nashak;
+       see the plan's Progress section)
        **TOP PRIORITY: Forever source data for every material** (fixes "some skins not counted", pool loot,
        mob drops, node yields; the user's top priority for data accuracy, 2026-11-14): `docs/plans/material-coverage.md`.
        It replaces the old Wowhead-reads item (same slow pace). Work in the order at the top of that file: other
@@ -30,8 +31,10 @@ tight: finish the current piece, commit, update this list, and set a reminder th
        mobs' own pages for complete loot, coins) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with drop rates from Wowhead Forever
        ("Dropped by", material-coverage step 4) and the kills-per-hour setting, never your own logged time
 4b. Moved to item 8 (the user, 2026-11-15: build it, at a lower priority).
-5. [-] ~~Forever loot addons and GatherLite node locations~~: cancelled by the user (2026-11-15): no more addons
-       for now, Wowhead data is enough.
+5. [ ] **GatherLite node locations** (installed; the user, 2026-11-15: "could be useful"; ask before downloading
+       the UiMap tables, with file name and size): `docs/plans/forever-data-next.md`, section 5. And keep an open
+       mind to new addons: recommend any good Forever addon found (loot addons: section 4); the user installs them
+       through CurseForge.
 6. [ ] **Review** of the 2026-11-13/14 work: `docs/plans/forever-data-next.md`, section 6
 7. [ ] **Strategy features**, items 1-10 (profession advisor, levelling planner and niches first):
        `docs/plans/strategy-features.md`

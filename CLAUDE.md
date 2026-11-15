@@ -30,6 +30,8 @@ memory of the project, not the chat.
   linking to Wowhead, the public tooltip API (slow, cached), and reading a short list of pages in the
   browser pane when asked. The user's decision (2026-11-14): if no bulk Forever source exists, read the top 100 of
   the coverage queue at one page a minute, stopping at the first block (`docs/plans/material-coverage.md`).
+  Pace from 2026-11-15 (the user left it to Claude, after one 403 at page 77 that lifted within 30 minutes):
+  one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session.
 - **Downloads:** ask first (file name, source, size).
 - **Usage limits:** when usage is getting tight, don't interrupt a task midway: finish the current piece,
   commit it, write the remaining steps into a plan file in `docs/plans/` (and note them in the project log),

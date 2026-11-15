@@ -33,8 +33,7 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   Hide at 16:21 (it had been skipped on an assumption; the user: never skip, check everything in order. Its page has
   no loot source, only "Created by": crafted-only, now confirmed). Left, in order: 1206 15419 12800 3820 13546 249428 2842
   8154 12203 6471 3864 249391 249427 12184 4232 6037 13464 1529 4387 3182 3356 5500, then the skinning items
-  7286 8165 15412 15423. Next sessions: about 5 pages a session (the rule after a block), 60+ s apart; if blocked again, one
-  single page after 30 minutes, then 2 hours, then the next day.
+  7286 8165 15412 15423. Next sessions (pace decided 2026-11-15): one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session.
 - How to read (works): in the Wowhead tab, `localStorage` keys `wfm_fn` (reader: throws on a blocked or non-Forever
   page, stores the page under `wfm_pages`) and `wfm_go2` (waits until 60 s since the last page, at most 40 s);
   per page a batch of [wait 10, wait 10, run wfm_go2, navigate, run wfm_fn]; 3 pages per batch (the tool stops a call
