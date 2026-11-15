@@ -557,6 +557,14 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Starter price history for new installs (user: the Market tab charts are empty after a fresh install).
+  `data/market_seed.json.gz` (tracked): daily candles per item from the author's snapshots, last 30 days (7,103 items,
+  3 days = 400 KB on 2026-11-15; about 4 MB at 30 days), used by `History.series` only for days before your own
+  history of an item begins (`starter: True`), labelled under the chart; market signals prefer your own data. Checked:
+  886 candles of 300 random items match the raw snapshots exactly. Refreshed by a versioned pre-commit hook
+  (`.githooks/pre-commit`, enabled with `git config core.hooksPath .githooks`) at most once a day: every commit would
+  add a new ~4 MB copy to the repository (the user asked for every commit; once a day is Claude's compromise). Tests: 228.
+
 - **2026-11-15** Character dropdown in the header (user's request): picks the character the app plans for (setting
   `character`; empty = the last played). `Engine.character()` now drives bags, plan holdings, fishing gear and lures;
   the purse and known recipes follow it too. Tests: 227.

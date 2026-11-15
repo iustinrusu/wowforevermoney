@@ -94,9 +94,10 @@ def sentiment(sigs: list[dict]) -> dict:
 
 
 def build(iid: int, item, p: dict | None, series: list[dict], now: float) -> dict:
-    sigs = signals(p, series, now)
+    sigs = signals(p, [s for s in series if not s.get('starter')] or series, now)
     return {'id': iid, 'name': item.name if item else f'Item {iid}', 'quality': item.quality if item else 1,
             'vendor_sell': item.sell_price if item else 0, 'prices': p or {}, 'series': series,
             'trend_24h': trend(_window(series, now - DAY)), 'trend_7d': trend(_window(series, now - 7 * DAY)),
             'trend_all': trend(series), 'signals': sigs, 'sentiment': sentiment(sigs),
-            'liquidity': liquidity(p), 'generated_at': int(now)}
+            'liquidity': liquidity(p), 'generated_at': int(now),
+            'starter_until': max((s['ts'] for s in series if s.get('starter')), default=None)}

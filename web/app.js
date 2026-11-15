@@ -314,6 +314,7 @@ function marketBody(d) {
       <div class="controls seg">${Object.keys(RANGES).map((r) => `<button class="btn ${r === range ? 'active' : ''}" data-range="${r}">${r === 'all' ? 'All' : r}</button>`).join('')}
       <span style="width:12px"></span>${['line', 'candles'].map((m) => `<button class="btn ${m === mode ? 'active' : ''}" data-mode="${m}">${m === 'line' ? 'Line' : 'Candles'}</button>`).join('')}</div>
       ${marketChart(d.series || [], range, mode, p.historical)}
+      ${d.starter_until ? `<div class="hint" title="A new install has no price history of its own: the app ships daily prices recorded by the app's author, used only for days before your own snapshots of this item begin">Up to ${new Date(d.starter_until * 1000).toLocaleDateString()}: starter history that comes with the app (daily prices from another player's copy, ${esc(STATE.settings.realm || 'same region')}); after that, your own snapshots.</div>` : ''}
       <div class="hint">Every TSM scan is kept for 14 days; older days are kept as one daily candle for a year. Snapshots are only saved while the app is running.</div></div>
     <div class="panel"><h2>Market sentiment <span class="sent ${cls}">${esc(s.label)}</span></h2>
       <table><tbody>${d.signals.map((g) => `<tr><td>${icon(g.score)}</td><td><b>${esc(g.name)}</b></td><td>${esc(g.reading)}</td></tr>`).join('')}</tbody></table>

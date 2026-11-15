@@ -1,0 +1,13 @@
+#!/bin/sh
+# Refresh the starter price history (data/market_seed.json.gz) before a commit, at most once a day, so a new install
+# gets recent Market charts. Only where the price history exists (the app author's PC); never blocks a commit.
+# Enabled per clone with: git config core.hooksPath .githooks
+SEED=data/market_seed.json.gz
+[ -f data/history.db ] || exit 0
+PY="${LOCALAPPDATA}/Programs/Python/Python313/python.exe"
+[ -x "$PY" ] || PY=$(command -v python3 || command -v python) || exit 0
+TODAY=$(date -u +%Y-%m-%d)
+MADE=$("$PY" -c "import gzip,json;print(json.load(gzip.open('$SEED','rt')).get('made',''))" 2>/dev/null)
+[ "$MADE" = "$TODAY" ] && exit 0
+"$PY" -m wfm.history seed >/dev/null 2>&1 && git add "$SEED"
+exit 0

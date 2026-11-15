@@ -1,13 +1,19 @@
 """Price history in SQLite: one row per item each time TSM delivers a new realm scan.
 
 TSM's data file only holds averages (14-day, recent, long-term), not a time series, so the app keeps its own.
+A new install has none, so the app ships a starter history (data/market_seed.json.gz, daily candles made from the
+author's snapshots, refreshed with `python -m wfm.history seed`): charts use it for days before your own history
+of an item begins, marked "starter" and labelled with its realm and date.
 Every snapshot is kept for FULL_DAYS; older days are folded into one daily candle per item (open, high, low,
 close of the lowest listing, plus the day's average listings, realm average, region sale price and sold/day),
 kept for KEEP_DAYS. Snapshots only exist for times the app was running.
 """
 from __future__ import annotations
 
+import gzip
+import json
 import sqlite3
+import sys
 import threading
 import time
 from contextlib import contextmanager
@@ -18,6 +24,20 @@ DAY = 86400
 FULL_DAYS = 14       # every snapshot (about hourly) for two weeks
 KEEP_DAYS = 365      # then one daily candle per item for a year
 SERIES_COLS = ('ts', 'min_buyout', 'num_auctions', 'market', 'region_market', 'region_sale', 'sold_per_day')
+SEED = DATA / 'market_seed.json.gz'
+SEED_DAYS = 30       # the starter history keeps the last 30 days
+_CANDLE = ('open', 'high', 'low', 'close', 'num_auctions', 'market', 'region_market', 'region_sale', 'sold_per_day')
+
+
+def load_seed(path=None) -> dict:
+    """The shipped starter history: {'made', 'realm', 'items': {item: [[day, open, high, low, close, listings,
+    market, region_market, region_sale, sold_per_day], ...]}} or {} when missing."""
+    try:
+        with gzip.open(path or SEED, 'rt', encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) and isinstance(d.get('items'), dict) else {}
+    except (OSError, ValueError):
+        return {}
 
 
 class History:
@@ -107,8 +127,27 @@ class History:
             c.execute('DELETE FROM scans WHERE ts < ?', (keep_after,))
             return len(days)
 
+    _seed: dict | None = None
+
+    def seed(self) -> dict:
+        if self._seed is None:
+            self._seed = load_seed(getattr(self, 'seed_path', None))
+        return self._seed
+
     def series(self, item: int, days: int = KEEP_DAYS) -> list[dict]:
-        """Oldest first: daily candles for folded days (ts = noon UTC, with open/high/low/close), then snapshots."""
+        """Oldest first: starter candles for days before your own history of this item, then daily candles for folded
+        days (ts = noon UTC, with open/high/low/close), then snapshots."""
+        own = self._series(item, days)
+        first_day = own[0]['ts'] // DAY if own else None
+        since_day = (int(time.time()) - days * DAY) // DAY
+        seed = self.seed()
+        starter = [{'ts': r[0] * DAY + DAY // 2, 'min_buyout': r[4], **dict(zip(_CANDLE, r[1:])), 'daily': True,
+                    'starter': True}
+                   for r in (seed.get('items') or {}).get(str(item), [])
+                   if r[0] >= since_day and (first_day is None or r[0] < first_day)]
+        return starter + own
+
+    def _series(self, item: int, days: int = KEEP_DAYS) -> list[dict]:
         since = int(time.time()) - days * DAY
         with self._conn() as c:
             out = [{'ts': day * DAY + DAY // 2, 'min_buyout': close, 'num_auctions': n, 'market': mv,
@@ -121,6 +160,42 @@ class History:
                             (item, since))
             out += [dict(zip(SERIES_COLS, r)) for r in cur.fetchall()]
             return out
+
+    def export_seed(self, path=None, realm: str = '', days: int = SEED_DAYS, now: float | None = None) -> dict:
+        """Write the starter history: one candle per item and day over the last `days` days, from folded days and
+        from snapshots grouped by day (UTC). Returns counts."""
+        now = int(now or time.time())
+        since_day = (now - days * DAY) // DAY
+        items: dict[int, dict[int, list]] = {}
+        with self._conn() as c:
+            for row in c.execute('SELECT item, day, open, high, low, close, num_auctions, market, region_market, '
+                                 'region_sale, sold_per_day FROM daily WHERE day >= ?', (since_day,)):
+                items.setdefault(row[0], {})[row[1]] = list(row[1:])
+            agg: dict[tuple, dict] = {}
+            for item, ts, mb, n, mv, rm, rs, spd in c.execute(
+                    'SELECT item, ts, min_buyout, num_auctions, market, region_market, region_sale, sold_per_day '
+                    'FROM prices WHERE ts >= ? ORDER BY item, ts', (since_day * DAY,)):
+                a = agg.setdefault((item, ts // DAY), {'o': None, 'h': None, 'l': None, 'c': None, 'n': [], 'mv': None,
+                                                       'rm': None, 'rs': None, 'spd': None})
+                if mb and mb > 0:
+                    a['o'] = a['o'] if a['o'] is not None else mb
+                    a['h'] = mb if a['h'] is None else max(a['h'], mb)
+                    a['l'] = mb if a['l'] is None else min(a['l'], mb)
+                    a['c'] = mb
+                a['n'].append(n or 0)
+                a['mv'], a['rm'], a['rs'], a['spd'] = mv or a['mv'], rm or a['rm'], rs or a['rs'], spd or a['spd']
+            for (item, day), a in agg.items():
+                items.setdefault(item, {})[day] = [day, a['o'], a['h'], a['l'], a['c'],
+                                                   round(sum(a['n']) / len(a['n']), 1), a['mv'], a['rm'], a['rs'], a['spd']]
+        out = {'about': 'Starter price history for Gold Ever After: daily candles (day = days since 1970 UTC; open, '
+                        'high, low, close of the lowest listing; average listings; realm market value; region market '
+                        'value; region sale price; region sold a day), used only before your own history begins.',
+               'made': time.strftime('%Y-%m-%d', time.gmtime(now)), 'realm': realm,
+               'items': {str(i): [d[k] for k in sorted(d)] for i, d in items.items()}}
+        with gzip.open(path or SEED, 'wt', encoding='utf-8') as f:
+            json.dump(out, f, separators=(',', ':'))
+        self._seed = None
+        return {'items': len(items), 'candles': sum(len(d) for d in items.values())}
 
     def previous(self, before_ts: int) -> dict[int, dict]:
         """The snapshot just before the given scan time."""
@@ -141,3 +216,8 @@ class History:
         with self._conn() as c:
             cur = c.execute('SELECT ts, realm, recorded FROM scans ORDER BY ts DESC LIMIT ?', (limit,))
             return [dict(zip(('ts', 'realm', 'recorded'), r)) for r in cur.fetchall()]
+
+
+if __name__ == '__main__' and sys.argv[1:2] == ['seed']:
+    from .settings import Settings
+    print(History().export_seed(realm=Settings().snapshot().get('realm') or ''), '->', SEED)
