@@ -43,8 +43,8 @@ tight: finish the current piece, commit, update this list, and set a reminder th
        through CurseForge.
 6. [x] (done 2026-11-15: recomputation and invariants pass, one coverage bug fixed; project log)
        **Review** of the 2026-11-13/14 work: `docs/plans/forever-data-next.md`, section 6
-7. [ ] (2026-11-15: item 2, the levelling planner, done first: the advisor's switching cost needs it; next item 1,
-       the profession advisor, then 10, niches)
+7. [ ] (2026-11-15: items 2 (levelling planner) and 1 (profession advisor, Professions tab) done; next item 10,
+       niches, then 3-9)
        **Strategy features**, items 1-10 (profession advisor, levelling planner and niches first):
        `docs/plans/strategy-features.md`
 8. [ ] **Dungeons view** (the user's idea; 2026-11-15: build it, at a lower priority): a "run <dungeon>" row = trash +

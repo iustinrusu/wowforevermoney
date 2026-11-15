@@ -5,7 +5,7 @@ do them after docs/plans/todays-plan.md and docs/plans/forever-data-next.md. To 
 session here and say "Do item N of docs/plans/strategy-features.md". Standing rules apply (CLAUDE.md): Forever
 data first, anything from Classic history labelled as speculation, plain-language explanations, tests.
 
-1. **Profession advisor** (a Professions view). For your two primary professions and each alternative pair:
+1. **Done 2026-11-15** (Professions tab; project log). **Profession advisor** (a Professions view). For your two primary professions and each alternative pair:
    gold per hour now (gathering) and per day (crafting), what the next skill milestones unlock (e.g. Leatherworking
    265: Devilsaur Gauntlets), the switching cost (skill you'd lose, time and gold to level the new one), and a
    short "now vs later" verdict: gathering pays most early, crafting captures the margin and the phase demand.

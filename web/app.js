@@ -480,6 +480,28 @@ const VIEWS = {
       <label class="chk"><input type="checkbox" id="cd" ${doable ? 'checked' : ''}> only what I can craft now</label>
       <label class="chk" title="Hides items that barely sell: under 1 a day in the whole region, under 1 in 10 listings selling, or over 10 days of sales already listed on your realm"><input type="checkbox" class="sells-only" ${sellsOnly ? 'checked' : ''}> hide items that barely sell</label></div>
       ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'effort', 'sells', 'cooldown', 'flags']})}</div>
+      <div class="hint">How to level a profession cheaply, and what each profession would earn you: the Professions tab.</div>`;
+  },
+  async profs() {
+    const d = await api('/api/professions');
+    const val = (r, which) => {
+      if (r.kind === 'gathering') {
+        const g = which === 'now' ? r.gather.now : (r.gather.full || r.gather.classic_full);
+        if (!g) return '<span class="pill">–</span>';
+        return `${money(g.gph)}<span class="pill"> an hour</span><div class="hint">${esc(g.title)}${g.classic ? ' <span class="flag" title="Some of what a node gives comes from WoW Classic loot tables: not confirmed for Forever">Classic yields</span>' : ''}</div>`;
+      }
+      const c = which === 'now' ? r.craft.now : r.craft.full, total = which === 'now' ? r.craft.now_daily : r.craft.full_daily;
+      if (!c.length) return '<span class="pill">–</span>';
+      return `${money(total)}<span class="pill"> a day</span><div class="hint">${c.map((x) => esc(x.title.replace(/^Craft /, ''))).join(', ')}</div>`;
+    };
+    const cost = (r) => r.kind === 'gathering' ? '<span class="pill" title="A gathering profession rises as you gather: no gold">levels as you gather</span>'
+      : r.levelling ? `${money(r.levelling.total)}<div class="hint">about ${num(r.levelling.crafts, 0)} crafts${r.levelling.stuck_at ? `; stops at ${r.levelling.stuck_at}` : ''}</div>` : '<span class="pill" title="Enchantments make no item, so they are not in the recipe tables">not planned</span>';
+    const rows = d.rows.map((r, i) => `<tr><td>${esc(r.profession)}${r.have ? ` <span class="pill good" title="You have this profession">yours: ${r.skill}</span>` : ''}</td>
+      <td class="num">${r.have ? val(r, 'now') : '<span class="pill">–</span>'}</td><td class="num">${val(r, 'full')}</td><td class="num">${cost(r)}</td><td>${esc(r.verdict)}</td></tr>`).join('');
+    return `<div class="panel"><h2>Professions <small>what each primary profession earns you now and at full skill, and what getting there costs</small></h2>
+      <div class="hint">${esc(d.note)} Yours: ${d.yours.length ? esc(d.yours.join(' and ')) : 'none detected'}.</div>
+      <table><thead><tr><th>Profession</th><th class="num" title="With your skill today (only for professions you have)">Now</th><th class="num" title="Gathering: the best spot that only needs more skill. Crafting: the three best crafts at 300 that sell, with the gold for their ingredients">At full skill</th><th class="num" title="Crafting: the levelling planner's cost from your skill (or from 1) to 300; a minus means you would earn that much on the way">To get there</th><th>In short</th></tr></thead><tbody>${rows}</tbody></table>
+      <details class="how"><summary>How this is worked out</summary><div>Gathering professions: the best gathering spot by gold an hour, from the Gathering tab (Forever data first; a spot partly resting on WoW Classic loot tables is marked "Classic yields"). Node spots do not check your level: a high zone (Winterspring, Eastern Plaguelands, Felwood) needs a high level to farm safely. Crafting professions: the profit a day of the three best crafts that sell, from the Crafting tab, and the levelling planner below for the cost from your skill (or from skill 1 for one you don't have) to 300. One hour of farming a day is about its gold an hour a day, so the two kinds can be compared. Switching a profession means dropping one of yours and its skill: compare its "Now" with the new one's numbers and cost.</div></details></div>
       ${await levellingPanel()}`;
   },
   async flips() {
@@ -667,7 +689,7 @@ async function render() {
 
 function wireView() {
   document.querySelectorAll('#view tr.row[data-item]').forEach((tr) => { if (!tr.dataset.key) tr.onclick = (e) => { if (!e.target.closest('a') && tr.dataset.item) openItem(+tr.dataset.item); }; });
-  if (TAB === 'craft' && $('#lp')) {
+  if (TAB === 'profs' && $('#lp')) {
     $('#lp').onchange = (e) => { sessionStorage.setItem('levelProf', e.target.value); sessionStorage.removeItem('levelSkill'); render(); };
     $('#ls').onchange = (e) => { sessionStorage.setItem('levelSkill', e.target.value); render(); };
   }

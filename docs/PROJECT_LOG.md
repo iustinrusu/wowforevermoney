@@ -24,6 +24,16 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-15 Profession advisor (strategy item 1): a Professions tab.** `wfm/advisor.py`, `/api/professions`: one row
+  per primary profession, yours first. Gathering: gold an hour now (a spot you can do today) and at full skill (the
+  best spot that only needs more skill, not a higher level; Classic-yield spots shown only when nothing else, labelled
+  "Classic yields"); no gold to level. Crafting: profit a day of the three best crafts that sell now and at 300 (one
+  per shared cooldown: Arcanite Bar and Elemental Fire share the transmute cooldown), and the levelling planner's cost
+  from your skill (or from 1) to 300. A one-sentence verdict per row. The levelling panel moved to this tab. Known
+  limit, said in the tab: node spots don't check your level (Mining's "37g 94s an hour" is Winterspring, a level 55+
+  zone: Rich Thorium Vein ~1g 50s a node, mostly the 11% Arcane Crystal at 7g 74s, at 40 nodes an hour). Not done:
+  pairs of professions (two primaries) are left to the reader; the switching cost is the skill you'd drop.
+
 - **2026-11-15 Levelling planner first among the strategy features (to-do 7, item 2 of strategy-features.md).** Built
   before the profession advisor (item 1) because the advisor's switching cost is a levelling cost. `wfm/levelling.py`:
   for every skill point the recipe with the lowest expected cost (one craft's ingredients minus what the product
@@ -503,6 +513,8 @@ moved into `forever-data-next.md`.
   from history needs a force push (the user's decision).
 
 ## Change log
+
+- **2026-11-15** Professions tab: profession advisor + levelling planner (`wfm/advisor.py`). Tests: 214.
 
 - **2026-11-15** Levelling planner (`wfm/levelling.py`, `Engine.levelling`, `/api/levelling`, Crafting tab panel);
   recipes each character knows from TSM. Wowhead Forever: 9 more item pages (102 in all; 20 this session, 2 minutes

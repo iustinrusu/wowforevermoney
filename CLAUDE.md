@@ -87,6 +87,9 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/world.py` | loads every source, tracks freshness, reloads on file change |
 | `wfm/pricing.py` | buy/sell quotes and flags; money formatting |
 | `wfm/engine.py` | all opportunity calculations and top-pick sections |
+| `wfm/levelling.py` | levelling planner: cheapest path to 300 in a crafting profession |
+| `wfm/advisor.py` | profession advisor (Professions tab): each profession now, at full skill, cost to get there |
+| `wfm/everloot.py` | Everloot drop rates (player uploads, CC BY-SA): cross-checked against Wowhead on Data health |
 | `wfm/plan.py` | "Your plan for today": cash-in, cooldowns, routines, snipe, farming, big flip, goal as ranked steps |
 | `wfm/history.py` | SQLite price history: every realm scan for 14 days, then daily candles for a year |
 | `wfm/market.py` | Market tab: one item's history, trends and market signals (sentiment) |

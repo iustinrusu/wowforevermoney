@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import anomalies, audit
+from . import advisor as advisor_mod
 from . import investments as investments_mod
 from . import market as market_mod
 from . import profile as profile_mod
@@ -312,6 +313,19 @@ class App:
     CRAFTING = ('Alchemy', 'Blacksmithing', 'Cooking', 'Enchanting', 'Engineering', 'First Aid', 'Leatherworking',
                 'Tailoring')
 
+    def _known_crafts(self) -> set:
+        """Recipes the character you play knows (TSM's crafting data)."""
+        active = ((self.world.profile or {}).get('active') or '')
+        kc = getattr(self.world, 'known_crafts', None) or {}
+        return kc.get(active) or next((v for k, v in kc.items() if active and k.split(' ')[0] == active.split(' ')[0]),
+                                      set())
+
+    def professions(self) -> dict:
+        """Profession advisor: every primary profession now and at full skill, and the cost of getting there."""
+        s = self.effective_settings()[0]
+        return advisor_mod.build(Engine(self.world, s), (self.result or {}).get('opportunities', []),
+                                 s.get('professions') or {}, self._known_crafts())
+
     def levelling(self, qs) -> dict:
         """The cheapest way to 300 in a crafting profession, for the character you play (Engine.levelling)."""
         s = self.effective_settings()[0]
@@ -325,11 +339,7 @@ class App:
         except ValueError:
             skill = int(profs.get(prof) or 1)
         skill = max(1, min(skill, 300))
-        # recipes the character you play knows (TSM's crafting data): no learning cost for those
-        active = ((self.world.profile or {}).get('active') or '')
-        kc = getattr(self.world, 'known_crafts', None) or {}
-        known = kc.get(active) or next((v for k, v in kc.items() if active and k.split(' ')[0] == active.split(' ')[0]),
-                                       set())
+        known = self._known_crafts()         # no learning cost for recipes you know
         crafts = [o for o in (self.result or {}).get('opportunities', []) if o.kind == 'craft']
         out = Engine(self.world, s).levelling(prof, skill, known=known, crafts=crafts)
         out['professions'] = list(self.CRAFTING)
@@ -515,6 +525,8 @@ def make_handler(app: App):
                     return self._json(app.purse())
                 if url.path == '/api/market':
                     return self._json(app.market(int(qs.get('id', ['0'])[0])))
+                if url.path == '/api/professions':
+                    return self._json(app.professions())
                 if url.path == '/api/levelling':
                     return self._json(app.levelling(qs))
                 if url.path == '/api/investments':
