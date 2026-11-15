@@ -37,6 +37,9 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       names from GitHub's history (C5: done 2026-11-15, history rewritten and force-pushed), crafted
       worth capped by what can be made a day (C7: done 2026-11-15), Everloot cross-check (C2: done 2026-11-15).
 
+- [ ] B7. Comprehensive review of the whole app (UI, UX, logic, accuracy, no discrepancies between views): planned
+      for a new chat after the usage reset, `docs/plans/comprehensive-review.md` (the user, 2026-11-15).
+
 ## C. Decisions for the user
 
 - [x] C1. **Decided 2026-11-15: build it, at a lower priority** (to-do 8, after the strategy features).

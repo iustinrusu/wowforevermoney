@@ -15,6 +15,8 @@ list), pace as in CLAUDE.md; (b) item 7: strategy item 3 (vertical integration),
 (d) item 4: mobs' own pages (part of the Wowhead budget). 2a, C8 (Everloot fills mob-drop gaps), C9 and item 5 were done the
 same night; nothing waits on the user.
 
+1a. [ ] **FIRST, IN A NEW CHAT AFTER THE USAGE RESET (19 Nov): comprehensive review** (UI, UX, logic, accuracy,
+       how all systems work together; the user's request, 2026-11-15): `docs/plans/comprehensive-review.md`.
 1b. [x] (done 2026-11-15, the user said "do it now") **Realm prices, own materials, three profit views** (the user's decisions, 2026-11-15):
        `docs/plans/realm-prices-and-profit-views.md`. Then continue with (a)-(d) above.
 
