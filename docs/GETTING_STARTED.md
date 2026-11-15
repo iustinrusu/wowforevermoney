@@ -17,12 +17,15 @@ characters' data. About 15 minutes the first time.
 
 ## 2. Get the app
 
-The project is on GitHub (github.com/iustinrusu/wowforevermoney) and is private, so:
-- **Either** ask Iustin to add your GitHub account as a collaborator. Then, on the repo page, click
-  **Code > Download ZIP**.
-- **Or** ask him for a ZIP of the folder.
+The project is public on GitHub: github.com/iustinrusu/wowforevermoney.
+- **Best:** clone it with Git (Git for Windows: `git clone https://github.com/iustinrusu/wowforevermoney.git`).
+  You get updates with `git pull`, and the app fetches a starter price history so the Market charts have data from
+  the first day.
+- **Or:** on the repo page click **Code > Download ZIP** and unzip it somewhere simple, for example
+  `Documents\WoWForeverMoney`. The Market charts then start empty and fill in as the app records prices.
 
-Unzip it somewhere simple, for example `Documents\WoWForeverMoney`.
+Not included: the Wowhead Forever data read by hand for the author's own use (drop, skinning and fishing counts in
+`data/wowhead_forever_*.json`). The app works without them; spots that need them show less until you add your own.
 
 ## 3. Start it
 

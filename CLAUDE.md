@@ -50,7 +50,8 @@ memory of the project, not the chat.
 - **Git:** remote is https://github.com/iustinrusu/wowforevermoney.git (branch `main`). Always commit and
   push each finished piece of work without asking (the user's standing permission for this project,
   2026-11-14). Never commit `data/` (caches, price history, logs, settings) except the
-  hand-curated `data/tips.json`, `data/investments.json` and `data/wowhead_forever_*.json`, (the starter price history
+  hand-curated `data/tips.json` and `data/investments.json` (the Wowhead Forever pages, `data/wowhead_forever_*.json`,
+  stay local since the repo went public on 2026-11-15: never commit them; the starter price history
   `data/market_seed.json.gz` is not on main: `.githooks/pre-push` replaces the branch `market-data` with one commit
   holding only the latest file on every push; enable per clone with `git config core.hooksPath .githooks`), and never commit the WoW account folder
   number or other account identifiers.
@@ -107,4 +108,4 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/app.py` | HTTP server, JSON API, SSE live updates, watcher loop |
 | `web/` | the page (index.html, app.js, style.css) |
 | `addon/ForeverMoneyBridge/` | our WoW addon; copied into AddOns when the app starts |
-| `data/` | caches and user state (not versioned, except the hand-curated `data/tips.json`, `data/investments.json` and `data/wowhead_forever_*.json`) |
+| `data/` | caches and user state (not versioned, except the hand-curated `data/tips.json` and `data/investments.json`) |
