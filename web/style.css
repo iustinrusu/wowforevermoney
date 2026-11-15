@@ -167,3 +167,18 @@ details.plan-items table { margin-top: 4px; }
 .pill.lvl-orange { color: #ff8040; } .pill.lvl-yellow { color: #e0c020; } .pill.lvl-green { color: #40c040; } .pill.lvl-grey { color: #909090; }
 .pill.good { color: var(--good, #5cb85c); font-weight: 600; }
 .charpick { margin-left: auto; margin-right: 8px; max-width: 220px; }
+
+/* narrow windows: every table with column headers becomes a list of cards, values labelled with the column name */
+@media (max-width: 700px) {
+  table.cardable, table.cardable > tbody, table.cardable > tbody > tr, table.cardable > tbody > tr > td { display: block; width: 100%; }
+  table.cardable > thead { display: none; }
+  table.cardable > tbody > tr { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 8px; padding: 6px 10px; background: var(--panel2); }
+  table.cardable > tbody > tr > td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    border: 0; padding: 3px 0; text-align: right; white-space: normal; background: none !important; }
+  table.cardable > tbody > tr > td::before { content: attr(data-label); color: var(--muted); font-size: 12px; text-align: left; flex: 0 0 38%; }
+  table.cardable > tbody > tr > td[data-label=""]::before { display: none; }
+  table.cardable > tbody > tr > td[data-label=""] { justify-content: flex-start; }
+  table.cardable > tbody > tr > td.rk { width: auto; }
+  table.cardable > tbody > tr > td.card-title { display: block; text-align: left; font-weight: 600; padding-bottom: 6px; }
+  .tablewrap { overflow-x: visible; }
+}

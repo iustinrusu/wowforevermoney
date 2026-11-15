@@ -557,6 +557,10 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Tables on narrow windows (user: "datatables are not responsive"): under 700 px every table with
+  headers becomes a list of cards (`labelTables` in app.js labels each value with its column, the first column is the
+  card's title; style.css). Before, a 1,400 px table sat in a 326 px scroll box. Checked at 375 px and at desktop width.
+
 - **2026-11-15** Wowhead data shared with friends only (user: "this repo is only for me and my friends"; Claude advised
   against plain obfuscation on a public repo, so it is encrypted instead): `data/wowhead_forever.pack` (43 KB) holds the
   four files, sealed with the passphrase in the local setting `data_key` (PBKDF2-SHA256 200k rounds, SHA-256 counter

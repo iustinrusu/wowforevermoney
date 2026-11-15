@@ -732,6 +732,24 @@ async function render() {
   refreshTooltips();
 }
 
+// Narrow windows: tables become stacked cards (style.css), each value labelled with its column's name
+function labelTables(root = document) {
+  root.querySelectorAll('table').forEach((t) => {
+    const heads = [...t.querySelectorAll(':scope > thead th')].map((th) => th.textContent.replace(/[?▲▼]/g, '').trim());
+    if (!heads.length) return;
+    t.classList.add('cardable');
+    const first = heads.findIndex((h) => h && h !== '#');      // the item or what to do: the card's title
+    t.querySelectorAll(':scope > tbody > tr').forEach((tr) => [...tr.children].forEach((td, i) => {
+      if (td.dataset.label !== undefined) return;
+      td.dataset.label = heads[i] === '#' || i === first ? '' : (heads[i] || '');
+      if (i === first) td.classList.add('card-title');
+    }));
+  });
+}
+let labelQueued = false;
+new MutationObserver(() => { if (!labelQueued) { labelQueued = true; requestAnimationFrame(() => { labelQueued = false; labelTables(); }); } })
+  .observe(document.body, {childList: true, subtree: true});
+
 function wireView() {
   document.querySelectorAll('#view tr.row[data-item]').forEach((tr) => { if (!tr.dataset.key) tr.onclick = (e) => { if (!e.target.closest('a') && tr.dataset.item) openItem(+tr.dataset.item); }; });
   if (TAB === 'profs' && $('#lp')) {
