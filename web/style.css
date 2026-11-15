@@ -166,3 +166,4 @@ details.plan-items table { margin-top: 4px; }
 /* levelling planner: recipe colours as the game shows them */
 .pill.lvl-orange { color: #ff8040; } .pill.lvl-yellow { color: #e0c020; } .pill.lvl-green { color: #40c040; } .pill.lvl-grey { color: #909090; }
 .pill.good { color: var(--good, #5cb85c); font-weight: 600; }
+.charpick { margin-left: auto; margin-right: 8px; max-width: 220px; }

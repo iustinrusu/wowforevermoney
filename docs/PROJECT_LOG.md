@@ -557,6 +557,10 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Character dropdown in the header (user's request): picks the character the app plans for (setting
+  `character`; empty = the last played). `Engine.character()` now drives bags, plan holdings, fishing gear and lures;
+  the purse and known recipes follow it too. Tests: 227.
+
 - **2026-11-15** Profit views (parts 2-3 of docs/plans/realm-prices-and-profit-views.md): Crafting tab columns "On a
   good day" (one sale today at the realm price, even for slow sellers; optimistic) and "With your own materials"
   (product minus the materials still bought; "adds" = over selling the gatherable ones raw; gold an hour of farming +

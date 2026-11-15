@@ -210,7 +210,8 @@ class App:
             'generated_at': self.generated_at, 'version': self.world.version,
             'freshness': self.world.freshness(), 'settings': self.settings.snapshot(),
             'effective': effective, 'detected': detected, 'characters': chars,
-            'active_character': self.world.profile.get('active'),
+            'active_character': self.settings.snapshot().get('character') or self.world.profile.get('active'),
+            'last_played': self.world.profile.get('active'),
             'realms': pd.realms() if pd else [], 'client_build': self.world.client_build,
             'counts': counts, 'audit_summary': audit.summary(self.audit),
             'top': {sec: [self.opp_view(by[k]) for k in keys if k in by] for sec, keys in r['top'].items()},
@@ -316,7 +317,7 @@ class App:
 
     def _known_crafts(self) -> set:
         """Recipes the character you play knows (TSM's crafting data)."""
-        active = ((self.world.profile or {}).get('active') or '')
+        active = self.settings.snapshot().get('character') or ((self.world.profile or {}).get('active') or '')
         kc = getattr(self.world, 'known_crafts', None) or {}
         return kc.get(active) or next((v for k, v in kc.items() if active and k.split(' ')[0] == active.split(' ')[0]),
                                       set())
@@ -387,7 +388,7 @@ class App:
         now = time.time()
         syn = getattr(w, 'syndicator', {}) or {}
         prof = w.profile or {}
-        active = prof.get('active') or ''
+        active = s.get('character') or prof.get('active') or ''
         key = next((k for k, c in syn.items() if c['name'] == active.split('-')[0]), None)
 
         def worth(counts: dict[int, int]) -> int:

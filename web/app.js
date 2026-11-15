@@ -108,7 +108,23 @@ async function loadState() {
   dot.className = 'dot ' + (worst.includes('stale') || worst.includes('error') || audit.fail ? 'stale' : (worst.includes('warn') || audit.warn ? 'warn' : 'ok'));
   const tsm = (STATE.freshness || []).find((f) => f.name === 'tsm');
   loadPurse();
+  fillCharPick();
   $('#status').textContent = `Prices from ${tsm && tsm.data_time ? ago(tsm.data_time) : '?'} · updated ${ago(STATE.generated_at)} · ${STATE.settings.realm}`;
+}
+
+// header dropdown: which character the app plans for (setting 'character'; empty = the last one you played)
+function fillCharPick() {
+  const sel = $('#char-pick'), chars = Object.keys(STATE.characters || {}), picked = STATE.settings.character || '';
+  if (!chars.length) { sel.style.display = 'none'; return; }
+  sel.style.display = '';
+  const desc = (n) => { const c = STATE.characters[n] || {}; return `${n}${c.level ? ` (${c.level})` : ''}`; };
+  sel.innerHTML = `<option value="" ${picked ? '' : 'selected'}>Last played: ${esc(STATE.last_played || '?')}</option>`
+    + chars.map((n) => `<option value="${esc(n)}" ${n === picked ? 'selected' : ''}>${esc(desc(n))}</option>`).join('');
+  sel.onchange = async () => {
+    await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({character: sel.value || null})});
+    toast(`Planning for ${sel.value || 'the character you played last'}. Recalculating…`);
+    await loadState(); render();
+  };
 }
 
 async function loadPurse() {

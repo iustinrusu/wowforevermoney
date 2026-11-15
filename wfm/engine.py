@@ -926,7 +926,7 @@ class Engine:
         if fixed not in (None, ''):
             return int(fixed), 'your setting'
         syn = getattr(self.w, 'syndicator', None) or {}
-        key = plan.character_key(syn, (getattr(self.w, 'profile', None) or {}).get('active') or '')
+        key = plan.character_key(syn, self.character())
         if not key:
             return 0, 'no bags read (needs Syndicator)'
         have = set((getattr(self.w, 'inventory', None) or {}).get(key) or {}) | set(syn[key].get('equipped') or {})
@@ -939,7 +939,7 @@ class Engine:
         if self.s.get('fishing_skill_bonus') not in (None, ''):
             return None
         syn = getattr(self.w, 'syndicator', None) or {}
-        key = plan.character_key(syn, (getattr(self.w, 'profile', None) or {}).get('active') or '')
+        key = plan.character_key(syn, self.character())
         if not key:
             return None
         have = set((getattr(self.w, 'inventory', None) or {}).get(key) or {}) | set(syn[key].get('equipped') or {})
@@ -1346,6 +1346,10 @@ class Engine:
                 'time_value': self.time_value, 'time_value_source': self.time_value_source, 'anomalies': checks,
                 'undervalued': self.undervaluation_watch()}
 
+    def character(self) -> str:
+        """The character the app plans for: the one picked in the header (setting 'character'), else the last played."""
+        return self.s.get('character') or (getattr(self.w, 'profile', None) or {}).get('active') or ''
+
     def sold_by_vendor(self, iid: int) -> bool:
         """A vendor you can use any day sells it (a Darkmoon Faire or other event vendor doesn't count)."""
         vp = self.vendor_price(iid)
@@ -1447,7 +1451,7 @@ class Engine:
         the mailbox; it counts as mail unless Syndicator already recorded that mail.
         """
         syn = getattr(self.w, 'syndicator', None) or {}
-        key = plan.character_key(syn, (getattr(self.w, 'profile', None) or {}).get('active') or '')
+        key = plan.character_key(syn, self.character())
         if not key:
             return {'found': False, 'items': [], 'ended_auctions': 0}
         c = syn[key]

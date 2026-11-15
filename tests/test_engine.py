@@ -473,3 +473,11 @@ class ProfitViewTests(unittest.TestCase):
         self.assertEqual(own['adds'], 810 - 10 - 3 * 95)               # over selling the meat raw
         self.assertEqual(own['hours'], 0.1)                            # 3 meat at 30 an hour (0.5 a kill x 60)
         self.assertEqual(own['gph'], 8000)                             # 800 per craft / 0.1 h
+
+
+class CharacterPickTests(unittest.TestCase):
+    def test_the_picked_character_wins_over_the_last_played(self):
+        w = make_world({})
+        w.profile = {'active': 'Testchar Alpha', 'characters': {}}
+        self.assertEqual(Engine(w, dict(SETTINGS)).character(), 'Testchar Alpha')
+        self.assertEqual(Engine(w, dict(SETTINGS, character='Alt Beta')).character(), 'Alt Beta')
