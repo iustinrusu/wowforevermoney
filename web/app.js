@@ -48,6 +48,7 @@ const FLAGS = {
   price_looks_off: ['warn', 'price looks off', "Only a few listings, far from the realm's recent average: valued at the recent average until more listings confirm the new price"],
   old_snapshot: ['warn', 'old Wowhead data', 'The Wowhead Forever counts for this zone are over 30 days old: re-read the zone page'],
   everloot: ['warn', 'Everloot rates', 'Some drop rates here come from Everloot (everloot.app, players\' uploads, CC BY-SA 4.0), where the Wowhead Forever pages read have none: only rates from 30+ loot windows, one item per drop. Kept out of Top picks until a Wowhead Forever page confirms them'],
+  stock_unknown: ['warn', 'stock unknown', 'Nothing says how many this vendor has: some vendors sell only a few at a time and restock slowly. Open the vendor once in game (the addon records its stock) and the app caps the amount if it is limited'],
   done_today: ['', 'done today', 'You ticked this as done for today: it leaves the plan and Top picks until tomorrow, and the next best takes its place. Untick it in the Done today list on Top picks'],
   craft_limited_demand: ['warn', 'limited demand', 'Valued by crafting it into something whose market only takes a limited number a day (or whose recipe has a cooldown). The crafted worth counts only for that many a day; every one beyond that counts at its sale price, in this row and everywhere else'],
   more_with_skill: ['', 'more with skill', "A recipe you can't make yet would make it worth more (see details); valued at what you can do now"],

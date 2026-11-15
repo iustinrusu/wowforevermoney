@@ -231,6 +231,8 @@ def routine(o, time_value: int) -> dict:
     else:
         title = (f'Buy {n} {_name(o)} from {_vendor_text(d.get("vendors"))} at {gold(o.cost_unit)} each; '
                  f'{_sell_text(o)}')
+        if 'stock_unknown' in o.flags:     # nothing says how many the vendor has: don't promise all of them
+            title += ' (if the vendor has that many: open it once and the addon records its stock)'
     if d.get('sell_channel') == 'vendor':
         why = (f'A vendor buys the result, so nothing waits on the AH: {gold(o.profit_unit)} profit each, '
                f'about {count_text(o.units_day)} a day')

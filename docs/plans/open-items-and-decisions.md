@@ -10,6 +10,10 @@ are done or decided (with the date). Don't drop an item without the user's say.
 Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session (the exact reading order:
 `docs/plans/material-coverage.md`, Progress section).
 
+- [ ] A0. **First in the next Wowhead session (the user, 2026-11-15: "Wowhead always has more accurate data"):** vendor
+      stock from Wowhead Forever NPC pages ("Sells" tab, Stock column: a number = limited, ∞ = unlimited) for the vendors
+      behind vendor flips flagged "stock unknown", most profitable first (Wizzle Brassbolts and Kor'gar for Copper
+      Modulator first). Store per npc and item like the addon's records; the engine already caps by stock.
 - [ ] A1. The rest of the top 100 coverage queue: 2 item pages left (Kingsblood 3356, Iridescent Pearl 5500; 20 read
       on 2026-11-15).
 - [ ] A2. The 4 skinning items left: Black Whelp Scale (7286), Worn Dragonscale (8165), Green Dragonscale (15412),

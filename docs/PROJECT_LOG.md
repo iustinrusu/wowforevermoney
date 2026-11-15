@@ -557,6 +557,12 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Vendor stock (user: the plan said "buy 73 Copper Modulator", a limited-stock item?): stock was taken
+  only from SkillUpForever's list (327 items; Copper Modulator isn't on it). Now also from ForeverMoneyBridge's vendor
+  records (stock > 0 = limited, capped; -1 = unlimited); with neither, flag `stock_unknown` and the plan step says "if
+  the vendor has that many: open it once and the addon records its stock". Next: Wowhead Forever NPC pages' Stock
+  column (checklist A0). Tests: 240.
+
 - **2026-11-15** Addon 1.5.10: the meter's blank top items were `GetItemInfo` being nil in WoW: Forever (moved to
   C_Item.GetItemInfo; GetSpellInfo to C_Spell.GetSpellName): local fallbacks added in Meter.lua (the main addon
   already had them). The guarded lines showed the error, as intended.

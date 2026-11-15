@@ -483,3 +483,25 @@ class CharacterPickTests(unittest.TestCase):
         w.profile = {'active': 'Testchar Alpha', 'characters': {}}
         self.assertEqual(Engine(w, dict(SETTINGS)).character(), 'Testchar Alpha')
         self.assertEqual(Engine(w, dict(SETTINGS, character='Alt Beta')).character(), 'Alt Beta')
+
+
+class VendorStockTests(unittest.TestCase):
+    def test_stock_seen_by_the_addon_caps_and_unknown_stock_is_flagged(self):
+        prices = {PHANTOM_SALT: {'numAuctions': 5, 'minBuyout': 9000, 'marketValue': 9000, 'regionSoldPerDay': 500,
+                                 'regionSalePercent': 0.8, 'regionSale': 9000},
+                  MAT_VENDOR: {'numAuctions': 5, 'minBuyout': 500, 'marketValue': 500, 'regionSoldPerDay': 500,
+                               'regionSalePercent': 0.8, 'regionSale': 500}}
+        w = make_world(prices)
+        w.questie.items[MAT_VENDOR] = {'vendors': [100]}
+        w.profile = {'vendors': {}}
+        flip = lambda: next(o for o in Engine(w, dict(SETTINGS, gold=1000)).vendor_flips() if o.item_id == MAT_VENDOR)
+        o = flip()
+        self.assertIn('stock_unknown', o.flags)                  # not on the list, never seen in game
+        w.profile = {'vendors': {100: {'items': {MAT_VENDOR: {'price': 10, 'qty': 1, 'stock': 4}}}}}
+        o = flip()
+        self.assertEqual(o.units_day, 4)                          # the addon saw 4 in stock: capped
+        self.assertIn('limited_stock', o.flags)
+        w.profile = {'vendors': {100: {'items': {MAT_VENDOR: {'price': 10, 'qty': 1, 'stock': -1}}}}}
+        o = flip()
+        self.assertNotIn('stock_unknown', o.flags)                # seen as unlimited
+        self.assertNotIn('limited_stock', o.flags)

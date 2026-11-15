@@ -159,8 +159,14 @@ class Engine:
             # Event-only vendors: holiday vendors, and the Darkmoon Faire (its NPCs spawn in both Elwynn Forest
             # and Mulgore, where the Faire alternates). Vendors with no known spawn may not be reachable at all.
             event = any(w in sub for w in EVENT_WORDS) or DARKMOON_ZONES <= spawn_zones
+            listed = (self.su.limited_stock.get(iid) or {}).get(npc_id)
+            seen = (((getattr(self.w, 'profile', None) or {}).get('vendors') or {}).get(npc_id) or {}).get('items') or {}
+            seen_stock = (seen.get(iid) or {}).get('stock')
+            if listed is None and seen_stock is not None and seen_stock > 0:
+                listed = int(seen_stock)       # limited, as the addon saw it (what was left then: a floor)
             out.append({'npc': npc_id, 'name': npc.get('name', f'NPC {npc_id}'), 'zone': self.gd.zones.get(zone_id, ''),
-                        'coords': spawn, 'friendly': friendly, 'stock': (self.su.limited_stock.get(iid) or {}).get(npc_id),
+                        'coords': spawn, 'friendly': friendly, 'stock': listed,
+                        'stock_known': listed is not None or seen_stock is not None,
                         'event': event, 'located': bool(spawn_zones or zone_id)})
         return out
 
@@ -472,6 +478,7 @@ class Engine:
             if profit <= max(25, cost * 0.1):
                 continue
             stock = [v['stock'] for v in vendors if v.get('stock')]
+            stock_unknown = not any(v.get('stock_known') for v in vendors)
             demand = sold_per_day(self.price(iid)) * self.share
             units_uncapped = min(demand, MAX_UNITS_PER_DAY, max(stock) if stock else MAX_UNITS_PER_DAY)
             units = min(demand, self.affordable(cost), MAX_UNITS_PER_DAY)
@@ -479,6 +486,8 @@ class Engine:
             if stock:
                 flags.append('limited_stock')
                 units = min(units, max(stock))
+            if stock_unknown and not stock:
+                flags.append('stock_unknown')      # no list or visit says how many the vendor has
             if self.affordable(cost) < 1:
                 flags.append('cant_afford')
             item = self.gd.items.get(iid)
