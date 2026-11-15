@@ -83,8 +83,10 @@ class MeterPricesTests(unittest.TestCase):
             profile.install_addon(src, addons, log=lambda m: None)
             self.assertTrue(profile.write_prices(addons, {2589: 95, 4306: 0, 2592: 140}, 1_800_000_000))
             text = (addons / 'ForeverMoneyBridge' / 'Prices.lua').read_text(encoding='utf-8')
-            self.assertIn('ForeverMoneyBridge_Prices = {made=1800000000, items={[2589]=95,[2592]=140}}', text)
-            self.assertFalse(profile.write_prices(addons, {2589: 95, 2592: 140}, 1_800_000_999))   # same values
+            self.assertIn('ForeverMoneyBridge_Prices = {made=1800000000, items={[2589]=95,[2592]=140}, containers={}}', text)
+            self.assertTrue(profile.write_prices(addons, {2589: 95, 2592: 140}, 1_800_000_000, {7973}))
+            self.assertIn('containers={[7973]=true}', (addons / 'ForeverMoneyBridge' / 'Prices.lua').read_text(encoding='utf-8'))
+            self.assertFalse(profile.write_prices(addons, {2589: 95, 2592: 140}, 1_800_000_999, {7973}))   # same values
             Path(src, 'Meter.lua').write_text('-- new file', encoding='utf-8')
             profile.install_addon(src, addons, log=lambda m: None)                               # an update
             self.assertIn('[2589]=95', (addons / 'ForeverMoneyBridge' / 'Prices.lua').read_text(encoding='utf-8'))

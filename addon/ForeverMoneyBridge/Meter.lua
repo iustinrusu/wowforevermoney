@@ -75,13 +75,17 @@ local function refresh()
   end
   local made = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0
   local age = made > 0 and string.format("app prices from %.1f h ago", (time() - made) / 3600) or "no app prices yet (start the app, then /reload)"
+  local boxes, inside = 0, 0
+  for id, n in pairs(session.unopened) do boxes = boxes + n; inside = inside + price(id) * n end
+  lines[10]:SetText(boxes > 0 and string.format("|cffffd100Not opened yet: %d container%s (about %s inside): open them to count them|r",
+    boxes, boxes == 1 and "" or "s", money(inside)) or "")
   lines[9]:SetText(age .. ((sources.tsm + sources.vendor + sources.none > 0) and string.format("; fallbacks: %d TSM, %d vendor, %d no price", sources.tsm, sources.vendor, sources.none) or ""))
 end
 
 local function makeWindow()
   if win then return win end
   win = CreateFrame("Frame", "ForeverMoneyBridgeMeter", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-  win:SetSize(330, 190)
+  win:SetSize(330, 205)
   local pos = db().pos
   if pos then win:SetPoint(pos[1], UIParent, pos[1], pos[2], pos[3]) else win:SetPoint("CENTER", UIParent, "CENTER", 300, 100) end
   if win.SetBackdrop then
@@ -100,7 +104,7 @@ local function makeWindow()
   end)
   win.title = win:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   win.title:SetPoint("TOPLEFT", 10, -8)
-  for i = 1, 9 do
+  for i = 1, 10 do
     local fs = win:CreateFontString(nil, "OVERLAY", i == 9 and "GameFontDisableSmall" or "GameFontHighlightSmall")
     fs:SetPoint("TOPLEFT", 10, -12 - i * 15)
     fs:SetWidth(310)
@@ -126,7 +130,7 @@ local function makeWindow()
 end
 
 local function start()
-  session = { start = GetTime(), paused = false, pausedFor = 0, money = 0, items = {}, loots = {}, zone = GetRealZoneText and GetRealZoneText() or "?" }
+  session = { start = GetTime(), paused = false, pausedFor = 0, money = 0, items = {}, unopened = {}, loots = {}, zone = GetRealZoneText and GetRealZoneText() or "?" }
   lastMoney = GetMoney()
   makeWindow():Show()
   win.pause:SetText("Pause")
@@ -136,6 +140,11 @@ end
 
 local function stop()
   if not session then return end
+  local boxes = 0
+  for _, n in pairs(session.unopened) do boxes = boxes + n end
+  if boxes > 0 then
+    print(string.format("|cffe8c060Farm meter|r: %d container%s not opened yet, so not counted. Open them and they count in your next session (or /fmb start again first).", boxes, boxes == 1 and "" or "s"))
+  end
   local secs = elapsed()
   local value = totals()
   local total = value + session.money
@@ -187,13 +196,11 @@ local function noteWindow()
     windowKind = "container"
     session.loots.containers = (session.loots.containers or 0) + 1
     local id = lastUsed.id and GetTime() - lastUsed.t <= 3 and lastUsed.id
-    if id and (session.items[id] or 0) > 0 then
-      session.items[id] = session.items[id] - 1
-      if session.items[id] == 0 then session.items[id] = nil end
-      say("container opened: counted its contents instead of the container itself")
-    else
-      say("container opened: its contents count")
+    if id and (session.unopened[id] or 0) > 0 then
+      session.unopened[id] = session.unopened[id] - 1
+      if session.unopened[id] == 0 then session.unopened[id] = nil end
     end
+    say("container opened: its contents count")
     return
   end
   windowKind = (IsFishingLoot and IsFishingLoot()) and "fishing" or (kind == "GameObject" and "nodes" or "mobs")
@@ -228,6 +235,12 @@ ev:SetScript("OnEvent", function(_, event, msg)
     local id = link and tonumber(link:match("item:(%d+)"))
     if not id then return end                          -- someone else's loot, or a quest or crafted item
     n = tonumber(n) or 1
+    local boxes = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.containers
+    if boxes and boxes[id] then                        -- a container: worth 0 until you open it
+      session.unopened[id] = (session.unopened[id] or 0) + n
+      say("container looted (counts when opened):", link, "x" .. n)
+      return
+    end
     session.items[id] = (session.items[id] or 0) + n
     say("item:", link, "x" .. n, money(price(id) * n))
   elseif event == "CHAT_MSG_MONEY" then

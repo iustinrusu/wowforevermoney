@@ -139,22 +139,23 @@ PRICES_FILE = 'Prices.lua'
 APP_WRITTEN = (CHECKS_FILE, PRICES_FILE)     # files the app writes into the installed addon: never overwritten
 
 
-def prices_lua(values: dict[int, int], made: int) -> str:
+def prices_lua(values: dict[int, int], made: int, containers=()) -> str:
     """The farm meter's price table: what the app values each item at (copper per unit, as on My bags)."""
     body = ','.join(f'[{int(i)}]={int(v)}' for i, v in sorted(values.items()) if v > 0)
+    boxes = ','.join(f'[{int(i)}]=true' for i in sorted(containers))     # count as 0 until opened
     return ('-- Written by the WoW Forever Money app: what it values each item at (copper per unit, the same values as\n'
             "-- the app's My bags). The farm meter (/fmb start) uses them. Refreshed when the app recalculates;\n"
             '-- WoW reads it on login or /reload.\n'
-            f'ForeverMoneyBridge_Prices = {{made={int(made)}, items={{{body}}}}}\n')
+            f'ForeverMoneyBridge_Prices = {{made={int(made)}, items={{{body}}}, containers={{{boxes}}}}}\n')
 
 
-def write_prices(addons_dir: Path, values: dict[int, int], made: int) -> bool:
+def write_prices(addons_dir: Path, values: dict[int, int], made: int, containers=()) -> bool:
     """Write Prices.lua into the installed addon when the values changed. True if written."""
     dest = addons_dir / ADDON_NAME / PRICES_FILE
     if not dest.parent.exists():
         return False
     old = dest.read_text(encoding='utf-8') if dest.exists() else ''
-    new = prices_lua(values, made)
+    new = prices_lua(values, made, containers)
     if old.split('items=', 1)[-1] == new.split('items=', 1)[-1]:
         return False                         # same values: keep the file (and its date)
     dest.write_text(new, encoding='utf-8')

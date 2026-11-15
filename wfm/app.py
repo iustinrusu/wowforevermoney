@@ -163,7 +163,8 @@ class App:
             valuer = Engine(self.world, settings).valuer(result.get('best_use') or {})
             ids = set(self.world.prices) | {i for i, it in gd.items.items() if it.sell_price}
             values = {i: valuer.value(i).value for i in ids if i in gd.items}
-            if profile_mod.write_prices(self.world.paths.addons, values, int(time.time())):
+            containers = {i for i, it in gd.items.items() if it.openable}       # count as 0 until opened
+            if profile_mod.write_prices(self.world.paths.addons, values, int(time.time()), containers):
                 log(f'Farm meter prices updated ({sum(1 for v in values.values() if v > 0):,} items)')
         except Exception as e:      # never let the meter's file break a recompute
             log(f'Farm meter prices not written: {e}')
