@@ -557,6 +557,11 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Farm meter 1.5.5 (user: clearer window, resizable): gold an hour in large text with the total under it,
+  labelled figures (time, items, gold looted), the loot kinds, top 5 items with icons and quality colours, the
+  container reminder and price source at the bottom; resize grip (size and position remembered, 260x230 to 600x600).
+  Untested in game (Claude can't run WoW): ask the user for a screenshot.
+
 - **2026-11-15** Farm meter 1.5.4 (user: "skinning counts as kills"): each loot window is classified by its source and
   the spell just cast (by spell id, every rank, plus this client's names): kills, skins, picked (Pick Pocket), fish,
   nodes (Herb Gathering/Mining), chests (objects without a gathering spell), opened (containers from bags),

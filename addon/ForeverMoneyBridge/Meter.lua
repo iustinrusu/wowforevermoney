@@ -52,50 +52,73 @@ local function totals()
   return value, sources, rows
 end
 
+local LABEL = { mobs = "Kills", skins = "Skins", pickpocket = "Picked", fishing = "Fish", nodes = "Nodes",
+                chests = "Chests", containers = "Opened", disenchant = "Disenchanted" }
+local ORDER = { "mobs", "skins", "pickpocket", "fishing", "nodes", "chests", "containers", "disenchant" }
+local ROWS = 5            -- top items shown
+
 local function refresh()
   if not (win and session) then return end
   local secs = elapsed()
   local value, sources, rows = totals()
   local total = value + session.money
-  local perHour = secs >= 60 and total / secs * 3600 or nil
-  win.title:SetText(session.paused and "Farm meter (paused)" or "Farm meter")
-  lines[1]:SetText(string.format("Time: %d:%02d", secs / 60, secs % 60))
-  lines[2]:SetText("Items: " .. money(value) .. "   Gold looted: " .. money(session.money))
-  lines[3]:SetText("Total: " .. money(total) .. "   Per hour: " .. (perHour and money(perHour) or "after 1 min"))
-  local l = session.loots
-  local parts = {}
+  win.title:SetText(session.paused and "Farm meter |cff999999(paused)|r" or "Farm meter")
+  win.rate:SetText(secs >= 60 and (money(total / secs * 3600) .. " |cffaaaaaaan hour|r") or "|cffaaaaaagold an hour after 1 min|r")
+  win.total:SetText("Total " .. money(total))
+  win.kv[1]:SetText(string.format("%d:%02d", secs / 60, secs % 60))
+  win.kv[2]:SetText(money(value))
+  win.kv[3]:SetText(money(session.money))
+  local l, parts = session.loots, {}
   for _, k in ipairs(ORDER) do if (l[k] or 0) > 0 then parts[#parts + 1] = LABEL[k] .. " " .. l[k] end end
-  lines[4]:SetText(#parts > 0 and table.concat(parts, "  ·  ") or "Nothing looted yet")
-  for i = 1, 4 do
-    local r = rows[i]
+  win.loots:SetText(#parts > 0 and table.concat(parts, "  ·  ") or "|cff999999Nothing looted yet|r")
+  for i = 1, ROWS do
+    local r, row = rows[i], win.items[i]
     if r then
-      local name = GetItemInfo(r.id) or ("item " .. r.id)
-      lines[4 + i]:SetText(string.format("  %dx %s  %s", r.n, name, money(r.total)))
+      local name, _, quality, _, _, _, _, _, _, icon = GetItemInfo(r.id)
+      local color = quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
+      row.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+      row.name:SetText(string.format("%s%s|r |cffaaaaaax%d|r", color and color.hex or "|cffffffff", name or ("item " .. r.id), r.n))
+      row.value:SetText(money(r.total))
+      row:Show()
     else
-      lines[4 + i]:SetText("")
+      row:Hide()
     end
   end
-  local made = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0
-  local age = made > 0 and string.format("app prices from %.1f h ago", (time() - made) / 3600) or "no app prices yet (start the app, then /reload)"
   local boxes, inside = 0, 0
   for id, n in pairs(session.unopened) do boxes = boxes + n; inside = inside + price(id) * n end
-  lines[10]:SetText(boxes > 0 and string.format("|cffffd100Not opened yet: %d container%s (about %s inside): open them to count them|r",
+  win.remind:SetText(boxes > 0 and string.format("|cffffd100%d container%s not opened yet (about %s inside): open them to count them|r",
     boxes, boxes == 1 and "" or "s", money(inside)) or "")
-  lines[9]:SetText(age .. ((sources.tsm + sources.vendor + sources.none > 0) and string.format("; fallbacks: %d TSM, %d vendor, %d no price", sources.tsm, sources.vendor, sources.none) or ""))
+  local made = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0
+  local note = made > 0 and string.format("Prices: the app's, from %.1f h ago", (time() - made) / 3600)
+    or "No app prices yet: start the app, then /reload"
+  local fb = sources.tsm + sources.vendor + sources.none
+  if fb > 0 then note = note .. string.format(" · %d by TSM, %d vendor, %d unpriced", sources.tsm, sources.vendor, sources.none) end
+  win.note:SetText(note)
+end
+
+local function text(parent, font, justify)
+  local fs = parent:CreateFontString(nil, "OVERLAY", font)
+  fs:SetJustifyH(justify or "LEFT")
+  fs:SetWordWrap(true)
+  return fs
 end
 
 local function makeWindow()
   if win then return win end
   win = CreateFrame("Frame", "ForeverMoneyBridgeMeter", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-  win:SetSize(330, 205)
-  local pos = db().pos
-  if pos then win:SetPoint(pos[1], UIParent, pos[1], pos[2], pos[3]) else win:SetPoint("CENTER", UIParent, "CENTER", 300, 100) end
+  local m = db()
+  win:SetSize(m.w or 320, m.h or 300)
+  if m.pos then win:SetPoint(m.pos[1], UIParent, m.pos[1], m.pos[2], m.pos[3]) else win:SetPoint("CENTER", UIParent, "CENTER", 300, 100) end
   if win.SetBackdrop then
     win:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                       tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-    win:SetBackdropColor(0.05, 0.06, 0.08, 0.9)
+    win:SetBackdropColor(0.04, 0.05, 0.07, 0.92)
+    win:SetBackdropBorderColor(0.91, 0.75, 0.38, 0.8)
   end
   win:SetMovable(true)
+  win:SetResizable(true)
+  if win.SetResizeBounds then win:SetResizeBounds(260, 230, 600, 600) elseif win.SetMinResize then win:SetMinResize(260, 230) end
+  win:SetClampedToScreen(true)
   win:EnableMouse(true)
   win:RegisterForDrag("LeftButton")
   win:SetScript("OnDragStart", win.StartMoving)
@@ -104,25 +127,92 @@ local function makeWindow()
     local p, _, _, x, y = self:GetPoint()
     db().pos = { p, x, y }
   end)
-  win.title = win:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  win.title:SetPoint("TOPLEFT", 10, -8)
-  for i = 1, 10 do
-    local fs = win:CreateFontString(nil, "OVERLAY", i == 9 and "GameFontDisableSmall" or "GameFontHighlightSmall")
-    fs:SetPoint("TOPLEFT", 10, -12 - i * 15)
-    fs:SetWidth(310)
-    fs:SetJustifyH("LEFT")
-    lines[i] = fs
-  end
+
+  win.title = text(win, "GameFontNormal")
+  win.title:SetPoint("TOPLEFT", 12, -10)
   local function button(label, x, onClick)
     local b = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
-    b:SetSize(64, 18)
-    b:SetPoint("TOPRIGHT", x, -6)
+    b:SetSize(62, 20)
+    b:SetPoint("TOPRIGHT", x, -7)
     b:SetText(label)
     b:SetScript("OnClick", onClick)
     return b
   end
-  win.pause = button("Pause", -76, function() SlashCmdList.FOREVERMONEYBRIDGE(session and session.paused and "resume" or "pause") end)
-  button("Stop", -8, function() SlashCmdList.FOREVERMONEYBRIDGE("stop") end)
+  win.pause = button("Pause", -74, function() SlashCmdList.FOREVERMONEYBRIDGE(session and session.paused and "resume" or "pause") end)
+  button("Stop", -10, function() SlashCmdList.FOREVERMONEYBRIDGE("stop") end)
+
+  -- headline: gold an hour, big; the total under it
+  win.rate = text(win, "GameFontNormalHuge")
+  win.rate:SetPoint("TOPLEFT", 12, -36)
+  win.rate:SetPoint("RIGHT", -12, 0)
+  win.total = text(win, "GameFontHighlight")
+  win.total:SetPoint("TOPLEFT", win.rate, "BOTTOMLEFT", 0, -4)
+
+  -- labelled figures
+  win.kv = {}
+  local labels = { "Time", "Items", "Gold looted" }
+  local prev = win.total
+  for i, label in ipairs(labels) do
+    local k = text(win, "GameFontDisableSmall")
+    k:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, i == 1 and -10 or -4)
+    k:SetText(label)
+    local v = text(win, "GameFontHighlightSmall", "RIGHT")
+    v:SetPoint("TOPRIGHT", win, "TOPRIGHT", -12, 0)
+    v:SetPoint("TOP", k, "TOP", 0, 0)
+    win.kv[i] = v
+    prev = k
+  end
+  win.loots = text(win, "GameFontHighlightSmall")
+  win.loots:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -8)
+  win.loots:SetPoint("RIGHT", -12, 0)
+
+  -- top items with icons
+  local head = text(win, "GameFontDisableSmall")
+  head:SetPoint("TOPLEFT", win.loots, "BOTTOMLEFT", 0, -8)
+  head:SetText("Top items")
+  win.items = {}
+  prev = head
+  for i = 1, ROWS do
+    local row = CreateFrame("Frame", nil, win)
+    row:SetHeight(16)
+    row:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -3)
+    row:SetPoint("RIGHT", win, "RIGHT", -12, 0)
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(14, 14)
+    row.icon:SetPoint("LEFT")
+    row.value = text(row, "GameFontHighlightSmall", "RIGHT")
+    row.value:SetPoint("RIGHT")
+    row.name = text(row, "GameFontHighlightSmall")
+    row.name:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
+    row.name:SetPoint("RIGHT", row.value, "LEFT", -6, 0)
+    row.name:SetWordWrap(false)
+    win.items[i] = row
+    prev = row
+  end
+
+  -- bottom: the container reminder and where the prices came from
+  win.note = text(win, "GameFontDisableSmall")
+  win.note:SetPoint("BOTTOMLEFT", 12, 10)
+  win.note:SetPoint("RIGHT", -24, 0)
+  win.remind = text(win, "GameFontHighlightSmall")
+  win.remind:SetPoint("BOTTOMLEFT", win.note, "TOPLEFT", 0, 4)
+  win.remind:SetPoint("RIGHT", -12, 0)
+
+  -- resize grip (bottom right); the size is remembered
+  local grip = CreateFrame("Button", nil, win)
+  grip:SetSize(14, 14)
+  grip:SetPoint("BOTTOMRIGHT", -4, 4)
+  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+  grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+  grip:SetScript("OnMouseDown", function() win:StartSizing("BOTTOMRIGHT") end)
+  grip:SetScript("OnMouseUp", function()
+    win:StopMovingOrSizing()
+    db().w, db().h = win:GetWidth(), win:GetHeight()
+    local p, _, _, x, y = win:GetPoint()
+    db().pos = { p, x, y }
+  end)
+
   local acc = 0
   win:SetScript("OnUpdate", function(_, dt)
     acc = acc + dt
@@ -206,9 +296,6 @@ for kind, ids in pairs(CAST_SPELLS) do
 end
 local lastCast = { kind = nil, t = 0 }
 local CAST_WINDOW = 10
-local LABEL = { mobs = "Kills", skins = "Skins", pickpocket = "Picked", fishing = "Fish", nodes = "Nodes",
-                chests = "Chests", containers = "Opened", disenchant = "Disenchanted" }
-local ORDER = { "mobs", "skins", "pickpocket", "fishing", "nodes", "chests", "containers", "disenchant" }
 
 local function noteWindow()
   if windowCounted then return end
