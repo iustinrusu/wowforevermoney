@@ -91,5 +91,23 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(audit.everloot_check({}, PAGES, str)['status'], 'info')
 
 
+class FillTests(unittest.TestCase):
+    def test_gaps_only_from_big_samples_and_wowhead_wins(self):
+        mobs = {THUG: {'id': THUG, 'name': 'Thug', 'looted': 1000, 'items': {LINEN: 0.3}, 'counts': {LINEN: (300, 1000)},
+                       'read': '2026-11-14', 'complete': False, 'small_sample': False}}
+        ev = {'rates': {('npc', THUG, LINEN): {'looted': 100, 'count': 90, 'reporters': 3, 'name': ''},   # Wowhead has it
+                        ('npc', THUG, WOOL): {'looted': 40, 'count': 10, 'reporters': 3, 'name': ''},     # a gap: filled
+                        ('npc', BANDIT, WOOL): {'looted': 29, 'count': 9, 'reporters': 3, 'name': ''},    # too few loots
+                        ('npc', 999, WOOL): {'looted': 60, 'count': 6, 'reporters': 3, 'name': 'Ghoul'},  # Everloot only
+                        ('object', VEIN, COPPER): {'looted': 99, 'count': 99, 'reporters': 3, 'name': ''}}}
+        touched = everloot.fill_mob_gaps(mobs, ev)
+        self.assertEqual(touched, {THUG, 999})
+        self.assertEqual(mobs[THUG]['items'], {LINEN: 0.3, WOOL: 0.25})
+        self.assertEqual(mobs[THUG]['everloot_items'], {WOOL})
+        self.assertEqual(mobs[THUG]['looted'], 1000)
+        self.assertNotIn(BANDIT, mobs)
+        self.assertEqual((mobs[999]['items'], mobs[999]['looted'], mobs[999]['small_sample']), ({WOOL: 0.1}, 60, False))
+
+
 if __name__ == '__main__':
     unittest.main()

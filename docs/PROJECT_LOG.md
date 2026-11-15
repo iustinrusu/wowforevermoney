@@ -24,6 +24,16 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-15 History rewritten (to-do 2a done).** At the user's word ("do the script yourself") Claude ran
+  `data/rewrite_history.sh`: 76 commits rewritten, force-pushed with a lease; origin/main has no mention of the name.
+  New first commit 73e3f39 (was 0b17b50). Backup: `data/before-rewrite.bundle`. GitHub may still serve old commits
+  by hash for a while; only the user can ask GitHub Support to purge cached views.
+- **2026-11-15 Everloot fills mob-drop gaps (checklist C8, the user: "go with your recommendation").**
+  `everloot.fill_mob_gaps`: where the Wowhead Forever pages read have no rate for a mob and item, an Everloot rate
+  from 30+ loot windows is added (one item per drop: no stack sizes; Wowhead always wins); mobs only Everloot knows
+  get rows too. Rows using any get flag `everloot` (labelled, never Top picks or the time value), and the drops
+  drawer marks each Everloot rate. First run: 49 of 812 mob rows use Everloot rates, 26 come from Everloot alone.
+
 - **2026-11-15 Downloads approved (user: "I approve downloads too").** No need to ask before a download; say what was
   downloaded afterwards (name, source, size). Addons stay the user's (CurseForge). CLAUDE.md updated. First use:
   UiMap.csv (3 KB) and UiMapAssignment.csv (7 KB) from wago.tools, build 1.60.1.70938 (now in `gamedata.TABLES`).
@@ -533,10 +543,12 @@ moved into `forever-data-next.md`.
   `web/app.js`; tests/test_web.py catches broken flag labels and names declared twice.
 - Is Javnir Nashak (Green Firework vendor, Durotar) permanent or event-only? Questie gives no hint; Claude reads
   his Wowhead Forever page in a reading session (checklist A7).
-- The user's character name was in tests until 2026-11-14 and is still in the first commit (0b17b50); removing it
-  from history needs a force push (the user's decision).
+- Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-15** History rewritten without the character name; Everloot fills mob-drop gaps (flag `everloot`).
+  Tests: 222.
 
 - **2026-11-15** GatherLite node positions (`wfm/gatherlite.py`, Data health entry); UiMap tables downloaded. Tests: 221.
 

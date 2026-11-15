@@ -134,6 +134,36 @@ def compare(ev: dict, pages: dict) -> dict:
             'as_of': ev.get('as_of', ''), 'files': ev.get('files') or []}
 
 
+FILL_MIN = 30       # an Everloot rate fills a gap only from this many loot windows (smaller samples lean high)
+
+
+def fill_mob_gaps(mobs: dict, ev: dict, min_loots: int = FILL_MIN) -> set[int]:
+    """Add Everloot's mob drop rates where the Wowhead Forever pages read have none for that mob and item (the user's
+    decision of 2026-11-15, checklist C8). Only rates from min_loots+ loot windows; one item per drop (Everloot gives no
+    stack sizes). Each mob keeps the items it got this way in 'everloot_items'. Returns the mobs touched.
+
+    A mob only Everloot knows gets an entry of its own (levels and zone come from QuestieDB in the engine)."""
+    touched = set()
+    for (kind, npc, item), e in (ev.get('rates') or {}).items():
+        if kind != 'npc' or e['looted'] < min_loots or not e['count']:
+            continue
+        m = mobs.get(npc)
+        if m is None:
+            m = mobs[npc] = {'id': npc, 'name': e.get('name') or '', 'min_level': None, 'max_level': None, 'zones': [],
+                             'classification': None, 'looted': 0, 'items': {}, 'counts': {}, 'read': '',
+                             'complete': False, 'small_sample': True}
+        if item in m['items']:
+            continue                      # Wowhead Forever has it: Wowhead wins
+        m['items'][item] = e['count'] / e['looted']
+        m['counts'][item] = (e['count'], e['looted'])
+        m.setdefault('everloot_items', set()).add(item)
+        m['looted'] = max(m['looted'], e['looted']) if not m.get('read') else m['looted']
+        if not m.get('read'):
+            m['small_sample'] = m['looted'] < 50
+        touched.add(npc)
+    return touched
+
+
 def describe(p: dict, name) -> str:
     """One pair in a sentence. name(kind, id) -> a mob's, object's or item's name."""
     src = name(p['kind'], p['source'])

@@ -12,9 +12,8 @@ tight: finish the current piece, commit, update this list, and set a reminder th
 done that night: 2b, 2c, 6, 7 items 1, 2 and 10, and 20 Wowhead pages (the session's limit). Next, in order:
 (a) item 2: 20 more Wowhead pages (Kingsblood 3356, Iridescent Pearl 5500, the 4 skinning items, then the pools
 list), pace as in CLAUDE.md; (b) item 7: strategy item 3 (vertical integration), then 4-9; (c) item 8, Dungeons;
-(d) item 4: mobs' own pages (part of the Wowhead budget). Waiting on the user: 2a (run `sh data/rewrite_history.sh`,
-the session's safety check blocked the force push) and checklist C8 (Everloot to fill gaps?). C9 and item 5 were done
-the same night after the user approved downloads.
+(d) item 4: mobs' own pages (part of the Wowhead budget). 2a, C8 (Everloot fills mob-drop gaps), C9 and item 5 were done the
+same night; nothing waits on the user.
 
 0. [x] **Quick check, needs the user in game** (done 2026-11-14: 1.4.1's gold = Syndicator's on both characters) (/reload once): addon 1.4.1 saves gold (compare with Syndicator in
        the app's purse), and see the project log's open items for the other in-game checks. Checked 2026-11-14:
@@ -26,8 +25,7 @@ the same night after the user approved downloads.
        mob drops, node yields; the user's top priority for data accuracy, 2026-11-14): `docs/plans/material-coverage.md`.
        It replaces the old Wowhead-reads item (same slow pace). Work in the order at the top of that file: other
        Forever data sources, the item-page data format, 5 top pages a session (target: top 50), pools, mob farming.
-2a. [ ] (2026-11-15: the rewrite works, but the session's safety check blocked the force push; the user runs
-       `sh data/rewrite_history.sh` in Git Bash, ready and tested, not committed because it holds the name)
+2a. [x] (done 2026-11-15: Claude ran data/rewrite_history.sh at the user's word; force-pushed)
        **Remove the user's character names from GitHub's history** (user's yes, 2026-11-15; force push approved):
        `docs/plans/decided-2026-11-15.md`, section 2a
 2b. [x] (done 2026-11-15: valuation.capped_total, every quantity and hourly row; see the project log)

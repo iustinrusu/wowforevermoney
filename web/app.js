@@ -47,6 +47,7 @@ const FLAGS = {
   listed_far_above_sales: ['warn', 'listings far above sales', 'Every listing on your realm is over 3x what it actually sells for across the region (a wall of wishful prices): valued at the region average sale price instead of the lowest listing'],
   price_looks_off: ['warn', 'price looks off', "Only a few listings, far from the realm's recent average: valued at the recent average until more listings confirm the new price"],
   old_snapshot: ['warn', 'old Wowhead data', 'The Wowhead Forever counts for this zone are over 30 days old: re-read the zone page'],
+  everloot: ['warn', 'Everloot rates', 'Some drop rates here come from Everloot (everloot.app, players\' uploads, CC BY-SA 4.0), where the Wowhead Forever pages read have none: only rates from 30+ loot windows, one item per drop. Kept out of Top picks until a Wowhead Forever page confirms them'],
   craft_limited_demand: ['warn', 'limited demand', 'Valued by crafting it into something whose market only takes a limited number a day (or whose recipe has a cooldown). The crafted worth counts only for that many a day; every one beyond that counts at its sale price, in this row and everywhere else'],
   more_with_skill: ['', 'more with skill', "A recipe you can't make yet would make it worth more (see details); valued at what you can do now"],
   event_vendor: ['bad', 'event vendor', 'Every vendor selling it is event-only (Darkmoon Faire, holidays) or has no known location: check it is there now. Kept out of Top picks'],
@@ -805,7 +806,7 @@ function oppDetail(o) {
       <div>Drops worth</div><div>${money(d.drop_value)} a kill</div>
       ${d.skin_value ? `<div>Skin worth</div><div>${money(d.skin_value)} a skin ${d.can_skin ? '' : `<span class="needs">not counted: needs Skinning ${d.skin_needed}</span>`}</div>` : ''}</div>
       <h3>Drops counted <small>chance per kill × average stack, at current prices</small></h3><table><thead><tr><th>Item</th><th class="num">Per kill</th><th class="num">Worth each</th><th class="num">Seen</th></tr></thead><tbody>
-      ${d.drops.map((x) => `<tr class="row" data-item="${x.item_id}"><td>${itemLink(x.item_id, x.name)}</td><td class="num">${num(x.per_kill, 3)}</td><td class="num">${money(x.value)}</td><td class="num">${num(x.count, 0)} of ${num(x.looted, 0)}</td></tr>`).join('')}</tbody></table>
+      ${d.drops.map((x) => `<tr class="row" data-item="${x.item_id}"><td>${itemLink(x.item_id, x.name)}${x.source === 'Everloot' ? ' <span class="flag warn" title="Rate from Everloot (players' uploads, CC BY-SA 4.0): Wowhead Forever has none for this mob yet">Everloot</span>' : ''}</td><td class="num">${num(x.per_kill, 3)}</td><td class="num">${money(x.value)}</td><td class="num">${num(x.count, 0)} of ${num(x.looted, 0)}</td></tr>`).join('')}</tbody></table>
       <p class="note">Only items whose Wowhead Forever pages are read are counted (materials first); coins, gray items and gear are not, so a kill is worth more than this.</p>`;
   }
   if (o.kind === 'realm_dip') {

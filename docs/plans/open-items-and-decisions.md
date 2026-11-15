@@ -34,7 +34,7 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 - [ ] B5. Pool catches: the addon records which pool a catch came from by itself (no fishing logged yet on
       2026-11-15). After the user next fishes, check the saved file has `pools` entries (moved from D3).
 - [ ] B6. The user's decisions of 2026-11-15, briefed in `docs/plans/decided-2026-11-15.md`: remove the character
-      names from GitHub's history (C5: rewrite ready, the push is the user's: `sh data/rewrite_history.sh`), crafted
+      names from GitHub's history (C5: done 2026-11-15, history rewritten and force-pushed), crafted
       worth capped by what can be made a day (C7: done 2026-11-15), Everloot cross-check (C2: done 2026-11-15).
 
 ## C. Decisions for the user
@@ -54,7 +54,7 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       first that day: "if we can get by with just Wowhead data, let's not add more addons". Was: Forever loot addons and GatherLite node locations (to-do item 5): install any through CurseForge?
       GatherLite's node locations also need map tables downloaded (Claude asks with file name and size first).
 - [x] C5. **Decided 2026-11-15: yes, remove it** ("let's make it more secure"; force push approved): to-do 2a.
-      Was: the user's character name in the first commit (0b17b50): remove it from GitHub's history (needs a force
+      Was: the user's character name in the first commit (0b17b50, now 73e3f39 after the rewrite): remove it from GitHub's history (needs a force
       push, which rewrites history) or leave it?
 - [x] C7. **Decided 2026-11-15: yes, Claude's recommendation** (to-do 2b). "Worth if crafted": count it only for as many as the product's market (your share) and cooldown take a day,
       the rest at the sale price? (asked 2026-11-14, not answered yet; the price checks list the 8 ingredients
@@ -63,7 +63,7 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       and 40 ore nodes an hour, 240 fishing casts an hour, 20% of a realm's daily sales. The user can still change
       them in Settings. Was: set to match the user's own play?
 
-- [ ] C8. **New 2026-11-15: may Everloot fill gaps where Wowhead Forever has no data?** The cross-check (Data
+- [x] C8. **Decided 2026-11-15: Claude's recommendation** (built: flag `everloot`). Was: may Everloot fill gaps where Wowhead Forever has no data? The cross-check (Data
       health) found the 10 pairs with 30+ loots on both sides all agree within chance (median ratio 1.04), but Everloot's
       small samples lean high (19 of 24 higher, median 1.63x: a rate only exists once the item dropped). Claude's
       recommendation: yes, only from rates with 30+ loot windows, labelled "Everloot", kept out of Top picks until a

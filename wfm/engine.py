@@ -11,6 +11,7 @@ import time
 from dataclasses import asdict, dataclass, field
 
 from . import anomalies, fishing, gamedata, nodes, plan, pricing, skinning, valuation, wowhead_items
+from . import everloot as everloot_mod
 from . import levelling as levelling_mod
 from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
@@ -741,6 +742,8 @@ class Engine:
         """Mob farming, one row per mob: Wowhead Forever "Dropped by" counts from item pages read by hand (only those
         items: a floor until the mob's own page is read), plus a skin if you can skin it. Kills per hour: Settings."""
         mobs = wowhead_items.mob_drops(getattr(self.w, 'forever_pages', None) or {})
+        # Everloot fills gaps where Wowhead Forever has no rate (30+ loot windows only, labelled, never Top picks)
+        everloot_mod.fill_mob_gaps(mobs, getattr(self.w, 'everloot', None) or {})
         if not mobs:
             return []
         q, gd = self.q, self.gd
@@ -762,8 +765,11 @@ class Engine:
                     per_kill[i] = per_kill.get(i, 0) + share
             skin_items = (sk or {}).get('items') or {}
             value_of = lambda i: self.loot_worth(i, best_use, per_kill.get(i) or skin_items.get(i, 0), per_hour)
+            from_everloot = m.get('everloot_items') or set()
             drops = sorted(({'item_id': i, 'name': self.name(i), 'per_kill': round(c, 4), 'value': value_of(i),
-                             'count': m['counts'][i][0], 'looted': m['counts'][i][1]} for i, c in m['items'].items()),
+                             'count': m['counts'][i][0], 'looted': m['counts'][i][1],
+                             'source': 'Everloot' if i in from_everloot else 'Wowhead Forever'}
+                            for i, c in m['items'].items()),
                            key=lambda d: -d['per_kill'] * d['value'])
             drop_value = sum(d['per_kill'] * d['value'] for d in drops)
             skin_value = sum(share * value_of(i) for i, share in skin_items.items())
@@ -776,7 +782,9 @@ class Engine:
             cls = m['classification'] if m['classification'] is not None else qn.get('rank')
             name = qn.get('name') or m['name'] or f'mob {npc}'
             can_kill = bool(hi) and hi <= level + skinning.LEVEL_REACH
-            flags = ['wowhead_forever', 'kills_from_settings']
+            flags = (['wowhead_forever'] if len(from_everloot) < len(m['items']) else []) + ['kills_from_settings']
+            if from_everloot:
+                flags.append('everloot')
             if not m['complete']:
                 flags.append('drops_partial')
             if m['small_sample']:
@@ -1428,7 +1436,7 @@ class Engine:
         return bool(o.gph and o.doable and not ({'classic_unconfirmed', 'classic_yields'} & set(o.flags))
                     and (o.kind != 'fishing_spot' or (o.detail.get('confirmed_by') and 'small_sample' not in o.flags))
                     and (o.kind != 'skin_spot' or 'small_sample' not in o.flags)
-                    and (o.kind != 'mob_spot' or not ({'small_sample', 'elite', 'dungeon'} & set(o.flags))))
+                    and (o.kind != 'mob_spot' or not ({'small_sample', 'elite', 'dungeon', 'everloot'} & set(o.flags))))
 
     def top_picks(self, opps: list[Opportunity], n: int = 15) -> dict:
         bonus = float(self.s.get('switch_bonus', 1.5))
