@@ -36,8 +36,12 @@ end
 
 local function money(c)
   c = math.floor(c or 0)
-  if GetCoinTextureString then return GetCoinTextureString(c) end
-  return string.format("%dg %ds %dc", c / 10000, (c / 100) % 100, c % 100)
+  local g, si, co = math.floor(c / 10000), math.floor(c / 100) % 100, c % 100
+  local parts = {}
+  if g > 0 then parts[#parts + 1] = "|cffffd700" .. g .. "g|r" end
+  if si > 0 then parts[#parts + 1] = "|cffc7c7cf" .. si .. "s|r" end
+  if co > 0 or #parts == 0 then parts[#parts + 1] = "|cffeda55f" .. co .. "c|r" end
+  return table.concat(parts, " ")
 end
 
 local function totals()
@@ -63,8 +67,8 @@ local function refresh()
   local value, sources, rows = totals()
   local total = value + session.money
   win.title:SetText(session.paused and "Farm meter |cff999999(paused)|r" or "Farm meter")
-  win.rate:SetText(secs >= 60 and (money(total / secs * 3600) .. " |cffaaaaaaan hour|r") or "|cffaaaaaagold an hour after 1 min|r")
-  win.total:SetText("Total " .. money(total))
+  win.rate:SetText(secs >= 60 and (money(total / secs * 3600) .. " |cffaaaaaaan hour|r") or "|cff888888-- an hour|r")
+  win.total:SetText("Total " .. money(total) .. (secs < 60 and "  |cff888888(gold an hour after the first minute)|r" or ""))
   win.kv[1]:SetText(string.format("%d:%02d", secs / 60, secs % 60))
   win.kv[2]:SetText(money(value))
   win.kv[3]:SetText(money(session.money))
@@ -144,7 +148,6 @@ local function makeWindow()
   -- headline: gold an hour, big; the total under it
   win.rate = text(win, "GameFontNormalHuge")
   win.rate:SetPoint("TOPLEFT", 12, -36)
-  win.rate:SetPoint("RIGHT", -12, 0)
   win.total = text(win, "GameFontHighlight")
   win.total:SetPoint("TOPLEFT", win.rate, "BOTTOMLEFT", 0, -4)
 
@@ -157,14 +160,12 @@ local function makeWindow()
     k:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, i == 1 and -10 or -4)
     k:SetText(label)
     local v = text(win, "GameFontHighlightSmall", "RIGHT")
-    v:SetPoint("TOPRIGHT", win, "TOPRIGHT", -12, 0)
-    v:SetPoint("TOP", k, "TOP", 0, 0)
+    v:SetPoint("TOPLEFT", k, "TOPLEFT", 0, 0)            -- full width, right-aligned (layout sets the width)
     win.kv[i] = v
     prev = k
   end
   win.loots = text(win, "GameFontHighlightSmall")
   win.loots:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -8)
-  win.loots:SetPoint("RIGHT", -12, 0)
 
   -- top items with icons
   local head = text(win, "GameFontDisableSmall")
@@ -176,7 +177,6 @@ local function makeWindow()
     local row = CreateFrame("Frame", nil, win)
     row:SetHeight(16)
     row:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -3)
-    row:SetPoint("RIGHT", win, "RIGHT", -12, 0)
     row.icon = row:CreateTexture(nil, "ARTWORK")
     row.icon:SetSize(14, 14)
     row.icon:SetPoint("LEFT")
@@ -184,7 +184,6 @@ local function makeWindow()
     row.value:SetPoint("RIGHT")
     row.name = text(row, "GameFontHighlightSmall")
     row.name:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
-    row.name:SetPoint("RIGHT", row.value, "LEFT", -6, 0)
     row.name:SetWordWrap(false)
     win.items[i] = row
     prev = row
@@ -193,10 +192,8 @@ local function makeWindow()
   -- bottom: the container reminder and where the prices came from
   win.note = text(win, "GameFontDisableSmall")
   win.note:SetPoint("BOTTOMLEFT", 12, 10)
-  win.note:SetPoint("RIGHT", -24, 0)
   win.remind = text(win, "GameFontHighlightSmall")
   win.remind:SetPoint("BOTTOMLEFT", win.note, "TOPLEFT", 0, 4)
-  win.remind:SetPoint("RIGHT", -12, 0)
 
   -- resize grip (bottom right); the size is remembered
   local grip = CreateFrame("Button", nil, win)
@@ -212,6 +209,21 @@ local function makeWindow()
     local p, _, _, x, y = win:GetPoint()
     db().pos = { p, x, y }
   end)
+
+  -- widths follow the window (resizing included)
+  local function layout()
+    local w = win:GetWidth() - 24
+    for _, fs in ipairs({ win.rate, win.total, win.loots, win.remind }) do fs:SetWidth(w) end
+    win.note:SetWidth(w - 12)
+    for _, v in ipairs(win.kv) do v:SetWidth(w) end
+    for _, row in ipairs(win.items) do
+      row:SetWidth(w)
+      row.value:SetWidth(90)
+      row.name:SetWidth(math.max(40, w - 18 - 96))
+    end
+  end
+  win:SetScript("OnSizeChanged", layout)
+  layout()
 
   local acc = 0
   win:SetScript("OnUpdate", function(_, dt)

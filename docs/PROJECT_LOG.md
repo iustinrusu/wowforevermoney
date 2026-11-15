@@ -557,6 +557,11 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Farm meter 1.5.6 after the user's screenshots: the top items never showed (a second RIGHT anchor gave
+  rows below the window's middle a negative height; now one anchor each, widths set from the window on resize);
+  money shows only non-zero parts in gold/silver/copper colours ("33c", not "0g 0s 33c"); a dash instead of the
+  grey "gold an hour after 1 min" headline. Counting was right: 1 fish = 33c, 3 fish in 1:15 = 99c, 47s 37c an hour.
+
 - **2026-11-15** Farm meter 1.5.5 (user: clearer window, resizable): gold an hour in large text with the total under it,
   labelled figures (time, items, gold looted), the loot kinds, top 5 items with icons and quality colours, the
   container reminder and price source at the bottom; resize grip (size and position remembered, 260x230 to 600x600).

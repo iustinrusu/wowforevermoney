@@ -2,7 +2,7 @@
 ## Title: |cffe8c060ForeverMoneyBridge|r
 ## Notes: Saves your level, gold, professions, real vendor prices, and what you loot where (with time spent) for the WoW Forever Money app. Farm meter: /fmb start, /fmb stop. Written on logout or /reload.
 ## Author: WoWForeverMoney
-## Version: 1.5.5
+## Version: 1.5.6
 ## SavedVariables: ForeverMoneyBridgeDB
 
 Checks.lua
