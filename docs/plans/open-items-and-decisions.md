@@ -68,6 +68,12 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       recommendation: yes, only from rates with 30+ loot windows, labelled "Everloot", kept out of Top picks until a
       Wowhead Forever page confirms them; never from smaller samples.
 
+- [ ] C9. **New 2026-11-15: download two map tables for GatherLite's node positions?** UiMap.csv and
+      UiMapAssignment.csv from wago.tools (build 1.60.1.70938; no size given by the server, estimate well under 1 MB
+      together). They turn GatherLite's map ids into zones. GatherLite has positions QuestieDB lacks (fishing pools:
+      Oily Blackmouth, Firefin Snapper, Sagefish; 10x more chests; 2-4x more of some herbs). Claude's recommendation:
+      yes, but it is a small gain (node weights per zone, where pools are), after the pool pages are read.
+
 ## D. Things only the user can do
 
 - [-] D1. **The user won't send it (2026-11-15).** Was: send the Wowhead email (`docs/plans/wowhead-data-request.md`); a yes could replace the slow page reading.

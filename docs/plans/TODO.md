@@ -36,7 +36,9 @@ tight: finish the current piece, commit, update this list, and set a reminder th
        mobs' own pages for complete loot, coins) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with drop rates from Wowhead Forever
        ("Dropped by", material-coverage step 4) and the kills-per-hour setting, never your own logged time
 4b. Moved to item 8 (the user, 2026-11-15: build it, at a lower priority).
-5. [ ] **GatherLite node locations** (installed; the user, 2026-11-15: "could be useful"; ask before downloading
+5. [ ] (2026-11-15: compared with QuestieDB without a download, see forever-data-next.md section 5; waits for
+       the user's yes to the two map tables, checklist C9)
+       **GatherLite node locations** (installed; the user, 2026-11-15: "could be useful"; ask before downloading
        the UiMap tables, with file name and size): `docs/plans/forever-data-next.md`, section 5. And keep an open
        mind to new addons: recommend any good Forever addon found (loot addons: section 4); the user installs them
        through CurseForge.
