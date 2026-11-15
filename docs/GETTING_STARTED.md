@@ -19,7 +19,7 @@ characters' data. About 15 minutes the first time.
 
 The project is public on GitHub: github.com/iustinrusu/wowforevermoney.
 - **Best:** clone it with Git (Git for Windows: `git clone https://github.com/iustinrusu/wowforevermoney.git`).
-  To update, double-click **`update.bat`** (it pulls the latest version), and the app fetches a starter price history so the Market charts have data from
+  The app updates itself each time it starts (Settings > Updates; or double-click **`update.bat`**), and the app fetches a starter price history so the Market charts have data from
   the first day.
 - **Or:** on the repo page click **Code > Download ZIP** and unzip it somewhere simple, for example
   `Documents\WoWForeverMoney`. The Market charts then start empty and fill in as the app records prices.

@@ -557,6 +557,11 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Update on start (user's request): run.py pulls the latest main first (`wfm/updater.py`, fast-forward
+  only; setting `auto_update`, on by default, Settings > Updates; `--no-update` skips it) and, when new code arrived,
+  runs itself again as a child process (exec on Windows would end start.bat's wait early). A ZIP folder, no git, no
+  network or local changes just mean no update, said in the log. Tests: 238.
+
 - **2026-11-15** Done for today (user's idea): a ✓ on plan steps and on craft, flip and farming rows opens "Did you list
   all N suggested for today, or fewer?" (`wfm/done.py`, `/api/done`, `Engine.apply_done`). All: flag `done_today`,
   out of Top picks and the plan, the next best moves up; fewer: the row keeps what's left today. Per character, reset

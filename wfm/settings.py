@@ -37,6 +37,8 @@ DEFAULTS = {
     'own_logs_for_rates': False,
     # Key that unlocks the shared Wowhead Forever data (data/wowhead_forever.pack): from the app's author. Local only.
     'data_key': '',
+    # Pull the latest version from GitHub when the app starts (git installs only; fast-forward only, never overwrites).
+    'auto_update': True,
     # Sale price on the AH: 'lower' = the lower of the current lowest buyout and the usual sale price, what you can
     # count on (the user's choice, 2026-11-14); 'min_buyout' = the current lowest buyout, what you'd list at;
     # 'actual_sales' = never above the realm's listing average or what it actually sells for (most conservative).
