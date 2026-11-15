@@ -5,6 +5,9 @@
 -- fishing and nodes show, plus gold looted; things opened from your bags are skipped (they'd count twice).
 
 local CUT = 0.05
+-- newer clients (WoW: Forever) moved these into C_Item / C_Spell; the old globals may not exist
+local GetItemInfo = GetItemInfo or (C_Item and C_Item.GetItemInfo) or function() return nil end
+local GetSpellInfo = GetSpellInfo or (C_Spell and C_Spell.GetSpellName) or function() return nil end
 local session                       -- {start, paused, pausedAt, pausedFor, money, items = {id = count}, loots = {}}
 local win, lines, lootOpenUntil, lastMoney = nil, {}, 0, nil
 

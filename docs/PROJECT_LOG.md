@@ -557,6 +557,10 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-15** Addon 1.5.10: the meter's blank top items were `GetItemInfo` being nil in WoW: Forever (moved to
+  C_Item.GetItemInfo; GetSpellInfo to C_Spell.GetSpellName): local fallbacks added in Meter.lua (the main addon
+  already had them). The guarded lines showed the error, as intended.
+
 - **2026-11-15** Addon 1.5.9: top items still blank in game (the row-frame code failed silently each second); now three
   plain numbered lines "1. Item x2:  4s 38c" (count and total value, most valuable first), filled inside a pcall so an
   error shows in the line instead of a blank (user's request: top 3 with count and total).
