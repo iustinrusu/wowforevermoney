@@ -44,6 +44,17 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 - [ ] B7. Comprehensive review of the whole app (UI, UX, logic, accuracy, no discrepancies between views): planned
       for a new chat after the usage reset, `docs/plans/comprehensive-review.md` (the user, 2026-11-15).
 
+- [ ] B8. (2026-11-19) Farm meter 1.6.1 in game: XP line, prices (the app's while under 12 h old, else TSM), a
+      container from a mob or fishing shown as "not opened yet" without the app. Claude can't run WoW: a screenshot.
+- [ ] B9. (2026-11-19) Big markets the app has no way into (Market tab, "only items the app has no way into"): Mote of
+      Unstable Magic (215 kinds of mob drop it, 390g traded a day), Shellfish, Pristine Black Diamond, Vulture
+      Gizzard; dungeon gear and patterns belong to the Dungeons view (to-do 8). Each needs its Wowhead Forever page
+      (Wowhead budget) to become a farming row.
+- [ ] B10. (2026-11-19) Power Crystal transmutations (Forever-only spells 1289305, 1308151-1308225: 5 crystals of one
+      colour into 5 of another; Red sells for 14s, Green 2s): the game data has no player source. Read one spell's
+      Wowhead Forever page to find who or what casts them (an object in Un'Goro?); if players can, they are a flip.
+      Data health "Item interactions" lists them.
+
 ## C. Decisions for the user
 
 - [x] C1. **Decided 2026-11-15: build it, at a lower priority** (to-do 8, after the strategy features).
@@ -81,6 +92,13 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       together). They turn GatherLite's map ids into zones. GatherLite has positions QuestieDB lacks (fishing pools:
       Oily Blackmouth, Firefin Snapper, Sagefish; 10x more chests; 2-4x more of some herbs). Claude's recommendation:
       yes, but it is a small gain (node weights per zone, where pools are), after the pool pages are read.
+
+- [ ] C10. (asked 2026-11-19) **Disenchanting values.** The app doesn't value disenchanting (your Enchanting alt; the
+      Biggest markets list has Large Brilliant Shard at 389g traded a day). ForeverRecipes ships disenchant tables
+      (by item level, quality and armor/weapon), but they are Classic reference data that its own author calls
+      provisional estimates. Claude's recommendation: use them as a labelled fallback ("Classic disenchant table"),
+      for My bags ("disenchant it" next to vendor and AH) and craft-to-disenchant rows, kept out of Top picks until
+      Forever data confirms them (as with the Classic fishing tables). Or wait for a Forever source.
 
 ## D. Things only the user can do
 

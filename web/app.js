@@ -457,6 +457,28 @@ function wirePlan() {
 }
 
 // ---------- views ----------
+// Biggest markets (markets.py, the user's idea 2026-11-19): where the most gold changes hands a day, and the app's way in
+async function marketsPanel() {
+  const d = await api('/api/markets');
+  const noWay = sessionStorage.getItem('mkNoWay') === '1';
+  const rows = (d.rows || []).filter((r) => !noWay || !r.ways.length).slice(0, 60);
+  const way = (r) => r.ways.length ? r.ways.map((w) => `<div><span class="pill">${esc(w.kind)}</span> ${esc(w.title)}: ${money(w.value)} ${esc(w.per)}${w.doable ? '' : ` <span class="needs">${esc(w.needs || 'not yet')}</span>`}</div>`).join('')
+    : '<span class="hint">none in the app yet</span>';
+  const body = rows.map((r, n) => `<tr class="row" data-item="${r.item_id}">${rankCell(n + 1)}<td>${itemLink(r.item_id, r.name, r.quality)}<div class="hint">${esc(r.category)}</div></td>
+    <td class="num">${money(r.gold_a_day)}</td><td class="num">${num(r.sold_per_day, r.sold_per_day < 10 ? 1 : 0)}</td><td class="num">${money(r.price)}</td><td class="num">${num(r.listed, 0)}</td>
+    <td>${r.sources.length ? esc(r.sources.join('; ')) : '<span class="hint">not in the data the app reads (often a dungeon or world drop)</span>'}</td>
+    <td>${way(r)}</td><td><a href="${esc(r.wowhead)}" target="_blank" rel="noopener" title="How to get it, on Wowhead's WoW: Forever pages">Wowhead</a></td></tr>`).join('');
+  return `<div class="panel"><h2>Biggest markets <small>where the most gold changes hands a day in the region, and your way in</small></h2>
+    <div class="controls"><label class="chk" title="Show only the items no craft, flip or farming row of the app supplies: the ones to look up"><input type="checkbox" id="mk-noway" ${noWay ? 'checked' : ''}> only items the app has no way into yet</label></div>
+    ${rows.length ? `<div class="tablewrap"><table><thead><tr><th class="rk">#</th><th>Item</th>
+      <th class="num" title="The whole region's sales a day times the usual sale price: how big the market is, not what you would earn">Gold traded a day</th>
+      <th class="num" title="Sold a day in the whole region (TSM)">Sold a day</th><th class="num" title="What it usually sells for (TSM region sale average, odd ones left out)">Usual price</th>
+      <th class="num" title="Listings on your realm at the last scan">Listed</th>
+      <th title="What the data the app reads says about getting it: recipes, vendors, QuestieDB mobs and objects, containers">How it is obtained</th>
+      <th title="The app's rows that supply this item, best first: a craft, a flip or a farming spot, with its profit a day">Your way in</th><th>Look it up</th></tr></thead><tbody>${body}</tbody></table></div>`
+      : '<div class="empty">No items found.</div>'}
+    <details class="how"><summary>How this is worked out</summary><div>Every item that sells at least once a day in the region (TSM), largest market first: its region sales a day times its usual sale price. That is the size of the market, not your income: your share of the sales is about ${num((d.share || 0.2) * 100, 0)}%, and other sellers compete. "How it is obtained" lists what the game data and your addons say: the recipes that make it, a vendor that sells it, the mobs and objects QuestieDB lists as dropping it (who, not how often), and containers read on Wowhead Forever. "Your way in" is the app's own rows for it: crafts and vendor flips with their profit a day, farming spots with their gold an hour (a spot gives other items too). When there is none, or the item comes from somewhere the app does not read (dungeon bosses, world drops), its Wowhead Forever page says how to get it; tell Claude what you find and it can be added. Click a row for everything about the item.</div></details></div>`;
+}
 // Levelling planner (strategy item 2): the cheapest path from one skill to another (your skill to 300 by default)
 async function levellingPanel() {
   const prof = sessionStorage.getItem('levelProf') || '';
@@ -553,7 +575,7 @@ const VIEWS = {
       </div>`;
   },
   async craft() {
-    const profs = STATE.professions_available.filter((p) => !/Racial|Riding|Test|Poison|Swim|Lockpick|Compreh|Survival|Horseman|Piloting/.test(p));
+    const profs = STATE.professions_available.filter((p) => !/Racial|Riding|Test|Swim|Lockpick|Compreh|Survival|Horseman|Piloting/.test(p));
     const sel = sessionStorage.getItem('craftProf') || '';
     const doable = sessionStorage.getItem('craftDoable') === '1';
     const sellsOnly = sessionStorage.getItem('sellsOnly') !== '0';
@@ -707,7 +729,8 @@ const VIEWS = {
     if (id) { try { d = await api('/api/market?id=' + id); } catch (e) { sessionStorage.removeItem('marketItem'); } }
     return `<div class="panel"><h2>Market <small>search any item: price history, trend and market signals</small></h2>
       <div class="ac"><input id="mq" placeholder="Type an item name…" autocomplete="off" spellcheck="false" value="${d ? esc(d.name) : ''}"><div id="ac-list" class="ac-list hidden"></div></div></div>
-      ${d ? marketBody(d) : '<div class="empty">Start typing an item name, then pick it from the list (arrow keys and Enter work too).</div>'}`;
+      ${d ? marketBody(d) : '<div class="empty">Start typing an item name, then pick it from the list (arrow keys and Enter work too).</div>'}
+      ${await marketsPanel()}`;
   },
   async search() {
     const q = sessionStorage.getItem('search') || '';
@@ -813,7 +836,7 @@ function wireView() {
   }
   if (TAB === 'craft') { $('#cp').onchange = (e) => { sessionStorage.setItem('craftProf', e.target.value); render(); }; $('#cd').onchange = (e) => { sessionStorage.setItem('craftDoable', e.target.checked ? '1' : ''); render(); }; }
   document.querySelectorAll('.sells-only').forEach((c) => c.onchange = (e) => { sessionStorage.setItem('sellsOnly', e.target.checked ? '1' : '0'); render(); });
-  if (TAB === 'market') wireMarket();
+  if (TAB === 'market') { wireMarket(); const mk = $('#mk-noway'); if (mk) mk.onchange = (e) => { sessionStorage.setItem('mkNoWay', e.target.checked ? '1' : ''); render(); }; }
   if (TAB === 'search') { const go = () => { sessionStorage.setItem('search', $('#sq').value); render(); }; $('#sb').onclick = go; $('#sq').onkeydown = (e) => { if (e.key === 'Enter') go(); }; $('#sq').focus(); }
   if (TAB === 'gather') {
     document.querySelectorAll('[data-gsel]').forEach((b) => b.onclick = () => { sessionStorage.setItem('gatherSel', b.dataset.gsel); render(); });
@@ -878,13 +901,15 @@ function oppDetail(o) {
   if (o.kind === 'craft') {
     const madeWith = (m) => m.made_with ? `<div class="hint">You can make this with a ${esc(m.made_with.tool)} (once every ${num(m.made_with.cooldown_hours, 0)} hours; see its own row on this tab). It is costed here at its price because selling it is what you give up by using it.</div>` : '';
     const learnText = !d.learn ? 'unknown / already known'
-      : d.learn.how === 'trainer' ? `Trainer, ${money(d.learn.cost)}`
+      : d.learn.how === 'item use' ? 'Nothing to learn: you use the item itself (game data: what using it does)'
+      : d.learn.how === 'trainer' ? `Trainer, ${money(d.learn.cost)}${d.level_required ? ` (at character level ${d.level_required} or higher)` : ''}`
       : d.learn.how === 'tool' ? `Nothing to learn: you need a ${itemLink(d.learn.item_id, d.learn.name)}, which you keep (it is not used up). ${d.learn.owned ? 'You have one.' : `${d.learn.owned === false ? 'Your bags, bank and gear have none: ' : ''}it costs ${d.learn.cost !== null ? money(d.learn.cost) : '? (not on AH / vendor)'} (${esc(d.learn.source || '')}), once.`}`
       : `${esc(d.learn.name || 'recipe')}: ${d.learn.cost !== null ? money(d.learn.cost) : 'not on AH / vendor'} (${esc(d.learn.source || '')})`;
     html += `<h3>Ingredients <small>per craft</small></h3><table><tbody>${d.mats.map((m) => `<tr><td>${m.count}×</td><td>${itemLink(m.item_id, m.name)}${madeWith(m)}</td><td class="num">${money(m.unit)}</td><td>${esc(m.source)} ${flagHtml(m.flags)}</td></tr>`).join('')}</tbody></table>
       <div class="kv" style="margin-top:8px"><div>Sells for (total)</div><div>${money(d.revenue)} via ${esc(d.sell_channel)} (${esc(d.sell_source)})</div>
       <div>Skill needed</div><div>${d.skill_required}${d.skill_exact ? '' : ' (estimated)'} ${d.thresholds ? `<span class="pill">orange/yellow/green/grey: ${d.thresholds.join(' / ')}</span>` : ''}</div>
       <div>${d.tool ? 'Tool' : 'Learn it'}</div><div>${learnText}</div>
+      ${(d.tools || []).length ? `<div>Tools in your bags</div><div>${d.tools.map((t) => `${t.item_id ? itemLink(t.item_id, t.name) : esc(t.name)}: ${t.have ? 'you have one' : t.have === false ? `none in your bags, bank or gear; ${t.cost !== null ? `${money(t.cost)} (${esc(t.source)})` : 'not on AH / vendor'}, once` : 'needed (your bags are not read: install Syndicator)'}`).join('<br>')}<div class="hint">The recipe needs this in your bags to be made; it is not used up.</div></div>` : ''}
       <div>Region sold/day</div><div>${num(d.sold_per_day)}</div>
       ${d.cooldown_hours ? `<div>Cooldown</div><div>${num(d.cooldown_hours, 1)} hours (game data): at most ${num(24 / d.cooldown_hours, 2)} a day${d.cooldown_group ? `<div class="needs">Shared with ${d.cooldown_shared_with} other recipes (${esc(d.cooldown_group)}): doing any of them starts this cooldown too</div>` : ''}</div>` : ''}</div>`;
   }

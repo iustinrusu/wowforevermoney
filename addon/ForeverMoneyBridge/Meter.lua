@@ -1,9 +1,11 @@
 -- Gold Ever After farm meter (in the ForeverMoneyBridge addon): /gea start shows it and starts a session, /gea stop saves it and hides it.
--- Works on its own, without the app (1.6.0, the user's wish): prices come from TSM in game, the same TSM data the app
--- reads (your realm's lowest listing, else its average, else the region's, minus the 5% AH cut), or the vendor price
--- when that is higher or TSM has none. "/gea prices app" uses the app's own values instead (Prices.lua, as its My bags
--- shows them), with TSM and the vendor price for items the app did not list. Counts what loot windows from mobs,
--- fishing and nodes show, gold looted and XP gained; things opened from your bags are skipped (they'd count twice).
+-- Prices (1.6.1, the user went with Claude's recommendation): the app's own values (Prices.lua, as its My bags shows
+-- them: odd listings corrected, crafted worth counted) while they are under 12 hours old, else TSM in game, so the
+-- meter also works without the app: the same TSM data the app reads (your realm's lowest listing, else its average,
+-- else the region's, minus the 5% AH cut), or the vendor price when that is higher or TSM has none. Items the app did
+-- not list always fall back to TSM and the vendor price. "/gea prices app" or "/gea prices tsm" fixes one source;
+-- "/gea prices auto" goes back. Counts what loot windows from mobs, fishing and nodes show, gold looted and XP gained;
+-- things opened from your bags are skipped (they'd count twice).
 
 local CUT = 0.05
 local TSM_PRICE = "first(DBMinBuyout, DBMarket, DBRegionMarketAvg)"
@@ -20,8 +22,20 @@ local function db()
   return ForeverMoneyBridgeDB.meter
 end
 
-local function priceMode() return db().prices == "app" and "app" or "tsm" end
+local APP_FRESH = 12 * 3600          -- the app's prices count while under 12 hours old (auto)
+local function priceMode() local m = db().prices; return (m == "app" or m == "tsm") and m or "auto" end
 local function hasTSM() return TSM_API and TSM_API.GetCustomPriceValue and true or false end
+local function appAge()               -- seconds since the app wrote its prices, nil if it never did
+  local made = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0
+  return made > 0 and (time() - made) or nil
+end
+local function useApp()               -- price with the app's values? Decided at /gea start, kept for the session
+  if session and session.app ~= nil then return session.app end
+  local m = priceMode()
+  if m ~= "auto" then return m == "app" end
+  local age = appAge()
+  return age ~= nil and age < APP_FRESH
+end
 
 local function vendorPrice(id)
   local sell = select(11, GetItemInfo(id))
@@ -39,7 +53,7 @@ local function price(id)
   local hit = cache[id]
   if hit then return hit[1], hit[2] end
   local v, src = 0, "none"
-  if priceMode() == "app" then
+  if useApp() then
     local t = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.items
     local a = t and t[id]
     if a and a > 0 then v, src = a, "app" end
@@ -202,14 +216,15 @@ local function refresh()
   win.remind:SetText(boxes > 0 and string.format("|cffffd100%d container%s not opened yet%s: open them to count what is inside|r",
     boxes, boxes == 1 and "" or "s", inside > 0 and (" (about " .. money(inside) .. " as they are)") or "") or "")
   local note
-  if priceMode() == "app" then
-    local made = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0
-    note = made > 0 and string.format("Prices: the app's, from %.1f h ago", (time() - made) / 3600)
+  local age = appAge()
+  if useApp() then
+    note = age and string.format("Prices: the app's, from %.1f h ago", age / 3600)
       or "No app prices yet (start the app, then /reload): TSM and vendor prices"
     local fb = sources.tsm + sources.vendor + sources.none
     if fb > 0 then note = note .. string.format(" · %d by TSM, %d vendor, %d unpriced", sources.tsm, sources.vendor, sources.none) end
   else
-    note = hasTSM() and "Prices: TSM in game, after the AH cut (vendor price if higher). /gea prices says more"
+    note = hasTSM() and ("Prices: TSM in game, after the AH cut (vendor price if higher)"
+      .. (priceMode() == "auto" and (age and string.format(": the app's are %.0f h old", age / 3600) or ": no app prices") or ""))
       or "TSM is not loaded: vendor prices only"
     if sources.vendor + sources.none > 0 then
       note = note .. string.format(" · %d at vendor price, %d unpriced", sources.vendor, sources.none)
@@ -343,6 +358,7 @@ local function start()
   session = { start = GetTime(), paused = false, pausedFor = 0, money = 0, xp = 0, items = {}, unopened = {}, loots = {}, seen = {}, zone = GetRealZoneText and GetRealZoneText() or "?" }
   lastMoney = GetMoney()
   for k in pairs(cache) do cache[k] = nil end         -- prices as of now (a /reload may have brought new TSM data)
+  session.app = useApp()                              -- the price source stays the same for the whole session
   xpLast, xpMaxLast = nil, nil
   noteXP()                                            -- the XP bar now: only what comes after counts
   makeWindow():Show()
@@ -366,7 +382,7 @@ local function stop()
   local xp = session.xp or 0
   table.insert(m.sessions, 1, { ended = time(), zone = session.zone, minutes = math.floor(secs / 6 + 0.5) / 10,
     items = session.items, money = session.money, value = value, total = total,
-    perHour = secs > 0 and math.floor(total / secs * 3600) or 0, prices = priceMode(),
+    perHour = secs > 0 and math.floor(total / secs * 3600) or 0, prices = session.app and "app" or "tsm",
     pricesMade = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0,
     xp = xp, xpPerHour = secs > 0 and math.floor(xp / secs * 3600) or 0, level = UnitLevel("player") })
   while #m.sessions > 50 do table.remove(m.sessions) end
@@ -533,19 +549,26 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
   elseif cmd == "debug" then
     debug = not debug
     print("|cffe8c060Gold Ever After|r debug " .. (debug and "on: what the meter counts is printed here" or "off"))
-  elseif cmd == "prices tsm" or cmd == "prices app" then
+  elseif cmd == "prices tsm" or cmd == "prices app" or cmd == "prices auto" then
     db().prices = cmd:sub(8)
     for k in pairs(cache) do cache[k] = nil end
-    print("|cffe8c060Gold Ever After|r prices: " .. (priceMode() == "app"
-      and "the app's values (Prices.lua; TSM and vendor prices for the rest)" or "TSM in game (vendor price when higher)"))
+    if session then session.app = nil; session.app = useApp() end
+    local m = priceMode()
+    print("|cffe8c060Gold Ever After|r prices: " .. (m == "app" and "the app's values (TSM and vendor prices for the rest)"
+      or m == "tsm" and "TSM in game (vendor price when higher)"
+      or "the app's while they are under 12 hours old, else TSM in game"))
     refresh()
   elseif cmd == "prices" then
-    print("|cffe8c060Gold Ever After|r prices now: " .. (priceMode() == "app" and "the app's" or "TSM in game") .. ".")
-    print("  /gea prices tsm: works without the app. Each item at your realm's lowest listing in TSM's data (else"
-      .. " its average there, else the region's), minus the 5% AH cut, or the vendor price when that is higher."
-      .. " TSM's data is as new as your last login or /reload.")
-    print("  /gea prices app: the WoW Forever Money app's values, as its My bags shows them (it also corrects odd"
+    local m, age = priceMode(), appAge()
+    print("|cffe8c060Gold Ever After|r prices now: " .. (m == "auto" and "auto, so " or "")
+      .. (useApp() and "the app's" or "TSM in game")
+      .. (age and string.format(" (the app's are %.1f h old)", age / 3600) or " (no app prices yet)") .. ".")
+    print("  /gea prices auto (the default): the app's values while they are under 12 hours old, else TSM in game.")
+    print("  /gea prices app: always the WoW Forever Money app's values, as its My bags shows them (it corrects odd"
       .. " listings and counts what crafting adds); TSM and vendor prices for items it did not list.")
+    print("  /gea prices tsm: always TSM in game, so the app is not needed. Each item at your realm's lowest listing in"
+      .. " TSM's data (else its average there, else the region's), minus the 5% AH cut, or the vendor price when that"
+      .. " is higher. TSM's data is as new as your last login or /reload.")
   elseif cmd == "resume" and session and session.paused then
     session.pausedFor = session.pausedFor + (GetTime() - session.pausedAt)
     session.paused = false

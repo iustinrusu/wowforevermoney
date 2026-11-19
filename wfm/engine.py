@@ -17,7 +17,9 @@ from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
 PROFESSIONS = {'Alchemy', 'Blacksmithing', 'Cooking', 'Enchanting', 'Engineering', 'First Aid', 'Fishing',
-               'Herbalism', 'Leatherworking', 'Mining', 'Skinning', 'Tailoring'}
+               'Herbalism', 'Leatherworking', 'Mining', 'Skinning', 'Tailoring',
+               'Poisons',                          # rogues (2026-11-19: missing until then; ForeverRecipes has them)
+               gamedata.NO_PROFESSION}             # made by using an item anyone can use (essences, Darkmoon cards)
 GATHER_SOURCE = {5: 'Mobs (cloth)', 6: 'Skinning', 7: 'Mining', 8: 'Mobs (meat)', 9: 'Herbalism', 10: 'Mobs / gathering',
                  12: 'Enchanting'}
 GATHER_PROFESSION = {6: 'Skinning', 7: 'Mining', 9: 'Herbalism'}
@@ -265,10 +267,10 @@ class Engine:
         return math.floor(self.gold / cost)
 
     def required_skill(self, recipe) -> tuple[int, bool]:
-        if getattr(recipe, 'tool_id', 0):          # a tool's own skill requirement (game data): Salt Shaker 250
-            return max(1, recipe.min_rank), True
+        if getattr(recipe, 'tool_id', 0) or getattr(recipe, 'use_item', 0):
+            return max(1, recipe.min_rank), True    # the item's own skill requirement (game data): Salt Shaker 250
         th = self.su.thresholds.get(recipe.spell_id)
-        if th and th[0] and th[0] > 1:
+        if th and th[0] and (th[0] > 1 or recipe.spell_id in getattr(self.su, 'requirement_known', ())):
             return int(th[0]), True
         if recipe.trivial_low:
             return max(1, recipe.trivial_low - 40), False   # classic pattern: orange = yellow - 40
@@ -287,16 +289,44 @@ class Engine:
                     out[spell].append(scroll)
         return out
 
+    def owned_items(self) -> set | None:
+        """What the character you play has in bags, bank and equipped (Syndicator). None: bags not read."""
+        if not hasattr(self, '_owned'):
+            syn = getattr(self.w, 'syndicator', None) or {}
+            key = plan.character_key(syn, self.character())
+            self._owned = None if not key else (set((getattr(self.w, 'inventory', None) or {}).get(key) or {})
+                                                | set(syn[key].get('equipped') or {}))
+        return self._owned
+
     def owns(self, iid: int) -> bool | None:
         """Does the character you play have this item in bags, bank or equipped (Syndicator)? None: bags not read."""
-        syn = getattr(self.w, 'syndicator', None) or {}
-        key = plan.character_key(syn, self.character())
-        if not key:
-            return None
-        have = set((getattr(self.w, 'inventory', None) or {}).get(key) or {}) | set(syn[key].get('equipped') or {})
-        return iid in have
+        have = self.owned_items()
+        return None if have is None else iid in have
+
+    def tools_for(self, recipe) -> list[dict]:
+        """The tools a recipe needs in your bags (SpellTotems: a Philosopher's Stone, Blacksmith Hammer, Runed rod...),
+        whether you have one (None: bags not read), and the cheapest way to get one (vendor or AH)."""
+        out = []
+        have = self.owned_items()
+        kinds = {self.gd.items[i].totem_category for i in (have or ()) if i in self.gd.items
+                 and self.gd.items[i].totem_category}
+        for cat in getattr(recipe, 'tools_needed', ()) or ():
+            name = (self.gd.totem_categories.get(cat) or (f'tool {cat}',))[0]
+            ok = None if have is None else any(gamedata.tool_fits(self.gd, k, cat) for k in kinds)
+            items = [i for i, it in self.gd.items.items() if it.totem_category == cat]
+            quotes = [(q.value, i, q.source) for i in items for q in [self.cheapest(i)] if q]
+            best = min(quotes) if quotes else None
+            out.append({'name': name, 'have': ok, 'item_id': best[1] if best else (items[0] if items else None),
+                        'cost': best[0] if best else None, 'source': best[2] if best else 'not on AH / vendor'})
+        for iid in getattr(recipe, 'tool_items', ()) or ():
+            q = self.cheapest(iid)
+            out.append({'name': self.name(iid), 'have': self.owns(iid), 'item_id': iid,
+                        'cost': q.value if q else None, 'source': q.source if q else 'not on AH / vendor'})
+        return out
 
     def learn_cost(self, recipe) -> dict | None:
+        if getattr(recipe, 'use_item', 0):
+            return {'how': 'item use', 'cost': 0}
         tool = getattr(recipe, 'tool_id', 0)
         if tool:                    # nothing to learn: you need the tool once (it is not used up)
             q = self.cheapest(tool)
@@ -395,8 +425,8 @@ class Engine:
         for r in self.gd.recipes:
             if r.profession not in PROFESSIONS or not r.reagents:
                 continue
-            tool = getattr(r, 'tool_id', 0)
-            verified = r.spell_id in self.su.thresholds or bool(tool)     # a tool's use comes from the game data
+            tool, use_item = getattr(r, 'tool_id', 0), getattr(r, 'use_item', 0)
+            verified = r.spell_id in self.su.thresholds or bool(tool or use_item)   # item uses: from the game data
             if not verified and not include_unverified:
                 continue
             mats, cost, unpriced = [], 0, []
@@ -457,9 +487,14 @@ class Engine:
                 flags.append('event_vendor')      # an ingredient is only sold during events
             if self.affordable(cost) < 1:
                 flags.append('cant_afford')
-            if have is None:
+            level_req = (getattr(self.su, 'level_required', None) or {}).get(r.spell_id, 0)
+            if r.profession == gamedata.NO_PROFESSION:
+                needs, doable = '', True
+            elif have is None:
                 needs, doable = f'Learn {r.profession}', False
                 flags.append('other_profession')
+            elif level_req > int(self.s.get('level', 60) or 60):
+                needs, doable = f'Level {level_req} to learn it (you are {self.s.get("level")})', False
             elif have < req:
                 needs, doable = f'{r.profession} {req}{"" if exact else "~"} (you have {have})', False
             else:
@@ -471,18 +506,34 @@ class Engine:
                     needs, doable = f'Get a {self.name(tool)} (once: you keep it)', False
             elif tool and owned is None:
                 flags.append('tool_unchecked')
+            tools = self.tools_for(r)                 # a hammer, a Philosopher's Stone, a runed rod
+            missing = [t for t in tools if t['have'] is False]
+            if missing:
+                flags.append('needs_tool')
+                if doable:
+                    needs, doable = f'Get a {missing[0]["name"]} (once: you keep it)', False
+            elif any(t['have'] is None for t in tools) and 'tool_unchecked' not in flags:
+                flags.append('tool_unchecked')
             product = self.gd.items.get(r.product_id)
             count_text = f' x{r.product_count:g}' if r.product_count != 1 else ''
+            if use_item:      # "Turn 3 Lesser Eternal Essence into Greater Eternal Essence", "Combine 8 items into ..."
+                made = f'{r.product_count:g} {self.name(r.product_id)}' if r.product_count != 1 else self.name(r.product_id)
+                title = (f'Turn {r.reagents[0][1]} {self.name(r.reagents[0][0])} into {made}' if len(r.reagents) == 1
+                         else f'Combine {sum(c for _, c in r.reagents)} items into {made}')
+            else:
+                title = (f'{self.name(tool)}: make {self.name(r.product_id)}{count_text}' if tool
+                         else f'Craft {self.name(r.product_id)}{count_text}')
             out.append(Opportunity(
                 kind='craft', key=f'craft:{r.spell_id}', item_id=r.product_id,
-                title=(f'{self.name(tool)}: make {self.name(r.product_id)}{count_text}' if tool
-                       else f'Craft {self.name(r.product_id)}{count_text}'),
+                title=title,
                 profit_unit=profit, cost_unit=cost, units_day=round(crafts_day, 2), daily=int(profit * crafts_day),
                 doable=doable, needs=needs, profession=r.profession, preferred=r.profession in self.preferred,
                 flags=flags,
                 detail={'recipe_spell': r.spell_id,
                         'recipe': f'use your {self.name(tool)} to make {self.name(r.product_id)}' if tool else r.name,
-                        'tool': {'item_id': tool, 'name': self.name(tool), 'owned': owned} if tool else None,
+                        'tool': {'item_id': tool, 'name': self.name(tool), 'owned': owned,
+                                 'charges': getattr(r, 'tool_charges', 0)} if tool else None,
+                        'tools': tools, 'use_item': use_item or None, 'level_required': level_req or None,
                         'mats': mats, 'revenue': revenue,
                         'sell_channel': channel, 'sell_source': q.source if q else 'vendor',
                         'sell_price': q.value if (q and channel == 'AH') else None,
@@ -601,9 +652,10 @@ class Engine:
         best: dict[int, dict] = {}
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         for r in self.gd.recipes:
-            if r.profession not in PROFESSIONS or r.spell_id not in self.su.thresholds:
+            if r.profession not in PROFESSIONS or not (r.spell_id in self.su.thresholds or getattr(r, 'use_item', 0)):
                 # tools too (the Salt Shaker): one use every 71 h, and Deeprock Salt costs 3s on the AH, so the profit
-                # belongs to the tool's own row, not to every Deeprock Salt you hold or farm
+                # belongs to the tool's own row, not to every Deeprock Salt you hold or farm. Items used up count:
+                # a Greater Eternal Essence is worth what 3 Lesser ones sell for if that is more
                 continue
             unit_val, channel, _ = self.sell_value(r.product_id)
             if channel == 'AH' and {'hard_to_sell', 'no_sales_data'} & set(liquidity(self.price(r.product_id), min_spd)['flags']):
@@ -623,7 +675,7 @@ class Engine:
                 continue
             req, _ = self.required_skill(r)
             have = self.profs.get(r.profession)
-            can = have is not None and have >= req
+            can = r.profession == gamedata.NO_PROFESSION or (have is not None and have >= req)
             # how many crafts a day the product's market takes at your share (and its cooldown allows)
             # (a product sold to a vendor has no market limit: the usual sanity cap of MAX_UNITS_PER_DAY)
             crafts = self.demand_per_day(r.product_id, channel) / max(r.product_count, 1)

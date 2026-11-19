@@ -54,6 +54,10 @@ class GamePaths:
     def skillup_data(self) -> Path:
         return self.addons / 'SkillUpForever' / 'Data'
 
+    @property
+    def foreverrecipes_data(self) -> Path:
+        return self.addons / 'ForeverRecipes' / 'Data'
+
     def hotfix_cache(self) -> Path | None:
         """The client's cache of data sent by the server (Cache/ADB/<locale>/DBCache.bin)."""
         adb = self.flavor / 'Cache' / 'ADB'

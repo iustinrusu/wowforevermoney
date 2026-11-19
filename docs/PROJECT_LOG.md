@@ -24,6 +24,41 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-19 Every item interaction is enumerated and checked (user: "let's try to not miss things like the Salt Shaker
+  anymore. We really need to cover all the items and their interactions").** A survey of the game data found every
+  spell that creates an item (3,350) and how a player casts it. Now counted: all profession recipes (Poisons added:
+  26 recipes, 13 sell; SkillUpForever has none, ForeverRecipes does), every item use (`gamedata.item_use_recipes`:
+  tools kept like the Salt Shaker and Snowmaster 9000; items used up, which count as one more reagent, like the
+  essences: "Turn three lesser magic essences into a greater one", checked on the Forever tooltip; items combined like
+  Darkmoon cards into a deck), shown as crafts with profession "No profession" when the item needs none; and the tools a
+  recipe needs in your bags (SpellTotems: Philosopher's Stone for 19 transmutes, Blacksmith Hammer, Arclight Spanner,
+  runed rods, Mining Pick, Flint and Tinder; 764 recipes; a Gnomish Army Knife counts for several, a higher runed rod
+  for the lower ones): flag `needs_tool`, not doable, "Get a X (once: you keep it)". Not counted, listed on Data health
+  "Item interactions covered" with what their product trades a day: class skills (mage food, warlock stones:
+  soulbound), spells another spell casts, and 574 with no player source (NPCs, objects, quests); the ones that matter
+  are Forever-only Power Crystal transmutations (checklist B10). Loot kinds and their status are listed there too
+  (disenchanting not counted: checklist C10). `python -m wfm.interactions` prints the full report.
+- **2026-11-19 ForeverRecipes is a second recipe source (the user installed it, asked whether it is useful).** Yes:
+  `wfm/foreverrecipes.py` reads its Recipes.lua and Sources.lua (GPL-3.0, read from the install, never copied) and
+  `merged()` fills SkillUpForever's holes (SkillUpForever stays first where it knows): 511 recipes get an exact
+  required skill (Cured Rugged Hide 225, was estimated 185), poisons get their colours, the Poisons skill the trainer
+  asks for (Instant Poison II: 130) and the character level to learn them (`level_required`: 30), trainer fees fill in.
+  On Data health they are compared: 2,158 recipes in both, all with the same yellow/green/grey. Not used yet: its
+  disenchant tables (Classic reference, "provisional"), recipe drops and sellers, Merchant's Favor items.
+- **2026-11-19 Biggest markets (the user's idea: TSM prices show which items are worth getting, then look them up on
+  Wowhead).** Built, as it fitted the Market tab: every item selling 1+ a day, by gold traded a day in the region
+  (sold a day x usual sale price: the market's size, not your income), how it is obtained (recipes, vendor, QuestieDB
+  mobs and objects, containers), the app's ways in (crafts and flips with profit a day, farming spots with gold an hour;
+  not the "Farm X" material rows, whose "a day" is a share of the market) and a Wowhead Forever link; a filter shows
+  only items the app has no way into. Of the top 300 markets, 156 had no row in the app, 50 have no known source
+  (mostly dungeon gear and patterns: the Dungeons view, to-do 8).
+- **2026-11-19 Farm meter prices: the app's when fresh, else TSM in game (the user: "If the app data is better and
+  complete, we can stick with app prices. I'll go with your recommendation").** Claude's recommendation, built in addon
+  1.6.1: the app's values are better (the same TSM data plus corrections for odd listings, walls and freak sales,
+  crafted worth, soulbound items), so they are used while Prices.lua is under 12 hours old; older or missing, TSM in
+  game, so the meter still works without the app. Items the app didn't list fall back to TSM and the vendor price. The
+  source is decided at /gea start and kept for the session; `/gea prices app|tsm|auto`.
+
 - **2026-11-19 Farm meter prices from TSM in game by default (user: "get price from tsm directly from ingame, not from
   app, so the addon works standalone").** Supersedes the 2026-11-15 "prices must match the app's". Addon 1.6.0: each
   item at TSM's `first(DBMinBuyout, DBMarket, DBRegionMarketAvg)` (the same TSM data the app reads: the realm's lowest
@@ -591,6 +626,17 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-19** (second part) Item interactions: Poisons as a profession, item uses (essences, Darkmoon cards, tools),
+  recipe tools in your bags (`Engine.tools_for`, `owned_items`), the interactions report on Data health and
+  `python -m wfm.interactions`; ForeverRecipes as a second recipe source (`wfm/foreverrecipes.py`, World loads it with
+  SkillUpForever; Data health compares them); Biggest markets on the Market tab (`wfm/markets.py`, `/api/markets`);
+  farm meter 1.6.1 (the app's prices under 12 h old, else TSM). Crafting tab: "Poisons" and "No profession" in the
+  picker; the drawer shows tools needed and the level to learn. On the user's data: Poisons 10 rows (Instant Poison V
+  needs level 52), essence splits 4 rows (Greater Mystic -> 3 Lesser: 4s 37c each), the Salt Shaker 66g 28s a use.
+  Downloads: SpellTotems.csv (25 KB) and TotemCategory.csv (1 KB) from wago.tools, build 1.60.1.70959 (now in
+  `gamedata.TABLES`); Wowhead Forever tooltips (public tooltip API) for items 10938, 10939, 273817 and spells 1308151,
+  1292560. Tests: 266 (6 of them Lua, with lupa). Consistency check: 0 problems.
 
 - **2026-11-19** Four things the user asked for. (1) Salt Shaker and other tools as craft rows (`gamedata.tool_recipes`,
   `Engine.owns`, `tool_made`; Crafting drawer "Tool" line; ingredients a tool makes say so; "Farm Refined Deeprock Salt"

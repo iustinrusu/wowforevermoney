@@ -21,6 +21,11 @@ class SkillUpData:
     recipe_data: dict[int, dict] = field(default_factory=dict)         # recipe spell -> {skillLine, reagents, output}
     recipe_scrolls: dict = field(default_factory=dict)
     source_build: str | None = None
+    # filled by foreverrecipes.merged (the second recipe source): spells whose required skill is exact, the character
+    # level a recipe needs, and the spells whose colours came from ForeverRecipes
+    requirement_known: set = field(default_factory=set)
+    level_required: dict[int, int] = field(default_factory=dict)
+    from_forever_recipes: set = field(default_factory=set)
 
 
 def _load(path: Path) -> tuple[dict, str]:

@@ -1,4 +1,4 @@
-"""Tools you keep and use (the Salt Shaker): read from ItemEffect, and their craft rows. Money in copper.
+"""Item uses (the Salt Shaker, essences, Darkmoon cards) and the tools recipes need. Money in copper.
 
 The user's question (2026-11-19): why isn't Cured Rugged Hide profitable with Leatherworking 255 and a Salt Shaker?
 The Salt Shaker turns Deeprock Salt (3s 13c) into Refined Deeprock Salt (57g listed) once every 71 hours, but it is an
@@ -25,38 +25,89 @@ def item(iid, name, sell=0, cls=7, sub=0, req_skill=0, rank=0):
                 class_id=cls, subclass_id=sub, bonding=0, req_skill=req_skill, req_skill_rank=rank)
 
 
-class ToolTableTests(unittest.TestCase):
-    def test_tools_from_item_effects(self):
+GREATER, BALL, ACE, TWO, HAMMER, KNIFE = 10939, 23135, 31882, 31889, 5956, 9060
+
+
+class ItemUseTableTests(unittest.TestCase):
+    """ItemEffect (on use) spells that create items, read from tiny CSVs shaped like wago.tools' exports."""
+
+    def load(self):
         gd = GameData(build='test')
         gd.professions = {LW: 'Leatherworking'}
         for it in (item(SHAKER, 'Salt Shaker', 7500, cls=0, req_skill=LW, rank=250), item(SALT, 'Deeprock Salt'),
-                   item(REFINED, 'Refined Deeprock Salt'), item(ESSENCE, 'Lesser Magic Essence', req_skill=LW),
-                   item(BRILLIANCE, 'Brilliance', req_skill=LW, rank=280), item(1, 'Quest Thing')):
+                   item(REFINED, 'Refined Deeprock Salt'), item(ESSENCE, 'Lesser Magic Essence'),
+                   item(GREATER, 'Greater Magic Essence'), item(BRILLIANCE, 'Brilliance', req_skill=LW, rank=280),
+                   item(1, 'Quest Thing'), item(BALL, 'Heavy Leather Ball'), item(ACE, 'Ace of Beasts'),
+                   item(TWO, 'Two of Beasts')):
             gd.items[it.id] = it
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
-            # TriggerType 0 = on use; Charges -1 = used up (single use); the essence's use consumes the essence itself
+            # TriggerType 0 = on use (1 = on equip: ignored); Charges -1 = used up, 0 = kept, 20 = twenty uses
             (folder / 'ItemEffect.csv').write_text(
                 'ID,LegacySlotIndex,TriggerType,Charges,CoolDownMSec,CategoryCoolDownMSec,SpellCategoryID,SpellID\n'
                 f'100917,0,0,0,0,{HOURS_71},791,19566\n'
-                '2,0,0,0,0,0,0,13361\n'
-                '3,0,0,-1,-1,-1,0,1232054\n'
-                '4,0,0,0,0,0,0,999\n'
-                '5,0,1,0,0,0,0,19566\n', encoding='utf-8')
+                '2,0,0,-1,-1,-1,0,13361\n'
+                '3,0,0,-1,-1,-1,0,13362\n'
+                '4,0,0,-1,-1,-1,0,1232054\n'
+                '5,0,0,0,0,0,0,999\n'
+                '6,0,0,-1,-1,-1,0,23135\n'
+                '7,0,0,0,0,0,0,23677\n'
+                '8,0,1,0,0,0,0,555\n', encoding='utf-8')
             (folder / 'ItemXItemEffect.csv').write_text(
-                f'ID,ItemEffectID,ItemID\n1,100917,{SHAKER}\n2,2,{ESSENCE}\n3,3,{BRILLIANCE}\n4,4,1\n', encoding='utf-8')
-            creates = {19566: (REFINED, 1.0), 13361: (2, 1.0), 1232054: (3, 1.0), 999: (4, 1.0)}
-            reagents = {19566: [(SALT, 1)], 13361: [(ESSENCE, 2)], 1232054: [(SALT, 15)], 999: [(SALT, 1)]}
-            out = gamedata.tool_recipes(folder, gd, creates, reagents, {19566: 'Salt Shaker'}, set())
-        self.assertEqual(len(out), 1)                       # essence (uses itself), single use, no profession: out
-        r = out[0]
-        self.assertEqual((r.tool_id, r.product_id, r.reagents, r.profession, r.min_rank), (SHAKER, REFINED, [(SALT, 1)],
-                                                                                       'Leatherworking', 250))
+                f'ID,ItemEffectID,ItemID\n1,100917,{SHAKER}\n2,2,{ESSENCE}\n3,3,{GREATER}\n4,4,{BRILLIANCE}\n5,5,1\n'
+                f'6,6,{BALL}\n7,7,{TWO}\n8,8,{SHAKER}\n', encoding='utf-8')
+            creates = {19566: (REFINED, 1.0), 13361: (GREATER, 1.0), 13362: (ESSENCE, 3.0), 1232054: (3, 1.0),
+                       999: (4, 1.0), 23135: (BALL, 1.0), 23677: (77, 1.0), 555: (5, 1.0)}
+            reagents = {19566: [(SALT, 1)], 13361: [(ESSENCE, 2)], 1232054: [(SALT, 15)], 23677: [(ACE, 1), (TWO, 1)]}
+            out = gamedata.item_use_recipes(folder, gd, creates, reagents, {19566: 'Salt Shaker'}, set())
+        return {r.spell_id: r for r in out}
+
+    def test_a_tool_you_keep(self):
+        r = self.load()[19566]
+        self.assertEqual((r.tool_id, r.use_item, r.product_id, r.reagents, r.profession, r.min_rank),
+                         (SHAKER, 0, REFINED, [(SALT, 1)], 'Leatherworking', 250))
         self.assertEqual(r.cooldown_ms, 255_600_000)        # 71 hours, the Forever tooltip's "2 Days, 23 Hrs"
 
-    def test_older_caches_without_the_tables_load_no_tools(self):
+    def test_items_used_up_count_as_one_more_reagent(self):
+        rs = self.load()
+        up = rs[13361]                 # "Turn three lesser magic essences into a greater one": 1 used + 2 reagents
+        self.assertEqual((up.use_item, up.tool_id, up.reagents, up.profession), (ESSENCE, 0, [(ESSENCE, 3)],
+                                                                                   gamedata.NO_PROFESSION))
+        down = rs[13362]               # "Turn a greater magic essence into three lesser ones"
+        self.assertEqual((down.reagents, down.product_id, down.product_count), ([(GREATER, 1)], ESSENCE, 3.0))
+        self.assertEqual(rs[1232054].reagents, [(SALT, 15), (BRILLIANCE, 1)])     # a single-use item
+        self.assertEqual(rs[1232054].profession, 'Leatherworking')
+
+    def test_combined_items_and_what_is_left_out(self):
+        rs = self.load()
+        deck = rs[23677]               # Darkmoon cards: the used card is one of the reagents, nothing extra
+        self.assertEqual((deck.use_item, deck.tool_id, deck.reagents), (TWO, 0, [(ACE, 1), (TWO, 1)]))
+        self.assertNotIn(999, rs)      # something from nothing, any time: not real
+        self.assertNotIn(23135, rs)    # an item turned into itself
+        self.assertNotIn(555, rs)      # on equip, not on use
+
+    def test_older_caches_without_the_tables_load_none(self):
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertEqual(gamedata.tool_recipes(Path(tmp), GameData(build='t'), {}, {}, {}, set()), [])
+            self.assertEqual(gamedata.item_use_recipes(Path(tmp), GameData(build='t'), {}, {}, {}, set()), [])
+
+    def test_tools_a_recipe_needs(self):
+        gd = GameData(build='test')
+        gd.recipes = [Recipe(spell_id=17187, name='Transmute: Arcanite', profession='Alchemy', skill_line=171,
+                             product_id=12360, product_count=1, reagents=[], trivial_low=0, trivial_high=0, min_rank=1)]
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            (folder / 'SpellTotems.csv').write_text('ID,SpellID,RequiredTotemCategoryID_0,RequiredTotemCategoryID_1,'
+                                                    'Totem_0,Totem_1\n1,17187,12,0,0,0\n', encoding='utf-8')
+            (folder / 'TotemCategory.csv').write_text(
+                'ID,Name_lang,TotemCategoryType,TotemCategoryMask\n12,"Philosopher\'s Stone",22,1\n'
+                '161,"Gnomish Army Knife",24,127\n162,"Blacksmith Hammer",24,4\n165,"Mining Pick",24,8\n'
+                '375,"Runed Golden Rod",3,7\n377,"Runed Arcanite Rod",3,31\n', encoding='utf-8')
+            gamedata.add_tools_needed(folder, gd)
+        self.assertEqual(gd.recipes[0].tools_needed, (12,))
+        self.assertTrue(gamedata.tool_fits(gd, 161, 162))      # a Gnomish Army Knife is a Blacksmith Hammer
+        self.assertTrue(gamedata.tool_fits(gd, 377, 375))      # an Arcanite rod does what a Golden rod does
+        self.assertFalse(gamedata.tool_fits(gd, 375, 377))
+        self.assertFalse(gamedata.tool_fits(gd, 162, 165))     # a hammer is not a pick
 
 
 def world(bags=None, lw=255):
@@ -143,6 +194,82 @@ class ToolRowTests(unittest.TestCase):
         farm = {o.item_id for o in e.gathering(e.best_uses())}
         self.assertNotIn(REFINED, farm)                       # only the Salt Shaker makes it: nothing to farm
         self.assertIn(SALT, farm)
+
+
+LESSER_ETERNAL, GREATER_ETERNAL, PHILO, PHILO_CAT, ARCANITE, THORIUM, CRYSTAL = 16202, 16203, 9149, 12, 12360, 12359, 12363
+
+
+class MoreInteractionTests(unittest.TestCase):
+    """Essence splits (no profession), recipe tools, and poisons' level requirement (2026-11-19 survey)."""
+
+    def world(self, bags=None, level=50, poisons=230):
+        gd = GameData(build='test')
+        for it in (item(LESSER_ETERNAL, 'Lesser Eternal Essence', sub=12), item(GREATER_ETERNAL, 'Greater Eternal Essence', sub=12),
+                   item(PHILO, "Philosopher's Stone", cls=0), item(ARCANITE, 'Arcanite Bar'), item(THORIUM, 'Thorium Bar'),
+                   item(CRYSTAL, 'Arcane Crystal'), item(2892, 'Deadly Poison', cls=0), item(5173, 'Deathweed'),
+                   item(3372, 'Leaded Vial')):
+            gd.items[it.id] = it
+        gd.items[PHILO].totem_category = PHILO_CAT
+        gd.totem_categories = {PHILO_CAT: ("Philosopher's Stone", 22, 1)}
+        gd.recipes = [
+            Recipe(spell_id=20040, name='Lesser Eternal Essence', profession=gamedata.NO_PROFESSION, skill_line=0,
+                   product_id=LESSER_ETERNAL, product_count=3, reagents=[(GREATER_ETERNAL, 1)], trivial_low=0,
+                   trivial_high=0, min_rank=1, use_item=GREATER_ETERNAL),
+            Recipe(spell_id=17187, name='Transmute: Arcanite', profession='Alchemy', skill_line=171, product_id=ARCANITE,
+                   product_count=1, reagents=[(THORIUM, 1), (CRYSTAL, 1)], trivial_low=275, trivial_high=300,
+                   min_rank=1, tools_needed=(PHILO_CAT,)),
+            Recipe(spell_id=2835, name='Deadly Poison', profession='Poisons', skill_line=40, product_id=2892,
+                   product_count=1, reagents=[(5173, 1), (3372, 1)], trivial_low=175, trivial_high=225, min_rank=1)]
+        # the user's TSM data, 2026-11-19: a Greater Eternal Essence at 27g, Lesser ones at 10g 42s
+        p = lambda mb, spd: {'numAuctions': 20, 'minBuyout': mb, 'marketValue': mb, 'regionSale': mb,
+                             'regionMarketValue': mb, 'regionSoldPerDay': spd, 'regionSalePercent': 0.5}
+        prices = {GREATER_ETERNAL: p(269990, 105.5), LESSER_ETERNAL: p(104230, 175.1), ARCANITE: p(442400, 36.8),
+                  THORIUM: p(4000, 500), CRYSTAL: p(86500, 32), 2892: p(1000, 13.5), 5173: p(100, 100), 3372: p(50, 100)}
+        su = SkillUpData(thresholds={17187: [275, 275, 282, 290], 2835: [130, 175, 200, 225]},
+                         level_required={2835: 30}, requirement_known={17187, 2835})
+        w = SimpleNamespace(gamedata=gd, prices=prices, questie=QuestieDB(), skillup=su, angler=None)
+        if bags is not None:
+            w.syndicator = {'k': {'name': 'Testchar', 'equipped': {}}}
+            w.inventory = {'k': bags}
+        s = {'gold': 1000, 'ah_cut': 0.05, 'market_share': 0.2, 'faction': 'H', 'min_sold_per_day': 0.5,
+             'professions': {'Alchemy': 300, 'Poisons': poisons}, 'character': 'Testchar-PvP', 'level': level,
+             'sale_price_basis': 'realm'}
+        e = Engine(w, s)
+        return e, {o.key: o for o in e.crafts()}
+
+    def test_splitting_a_greater_essence_is_a_flip_anyone_can_do(self):
+        e, rows = self.world(bags={})
+        o = rows['craft:20040']
+        self.assertEqual(o.title, 'Turn 1 Greater Eternal Essence into 3 Lesser Eternal Essence')
+        self.assertTrue(o.doable)
+        self.assertEqual(o.profit_unit, 3 * int(104230 * 0.95) - 269990)    # 297,054 - 269,990 = 27,064 (2g 70s)
+        self.assertEqual(o.detail['learn']['how'], 'item use')
+        # and a Greater Eternal Essence is worth what its three Lesser ones sell for
+        self.assertEqual(e.best_uses()[GREATER_ETERNAL]['doable_value'], 3 * int(104230 * 0.95))
+
+    def test_a_recipe_tool_you_lack(self):
+        _, rows = self.world(bags={})
+        o = rows['craft:17187']
+        self.assertFalse(o.doable)
+        self.assertIn('needs_tool', o.flags)
+        self.assertEqual(o.needs, "Get a Philosopher's Stone (once: you keep it)")
+        self.assertEqual(o.detail['tools'][0]['have'], False)
+        _, rows = self.world(bags={PHILO: 1})
+        self.assertTrue(rows['craft:17187'].doable)
+        self.assertNotIn('needs_tool', rows['craft:17187'].flags)
+        _, rows = self.world()                                       # bags not read: shown, with a doubt
+        self.assertIn('tool_unchecked', rows['craft:17187'].flags)
+
+    def test_poisons_are_crafts_with_a_level_to_learn_them(self):
+        _, rows = self.world(bags={})
+        o = rows['craft:2835']
+        self.assertTrue(o.doable)
+        self.assertEqual((o.detail['skill_required'], o.detail['skill_exact']), (130, True))
+        _, rows = self.world(bags={}, level=25)
+        self.assertFalse(rows['craft:2835'].doable)
+        self.assertIn('Level 30', rows['craft:2835'].needs)
+        _, rows = self.world(bags={}, poisons=100)
+        self.assertIn('Poisons 130', rows['craft:2835'].needs)
 
 
 if __name__ == '__main__':

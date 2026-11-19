@@ -5,7 +5,7 @@ Run on every recompute (shown on the Data health page) and from the command line
 """
 from __future__ import annotations
 
-from . import coverage, everloot, gatherlite, wowhead_items
+from . import coverage, everloot, foreverrecipes, gatherlite, interactions, wowhead_items
 from .engine import PROFESSIONS
 
 
@@ -238,6 +238,25 @@ def run(world, engine) -> list[dict]:
                                   if r['zones_only_gatherlite'] else '') for r in c['rows']]))
     except Exception as e:          # never let a check break the audit
         out.append(_check('Node positions: QuestieDB vs GatherLite', 'warn', f'Could not work it out: {e}'))
+
+    # Every way an item is made, and whether the app counts it (2026-11-19, after the Salt Shaker was missed)
+    try:
+        out.append(interactions.check(interactions.report(gd, prices), engine.name))
+    except Exception as e:          # never let a check break the audit
+        out.append(_check('Item interactions covered (every way an item is made)', 'warn', f'Could not work it out: {e}'))
+
+    # ForeverRecipes: a second source of recipe skill levels, compared with SkillUpForever
+    fr = getattr(world, 'forever_recipes', None)
+    if fr and fr.recipes:
+        c = foreverrecipes.compare(getattr(world, 'skillup_raw', None) or su, fr)
+        filled = len(getattr(su, 'from_forever_recipes', ()) or ())
+        out.append(_check('Recipe skill levels: SkillUpForever vs ForeverRecipes', 'pass' if not c['diff'] else 'warn',
+                          f"{c['both']:,} recipes in both: {c['same']:,} have the same colours (yellow, green, grey), "
+                          f"{len(c['diff'])} differ. ForeverRecipes fills {filled} gaps (recipes SkillUpForever lacks, "
+                          f"like rogue poisons, or whose required skill it doesn't know, like Cured Rugged Hide); "
+                          f"{len(c['only_forever_recipes'])} recipes only it has.",
+                          [f"{engine.name(ours[s].product_id) if s in ours else s} ({s}): SkillUpForever {a}, ForeverRecipes {b}"
+                           for s, a, b in c['diff']]))
 
     # Everloot: a second Forever source for drop rates (player uploads), compared with the Wowhead pages read (2c)
     try:

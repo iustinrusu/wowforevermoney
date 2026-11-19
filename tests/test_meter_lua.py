@@ -85,6 +85,25 @@ class MeterTests(unittest.TestCase):
         self.slash('start')
         self.assertIn('max level', self.refresh().kv[4].text)
 
+    def test_auto_uses_the_apps_prices_while_fresh(self):
+        # the default: the app's values while under 12 hours old, else TSM in game (decided at /gea start)
+        self.g.ForeverMoneyBridge_Prices = self.lua.eval('{made = 1795000000 - 7200, items = {[8150] = 5000}, containers = {}}')
+        self.slash('start')
+        self.loot(8150, 'Deeprock Salt')
+        win = self.refresh()
+        self.assertEqual(win.kv[2].text, '|cffc7c7cf50s|r')              # the app's 5,000
+        self.assertIn("the app's, from 2.0 h ago", win.note.text)
+        self.slash('stop')
+        self.g.ForeverMoneyBridge_Prices = self.lua.eval('{made = 1795000000 - 13 * 3600, items = {[8150] = 5000}, containers = {}}')
+        self.slash('start')
+        self.loot(8150, 'Deeprock Salt')
+        win = self.refresh()
+        self.assertEqual(win.kv[2].text, '|cffc7c7cf2s|r |cffeda55f97c|r')   # 13 h old: TSM, 313 - 5% = 297
+        self.assertIn("the app's are 13 h old", win.note.text)
+        self.slash('stop')
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.sessions[1].prices, 'tsm')
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.sessions[2].prices, 'app')
+
     def test_price_source_can_be_the_app(self):
         self.g.ForeverMoneyBridge_Prices = self.lua.eval('{made = 1795000000 - 7200, items = {[8150] = 5000}, containers = {}}')
         self.slash('prices app')

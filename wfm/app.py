@@ -18,6 +18,8 @@ from . import niches as niches_mod
 from . import sniper as sniper_mod
 from . import investments as investments_mod
 from . import market as market_mod
+from . import markets as markets_mod
+from . import valuation as valuation_mod
 from . import profile as profile_mod
 from .alerts import EventLog, desktop_notify, diff_runs
 from .engine import Engine
@@ -348,7 +350,7 @@ class App:
             'tip': self.tips.get(str(iid)),
         }
 
-    CRAFTING = ('Alchemy', 'Blacksmithing', 'Cooking', 'Enchanting', 'Engineering', 'First Aid', 'Leatherworking',
+    CRAFTING = ('Alchemy', 'Blacksmithing', 'Cooking', 'Enchanting', 'Engineering', 'First Aid', 'Leatherworking', 'Poisons',
                 'Tailoring')
 
     def _known_crafts(self) -> set:
@@ -425,6 +427,29 @@ class App:
             investments_mod.load_list(), gd.items if gd else {}, gd.recipes if gd else [], self.world.prices,
             lambda iid: self.history.series(iid, days=KEEP_DAYS), s.get('watchlist'), float(s.get('ah_cut', 0.05)),
             s.get('sale_price_basis', 'realm'))
+
+    def markets(self) -> dict:
+        """Biggest markets (markets.py): where the most gold changes hands a day, and the app's ways into each."""
+        s = self.effective_settings()[0]
+        w, gd = self.world, self.world.gamedata
+        if not gd:
+            return {'rows': []}
+        eng = Engine(w, s)
+        made_by: dict[int, list] = {}
+        for r in gd.recipes:
+            made_by.setdefault(r.product_id, []).append(r.profession)
+        contents = valuation_mod.merge_contents(getattr(w, 'forever_containers', None), (w.profile or {}).get('containers'))
+        inside = {cid for c in contents.values() for cid in c['qty']}
+        rows_for: dict[int, list] = {}
+        for o in (self.result or {}).get('opportunities', []):
+            if o.kind in markets_mod.KIND_TEXT:
+                rows_for.setdefault(o.item_id, []).append(o)
+                for d in (o.detail.get('drops') or []):          # mob farming rows supply each item they drop
+                    if d.get('item_id'):
+                        rows_for.setdefault(d['item_id'], []).append(o)
+        rows = markets_mod.build(w.prices, gd.items, made_by, eng.sold_by_vendor,
+                                 (w.questie.items if w.questie else {}), inside, rows_for)
+        return {'rows': rows, 'share': s.get('market_share', 0.2)}
 
     def market(self, iid: int) -> dict:
         gd = self.world.gamedata
@@ -599,6 +624,8 @@ def make_handler(app: App):
                     return self._json(app.purse())
                 if url.path == '/api/market':
                     return self._json(app.market(int(qs.get('id', ['0'])[0])))
+                if url.path == '/api/markets':
+                    return self._json(app.markets())
                 if url.path == '/api/niches':
                     return self._json(app.niches())
                 if url.path == '/api/sniper':

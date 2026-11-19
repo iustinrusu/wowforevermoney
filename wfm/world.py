@@ -27,6 +27,7 @@ from . import gatherlite as gatherlite_mod
 from . import wowhead_items
 from .questie import QuestieDB, load_drop_rates, load_questie
 from .skillup import SkillUpData, load_skillup
+from . import foreverrecipes as foreverrecipes_mod
 from .tooltips import TooltipCache
 from .tsm import PriceData, parse_appdata
 
@@ -78,7 +79,9 @@ class World:
         self.syndicator: dict = {}
         self.source_grades: dict = {}
         self.untrusted_items = 0
-        self.skillup: SkillUpData = SkillUpData()
+        self.skillup: SkillUpData = SkillUpData()          # SkillUpForever with ForeverRecipes filling its holes
+        self.skillup_raw: SkillUpData = SkillUpData()      # SkillUpForever alone (for the cross-check)
+        self.forever_recipes = None                        # ForeverRecipes addon data (foreverrecipes.py)
         self.angler: dict | None = None
         self.classic_fishing: classicdb.ClassicFishing | None = None
         self.forever_fishing: dict = {}      # zone name -> Wowhead Forever counts (read by hand)
@@ -184,9 +187,16 @@ class World:
             st.status, st.note = 'missing', ('Not installed: recipes can\'t be checked as learnable in Forever, so crafts '
                                              'are marked "unverified recipe" and kept out of Top picks, and recipe skill '
                                              'levels are estimated. Install the SkillUpForever addon.')
-            self.skillup = SkillUpData()
+            self.skillup_raw = SkillUpData()
+        else:
+            self.skillup_raw = load_skillup(d)
+        self._load_forever_recipes()
+        self.skillup = foreverrecipes_mod.merged(self.skillup_raw, self.forever_recipes)
+        if not d.exists():
+            if self.forever_recipes and self.forever_recipes.recipes:
+                st.note += ' ForeverRecipes is installed and fills in for it where it can.'
+            self.version += 1
             return
-        self.skillup = load_skillup(d)
         st.version = self.paths.addon_version('SkillUpForever')
         st.file_time, st.loaded_at = _mtime([d]), int(time.time())
         cb = self.client_build or self.paths.client_build()
@@ -196,6 +206,24 @@ class World:
         else:
             st.status, st.note = 'ok', ''
         self.version += 1
+
+    def _load_forever_recipes(self):
+        """ForeverRecipes (a second source of Forever recipe facts; merged into self.skillup by _load_skillup)."""
+        st = self.status.setdefault('foreverrecipes', SourceStatus(
+            'foreverrecipes', 'ForeverRecipes (recipe skill, poisons, trainers: second source)'))
+        d = self.paths.foreverrecipes_data
+        st.files = [str(d)]
+        if not d.exists():
+            self.forever_recipes = None
+            st.status, st.note = 'missing', ('Optional. Not installed: SkillUpForever alone gives recipe skill levels, '
+                                             'and rogue poisons are not covered.')
+            return
+        self.forever_recipes = foreverrecipes_mod.load(d)
+        st.version = self.paths.addon_version('ForeverRecipes')
+        st.file_time, st.loaded_at = _mtime([d]), int(time.time())
+        n = len(self.forever_recipes.recipes)
+        st.status = 'ok' if n else 'warn'
+        st.note = f'{n} recipes (data from client build {self.forever_recipes.source_build or "?"})'
 
     def _load_gatherlite(self):
         st = self.status.setdefault('gatherlite', SourceStatus('gatherlite', 'GatherLite node positions (Forever)'))
@@ -428,7 +456,7 @@ class World:
         'hotfix': ('_load_hotfix', lambda self: [self.paths.hotfix_cache() or '']),
         'tsm': ('_load_tsm', lambda self: [self.paths.tsm_appdata]),
         'questie': ('_load_questie', lambda self: [self.paths.questie_toc, self.paths.questie_drops]),
-        'skillup': ('_load_skillup', lambda self: [self.paths.skillup_data]),
+        'skillup': ('_load_skillup', lambda self: [self.paths.skillup_data, self.paths.foreverrecipes_data]),
         'angler': ('_load_angler', lambda self: [self._sv('ForeverAngler.lua') or '']),
         'gatherlite': ('_load_gatherlite', lambda self: [gatherlite_mod.data_file(self.paths.addons) or '']),
         'classicdb': ('_load_classic', lambda self: [classicdb.CACHE]),

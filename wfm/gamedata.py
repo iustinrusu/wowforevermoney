@@ -12,7 +12,8 @@ from .paths import DATA
 
 TABLES = ['ItemSparse', 'Item', 'SkillLine', 'SkillLineAbility', 'SpellEffect', 'SpellReagents', 'SpellName',
           'AreaTable', 'SpellCooldowns', 'SpellCategories', 'SpellCategory', 'UiMap', 'UiMapAssignment',
-          'ItemEffect', 'ItemXItemEffect']      # what an item does when used (the Salt Shaker), and its cooldown
+          'ItemEffect', 'ItemXItemEffect',      # what an item does when used (the Salt Shaker), and its cooldown
+          'SpellTotems', 'TotemCategory']       # tools a recipe needs (Philosopher's Stone, Blacksmith Hammer)
 USER_AGENT = 'WoWForeverMoney/0.1 (personal gold tool)'
 CREATE_ITEM = '24'
 ITEM_FLAG_HAS_LOOT = 0x4   # ItemSparse Flags_0: the item can be opened (has its own loot)
@@ -103,6 +104,7 @@ class Item:
     untrusted: tuple = ()      # fields of this item's source that in-game checks show are often wrong
     req_skill: int = 0         # profession (SkillLine id) needed to use it, e.g. Leatherworking for the Salt Shaker
     req_skill_rank: int = 0    # and the skill in it
+    totem_category: int = 0    # the kind of tool it counts as (TotemCategory: Blacksmith Hammer, Runed Arcanite Rod)
 
     @property
     def category(self) -> str:
@@ -126,6 +128,10 @@ class Recipe:
     cooldown_ms: int = 0                 # SpellCooldowns (e.g. Transmute: Arcanite 47 h, Mooncloth 95 h)
     cooldown_group: str = ''             # shared cooldown (SpellCategories), e.g. 'Transmute - Alchemy'
     tool_id: int = 0                     # made by using an item you keep (the Salt Shaker), not a recipe you learn
+    use_item: int = 0                    # made by using an item that is used up or combined (essences, Darkmoon cards)
+    tool_charges: int = 0                # uses the tool has before it is gone (0 = unlimited)
+    tools_needed: tuple = ()             # TotemCategory ids the recipe needs in your bags (SpellTotems)
+    tool_items: tuple = ()               # specific items the recipe needs in your bags (SpellTotems)
 
 
 @dataclass
@@ -140,6 +146,10 @@ class GameData:
     item_classes: dict[int, tuple[int, int]] = field(default_factory=dict)   # every item id -> (class, subclass)
     hotfix_items: int = 0          # items taken from the server's data (client hotfix cache)
     downloaded: int = 0
+    totem_categories: dict[int, tuple] = field(default_factory=dict)          # id -> (name, type, mask)
+    # every other spell that makes an item, and why it is not a recipe here: (spell, name, product, count, reagents,
+    # how it is cast). interactions.py reports them, so a gap like the Salt Shaker shows up by itself.
+    other_creates: list[tuple] = field(default_factory=list)
 
 
 def load(build: str) -> GameData:
@@ -162,9 +172,12 @@ def load(build: str) -> GameData:
             sell_price=_int(r.get('SellPrice')), buy_price=round(_int(r.get('BuyPrice')) / stack_count),
             stack=_int(r.get('Stackable'), 1), class_id=cls, subclass_id=sub, bonding=_int(r.get('Bonding')),
             openable=bool(_int(r.get('Flags_0')) & ITEM_FLAG_HAS_LOOT), locked=_int(r.get('LockID')) > 0,
-            req_skill=_int(r.get('RequiredSkill')), req_skill_rank=_int(r.get('RequiredSkillRank')))
+            req_skill=_int(r.get('RequiredSkill')), req_skill_rank=_int(r.get('RequiredSkillRank')),
+            totem_category=_int(r.get('TotemCategoryID')))
 
+    line_names: dict[int, str] = {}
     for r in _rows(folder, 'SkillLine'):
+        line_names[_int(r['ID'])] = r.get('DisplayName_lang', '')
         if _int(r.get('CategoryID')) in (9, 11):   # 11 = professions, 9 = secondary skills
             gd.professions[_int(r['ID'])] = r.get('DisplayName_lang', '')
 
@@ -176,9 +189,12 @@ def load(build: str) -> GameData:
 
     names = {_int(r['ID']): r.get('Name_lang', '') for r in _rows(folder, 'SpellName')}
     creates: dict[int, tuple[int, float]] = {}
+    triggered: set[int] = set()                    # spells another spell casts
     for r in _rows(folder, 'SpellEffect'):
         if r.get('Effect') == CREATE_ITEM and _int(r.get('EffectItemType')):
             creates[_int(r['SpellID'])] = (_int(r['EffectItemType']), max(1.0, float(r.get('EffectBasePointsF') or 1)))
+        if _int(r.get('EffectTriggerSpell')):
+            triggered.add(_int(r.get('EffectTriggerSpell')))
     reagents: dict[int, list[tuple[int, int]]] = {}
     for r in _rows(folder, 'SpellReagents'):
         mats = []
@@ -208,8 +224,10 @@ def load(build: str) -> GameData:
                 groups[_int(r.get('SpellID'))] = cat_names.get(cat) or f'category {cat}'
 
     seen = set()
+    any_line: dict[int, int] = {}                  # every spell a skill line teaches (class skills too)
     for r in _rows(folder, 'SkillLineAbility'):
         line = _int(r.get('SkillLine'))
+        any_line.setdefault(_int(r.get('Spell')), line)
         if line not in gd.professions:
             continue
         spell = _int(r.get('Spell'))
@@ -223,7 +241,23 @@ def load(build: str) -> GameData:
             trivial_low=_int(r.get('TrivialSkillLineRankLow')), trivial_high=_int(r.get('TrivialSkillLineRankHigh')),
             min_rank=_int(r.get('MinSkillLineRank')), cooldown_ms=cooldowns.get(spell, 0),
             cooldown_group=groups.get(spell, '') if cooldowns.get(spell, 0) else ''))
-    gd.recipes.extend(tool_recipes(folder, gd, creates, reagents, names, seen))
+    gd.recipes.extend(item_use_recipes(folder, gd, creates, reagents, names, seen))
+    add_tools_needed(folder, gd)
+    in_recipes = {r.spell_id for r in gd.recipes}
+    item_uses = _item_use_spells(folder)
+    for spell, (product, count) in creates.items():
+        if spell in in_recipes:
+            continue
+        if spell in any_line:
+            how = f'class or other skill: {line_names.get(any_line[spell], any_line[spell])}'
+        elif spell in item_uses:
+            how = ('item use left out (it turns an item into itself, or makes something from nothing with under 10 '
+                   'minutes between uses)')
+        elif spell in triggered:
+            how = 'cast by another spell'
+        else:
+            how = 'no player source in the game data (an NPC, object or quest casts it)'
+        gd.other_creates.append((spell, names.get(spell, ''), product, count, reagents.get(spell, []), how))
     shared: dict[str, int] = {}
     for rec in gd.recipes:
         if rec.cooldown_group:
@@ -234,35 +268,95 @@ def load(build: str) -> GameData:
     return gd
 
 
-def tool_recipes(folder: Path, gd: GameData, creates: dict, reagents: dict, names: dict, recipe_spells: set) -> list[Recipe]:
-    """Things you make by using a tool you keep, not by a recipe: an item whose use (ItemEffect, trigger 0) turns
-    reagents into another item and needs a profession skill to use. The Salt Shaker (Leatherworking 250): 1 Deeprock
-    Salt -> 1 Refined Deeprock Salt, once every 71 hours in Forever (checked 2026-11-19 against the Forever tooltip:
-    "2 Days, 23 Hrs Cooldown"). These are not in SkillLineAbility, so the app never saw them (the user's question about
-    Cured Rugged Hide). They give no skill-ups. Left out: a use that consumes the item (combining essences, map pieces;
-    ItemEffect Charges not 0, e.g. Forever's single-use Brilliance of the Grand Sorcerer) and uses that need no
-    profession (quest items). Found on build 1.60.1.70959: the Salt Shaker and the Snowmaster 9000 (Engineering)."""
+NO_PROFESSION = 'No profession'
+
+
+def item_use_recipes(folder: Path, gd: GameData, creates: dict, reagents: dict, names: dict,
+                     recipe_spells: set) -> list[Recipe]:
+    """Things made by using an item, not by a recipe you learn (ItemEffect with trigger 0 = on use, whose spell creates
+    an item). These are not in SkillLineAbility, so the app never saw them until the user asked about the Salt Shaker
+    and Cured Rugged Hide (2026-11-19). Three kinds, from ItemEffect.Charges:
+    - a tool you keep (Charges 0, the item is not a reagent): the Salt Shaker (Leatherworking 250) turns 1 Deeprock
+      Salt into 1 Refined Deeprock Salt, once every 71 hours (the Forever tooltip says "2 Days, 23 Hrs Cooldown");
+      the Snowmaster 9000 (Engineering). Charges above 0: a tool with that many uses (Graverobber's Shovel, 20).
+    - an item used up (Charges -1): it counts as one more reagent. Lesser Magic Essence: 1 used + 2 reagents = "Turn
+      three lesser magic essences into a greater one" (Forever tooltip); Greater Magic Essence: "into three lesser
+      ones" (creates 3).
+    - items combined (Charges 0, the item is one of the reagents): eight Darkmoon cards into a deck, map fragments.
+    The profession is the one the item needs to be used (RequiredSkill), else NO_PROFESSION. They give no skill-ups.
+    Left out: a use that only turns an item into itself, and a free use (no reagents, nothing used up) without a
+    cooldown of 10+ minutes."""
     if not ((folder / 'ItemEffect.csv').exists() and (folder / 'ItemXItemEffect.csv').exists()):
         return []                                   # older caches get the tables on the next start
     effects = {_int(r['ID']): r for r in _rows(folder, 'ItemEffect') if _int(r.get('TriggerType')) == 0}
     out, seen = [], set(recipe_spells)
     for link in _rows(folder, 'ItemXItemEffect'):
-        tool, e = _int(link.get('ItemID')), effects.get(_int(link.get('ItemEffectID')))
-        it = gd.items.get(tool)
-        if not e or not it or it.req_skill not in gd.professions or _int(e.get('Charges')) != 0:
+        used, e = _int(link.get('ItemID')), effects.get(_int(link.get('ItemEffectID')))
+        it = gd.items.get(used)
+        if not e or not it:
             continue
-        spell = _int(e.get('SpellID'))
-        mats = reagents.get(spell) or []
-        if spell not in creates or not mats or spell in seen or any(m == tool for m, _ in mats):
+        spell, charges = _int(e.get('SpellID')), _int(e.get('Charges'))
+        if spell not in creates or spell in seen:
             continue
-        seen.add(spell)
         product, count = creates[spell]
+        mats = list(reagents.get(spell) or [])
+        cooldown = max(_int(e.get('CoolDownMSec')), _int(e.get('CategoryCoolDownMSec')), 0)
+        tool = use_item = 0
+        if charges < 0:                              # used up: one more of it is consumed
+            use_item = used
+            mats = [(m, c + 1) if m == used else (m, c) for m, c in mats]
+            if not any(m == used for m, _ in mats):
+                mats.append((used, 1))
+        elif any(m == used for m, _ in mats):         # combined with the others (Darkmoon cards)
+            use_item = used
+        else:                                         # a tool you keep (or one with a few charges)
+            tool = used
+        if not mats and cooldown < 600_000:
+            continue                                  # something from nothing, as often as you like: not real
+        if [m for m, _ in mats] == [product]:
+            continue                                  # an item turned into itself (Heavy Leather Ball)
+        seen.add(spell)
+        prof = gd.professions.get(it.req_skill, NO_PROFESSION)
         out.append(Recipe(
-            spell_id=spell, name=names.get(spell, '') or it.name, profession=gd.professions[it.req_skill],
-            skill_line=it.req_skill, product_id=product, product_count=count, reagents=mats, trivial_low=0,
-            trivial_high=0, min_rank=max(1, it.req_skill_rank),
-            cooldown_ms=max(_int(e.get('CoolDownMSec')), _int(e.get('CategoryCoolDownMSec'))), tool_id=tool))
+            spell_id=spell, name=names.get(spell, '') or it.name, profession=prof, skill_line=it.req_skill,
+            product_id=product, product_count=count, reagents=mats, trivial_low=0, trivial_high=0,
+            min_rank=max(1, it.req_skill_rank), cooldown_ms=cooldown, tool_id=tool, use_item=use_item,
+            tool_charges=max(0, charges) if tool else 0))
     return out
+
+
+def _item_use_spells(folder: Path) -> set[int]:
+    if not (folder / 'ItemEffect.csv').exists():
+        return set()
+    return {_int(r.get('SpellID')) for r in _rows(folder, 'ItemEffect') if _int(r.get('TriggerType')) == 0}
+
+
+def add_tools_needed(folder: Path, gd: GameData) -> None:
+    """The tools a recipe needs in your bags (SpellTotems): a kind of tool (TotemCategory, e.g. Philosopher's Stone for
+    transmutes, Blacksmith Hammer, Runed Arcanite Rod) or a specific item (Flint and Tinder). Not used up."""
+    if not ((folder / 'SpellTotems.csv').exists() and (folder / 'TotemCategory.csv').exists()):
+        return
+    gd.totem_categories = {_int(r['ID']): (r.get('Name_lang', ''), _int(r.get('TotemCategoryType')),
+                                            _int(r.get('TotemCategoryMask'))) for r in _rows(folder, 'TotemCategory')}
+    need: dict[int, tuple[tuple, tuple]] = {}
+    for r in _rows(folder, 'SpellTotems'):
+        cats = tuple(c for c in (_int(r.get('RequiredTotemCategoryID_0')), _int(r.get('RequiredTotemCategoryID_1'))) if c)
+        items = tuple(i for i in (_int(r.get('Totem_0')), _int(r.get('Totem_1'))) if i)
+        if cats or items:
+            need[_int(r.get('SpellID'))] = (cats, items)
+    for rec in gd.recipes:
+        if rec.spell_id in need:
+            rec.tools_needed, rec.tool_items = need[rec.spell_id]
+
+
+def tool_fits(gd: GameData, have_category: int, need_category: int) -> bool:
+    """Does an item of one tool kind count as another (TotemCategory: same type, and its mask holds the needed mask)?
+    A Gnomish Army Knife counts as a Blacksmith Hammer, Mining Pick and Skinning Knife; a Runed Arcanite Rod as every
+    lower rod."""
+    if have_category == need_category:
+        return True
+    have, need = gd.totem_categories.get(have_category), gd.totem_categories.get(need_category)
+    return bool(have and need and have[1] == need[1] and (have[2] & need[2]) == need[2])
 
 
 # Classic dungeon, raid and battleground map ids (AreaTable ContinentID). Forever's new open-world zones sit on new

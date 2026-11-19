@@ -88,6 +88,7 @@ them automatically after every update. Only ForeverMoneyBridge comes from this t
 | **TSM desktop app** + **TradeSkillMaster** + **TradeSkillMaster_AppHelper** | **Required** | Auction prices: the desktop app writes them into AppHelper's folder about hourly | Addons: CurseForge app. Desktop app: tradeskillmaster.com |
 | **ForeverMoneyBridge** (this tool's addon) | **Required** | Your level, gold, professions, real vendor prices, loot and time per zone, trunk contents, in-game item checks | Installed by `start.bat` or `install_addon.bat` |
 | **SkillUpForever** | Strongly recommended | Which recipes can really be learned in Forever, exact skill levels. Without it, crafts are marked "unverified recipe" and never reach Top picks | CurseForge app |
+| **ForeverRecipes** | Recommended | A second source of recipe facts: rogue poisons (SkillUpForever has none), the exact skill for recipes SkillUpForever doesn't know, the character level to learn a recipe, trainer fees. Compared with SkillUpForever on Data health | CurseForge app |
 | **Questie** (with **QuestieDB**) | Strongly recommended | Vendors, who drops what, herb and ore node locations (Forever data) | CurseForge app |
 | **Syndicator** | Recommended | Your bags and bank: enables the My bags tab | CurseForge app |
 | **ForeverAngler** | Optional | Fishing log (pace and got-away rate) | CurseForge app |
@@ -107,9 +108,10 @@ GatherLite (Forever node locations from Wowhead) is read nowhere yet either. See
 - **When:** only on `/reload` or logout, because WoW doesn't let addons write files any other time.
 - **`/gea`** (or `/fmb`) takes a snapshot right away (then `/reload` to write it).
 - **`/gea start`** / **`/gea stop`**: the farm meter: what you loot and its worth, gold an hour, and XP gained (total,
-  an hour, and how long to the next level at that pace). It works without the app: prices come from TSM in game
-  (your realm's lowest listing, else its average, minus the 5% AH cut; the vendor price when that is higher).
-  `/gea prices app` uses the app's own values instead (as its My bags shows them); `/gea prices` explains both.
+  an hour, and how long to the next level at that pace). Prices: the app's own values (as its My bags shows them)
+  while they are under 12 hours old, else TSM in game, so it also works without the app (your realm's lowest
+  listing, else its average, minus the 5% AH cut; the vendor price when that is higher). `/gea prices app` or
+  `/gea prices tsm` fixes one source, `/gea prices auto` goes back; `/gea prices` explains them.
 - **Install without the app:** double-click `install_addon.bat`. It finds WoW: Forever (TSM desktop app
   settings, the Battle.net install entry, then the usual folders on drives C to H), or asks for the folder.
   It never overwrites the item-check list (`Checks.lua`) the app wrote.
@@ -152,6 +154,7 @@ Checks GitHub for a newer Classic fishing dump, and downloads and extracts it if
 | Your game client (ForeverMoneyBridge item checks) | the final word on sell price, quality, levels, stack size and binding for the items the app asks about | after you log in (or `/reload`), wait a minute, then `/reload` again |
 | QuestieDB addon | which NPCs sell, drop and contain each item, faction, location | re-read whenever the addon updates |
 | SkillUpForever addon | exact recipe skill levels, trainer fees, limited-stock vendors | re-read whenever the addon updates |
+| ForeverRecipes addon | rogue poisons, skill levels SkillUpForever lacks, level to learn a recipe, trainer fees | re-read whenever the addon updates |
 | ForeverMoneyBridge (our addon, auto-installed) | your level, gold, professions, real vendor prices, loot by zone with time spent | on logout or `/reload` |
 | ForeverAngler, Syndicator | your fishing catch log; your bags | on logout or `/reload` |
 | Wowhead Forever (read by hand) | real Forever fishing counts for 5 zones; what 5 trunks/clams contain | a dated snapshot in `data/wowhead_forever_*.json`; re-read the pages to refresh |
