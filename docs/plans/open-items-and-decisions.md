@@ -47,6 +47,10 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 - [ ] B8. (2026-11-19) Farm meter 1.6.x in game: XP line, prices (the app's while under 12 h old, else TSM), a
       container from a mob or fishing shown as "not opened yet" without the app. Claude can't run WoW: a screenshot.
       Same login: addon 1.6.2 saves TSM's vendor prices about 30 s after login (then /reload); Data health shows them.
+      Done 2026-11-19: TSM's vendor prices saved (22,265 sell, 87 buy); the XP line and "Prices: the app's, from 2.0 h
+      ago" show (the user's screenshot, nothing looted yet). Left: XP and loot counted after a few kills; a container
+      as "not opened yet" without the app; addon 1.6.3's fold ("–" at the top right or /gea min: a screenshot folded
+      and open, and that the window doesn't jump when folding).
 - [ ] B11. (2026-11-19) Levelling paths stop where the next patterns only drop (Leatherworking at 270): use
       ForeverRecipes' pattern sellers and drop chances, and rank training fees (TODO 1d).
 - [ ] B12. (2026-11-19) Compare TSM's vendor prices with the game files once they arrive; check every priced item in

@@ -17,10 +17,13 @@ where to learn it, farm meter 1.6.x (XP; the app's prices while fresh, else TSM 
 
 ## A. The 2026-11-19 session's topics (highest priority)
 
-A0. [ ] **The user, in game (no Claude needed, 2 minutes, any time):** log in, wait a minute, /reload. That saves
+A0. [x] (done 2026-11-19: TSM's vendor prices saved, 22,265 sell and 87 buy; the meter's XP line and "the app's,
+       from 2.0 h ago" shown in the user's screenshot. Left in checklist B8: XP counted after kills.)
+       **The user, in game (no Claude needed, 2 minutes, any time):** log in, wait a minute, /reload. That saves
        TSM's vendor prices (addon 1.6.2; Data health "Vendor prices from TSM" then fills in) and lets Claude check the
        farm meter (checklist B8: /gea start, kill a few mobs, a screenshot with the XP line).
-A1. [ ] **Collapse / minimize the farm meter** (the user, 2026-11-19: "collapse feature / minimize feature for the gea
+A1. [x] (built 2026-11-19, addon 1.6.3, 5 Lua tests; left: a screenshot folded and open in game, checklist B8)
+       **Collapse / minimize the farm meter** (the user, 2026-11-19: "collapse feature / minimize feature for the gea
        farm meter", high priority). The window (`addon/ForeverMoneyBridge/Meter.lua`, `makeWindow`, 320x340, resizable,
        min 260x290) has only Pause and Stop; it always shows everything. Build:
        - a small "–" button on the title bar (left of Pause) collapses it to one title-height bar that still shows the

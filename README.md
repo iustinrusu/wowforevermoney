@@ -115,6 +115,9 @@ GatherLite (Forever node locations from Wowhead) is read nowhere yet either. See
   while they are under 12 hours old, else TSM in game, so it also works without the app (your realm's lowest
   listing, else its average, minus the 5% AH cut; the vendor price when that is higher). `/gea prices app` or
   `/gea prices tsm` fixes one source, `/gea prices auto` goes back; `/gea prices` explains them.
+- **Fold the meter:** the "–" button at the top right (or `/gea min`) folds the window to one line: the total, gold an
+  hour and the time; "+" opens it again. It stays folded for the next session until you open it. `/gea hide` hides it
+  completely and `/gea show` brings it back. Folded or hidden, it keeps counting (only Pause and Stop change that).
 - **Install without the app:** double-click `install_addon.bat`. It finds WoW: Forever (TSM desktop app
   settings, the Battle.net install entry, then the usual folders on drives C to H), or asks for the folder.
   It never overwrites the item-check list (`Checks.lua`) the app wrote.

@@ -104,6 +104,92 @@ class MeterTests(unittest.TestCase):
         self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.sessions[1].prices, 'tsm')
         self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.sessions[2].prices, 'app')
 
+    def test_fold_to_one_line_and_back(self):
+        g = self.g
+        self.slash('start')
+        win = g.frames[2]
+        self.assertEqual((win.fold.text, win.title.text), ('–', 'Gold Ever After'))
+        self.assertEqual(win.title.width, 320 - 164)                      # stops short of Pause, Stop and "–"
+        self.loot(8150, 'Deeprock Salt', 40)                               # 40 x 297 = 11,880 = 1g 18s 80c
+        g.NOW = 1000 + 1800                                                # half an hour: 23,760 an hour
+        win.left, win.top = 812.5, 640.25                                  # where the window is now
+        self.slash('min')
+        self.assertTrue(g.ForeverMoneyBridgeDB.meter.collapsed)
+        self.assertEqual((win.h, win.bounds[2], win.bounds[4]), (34, 34, 34))   # the title bar only
+        self.assertEqual([p.shown for p in (win.body, win.pause, win.stop)], [False] * 3)
+        self.assertEqual((win.fold.text, win.title.width), ('+', 320 - 46))
+        sep = ' |cff777777·|r '
+        self.assertEqual(win.title.text, '|cffffd7001g|r |cffc7c7cf18s|r' + sep + '|cffaaaaaa2g 37s an hour|r' + sep
+                         + '|cffaaaaaa30 min|r')                           # no copper once there is gold
+        # anchored at its top left corner, where it was: folding doesn't move the title bar
+        self.assertEqual([win.point[i] for i in (1, 3, 4, 5)], ['TOPLEFT', 'BOTTOMLEFT', 812.5, 640.25])
+        pos = g.ForeverMoneyBridgeDB.meter.pos
+        self.assertEqual([pos[i] for i in (1, 2, 3, 4)], ['TOPLEFT', 812.5, 640.25, 'BOTTOMLEFT'])
+        # folded, it keeps counting; paused shows on the line
+        self.loot(8171, 'Rugged Hide')                                     # +500: 12,380 = 1g 23s 80c
+        self.slash('pause')
+        self.assertEqual(self.refresh().title.text, '|cffffd7001g|r |cffc7c7cf23s|r' + sep
+                         + '|cffaaaaaa2g 47s an hour|r' + sep + '|cffaaaaaa30 min, paused|r')   # 24,760 an hour
+        self.slash('resume')
+        self.slash('min')                                                  # open again, as it was
+        self.assertFalse(g.ForeverMoneyBridgeDB.meter.collapsed)
+        self.assertEqual((win.h, win.bounds[2], win.bounds[4]), (340, 290, 600))
+        self.assertEqual([p.shown for p in (win.body, win.pause, win.stop)], [True] * 3)
+        self.assertEqual((win.fold.text, win.title.text), ('–', 'Gold Ever After'))
+        self.assertEqual(win.kv[2].text, '|cffffd7001g|r |cffc7c7cf23s|r |cffeda55f80c|r')
+        self.slash('pause')
+        self.assertEqual(self.refresh().kv[1].text, '30:00  |cffffd100paused|r')
+        # remembered: the next session opens the way the last one was left
+        self.slash('min')
+        self.slash('stop')
+        self.slash('start')
+        self.assertEqual((win.h, win.body.shown, win.fold.text), (34, False, '+'))
+        self.assertEqual(self.refresh().title.text, '|cffeda55f0c|r' + sep + '|cffaaaaaa0 s|r')
+
+    def test_opens_folded_at_the_saved_corner(self):
+        g = self.g
+        g.ForeverMoneyBridgeDB = self.lua.eval(
+            '{meter = {collapsed = true, w = 300, h = 400, pos = {"TOPLEFT", 120, 900, "BOTTOMLEFT"}}}')
+        self.slash('start')
+        win = g.frames[2]
+        self.assertEqual((win.w, win.h, win.left, win.top, win.body.shown), (300, 34, 120, 900, False))
+        self.slash('min')
+        self.assertEqual((win.h, g.ForeverMoneyBridgeDB.meter.h), (400, 400))   # the open height is kept
+
+    def test_old_saved_position_moves_to_the_top_left_corner(self):
+        # before 1.6.3 the position was whatever WoW anchored the moved window at, e.g. its bottom right corner
+        g = self.g
+        g.ForeverMoneyBridgeDB = self.lua.eval('{meter = {pos = {"BOTTOMRIGHT", -238, 121}}}')
+        self.slash('start')
+        win = g.frames[2]
+        first = win.points[1]
+        self.assertEqual([first[i] for i in (1, 3, 4, 5)], ['BOTTOMRIGHT', 'BOTTOMRIGHT', -238, 121])
+        pos = g.ForeverMoneyBridgeDB.meter.pos
+        self.assertEqual([pos[i] for i in (1, 2, 3, 4)], ['TOPLEFT', 500, 700, 'BOTTOMLEFT'])
+
+    def test_hide_and_show_keep_counting(self):
+        g = self.g
+        self.slash('start')
+        win = g.frames[2]
+        self.slash('hide')
+        self.assertFalse(win.shown)
+        self.loot(8150, 'Deeprock Salt', 3)                                # 3 x 297 = 891, counted while hidden
+        self.slash('show')
+        self.assertTrue(win.shown)
+        self.assertEqual(win.kv[2].text, '|cffc7c7cf8s|r |cffeda55f91c|r')
+        self.slash('stop')
+        self.slash('show')
+        self.assertIn('not running', g.printed[len(g.printed)])
+        self.assertFalse(win.shown)
+
+    def test_min_before_start_and_the_help(self):
+        g = self.g
+        self.slash('min')
+        self.assertTrue(g.ForeverMoneyBridgeDB.meter.collapsed)
+        self.assertIn('opens folded to one line from now on', g.printed[len(g.printed)])
+        self.slash('')
+        self.assertIn('/gea min (fold the window to one line and back), /gea hide, /gea show', g.printed[len(g.printed)])
+
     def test_price_source_can_be_the_app(self):
         self.g.ForeverMoneyBridge_Prices = self.lua.eval('{made = 1795000000 - 7200, items = {[8150] = 5000}, containers = {}}')
         self.slash('prices app')

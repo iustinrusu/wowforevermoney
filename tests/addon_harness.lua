@@ -32,22 +32,44 @@ C_TooltipInfo = { GetItemByID = function(id) local l = {} for _, t in ipairs(TOO
 C_Timer = { After = function() end }
 
 local function fontString()
-  local fs = { text = "" }
+  local fs = { text = "", shown = true }
   return setmetatable(fs, { __index = function(_, k)
     if k == "SetText" then return function(s, v) s.text = v end end
+    if k == "SetWidth" then return function(s, v) s.width = v end end
     return function() end
   end })
 end
+
+-- frames remember what the meter's window code sets: size, shown, text, anchors (all of them, in order), resize
+-- bounds. GetLeft / GetTop follow a TOPLEFT-to-BOTTOMLEFT anchor; any other anchor leaves them as they were.
+local frameMethods = {
+  SetScript = function(self, n, fn) self.scripts[n] = fn end,
+  CreateFontString = function() return fontString() end,
+  GetWidth = function(self) return self.w end,
+  GetHeight = function(self) return self.h end,
+  SetSize = function(self, w, h) self.w, self.h = w, h end,
+  SetWidth = function(self, w) self.w = w end,
+  SetHeight = function(self, h) self.h = h end,
+  Show = function(self) self.shown = true end,
+  Hide = function(self) self.shown = false end,
+  IsShown = function(self) return self.shown end,
+  SetText = function(self, t) self.text = t end,
+  GetLeft = function(self) return self.left end,
+  GetTop = function(self) return self.top end,
+  ClearAllPoints = function(self) self.point = nil end,
+  SetPoint = function(self, ...)
+    self.point = { ... }
+    self.points[#self.points + 1] = self.point
+    local p, rel, relPoint, x, y = ...
+    if p == "TOPLEFT" and rel == UIParent and relPoint == "BOTTOMLEFT" then self.left, self.top = x, y end
+  end,
+  GetPoint = function() return "CENTER", nil, "CENTER", 0, 0 end,
+  SetResizeBounds = function(self, ...) self.bounds = { ... } end,
+}
 frames = {}
 function CreateFrame()
-  local f = { scripts = {} }
-  setmetatable(f, { __index = function(_, k)
-    if k == "SetScript" then return function(self, n, fn) self.scripts[n] = fn end end
-    if k == "CreateFontString" then return function() return fontString() end end
-    if k == "GetWidth" or k == "GetHeight" then return function() return 320 end end
-    if k == "GetPoint" then return function() return "CENTER", nil, "CENTER", 0, 0 end end
-    return function() end
-  end })
+  local f = { scripts = {}, shown = true, w = 320, h = 340, left = 500, top = 700, points = {} }
+  setmetatable(f, { __index = function(_, k) return frameMethods[k] or function() end end })
   frames[#frames + 1] = f
   return f
 end

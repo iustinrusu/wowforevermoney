@@ -26,7 +26,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 - **2026-11-19 The farm meter gets a collapse / minimize button (user: "collapse feature / minimize feature for the gea
   farm meter", high priority).** A one-line bar that keeps showing gold an hour, total and time, remembered between
-  sessions; the session keeps counting. Brief: `docs/plans/TODO.md` item A1.
+  sessions; the session keeps counting. Brief: `docs/plans/TODO.md` item A1. Built as addon 1.6.3. Claude's choices,
+  with the reason: the fold button sits at the far right of the title bar, not left of Pause as the brief said, so
+  "–" and "+" are in the same spot (click twice to go back) and folded the line can use the whole width; Pause and
+  Stop hide while folded (at the user's 260-pixel width they'd leave no room for the line; /gea pause still works);
+  the line reads "total · gold an hour · time" (the user's order: the total is the headline) without copper once there
+  is gold, so it fits 260 pixels; the window's tooltip says what the three numbers are. The open title is just "Gold
+  Ever After": the user's screenshot showed "· farm meter" running under the Pause button.
 - **2026-11-19 Slow sellers must not drive the levelling route (user: "slow sells should not rank that high in the
   algorithm deciding best route"; agreed, to be built after the usage reset).** The path counted a week of your
   share of AH sales at the lowest listing as money in hand, so slow, valuable products (Living Shoulders, Devilsaur
@@ -564,6 +570,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-19: after the user's login + /reload, ForeverMoneyBridge 1.6.2 saved TSM's vendor prices: 22,265 VendorSell
+  and 87 VendorBuy. WoW saved the moved meter window as `pos = {"BOTTOMRIGHT", -238.3, 121.7}` (it re-anchors a moved
+  frame at its nearest corner, point = relative point), size 260 x 290 (the minimum).
+
 - 2026-11-19: Salt Shaker (15846) in WoW: Forever, from ItemEffect/ItemXItemEffect (build 1.60.1.70959) and the Wowhead
   Forever tooltip (tooltip API): needs Leatherworking 250; Use: spell 19566, 1 Deeprock Salt -> 1 Refined Deeprock Salt
   (SpellEffect base points 0 = 1 made), 25 s cast, cooldown 255,600,000 ms = 71 h ("2 Days, 23 Hrs"), not used up
@@ -693,6 +703,13 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-19** (sixth part) Farm meter 1.6.3, fold and hide (to-do A1): `Meter.lua` `applyFolded`, `pinTopLeft`,
+  `setBounds`, `clock`, `money(c, plain, coarse)`, a body frame that holds everything under the title bar, the fold
+  button, tooltips; `/gea min`, `/gea hide`, `/gea show`; the saved position is the top left corner (old saved
+  positions still load, then convert); paused shows on the Time line. The test harness frames now remember size,
+  shown, anchors and resize bounds. Tests: 5 new Lua tests (11 in `tests/test_meter_lua.py`). To-do A0 done (TSM
+  vendor prices saved). Not seen in game yet.
 
 - **2026-11-19** (fifth part) Levelling with every recipe in the game: `foreverrecipes.sources()` / `find_how()` (Sellers,
   Drops, OtherDrops, QuestRewards, RecipeVendorCosts, SourceMeta, RecipeItemBinding, Npcs, Quests), `Engine.recipe_sources`,

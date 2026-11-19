@@ -6,6 +6,9 @@
 -- not list always fall back to TSM and the vendor price. "/gea prices app" or "/gea prices tsm" fixes one source;
 -- "/gea prices auto" goes back. Counts what loot windows from mobs, fishing and nodes show, gold looted and XP gained;
 -- things opened from your bags are skipped (they'd count twice).
+-- Fold (1.6.3, the user: "collapse feature / minimize feature"): the "–" button or /gea min folds the window to one
+-- line (total, gold an hour, time) and "+" opens it again; remembered between sessions. /gea hide hides it completely,
+-- /gea show brings it back. Folded or hidden, the session keeps counting.
 
 local CUT = 0.05
 local TSM_PRICE = "first(DBMinBuyout, DBMarket, DBRegionMarketAvg)"
@@ -135,20 +138,25 @@ local function duration(mins)
   return string.format("%d h %d min", mins / 60, mins % 60)
 end
 
+local function clock(secs)            -- the folded bar's time: "42 s", "23 min", "1 h 5 min"
+  if secs < 60 then return math.floor(secs) .. " s" end
+  return duration(math.floor(secs / 60))
+end
+
 local function elapsed()
   if not session then return 0 end
   local now = session.paused and session.pausedAt or GetTime()
   return math.max(0, now - session.start - session.pausedFor)
 end
 
-local function money(c, plain)       -- plain: no coin colours (for muted text)
+local function money(c, plain, coarse)  -- plain: no coin colours (for muted text); coarse: no copper once there is gold
   c = math.floor(c or 0)
   local g, si, co = math.floor(c / 10000), math.floor(c / 100) % 100, c % 100
   local parts = {}
   local function part(v, unit, colour) return plain and (v .. unit) or ("|cff" .. colour .. v .. unit .. "|r") end
   if g > 0 then parts[#parts + 1] = part(g, "g", "ffd700") end
   if si > 0 then parts[#parts + 1] = part(si, "s", "c7c7cf") end
-  if co > 0 or #parts == 0 then parts[#parts + 1] = part(co, "c", "eda55f") end
+  if (co > 0 and not (coarse and g > 0)) or #parts == 0 then parts[#parts + 1] = part(co, "c", "eda55f") end
   return table.concat(parts, " ")
 end
 
@@ -174,12 +182,20 @@ local function refresh()
   local secs = elapsed()
   local value, sources, rows = totals()
   local total = value + session.money
-  win.title:SetText("Gold Ever After |cff999999· farm meter" .. (session.paused and " (paused)" or "") .. "|r")
+  if db().collapsed then
+    -- folded: one line with the total, gold an hour and the time (the window's tooltip says what they are)
+    local parts = { money(total, false, true) }
+    if secs >= 60 then parts[#parts + 1] = "|cffaaaaaa" .. money(total / secs * 3600, true, true) .. " an hour|r" end
+    parts[#parts + 1] = "|cffaaaaaa" .. clock(secs) .. (session.paused and ", paused" or "") .. "|r"
+    win.title:SetText(table.concat(parts, " |cff777777·|r "))
+  else
+    win.title:SetText("Gold Ever After")
+  end
   -- headline: the session's total, big; gold an hour under it, muted (the user's choice)
   win.rate:SetText(money(total) .. " |cffaaaaaatotal|r")
   win.total:SetText(secs >= 60 and ("|cffaaaaaa" .. money(total / secs * 3600, true) .. " an hour|r")
     or "|cff888888Gold an hour after the first minute|r")
-  win.kv[1]:SetText(string.format("%d:%02d", secs / 60, secs % 60))
+  win.kv[1]:SetText(string.format("%d:%02d", secs / 60, secs % 60) .. (session.paused and "  |cffffd100paused|r" or ""))
   win.kv[2]:SetText(money(value))
   win.kv[3]:SetText(money(session.money))
   -- XP gained, an hour, and when the next level comes at this pace
@@ -240,12 +256,67 @@ local function text(parent, font, justify)
   return fs
 end
 
+local MIN_W, MIN_H, MAX_W, MAX_H = 260, 290, 600, 600   -- resize bounds of the open window
+local FOLDED_H = 34                                      -- the folded window: just the title bar
+
+local function setBounds(minH, maxH)
+  if win.SetResizeBounds then win:SetResizeBounds(MIN_W, minH, MAX_W, maxH)
+  elseif win.SetMinResize then
+    win:SetMinResize(MIN_W, minH)
+    if win.SetMaxResize then win:SetMaxResize(MAX_W, maxH) end
+  end
+end
+
+-- Anchor the window at its top left corner and remember that. WoW anchors a moved window at its nearest corner (the
+-- user's was saved as BOTTOMRIGHT), so changing the height would move the title bar: folding would make it jump.
+local function pinTopLeft()
+  local left, top = win:GetLeft(), win:GetTop()
+  if not (left and top) then return end                -- not laid out yet: keep the anchor it has
+  win:ClearAllPoints()
+  win:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+  db().pos = { "TOPLEFT", left, top, "BOTTOMLEFT" }
+end
+
+-- folded: only the title bar, with the total, gold an hour and time on it, and "+" to open it again
+local function applyFolded()
+  if not win then return end
+  local folded = db().collapsed and true or false
+  pinTopLeft()
+  if folded then
+    setBounds(FOLDED_H, FOLDED_H)
+    win:SetHeight(FOLDED_H)
+  else
+    setBounds(MIN_H, MAX_H)
+    win:SetHeight(math.max(MIN_H, db().h or 340))
+  end
+  for _, part in ipairs({ win.body, win.pause, win.stop }) do
+    if folded then part:Hide() else part:Show() end
+  end
+  win.fold:SetText(folded and "+" or "–")
+  win.layout()
+  refresh()
+end
+
+local function tip(frame, textOf)     -- a hover explanation; textOf() returns nil for none
+  frame:SetScript("OnEnter", function(self)
+    local t = GameTooltip and textOf()
+    if not t then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText(t, 1, 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  frame:SetScript("OnLeave", function(self)
+    if GameTooltip and GameTooltip:GetOwner() == self then GameTooltip:Hide() end
+  end)
+end
+
 local function makeWindow()
   if win then return win end
   win = CreateFrame("Frame", "ForeverMoneyBridgeMeter", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
   local m = db()
-  win:SetSize(m.w or 320, m.h or 340)
-  if m.pos then win:SetPoint(m.pos[1], UIParent, m.pos[1], m.pos[2], m.pos[3]) else win:SetPoint("CENTER", UIParent, "CENTER", 300, 100) end
+  win:SetSize(m.w or 320, m.collapsed and FOLDED_H or (m.h or 340))
+  local p = m.pos                                       -- { point, x, y, relative point } (before 1.6.3: no 4th)
+  if p then win:SetPoint(p[1], UIParent, p[4] or p[1], p[2], p[3]) else win:SetPoint("CENTER", UIParent, "CENTER", 300, 100) end
   if win.SetBackdrop then
     win:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
                       tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
@@ -254,34 +325,49 @@ local function makeWindow()
   end
   win:SetMovable(true)
   win:SetResizable(true)
-  if win.SetResizeBounds then win:SetResizeBounds(260, 290, 600, 600) elseif win.SetMinResize then win:SetMinResize(260, 290) end
+  setBounds(MIN_H, MAX_H)
   win:SetClampedToScreen(true)
   win:EnableMouse(true)
   win:RegisterForDrag("LeftButton")
   win:SetScript("OnDragStart", win.StartMoving)
   win:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
-    local p, _, _, x, y = self:GetPoint()
-    db().pos = { p, x, y }
+    pinTopLeft()
+  end)
+  tip(win, function()
+    return db().collapsed and ("Gold Ever After, folded to one line: the session's total (items and gold looted), gold an"
+      .. " hour, and the time so far. It keeps counting. Click + to open it in full; drag to move it.") or nil
   end)
 
+  -- title bar: the title (or, folded, the one-line summary), Pause, Stop, and the fold button at the far right
   win.title = text(win, "GameFontNormal")
   win.title:SetPoint("TOPLEFT", 12, -10)
-  local function button(label, x, onClick)
+  win.title:SetWordWrap(false)                         -- too long for the bar: cut short with "..."
+  local function button(label, x, w, onClick)
     local b = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
-    b:SetSize(62, 20)
+    b:SetSize(w, 20)
     b:SetPoint("TOPRIGHT", x, -7)
     b:SetText(label)
     b:SetScript("OnClick", onClick)
     return b
   end
-  win.pause = button("Pause", -74, function() SlashCmdList.FOREVERMONEYBRIDGE(session and session.paused and "resume" or "pause") end)
-  button("Stop", -10, function() SlashCmdList.FOREVERMONEYBRIDGE("stop") end)
+  win.fold = button("–", -8, 22, function() SlashCmdList.FOREVERMONEYBRIDGE("min") end)
+  tip(win.fold, function()
+    return db().collapsed and "Open the meter in full." or
+      "Fold the meter to one line: total, gold an hour and time. It keeps counting (/gea min does the same)."
+  end)
+  win.stop = button("Stop", -36, 54, function() SlashCmdList.FOREVERMONEYBRIDGE("stop") end)
+  win.pause = button("Pause", -94, 54, function() SlashCmdList.FOREVERMONEYBRIDGE(session and session.paused and "resume" or "pause") end)
 
-  -- headline: gold an hour, big; the total under it
-  win.rate = text(win, "GameFontNormalHuge")
+  -- everything under the title bar sits on one frame, so folding hides it in one go
+  local body = CreateFrame("Frame", nil, win)
+  body:SetAllPoints(win)
+  win.body = body
+
+  -- headline: the total, big; gold an hour under it
+  win.rate = text(body, "GameFontNormalHuge")
   win.rate:SetPoint("TOPLEFT", 12, -36)
-  win.total = text(win, "GameFontHighlight")
+  win.total = text(body, "GameFontHighlight")
   win.total:SetPoint("TOPLEFT", win.rate, "BOTTOMLEFT", 0, -4)
 
   -- labelled figures
@@ -289,25 +375,25 @@ local function makeWindow()
   local labels = { "Time", "Items", "Gold looted", "XP gained", "Next level" }
   local prev = win.total
   for i, label in ipairs(labels) do
-    local k = text(win, "GameFontDisableSmall")
+    local k = text(body, "GameFontDisableSmall")
     k:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, i == 1 and -10 or -4)
     k:SetText(label)
-    local v = text(win, "GameFontHighlightSmall", "RIGHT")
+    local v = text(body, "GameFontHighlightSmall", "RIGHT")
     v:SetPoint("TOPLEFT", k, "TOPLEFT", 0, 0)            -- full width, right-aligned (layout sets the width)
     win.kv[i] = v
     prev = k
   end
-  win.loots = text(win, "GameFontHighlightSmall")
+  win.loots = text(body, "GameFontHighlightSmall")
   win.loots:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -8)
 
-  -- top items with icons
-  local head = text(win, "GameFontDisableSmall")
+  -- top items
+  local head = text(body, "GameFontDisableSmall")
   head:SetPoint("TOPLEFT", win.loots, "BOTTOMLEFT", 0, -8)
   head:SetText("Top items (count, total)")
   win.items = {}
   prev = head
   for i = 1, ROWS do
-    local line = text(win, "GameFontHighlightSmall")
+    local line = text(body, "GameFontHighlightSmall")
     line:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -3)
     line:SetWordWrap(false)
     win.items[i] = line
@@ -315,13 +401,13 @@ local function makeWindow()
   end
 
   -- bottom: the container reminder and where the prices came from
-  win.note = text(win, "GameFontDisableSmall")
+  win.note = text(body, "GameFontDisableSmall")
   win.note:SetPoint("BOTTOMLEFT", 12, 10)
-  win.remind = text(win, "GameFontHighlightSmall")
+  win.remind = text(body, "GameFontHighlightSmall")
   win.remind:SetPoint("BOTTOMLEFT", win.note, "TOPLEFT", 0, 4)
 
-  -- resize grip (bottom right); the size is remembered
-  local grip = CreateFrame("Button", nil, win)
+  -- resize grip (bottom right, hidden with the rest when folded); the size is remembered
+  local grip = CreateFrame("Button", nil, body)
   grip:SetSize(14, 14)
   grip:SetPoint("BOTTOMRIGHT", -4, 4)
   grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
@@ -330,27 +416,29 @@ local function makeWindow()
   grip:SetScript("OnMouseDown", function() win:StartSizing("BOTTOMRIGHT") end)
   grip:SetScript("OnMouseUp", function()
     win:StopMovingOrSizing()
-    db().w, db().h = win:GetWidth(), win:GetHeight()
-    local p, _, _, x, y = win:GetPoint()
-    db().pos = { p, x, y }
+    db().w = win:GetWidth()
+    if not db().collapsed then db().h = win:GetHeight() end
+    pinTopLeft()
   end)
+  win.grip = grip
 
-  -- widths follow the window (resizing included)
-  local function layout()
+  -- widths follow the window (resizing included); the title stops short of the buttons
+  function win.layout()
     local w = win:GetWidth() - 24
+    win.title:SetWidth(win:GetWidth() - (db().collapsed and 46 or 164))
     for _, fs in ipairs({ win.rate, win.total, win.loots, win.remind }) do fs:SetWidth(w) end
     win.note:SetWidth(w - 12)
     for _, v in ipairs(win.kv) do v:SetWidth(w) end
     for _, line in ipairs(win.items) do line:SetWidth(w) end
   end
-  win:SetScript("OnSizeChanged", layout)
-  layout()
+  win:SetScript("OnSizeChanged", win.layout)
 
   local acc = 0
   win:SetScript("OnUpdate", function(_, dt)
     acc = acc + dt
     if acc >= 1 then acc = 0; refresh() end
   end)
+  applyFolded()                                       -- as it was left (folded or not), anchored at the top left
   return win
 end
 
@@ -364,7 +452,7 @@ local function start()
   makeWindow():Show()
   win.pause:SetText("Pause")
   refresh()
-  print("|cffe8c060Gold Ever After|r started. /gea pause, /gea stop.")
+  print("|cffe8c060Gold Ever After|r started. /gea pause, /gea min (one line), /gea stop.")
 end
 
 local function stop()
@@ -534,14 +622,31 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
   end
 end)
 
--- /gea start | stop | pause | resume; anything else goes to the addon's own /gea (snapshot)
+-- /gea start | stop | pause | resume | min | hide | show | prices | debug; anything else goes to the addon's own /gea
+-- (snapshot)
+local NOT_RUNNING = "|cffe8c060Gold Ever After|r is not running. /gea start"
 local original = SlashCmdList.FOREVERMONEYBRIDGE
 SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
   local cmd = strlower(strtrim(msg or ""))
   if cmd == "start" then
     start()
   elseif cmd == "stop" then
-    if session then stop() else print("|cffe8c060Gold Ever After|r is not running. /gea start") end
+    if session then stop() else print(NOT_RUNNING) end
+  elseif cmd == "min" then                             -- fold to one line and back; remembered
+    db().collapsed = not db().collapsed
+    applyFolded()
+    if not (win and win:IsShown()) then
+      print("|cffe8c060Gold Ever After|r opens " .. (db().collapsed and "folded to one line" or "in full") .. " from now on.")
+    end
+  elseif cmd == "hide" then                            -- out of sight; the session keeps counting
+    if session and win then
+      win:Hide()
+      print("|cffe8c060Gold Ever After|r hidden. It keeps counting: /gea show brings it back, /gea stop ends the session.")
+    else
+      print(NOT_RUNNING)
+    end
+  elseif cmd == "show" then
+    if session then makeWindow():Show(); refresh() else print(NOT_RUNNING) end
   elseif cmd == "pause" and session and not session.paused then
     session.paused, session.pausedAt = true, GetTime()
     win.pause:SetText("Resume")
@@ -577,6 +682,7 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
     refresh()
   else
     if original then original(msg) end
-    print("|cffe8c060Gold Ever After|r: /gea start, /gea pause, /gea resume, /gea stop, /gea prices, /gea debug.")
+    print("|cffe8c060Gold Ever After|r: /gea start, /gea pause, /gea resume, /gea stop, /gea min (fold the window to"
+      .. " one line and back), /gea hide, /gea show (it keeps counting while hidden), /gea prices, /gea debug.")
   end
 end

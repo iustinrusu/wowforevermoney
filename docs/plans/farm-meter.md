@@ -33,6 +33,14 @@ sales, soulbound items, things that don't sell, crafted worth with its daily cap
   changes while a loot window is open (+1 s), as drafted on 2026-11-14 (no language-dependent text parsing).
 - Kills, skins and fishing catches counted too, so a session can be compared with the app's estimate for that spot.
 - Saves finished sessions in ForeverMoneyBridgeDB (zone, minutes, value, gold/hour) for the user to look back on.
+- Fold (1.6.3, the user 2026-11-19: "collapse feature / minimize feature"): the "–" button at the far right of the
+  title bar (or `/gea min`) folds the window to its 34-pixel title bar showing "total · gold an hour · time" (no copper
+  once there is gold; ", paused" when paused); Pause and Stop hide with the rest, "+" opens it again. Saved as
+  `ForeverMoneyBridgeDB.meter.collapsed`. The position is now saved as the top left corner (`{"TOPLEFT", x, y,
+  "BOTTOMLEFT"}`): WoW had anchored the moved window at its bottom right corner, so folding would have moved the title
+  bar. `/gea hide` / `/gea show` hide it completely; the session keeps counting either way. The open title is just
+  "Gold Ever After" (the old "· farm meter" ran under the Pause button at the 260-pixel width); paused shows on the
+  Time line.
 - The app still never uses these sessions as farming rates (user's rule, 2026-11-14); it may show them on the
   Gathering tab as "your sessions" if the user wants.
 
