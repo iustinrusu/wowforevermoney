@@ -24,11 +24,14 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-19 The farm meter gets a collapse / minimize button (user: "collapse feature / minimize feature for the gea
+  farm meter", high priority).** A one-line bar that keeps showing gold an hour, total and time, remembered between
+  sessions; the session keeps counting. Brief: `docs/plans/TODO.md` item A1.
 - **2026-11-19 Slow sellers must not drive the levelling route (user: "slow sells should not rank that high in the
   algorithm deciding best route"; agreed, to be built after the usage reset).** The path counted a week of your
   share of AH sales at the lowest listing as money in hand, so slow, valuable products (Living Shoulders, Devilsaur
   Leggings) made a route look like it earns gold. Plan: about 2 days of sales, at the lower of listing and actual
-  sale price, slow sales labelled. Brief: `docs/plans/TODO.md` item A1.
+  sale price, slow sales labelled. Brief: `docs/plans/TODO.md` item A2.
 - **2026-11-19 Every recipe in the game in the levelling path, with where to learn it (user: "it should be with all
   recipes in game, and where to get them or learn them").** The planner already used every trainer recipe and every
   pattern it could price, but it didn't know which item teaches many Forever recipes (QuestieDB lacks them), so those

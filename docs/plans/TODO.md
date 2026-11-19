@@ -20,7 +20,21 @@ where to learn it, farm meter 1.6.x (XP; the app's prices while fresh, else TSM 
 A0. [ ] **The user, in game (no Claude needed, 2 minutes, any time):** log in, wait a minute, /reload. That saves
        TSM's vendor prices (addon 1.6.2; Data health "Vendor prices from TSM" then fills in) and lets Claude check the
        farm meter (checklist B8: /gea start, kill a few mobs, a screenshot with the XP line).
-A1. [ ] **Slow sellers must not drive the levelling route** (the user: "slow sells should not rank that high in the
+A1. [ ] **Collapse / minimize the farm meter** (the user, 2026-11-19: "collapse feature / minimize feature for the gea
+       farm meter", high priority). The window (`addon/ForeverMoneyBridge/Meter.lua`, `makeWindow`, 320x340, resizable,
+       min 260x290) has only Pause and Stop; it always shows everything. Build:
+       - a small "–" button on the title bar (left of Pause) collapses it to one title-height bar that still shows the
+         headline: gold an hour, total, time (e.g. "12g 30s an hour · 45g 10s · 23 min"); "+" opens it again; the
+         session keeps counting while collapsed (collapse is not pause or stop);
+       - remember it: `ForeverMoneyBridgeDB.meter.collapsed`, like `pos`, `w`, `h`; save the position anchored at the
+         top left so collapsing doesn't make the window jump (today `pos` keeps whatever `GetPoint` returns); the
+         resize bounds and grip must not stop the collapsed height (hide the grip while collapsed);
+       - slash commands: `/gea min` (toggle), and say it in `/gea` help; maybe `/gea hide` / `/gea show` to hide it
+         completely while it keeps counting;
+       - tests in `tests/test_meter_lua.py` with `tests/addon_harness.lua` (lupa): toggling, the saved state, the
+         one-line text; bump ForeverMoneyBridge's version (1.6.3) and note it in README and docs/plans/farm-meter.md;
+       - check in game with the user (a screenshot collapsed and open).
+A2. [ ] **Slow sellers must not drive the levelling route** (the user: "slow sells should not rank that high in the
        algorithm deciding best route"; agreed 2026-11-19, to be built after the usage reset). Today `levelling.WEEK`
        lets the AH take a week of your share of a product's sales, at the lowest listing (`ah_sell` in
        `Engine.levelling`). Living Shoulders 255-257 earns 61g only from 2 slow sales at 37g (one every 3-4 days at a
@@ -30,7 +44,7 @@ A1. [ ] **Slow sellers must not drive the levelling route** (the user: "slow sel
        (`pricing.usual_sale`, as Big flips do); (3) the Back column says when a sale is slow ("about 1 sale every 4
        days"). Update tests (`test_the_ah_takes_only_so_many_then_the_vendor_price`), re-run every profession 1->300 on
        real data and compare totals before and after; update the "How this is worked out" text.
-A2. [ ] **The rest of the levelling work** (every recipe in the game and where to learn it: done 2026-11-19):
+A3. [ ] **The rest of the levelling work** (every recipe in the game and where to learn it: done 2026-11-19):
        - rank training (Journeyman, Expert, Artisan): fee, the skill and character level each needs, at 75/150/225 the
          path must stop for it (ForeverRecipes `Trainers` may hold the rank spells; check, never assume Classic fees);
        - a recipe whose pattern is only on the AH at "market value (none listed now)" or "region market value": say
@@ -38,10 +52,10 @@ A2. [ ] **The rest of the levelling work** (every recipe in the game and where t
        - materials marked "yours" that aren't gathered (Ironfeather, Cured Rugged Hide showed "yours" on the
          Leatherworking path: GATHER_PROFESSION by trade-goods subclass is too wide; check it);
        - check a "find it" row in the browser: none came up on real data (every path uses buyable recipes).
-A3. [ ] **Compare TSM's vendor prices with the game files** (after A0; "TSM is the king"): the addon checks up to 800
+A4. [ ] **Compare TSM's vendor prices with the game files** (after A0; "TSM is the king"): the addon checks up to 800
        items a login; once TSM's vendor prices arrive, compare them on Data health and decide whether the game files
        are still needed for vendor sell prices at all.
-A4. [ ] **Wowhead reading session** (pace in CLAUDE.md, at most 20 pages): checklist B10 (one Power Crystal
+A5. [ ] **Wowhead reading session** (pace in CLAUDE.md, at most 20 pages): checklist B10 (one Power Crystal
        transmutation spell page: who casts them?), B9 (Mote of Unstable Magic, Shellfish, Pristine Black Diamond,
        Vulture Gizzard: the biggest markets the app has no way into), A0 (vendor stock for flips), then A1, A2.
 
