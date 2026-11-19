@@ -391,7 +391,7 @@ class Engine:
         return best
 
     def levelling(self, profession: str, skill: int | None = None, known: set[int] | None = None,
-                  crafts: list | None = None, target: int = levelling_mod.MAX_SKILL) -> dict:
+                  crafts: list | None = None, target: int = levelling_mod.MAX_SKILL, use_de: bool = True) -> dict:
         """The cheapest way from your skill (or any skill) to a target skill, 300 by default, in a crafting profession
         (levelling.py), and what it unlocks on the way (crafts: this run's craft rows, for their profit once you have
         the skill)."""
@@ -429,6 +429,7 @@ class Engine:
             sells = q and item and item.bonding != 1 and not ({'hard_to_sell', 'no_sales_data'} &
                                                             set(liquidity(self.price(r.product_id), min_spd)['flags']))
             ah_value = int(proceeds(q, self.cut) * r.product_count) if sells else 0
+            de = self.disenchant(r.product_id)                 # Classic table, labelled; counted if you can
             learn = self.learn_cost(r)
             if learn is None:                # starting recipes (orange at 1) come with the profession
                 learn_cost = 0 if orange <= 1 else None
@@ -440,8 +441,12 @@ class Engine:
                 ah_cap=sold_per_day(self.price(r.product_id)) * self.share * levelling_mod.WEEK / max(r.product_count, 1),
                 learn=learn_cost,
                 learn_how=(learn or {}).get('how', 'starting recipe' if orange <= 1 else ''), product_id=r.product_id,
-                mats=mats))
-        out = levelling_mod.plan(options, skill, target, known=known)
+                mats=mats, de_value=int(de['value'] * r.product_count) if de else 0, de_can=bool(de and de['can'])))
+        out = levelling_mod.plan(options, skill, target, known=known, use_de=use_de)
+        for m in out['shopping']:
+            m['name'] = self.name(m['item_id'])
+        who = self.enchanter()
+        out['enchanter'] = {'name': who[0], 'skill': who[1]} if who else None
         for st in out['steps']:
             st['product'] = self.name(st['product_id'])
             st['mats'] = [{'item_id': m, 'name': self.name(m), 'count': c, 'each': e, 'own': own}

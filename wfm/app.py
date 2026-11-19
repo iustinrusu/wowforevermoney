@@ -415,7 +415,8 @@ class App:
         target = max(skill + 1, min(target, 300))
         known = self._known_crafts()         # no learning cost for recipes you know
         crafts = [o for o in (self.result or {}).get('opportunities', []) if o.kind == 'craft']
-        out = Engine(self.world, s).levelling(prof, skill, known=known, crafts=crafts, target=target)
+        use_de = (qs.get('de') or ['1'])[0] != '0'          # count disenchanting (Classic table) where you can
+        out = Engine(self.world, s).levelling(prof, skill, known=known, crafts=crafts, target=target, use_de=use_de)
         out['professions'] = list(self.CRAFTING)
         out['yours'] = {p: profs[p] for p in mine}
         out['known_source'] = 'TSM crafting data' if known else 'none found (TSM records the recipes a character knows)'
@@ -429,12 +430,24 @@ class App:
             lambda iid: self.history.series(iid, days=KEEP_DAYS), s.get('watchlist'), float(s.get('ah_cut', 0.05)),
             s.get('sale_price_basis', 'realm'))
 
-    def markets(self) -> dict:
-        """Biggest markets (markets.py): where the most gold changes hands a day, and the app's ways into each."""
+    def markets(self, qs=None) -> dict:
+        """Biggest markets (markets.py): every item that sells, ranked by price and market size, with the app's ways
+        into each. Built once per recompute; ?sort=score|gold|price&filter=all|yours|way|noway&offset=&limit=."""
+        qs = qs or {}
+        arg = lambda k, d: (qs.get(k) or [d])[0] or d
+        res = self.result
+        if getattr(self, '_markets_for', None) is not res or res is None:
+            self._markets_rows, self._markets_for = self._build_markets(), res
+        out = markets_mod.page(self._markets_rows, arg('sort', 'score'), arg('filter', 'all'),
+                               max(0, int(arg('offset', '0'))), min(500, max(1, int(arg('limit', '100')))))
+        out['share'] = self.effective_settings()[0].get('market_share', 0.2)
+        return out
+
+    def _build_markets(self) -> list[dict]:
         s = self.effective_settings()[0]
         w, gd = self.world, self.world.gamedata
         if not gd:
-            return {'rows': []}
+            return []
         eng = Engine(w, s)
         made_by: dict[int, list] = {}
         for r in gd.recipes:
@@ -448,9 +461,8 @@ class App:
                 for d in (o.detail.get('drops') or []):          # mob farming rows supply each item they drop
                     if d.get('item_id'):
                         rows_for.setdefault(d['item_id'], []).append(o)
-        rows = markets_mod.build(w.prices, gd.items, made_by, eng.sold_by_vendor,
+        return markets_mod.build(w.prices, gd.items, made_by, eng.sold_by_vendor,
                                  (w.questie.items if w.questie else {}), inside, rows_for)
-        return {'rows': rows, 'share': s.get('market_share', 0.2)}
 
     def market(self, iid: int) -> dict:
         gd = self.world.gamedata
@@ -630,7 +642,7 @@ def make_handler(app: App):
                 if url.path == '/api/market':
                     return self._json(app.market(int(qs.get('id', ['0'])[0])))
                 if url.path == '/api/markets':
-                    return self._json(app.markets())
+                    return self._json(app.markets(qs))
                 if url.path == '/api/niches':
                     return self._json(app.niches())
                 if url.path == '/api/sniper':

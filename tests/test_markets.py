@@ -26,14 +26,23 @@ class MarketsTests(unittest.TestCase):
                                profit_unit=1, doable=True, needs='')    # your share of the market: not a way in
         rows = markets.build(prices, items, {1: ['Alchemy'], 3: ['Mining']}, lambda i: i == 3,
                              {2: {}, 3: {'npcDrops': []}}, set(), {1: [craft, farm]})
-        self.assertEqual([r['name'] for r in rows], ['Arcanite Bar', 'Destiny', 'Copper Bar'])   # 4: under 1 a day
+        # every item that sells, ranked by price x square root of sold a day: Arcanite 268g, Destiny 245g,
+        # Rare Thing 7g (10g, 1 every 2 days), Copper Bar 1g 46s (2s 28c, 4,091 a day)
+        self.assertEqual([r['name'] for r in rows], ['Arcanite Bar', 'Destiny', 'Rare Thing', 'Copper Bar'])
+        self.assertEqual(rows[0]['score'], int(442400 * 36.8 ** 0.5))
         self.assertEqual(rows[0]['gold_a_day'], int(36.8 * 442400))                               # 1,628g a day
+        self.assertFalse(rows[0]['yours'])                       # the craft needs Alchemy
+        by_gold = markets.page(rows, 'gold')['rows']
+        self.assertEqual([r['name'] for r in by_gold][:3], ['Arcanite Bar', 'Destiny', 'Copper Bar'])   # 1,628g, 329g, 93g
+        p = markets.page(rows, 'score', 'noway', 0, 2)
+        self.assertEqual((p['total'], p['all'], p['way'], len(p['rows'])), (3, 4, 1, 2))
+        self.assertEqual(p['rows'][0]['rank'], 1)
         self.assertEqual(rows[0]['sources'], ['made by Alchemy'])
         self.assertEqual([(w['kind'], w['value'], w['per']) for w in rows[0]['ways']], [('craft', 200000, 'a day')])
         self.assertEqual(rows[1]['sources'], [])                 # a dungeon drop: nothing the app reads knows it
         self.assertEqual(rows[1]['ways'], [])
         self.assertIn('wowhead.com/forever/item=2', rows[1]['wowhead'])
-        self.assertEqual(rows[2]['sources'], ['made by Mining', 'sold by a vendor'])
+        self.assertEqual(rows[3]['sources'], ['made by Mining', 'sold by a vendor'])
 
 
 class InteractionsTests(unittest.TestCase):

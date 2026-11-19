@@ -22,18 +22,61 @@ class ChanceTests(unittest.TestCase):
 
 
 class PlanTests(unittest.TestCase):
-    def test_cheapest_recipe_point_by_point_with_a_fee_counted_once(self):
+    def test_cheapest_path_with_a_fee_counted_once(self):
         a = opt(1, (1, 10, 15, 20), 100, vendor=10)                 # 90 a craft, fades out from skill 10
         b = opt(2, (5, 30, 40, 50), 300, learn=500)                 # 300 a craft, a 500 fee
         p = plan([a, b], 1, 25)
-        # 1-9: A at 90 (sure); 10: 90/1.0; 11: 90/0.9; ... 18: 90/0.2 = 450; 19: A 900 vs B 300 + 500: B; 20-24: B 300
-        expected = 9 * 90 + sum(90 / ((20 - s) / 10) for s in range(10, 19)) + 800 + 5 * 300
-        self.assertEqual(p['total'], round(expected))                # 4,846
-        self.assertEqual([(s['recipe'], s['from'], s['to']) for s in p['steps']], [('R1', 1, 19), ('R2', 19, 25)])
+        # B is needed anyway from 20 (A is grey), so its fee is paid anyway: use B wherever A costs more than 300.
+        # 1-9: A at 90 (sure); 10-17: 90 / ((20 - s) / 10), up to 300 at 17 (a tie: A stays); 18-24: B at 300
+        # The first planner (point by point, fee charged to the first point) kept A until 19: 4,846, 150 more.
+        expected = 9 * 90 + sum(90 / ((20 - s) / 10) for s in range(10, 18)) + 500 + 7 * 300
+        self.assertEqual(p['total'], round(expected))                # 4,696
+        self.assertEqual([(s['recipe'], s['from'], s['to']) for s in p['steps']], [('R1', 1, 18), ('R2', 18, 25)])
         self.assertEqual(p['learn_total'], 500)
         self.assertEqual(p['steps'][1]['learn'], 500)
         self.assertEqual((p['reached'], p['stuck_at']), (25, None))
-        self.assertEqual(p['steps'][0]['crafts'], round(9 + sum(1 / ((20 - s) / 10) for s in range(10, 19)), 1))
+        self.assertEqual(p['steps'][0]['crafts'], round(9 + sum(1 / ((20 - s) / 10) for s in range(10, 18)), 1))
+
+    def test_a_fee_is_worth_it_over_many_points(self):
+        # A: free, 100 a point. B: a 300 fee, 50 a point. Point by point, B's first point cost 350 (> 100) and B was
+        # never chosen; over 20 points B saves 20 x 50 = 1,000 for its 300 fee.
+        a = opt(1, (1, 100, 100, 101), 100)
+        b = opt(2, (1, 100, 100, 101), 50, learn=300)
+        p = plan([a, b], 1, 21)
+        self.assertEqual(p['total'], 300 + 20 * 50)
+        self.assertEqual([s['recipe'] for s in p['steps']], ['R2'])
+        self.assertEqual(plan([a, b], 1, 3)['total'], 2 * 100)      # for 2 points the fee isn't worth it
+
+    def test_learns_what_it_needs_even_when_the_end_is_out_of_reach(self):
+        # 2026-11-19 bug: with points nobody could give (21-29), every total was infinite and the planner dropped the
+        # recipe it needed for 10-20 (Leatherworking stopped at 265 instead of 270)
+        a = opt(1, (1, 100, 100, 101), 100, name='A')
+        a.colors = (1, 10, 10, 11)                                    # gives points up to 10
+        b = opt(2, (5, 100, 100, 101), 300, learn=500, name='B')
+        b.colors = (5, 20, 20, 21)                                    # up to 20
+        p = plan([a, b], 1, 30)
+        self.assertEqual((p['reached'], p['stuck_at']), (21, 21))
+        self.assertEqual([s['recipe'] for s in p['steps']], ['A', 'B'])
+
+    def test_disenchanting_counts_only_when_you_can(self):
+        o = opt(1, (1, 100, 100, 101), 100, vendor=10)
+        o.de_value = 60
+        self.assertEqual(plan([o], 1, 3)['total'], 2 * 90)           # nobody can disenchant it: vendor
+        o.de_can = True
+        p = plan([o], 1, 3)
+        self.assertEqual(p['total'], 2 * 40)                          # disenchanted: 100 - 60
+        self.assertEqual(p['steps'][0]['back_how'], 'disenchant')
+        self.assertEqual(plan([o], 1, 3, use_de=False)['total'], 2 * 90)
+
+    def test_materials_back_and_shopping_list(self):
+        o = opt(1, (1, 10, 15, 20), 100, vendor=10)
+        o.mats = [(2589, 2, 50, False)]                               # 2 Linen Cloth at 50 a craft
+        p = plan([o], 1, 12)          # 1-9 sure (9 crafts), 10 and 11: 1/1.0 + 1/0.9 crafts
+        crafts = 9 + 1 + 1 / 0.9
+        self.assertEqual(p['materials_total'], round(crafts * 100))
+        self.assertEqual(p['back_total'], round(crafts * 10))
+        self.assertEqual(p['total'], round(crafts * 90))
+        self.assertEqual(p['shopping'], [{'item_id': 2589, 'count': 2 * 12, 'each': 50, 'own': False, 'total': 1200}])
 
     def test_a_known_recipe_has_no_fee(self):
         b = opt(2, (1, 30, 40, 50), 300, learn=500)

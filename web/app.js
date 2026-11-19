@@ -459,51 +459,83 @@ function wirePlan() {
 }
 
 // ---------- views ----------
-// Biggest markets (markets.py, the user's idea 2026-11-19): where the most gold changes hands a day, and the app's way in
+// Biggest markets (markets.py, the user's idea 2026-11-19): every item that sells, ranked by price and market size;
+// a glowing gold border marks the ones you can get now (a craft, flip or farming spot you can do)
 async function marketsPanel() {
-  const d = await api('/api/markets');
-  const noWay = sessionStorage.getItem('mkNoWay') === '1';
-  const rows = (d.rows || []).filter((r) => !noWay || !r.ways.length).slice(0, 60);
+  const sort = sessionStorage.getItem('mkSort') || 'score';
+  const filt = sessionStorage.getItem('mkFilter') || 'all';
+  const limit = +(sessionStorage.getItem('mkLimit') || 100);
+  const d = await api(`/api/markets?sort=${sort}&filter=${filt}&limit=${limit}`);
   const way = (r) => r.ways.length ? r.ways.map((w) => `<div><span class="pill">${esc(w.kind)}</span> ${esc(w.title)}: ${money(w.value)} ${esc(w.per)}${w.doable ? '' : ` <span class="needs">${esc(w.needs || 'not yet')}</span>`}</div>`).join('')
     : '<span class="hint">none in the app yet</span>';
-  const body = rows.map((r, n) => `<tr class="row" data-item="${r.item_id}">${rankCell(n + 1)}<td>${itemLink(r.item_id, r.name, r.quality)}<div class="hint">${esc(r.category)}</div></td>
-    <td class="num">${money(r.gold_a_day)}</td><td class="num">${num(r.sold_per_day, r.sold_per_day < 10 ? 1 : 0)}</td><td class="num">${money(r.price)}</td><td class="num">${num(r.listed, 0)}</td>
+  const body = (d.rows || []).map((r) => `<tr class="row${r.yours ? ' yours' : ''}" data-item="${r.item_id}" ${r.yours ? 'title="You can get this now: a craft, flip or farming spot you can do (see Your way in)"' : ''}>${rankCell(r.rank)}<td>${itemLink(r.item_id, r.name, r.quality)}<div class="hint">${esc(r.category)}${r.yours ? ' · <b class="yours-tag">you can get this</b>' : ''}</div></td>
+    <td class="num">${money(r.price)}</td><td class="num">${num(r.sold_per_day, r.sold_per_day < 10 ? 1 : 0)}</td><td class="num">${money(r.gold_a_day)}</td><td class="num">${num(r.listed, 0)}</td>
     <td>${r.sources.length ? esc(r.sources.join('; ')) : '<span class="hint">not in the data the app reads (often a dungeon or world drop)</span>'}</td>
     <td>${way(r)}</td><td><a href="${esc(r.wowhead)}" target="_blank" rel="noopener" title="How to get it, on Wowhead's WoW: Forever pages">Wowhead</a></td></tr>`).join('');
-  return `<div class="panel"><h2>Biggest markets <small>where the most gold changes hands a day in the region, and your way in</small></h2>
-    <div class="controls"><label class="chk" title="Show only the items no craft, flip or farming row of the app supplies: the ones to look up"><input type="checkbox" id="mk-noway" ${noWay ? 'checked' : ''}> only items the app has no way into yet</label></div>
-    ${rows.length ? `<div class="tablewrap"><table><thead><tr><th class="rk">#</th><th>Item</th>
-      <th class="num" title="The whole region's sales a day times the usual sale price: how big the market is, not what you would earn">Gold traded a day</th>
-      <th class="num" title="Sold a day in the whole region (TSM)">Sold a day</th><th class="num" title="What it usually sells for (TSM region sale average, odd ones left out)">Usual price</th>
+  const opt = (v, label, cur) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
+  const shown = (d.rows || []).length;
+  return `<div class="panel"><h2>Biggest markets <small>every item that sells, by what it is worth and how much of it sells</small></h2>
+    <div class="controls">
+      <label class="chk">Order <select id="mk-sort">${opt('score', 'Price and market size (best first)', sort)}${opt('gold', 'Gold traded a day', sort)}${opt('price', 'Price each', sort)}</select></label>
+      <label class="chk">Show <select id="mk-filter">${opt('all', `All items (${num(d.all, 0)})`, filt)}${opt('yours', `Ones you can get now (${num(d.yours, 0)})`, filt)}${opt('way', `Ones the app has a way into (${num(d.way, 0)})`, filt)}${opt('noway', `Ones the app has no way into yet (${num(d.all - d.way, 0)})`, filt)}</select></label>
+    </div>
+    <div class="hint"><span class="yours-sample">Glowing gold border</span>: you can get it now, with a craft, flip or farming spot the app found that you can do.</div>
+    ${shown ? `<div class="tablewrap"><table><thead><tr><th class="rk">#</th><th>Item</th>
+      <th class="num" title="What one usually sells for (TSM region sale average, odd ones left out)">Price each</th>
+      <th class="num" title="Sold a day in the whole region (TSM)">Sold a day</th>
+      <th class="num" title="Sold a day times the price: how big the market is, not what you would earn">Gold traded a day</th>
       <th class="num" title="Listings on your realm at the last scan">Listed</th>
       <th title="What the data the app reads says about getting it: recipes, vendors, QuestieDB mobs and objects, containers">How it is obtained</th>
-      <th title="The app's rows that supply this item, best first: a craft, a flip or a farming spot, with its profit a day">Your way in</th><th>Look it up</th></tr></thead><tbody>${body}</tbody></table></div>`
+      <th title="The app's rows that supply this item, best first: a craft or flip with its profit a day, a farming spot with its gold an hour">Your way in</th><th>Look it up</th></tr></thead><tbody>${body}</tbody></table></div>
+      <div class="controls"><span class="hint">Showing ${num(shown, 0)} of ${num(d.total, 0)}.</span>${shown < d.total ? ' <button class="btn" id="mk-more">Show 100 more</button>' : ''}</div>`
       : '<div class="empty">No items found.</div>'}
-    <details class="how"><summary>How this is worked out</summary><div>Every item that sells at least once a day in the region (TSM), largest market first: its region sales a day times its usual sale price. That is the size of the market, not your income: your share of the sales is about ${num((d.share || 0.2) * 100, 0)}%, and other sellers compete. "How it is obtained" lists what the game data and your addons say: the recipes that make it, a vendor that sells it, the mobs and objects QuestieDB lists as dropping it (who, not how often), and containers read on Wowhead Forever. "Your way in" is the app's own rows for it: crafts and vendor flips with their profit a day, farming spots with their gold an hour (a spot gives other items too). When there is none, or the item comes from somewhere the app does not read (dungeon bosses, world drops), its Wowhead Forever page says how to get it; tell Claude what you find and it can be added. Click a row for everything about the item.</div></details></div>`;
+    <details class="how"><summary>How this is worked out</summary><div>Every item with sales recorded in the region (TSM). "Price and market size" ranks by the price of one times the square root of how many sell a day: an expensive item that sells a few times a day ranks with a cheaper one that sells many times more, and a cheap item with a huge market (cloth) does not crowd out the valuable ones. "Gold traded a day" is sold a day times the price: the size of the market, not your income (your share of the sales is about ${num((d.share || 0.2) * 100, 0)}%, and other sellers compete). "How it is obtained" lists what the game data and your addons say: the recipes that make it, a vendor that sells it, the mobs and objects QuestieDB lists as dropping it (who, not how often), and containers read on Wowhead Forever. "Your way in" is the app's own rows for it: crafts and vendor flips with their profit a day, farming spots with their gold an hour (a spot gives other items too); a gold border means at least one of them is something you can do now. When there is none, or the item comes from somewhere the app does not read (dungeon bosses, world drops), its Wowhead Forever page says how to get it; tell Claude what you find and it can be added. Click a row for everything about the item.</div></details></div>`;
 }
-// Levelling planner (strategy item 2): the cheapest path from one skill to another (your skill to 300 by default)
+// Levelling planner (strategy item 2; overhauled 2026-11-19): the cheapest path from one skill to another, with what
+// the materials cost, what the products bring back (AH, vendor, disenchant) and a shopping list
 async function levellingPanel() {
   const prof = sessionStorage.getItem('levelProf') || '';
   const skill = sessionStorage.getItem('levelSkill') || '';
   const target = sessionStorage.getItem('levelTarget') || '';
-  const d = await api(`/api/levelling?profession=${encodeURIComponent(prof)}&skill=${encodeURIComponent(skill)}&target=${encodeURIComponent(target)}`);
+  const useDe = sessionStorage.getItem('levelDe') !== '0';
+  const d = await api(`/api/levelling?profession=${encodeURIComponent(prof)}&skill=${encodeURIComponent(skill)}&target=${encodeURIComponent(target)}&de=${useDe ? 1 : 0}`);
   if (d.error) return `<div class="panel"><h2>Levelling a profession</h2><div class="hint">${esc(d.error)}</div></div>`;
   const opts = d.professions.map((p) => `<option value="${esc(p)}" ${p === d.profession ? 'selected' : ''}>${esc(p)}${d.yours[p] !== undefined ? ` (you: ${d.yours[p]})` : ''}</option>`).join('');
   const mats = (st) => st.mats.map((m) => `${m.count}× ${itemLink(m.item_id, m.name)}${m.own ? ' <span class="pill" title="You gather this yourself: counted at what you would get for selling it">yours</span>' : ''}`).join(', ');
-  const rows = d.steps.map((st) => `<tr><td class="num">${st.from}–${st.to}</td><td>${itemLink(st.product_id, st.recipe)}<div class="hint">${mats(st)}</div></td>
-    <td><span class="pill lvl-${st.color}" title="Its colour when you start this stretch">${esc(st.color)}</span></td><td class="num">${num(st.crafts, 1)}</td>
-    <td class="num">${money(st.per_craft)}</td><td class="num">${money(st.cost)}</td><td class="num">${money(st.cumulative)}</td>
-    <td>${st.learn ? `${money(st.learn)} <span class="pill">${esc(st.learn_how)}</span>` : ''}</td></tr>`).join('');
+  const ch = (st) => {
+    const c = st.channels;
+    const de = c.disenchant ? ` · disenchant ${money(c.disenchant)}${c.disenchant_can ? '' : ' (no one can yet)'} <span class="pill" title="WoW Classic table (ForeverRecipes), an estimate">Classic</span>` : '';
+    return `AH ${c.AH ? money(c.AH) : '–'}${c.AH && st.ah_cap ? ` (the AH takes about ${num(st.ah_cap, 0)})` : ''} · vendor ${money(c.vendor)}${de}`;
+  };
+  const rows = d.steps.map((st) => `<tr><td class="num">${st.from}–${st.to}</td>
+    <td>${itemLink(st.product_id, st.recipe)}<div class="hint">each craft: ${mats(st)}</div></td>
+    <td><span class="pill lvl-${st.color}" title="Its colour when you start this stretch: orange always gives a point, yellow usually, green sometimes">${esc(st.color)}</span></td>
+    <td class="num">${num(st.crafts, 1)}<div class="hint">buy for ${st.crafts_to_buy}</div></td>
+    <td class="num">${money(st.mats_cost)}</td>
+    <td class="num">${money(st.back)}<div class="hint">${esc(st.back_how)}</div></td>
+    <td class="num"><b>${money(st.cost)}</b></td><td class="num">${money(st.cumulative)}</td>
+    <td>${st.learn ? `${money(st.learn)} <span class="pill">${esc(st.learn_how)}</span>` : ''}</td></tr>
+    <tr class="sub"><td></td><td colspan="8" class="hint">One product sells back for: ${ch(st)}</td></tr>`).join('');
+  const shop = (d.shopping || []).map((m) => `<tr><td>${itemLink(m.item_id, m.name)}${m.own ? ' <span class="pill" title="You gather this yourself">yours</span>' : ''}</td><td class="num">${num(m.count, 0)}</td><td class="num">${money(m.each)}</td><td class="num">${money(m.total)}</td></tr>`).join('');
   const unlocks = d.unlocks.length ? `<h3>What it unlocks on the way</h3><table><thead><tr><th class="num">Skill</th><th>Craft</th><th class="num" title="Profit a day once you have the skill (and the gold), from the Crafting table">Profit a day</th><th class="num" title="The path's total cost from your skill to this one (a minus: you would earn that much on the way)">Cost to get there</th></tr></thead><tbody>${d.unlocks.map((u) => `<tr class="row" data-item="${u.item_id}"><td class="num">${u.skill}</td><td>${esc(u.title)}</td><td class="num">${money(u.daily)}</td><td class="num">${u.cost_to_reach == null ? '–' : money(u.cost_to_reach)}</td></tr>`).join('')}</tbody></table>` : '';
   const ench = d.profession === 'Enchanting' ? `<div class="hint">⚠ Enchantments make no item, so they are not in the game's recipe tables this tool reads: the path below has only the Enchanting crafts that make an item (rods, wands, oils), and stops early. Plan Enchanting by hand for now.</div>` : '';
   const end = ench + (d.stuck_at ? `<div class="hint">⚠ The path stops at <b>${d.stuck_at}</b>: no recipe you can learn (a trainer recipe, or a pattern on the AH or from a vendor) gives a skill point there. Patterns that only drop are not counted unless TSM shows you already know them.</div>` : '');
+  const card = (label, value, hint) => `<div class="stat"><div class="hint">${label}</div><div class="v">${value}</div>${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
+  const deNote = d.enchanter ? `${esc(d.enchanter.name)} has Enchanting ${d.enchanter.skill}` : 'none of your characters has Enchanting';
   return `<div class="panel" id="levelling"><h2>Levelling a profession <small>the cheapest path from one skill to another, at today's prices</small></h2>
-    <div class="controls"><select id="lp">${opts}</select> <label class="chk">from skill <input id="ls" type="number" min="1" max="299" value="${d.skill}" style="width:5em" title="Where you start: your skill now, or any skill"></label> <label class="chk">to skill <input id="lt" type="number" min="2" max="300" value="${d.target}" style="width:5em" title="Where you want to get to (300 is the most)"></label></div>
-    <div class="hint">${d.steps.length ? `From ${d.skill} to <b>${d.reached}</b>${d.reached < d.target && !d.stuck_at ? ` (of ${d.target})` : ''}: about <b>${num(d.crafts, 0)} crafts</b> and <b>${money(d.total)}</b> in all (learning recipes: ${money(d.learn_total)}). A minus means you would earn that much: the products sell for more than the ingredients.` : 'Nothing to plan from here.'} Recipes you know: ${d.known} (${esc(d.known_source)}).</div>
+    <div class="controls"><select id="lp">${opts}</select> <label class="chk">from skill <input id="ls" type="number" min="1" max="299" value="${d.skill}" style="width:5em" title="Where you start: your skill now, or any skill"></label> <label class="chk">to skill <input id="lt" type="number" min="2" max="300" value="${d.target}" style="width:5em" title="Where you want to get to (300 is the most)"></label>
+      <label class="chk" title="Count disenchanting a product where one of your characters has the Enchanting skill for it (${deNote}). Its value comes from a WoW Classic table (ForeverRecipes, an estimate), not Forever data."><input type="checkbox" id="lde" ${useDe ? 'checked' : ''}> count disenchanting (Classic table)</label></div>
+    ${d.steps.length ? `<div class="stats">${card('Skill', `${d.skill} → <b>${d.reached}</b>${d.reached < d.target && !d.stuck_at ? ` of ${d.target}` : ''}`, `about ${num(d.crafts, 0)} crafts`)}
+      ${card('Materials to buy', money(d.materials_total), 'every craft on the path')}
+      ${card('Back from the products', money(d.back_total), 'sold on the AH, to a vendor or disenchanted, whichever pays most')}
+      ${card('Learning recipes', money(d.learn_total), 'trainer fees and patterns, once each')}
+      ${card('Net cost', `<b>${money(d.total)}</b>`, d.total < 0 ? 'a minus: you would earn that much on the way' : 'materials - back + learning')}</div>` : `<div class="hint">Nothing to plan from here.</div>`}
+    <div class="hint">Recipes you know: ${d.known} (${esc(d.known_source)}).</div>
     ${end}
-    ${d.steps.length ? `<table><thead><tr><th class="num">Skill</th><th>Recipe</th><th>Colour</th><th class="num" title="Expected crafts for this stretch: a yellow or green recipe does not always give a point">Crafts</th><th class="num" title="Ingredients minus what one product sells for (a minus: each craft makes money)">Each craft</th><th class="num" title="Expected cost of this stretch, learning cost included">Cost</th><th class="num" title="Total from your skill to the end of this stretch">Total so far</th><th>Learn</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+    ${d.steps.length ? `<div class="tablewrap"><table class="level"><thead><tr><th class="num">Skill</th><th>Recipe</th><th>Colour</th><th class="num" title="Expected crafts for this stretch (a yellow or green recipe does not always give a point), and how many to buy materials for">Crafts</th><th class="num" title="What the materials for these crafts cost (cheapest of vendor and AH; your own gathered materials at what they would sell for)">Materials</th><th class="num" title="What the products bring back, and how: the AH for as many as its market takes in a week at your share, then the better of a vendor and disenchanting">Back</th><th class="num" title="Materials minus what comes back, plus learning: what this stretch really costs">Net</th><th class="num" title="Net cost from your skill to the end of this stretch">Total so far</th><th>Learn</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}
+    ${shop ? `<h3>Shopping list <small>everything to buy for the whole path (whole crafts)</small></h3><table><thead><tr><th>Material</th><th class="num">Count</th><th class="num">Each</th><th class="num">Total</th></tr></thead><tbody>${shop}</tbody></table>` : ''}
     ${unlocks}
-    <details class="how"><summary>How this is worked out</summary><div>For every skill point, the recipe with the lowest expected cost for that point: the cost of one craft (ingredients at the cheapest of vendor and AH; a material you gather yourself${d.own_materials.length ? ` (${esc(d.own_materials.join(', '))})` : ''} at what you would get for selling it) minus what the product sells for, divided by the chance that the craft gives a point. The chance follows the WoW Classic rule (not checked for Forever): orange always, then from yellow to grey (grey − skill) ÷ (grey − yellow), grey never; the colours are SkillUpForever's Forever thresholds. A recipe's learning cost (trainer fee, or the pattern on the AH or from a vendor) counts once, the first time the path uses it, and not at all for recipes TSM shows you know. A product counts at its AH price only for as many as your share of a week's sales takes (${num(STATE.settings.market_share * 100, 0)}% of the region's), the rest at its vendor price. Not counted: training the next rank at the trainer (Journeyman, Expert, Artisan) and the level it needs, AH deposits, and buying many of one ingredient (each at the lowest listing). Patterns that only drop are left out unless you know them. ${d.options} recipes considered.</div></details>
+    <details class="how"><summary>How this is worked out</summary><div>The path is chosen as a whole, not point by point: start with the recipes you know and the ones that come with the profession, then learn the recipe that saves the most over every skill point it would take, minus what it costs to learn (a trainer fee, or the pattern on the AH or from a vendor), and drop any learned recipe that no longer pays for itself; repeat until nothing changes. Each skill point then uses the cheapest recipe you have. A point's cost is one craft's net cost (materials, at the cheapest of vendor and AH, a material you gather yourself${d.own_materials.length ? ` (${esc(d.own_materials.join(', '))})` : ''} at what it would sell for, minus what the product brings back) divided by the chance that the craft gives a point. That chance follows the WoW Classic rule (not checked for Forever): orange always, then from yellow to grey (grey − skill) ÷ (grey − yellow), grey never; the colours are SkillUpForever's Forever thresholds, with ForeverRecipes filling the gaps. A product brings back the best of: the AH after the cut, but only for as many as your share of a week's sales takes (${num(STATE.settings.market_share * 100, 0)}% of the region's), then the better of a vendor and disenchanting it. Disenchanting counts only where one of your characters has the Enchanting skill (${deNote}) and the box is ticked; its value is a WoW Classic table (ForeverRecipes calls it a provisional estimate). Then the path is worked out again with how many of each product it really makes, so the AH's limit is counted. Not counted: training the next rank at the trainer (Journeyman, Expert, Artisan) and the level it needs, AH deposits, and buying many of one ingredient (each at the lowest listing). Patterns that only drop are left out unless you know them. ${d.options} recipes considered.</div></details>
   </div>`;
 }
 
@@ -835,10 +867,17 @@ function wireView() {
     $('#lp').onchange = (e) => { sessionStorage.setItem('levelProf', e.target.value); sessionStorage.removeItem('levelSkill'); render(); };
     $('#ls').onchange = (e) => { sessionStorage.setItem('levelSkill', e.target.value); render(); };
     $('#lt').onchange = (e) => { sessionStorage.setItem('levelTarget', e.target.value); render(); };
+    $('#lde').onchange = (e) => { sessionStorage.setItem('levelDe', e.target.checked ? '1' : '0'); render(); };
   }
   if (TAB === 'craft') { $('#cp').onchange = (e) => { sessionStorage.setItem('craftProf', e.target.value); render(); }; $('#cd').onchange = (e) => { sessionStorage.setItem('craftDoable', e.target.checked ? '1' : ''); render(); }; }
   document.querySelectorAll('.sells-only').forEach((c) => c.onchange = (e) => { sessionStorage.setItem('sellsOnly', e.target.checked ? '1' : '0'); render(); });
-  if (TAB === 'market') { wireMarket(); const mk = $('#mk-noway'); if (mk) mk.onchange = (e) => { sessionStorage.setItem('mkNoWay', e.target.checked ? '1' : ''); render(); }; }
+  if (TAB === 'market') {
+    wireMarket();
+    const set = (k, v) => { sessionStorage.setItem(k, v); sessionStorage.removeItem('mkLimit'); render(); };
+    if ($('#mk-sort')) $('#mk-sort').onchange = (e) => set('mkSort', e.target.value);
+    if ($('#mk-filter')) $('#mk-filter').onchange = (e) => set('mkFilter', e.target.value);
+    if ($('#mk-more')) $('#mk-more').onclick = () => { sessionStorage.setItem('mkLimit', String(+(sessionStorage.getItem('mkLimit') || 100) + 100)); render(); };
+  }
   if (TAB === 'search') { const go = () => { sessionStorage.setItem('search', $('#sq').value); render(); }; $('#sb').onclick = go; $('#sq').onkeydown = (e) => { if (e.key === 'Enter') go(); }; $('#sq').focus(); }
   if (TAB === 'gather') {
     document.querySelectorAll('[data-gsel]').forEach((b) => b.onclick = () => { sessionStorage.setItem('gatherSel', b.dataset.gsel); render(); });
