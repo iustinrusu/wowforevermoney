@@ -272,5 +272,60 @@ class MoreInteractionTests(unittest.TestCase):
         self.assertIn('Poisons 130', rows['craft:2835'].needs)
 
 
+class DisenchantTests(unittest.TestCase):
+    """Disenchanting from ForeverRecipes' Classic table (the user's yes to a labelled fallback, 2026-11-19)."""
+    GREEN, DUST, ESSENCE_, CLOTH = 4240, 10940, 10938, 2996
+
+    def world(self, enchanting=None):
+        from wfm.foreverrecipes import ForeverRecipesData
+        gd = GameData(build='test')
+        green = Item(id=self.GREEN, name='Woolen Bag Thing', quality=2, item_level=12, req_level=7, sell_price=100,
+                     buy_price=0, stack=1, class_id=4, subclass_id=1, bonding=2)
+        for it in (green, item(self.DUST, 'Strange Dust', sub=12), item(self.ESSENCE_, 'Lesser Magic Essence', sub=12),
+                   item(self.CLOTH, 'Bolt of Linen Cloth', sub=5)):
+            gd.items[it.id] = it
+        gd.recipes = [Recipe(spell_id=2385, name='Brown Linen Vest', profession='Tailoring', skill_line=197,
+                             product_id=self.GREEN, product_count=1, reagents=[(self.CLOTH, 1)], trivial_low=40,
+                             trivial_high=80, min_rank=1)]
+        fr = ForeverRecipesData(de_profiles={1: [(self.ESSENCE_, 0.2, 1, 2), (self.DUST, 0.8, 1, 2)]},
+                                de_items={self.GREEN: 1})
+        p = lambda mb, spd: {'numAuctions': 20, 'minBuyout': mb, 'marketValue': mb, 'regionSale': mb,
+                             'regionMarketValue': mb, 'regionSoldPerDay': spd, 'regionSalePercent': 0.5}
+        prices = {self.DUST: p(1000, 300), self.ESSENCE_: p(2000, 200), self.CLOTH: p(300, 500), self.GREEN: p(400, 5)}
+        chars = {'Enchy-PvP': {'professions': {'Enchanting': {'rank': enchanting}}}} if enchanting else {}
+        w = SimpleNamespace(gamedata=gd, prices=prices, questie=QuestieDB(), angler=None, forever_recipes=fr,
+                            skillup=SkillUpData(thresholds={2385: [1, 40, 60, 80]}), profile={'characters': chars})
+        s = {'gold': 1000, 'ah_cut': 0.05, 'market_share': 0.2, 'faction': 'H', 'min_sold_per_day': 0.5,
+             'professions': {'Tailoring': 100}, 'sale_price_basis': 'realm'}
+        return Engine(w, s)
+
+    def test_value_and_who_can_do_it(self):
+        e = self.world(enchanting=3)
+        d = e.disenchant(self.GREEN)
+        # 0.2 x 1.5 Lesser Magic Essence at 1,900 + 0.8 x 1.5 Strange Dust at 950 (after the cut) = 570 + 1,140
+        self.assertEqual(d['value'], 1710)
+        self.assertEqual((d['skill'], d['can'], d['enchanter'], d['enchanter_skill']), (1, True, 'Enchy', 3))
+        self.assertIsNone(self.world().disenchant(self.GREEN)['enchanter'])
+        v = e.valuer().value(self.GREEN)
+        self.assertEqual(v.channel, 'AH')                 # a Classic table never decides the best way
+        self.assertIn('disenchant_more', v.flags)
+        self.assertEqual(v.disenchant['value'], 1710)
+
+    def test_craft_to_disenchant_row_is_labelled_and_never_a_top_pick(self):
+        e = self.world(enchanting=3)
+        rows = {o.key: o for o in e.crafts()}
+        o = rows['craft_de:2385']
+        self.assertEqual(o.title, 'Craft Woolen Bag Thing and disenchant it')
+        self.assertEqual(o.profit_unit, 1710 - 300)
+        self.assertIn('classic_disenchant', o.flags)
+        self.assertTrue(o.doable)
+        self.assertEqual(rows['craft:2385'].profit_unit, 380 - 300)      # selling it: 400 - 5%
+        top = e.top_picks(list(rows.values()))
+        self.assertNotIn('craft_de:2385', top['now'] + top['slow'] + top['level_up'])
+        o = {x.key: x for x in self.world().crafts()}['craft_de:2385']     # nobody can disenchant
+        self.assertFalse(o.doable)
+        self.assertIn('Enchanting 1~', o.needs)
+
+
 if __name__ == '__main__':
     unittest.main()

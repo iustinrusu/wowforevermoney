@@ -27,8 +27,9 @@ LOOT = [
     ('Herb and ore nodes', 'counted', 'Wowhead Forever "Gathered/Mined from" counts, Classic node tables labelled'),
     ('Opening containers, clams and lockboxes', 'counted', 'Wowhead Forever "Contains" counts and your own opens'),
     ('Pick Pocket', 'partly', 'read on item pages ("Pick pocketed from"), not yet a farming row'),
-    ('Disenchanting', 'not counted', 'no Forever source yet; ForeverRecipes has Classic-based estimates (its own '
-                                     'words: provisional), which could be shown as a labelled fallback'),
+    ('Disenchanting', 'estimated', 'the WoW Classic reference table in ForeverRecipes (its own words: provisional), '
+                                   'labelled "Classic table": shown in item details, My bags and "craft and '
+                                   'disenchant it" rows, never in Top picks or the plan (the user said yes, 2026-11-19)'),
     ('Quest rewards', 'not counted', 'quest items are worth their vendor price only'),
 ]
 MIN_SOLD = 1.0           # a product counts as traded at 1+ sold a day in the region

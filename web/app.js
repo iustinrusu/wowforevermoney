@@ -36,6 +36,8 @@ const FLAGS = {
   limited_mat: ['warn', 'ingredient in limited stock', 'An ingredient comes from a limited-stock vendor'],
   limited_stock: ['warn', 'limited stock', 'Vendor has limited stock that restocks over time'],
   other_profession: ['', 'other profession', 'You don\'t have this profession'],
+  classic_disenchant: ['warn', 'Classic disenchant table', 'Its profit comes from disenchanting the product, valued with a WoW Classic reference table (ForeverRecipes, provisional estimates), not Forever data. Never a Top pick or part of your plan; check what you really get in game'],
+  disenchant_more: ['', 'may be worth more disenchanted', 'A WoW Classic disenchant table (ForeverRecipes, an estimate) says its materials are worth more than selling it: open the item for the materials and the Enchanting skill needed'],
   needs_tool: ['warn', 'needs the tool', 'Made by using a tool you keep (like the Salt Shaker), and your bags, bank and gear do not have one. You buy it once; open the row for its price'],
   tool_unchecked: ['', 'needs the tool', 'Made by using a tool you keep (like the Salt Shaker). The app cannot see your bags (Syndicator), so it does not know whether you have one'],
   snapshot: ['warn', 'one listing, last scan', 'Based on one listing at the last scan; check in game'],
@@ -906,7 +908,7 @@ function oppDetail(o) {
       : d.learn.how === 'tool' ? `Nothing to learn: you need a ${itemLink(d.learn.item_id, d.learn.name)}, which you keep (it is not used up). ${d.learn.owned ? 'You have one.' : `${d.learn.owned === false ? 'Your bags, bank and gear have none: ' : ''}it costs ${d.learn.cost !== null ? money(d.learn.cost) : '? (not on AH / vendor)'} (${esc(d.learn.source || '')}), once.`}`
       : `${esc(d.learn.name || 'recipe')}: ${d.learn.cost !== null ? money(d.learn.cost) : 'not on AH / vendor'} (${esc(d.learn.source || '')})`;
     html += `<h3>Ingredients <small>per craft</small></h3><table><tbody>${d.mats.map((m) => `<tr><td>${m.count}×</td><td>${itemLink(m.item_id, m.name)}${madeWith(m)}</td><td class="num">${money(m.unit)}</td><td>${esc(m.source)} ${flagHtml(m.flags)}</td></tr>`).join('')}</tbody></table>
-      <div class="kv" style="margin-top:8px"><div>Sells for (total)</div><div>${money(d.revenue)} via ${esc(d.sell_channel)} (${esc(d.sell_source)})</div>
+      <div class="kv" style="margin-top:8px">${d.disenchant ? `<div>Disenchanted (total) <span class="pill">Classic table</span></div><div>about ${money(d.revenue)}: each one gives ${deMats(d.disenchant)}${deWho(d.disenchant)}</div>` : `<div>Sells for (total)</div><div>${money(d.revenue)} via ${esc(d.sell_channel)} (${esc(d.sell_source)})</div>`}
       <div>Skill needed</div><div>${d.skill_required}${d.skill_exact ? '' : ' (estimated)'} ${d.thresholds ? `<span class="pill">orange/yellow/green/grey: ${d.thresholds.join(' / ')}</span>` : ''}</div>
       <div>${d.tool ? 'Tool' : 'Learn it'}</div><div>${learnText}</div>
       ${(d.tools || []).length ? `<div>Tools in your bags</div><div>${d.tools.map((t) => `${t.item_id ? itemLink(t.item_id, t.name) : esc(t.name)}: ${t.have ? 'you have one' : t.have === false ? `none in your bags, bank or gear; ${t.cost !== null ? `${money(t.cost)} (${esc(t.source)})` : 'not on AH / vendor'}, once` : 'needed (your bags are not read: install Syndicator)'}`).join('<br>')}<div class="hint">The recipe needs this in your bags to be made; it is not used up.</div></div>` : ''}
@@ -994,6 +996,9 @@ function spark(hist) {
     <div class="legend"><span style="color:#e8c060">● lowest listing</span><span style="color:#6ea8fe">● realm market</span><span style="color:#9ca3af">● region market</span><span class="pill">${money(lo)} – ${money(hi)}</span></div>`;
 }
 
+// disenchanting (ForeverRecipes' WoW Classic reference table: a labelled estimate, never a Top pick)
+const deMats = (de) => de.mats.map((m) => `${itemLink(m.item_id, m.name)} ${m.min === m.max ? m.min : `${m.min}-${m.max}`} (${num(m.chance * 100, 0)}%, ${money(m.each)} each)`).join(', ');
+const deWho = (de) => `<div class="hint">Needs Enchanting ${de.skill} (estimated, WoW Classic rule). ${de.enchanter ? `${esc(de.enchanter)} has ${de.enchanter_skill}${de.can ? ': can do it now (mail it there).' : '.'}` : 'None of your characters has Enchanting.'} The results and chances are WoW Classic reference data (ForeverRecipes calls them provisional estimates), not Forever data.</div>`;
 async function openItem(id, opp) {
   openDrawer('<div class="empty">Loading…</div>');
   const it = await api('/api/item?id=' + id);
@@ -1018,6 +1023,7 @@ async function openItem(id, opp) {
       ${it.vendor_price ? `<div>Vendor sells for</div><div>${money(it.vendor_price)}</div>` : ''}
       ${it.best_use ? `<div>Best crafting use</div><div>${money(it.best_use.value)} each via ${esc(it.best_use.profession)}: ${esc(it.best_use.recipe)}${it.best_use.doable ? '' : ' <span class="pill">(you can\'t yet)</span>'}</div>` : ''}
       <div>Required level · item level</div><div>${it.req_level ?? '–'} · ${it.item_level ?? '–'}</div>
+      ${it.disenchant ? `<div>Disenchant it <span class="pill" title="${esc(it.disenchant.source)}">Classic table</span></div><div>about ${money(it.disenchant.value)} each: ${deMats(it.disenchant)}${deWho(it.disenchant)}</div>` : ''}
     </div>${spark(it.history)}`;
   if (it.opportunities.length && !opp) html += `<h3>Ways to make money with it</h3>${oppTable(it.opportunities, {cols: ['title', 'profit_unit', 'daily', 'flags'], export: false})}`;
   if (it.vendors.length) html += `<h3>Sold by <small>your faction</small></h3><table><tbody>${it.vendors.slice(0, 15).map((v) => `<tr><td>${esc(v.name)}</td><td>${esc(v.zone)}</td><td>${v.coords ? v.coords.map((c) => (+c).toFixed(1)).join(', ') : ''}</td><td>${v.stock ? 'limited: ' + v.stock : ''}</td></tr>`).join('')}</tbody></table>`;

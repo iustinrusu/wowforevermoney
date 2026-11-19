@@ -13,6 +13,7 @@ from dataclasses import asdict, dataclass, field
 from . import anomalies, fishing, gamedata, nodes, plan, pricing, skinning, valuation, wowhead_items
 from . import everloot as everloot_mod
 from . import levelling as levelling_mod
+from . import foreverrecipes as foreverrecipes_mod
 from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
@@ -34,7 +35,7 @@ DARKMOON_ZONES = {12, 215}       # Elwynn Forest + Mulgore: where the Darkmoon F
 # the numbers shown: a pick with doubtful prices ranks below an equally good one with solid prices.
 DOUBT = {'price_check': 0.7, 'price_check_fails': 0.4, 'listed_far_above_sales': 0.8, 'sale_price_outlier': 0.7, 'slow_to_sell': 0.7, 'crowded': 0.7, 'sells_lower': 0.6, 'price_looks_off': 0.6, 'none_listed': 0.8, 'mat_not_listed': 0.8, 'small_sample': 0.8,
          'limited_mat': 0.9, 'limited_stock': 0.9, 'seasonal': 0.9, 'vendor_price_unconfirmed': 0.95,
-         'skill_estimated': 0.95, 'tool_unchecked': 0.9, 'assumed_rate': 0.95, 'assumed_kill_rate': 0.9, 'skins_partial': 0.95, 'classic_yields': 0.85, 'dungeon': 0.6, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
+         'skill_estimated': 0.95, 'tool_unchecked': 0.9, 'classic_disenchant': 0.6, 'assumed_rate': 0.95, 'assumed_kill_rate': 0.9, 'skins_partial': 0.95, 'classic_yields': 0.85, 'dungeon': 0.6, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
 
 
 def vendor_sell(item) -> int:
@@ -303,6 +304,49 @@ class Engine:
         have = self.owned_items()
         return None if have is None else iid in have
 
+    def enchanter(self) -> tuple[str, int] | None:
+        """Your character with the most Enchanting (any of them: you can mail items to it), and its skill."""
+        if not hasattr(self, '_enchanter'):
+            best = None
+            for name, c in ((getattr(self.w, 'profile', None) or {}).get('characters') or {}).items():
+                rank = int(((c.get('professions') or {}).get('Enchanting') or {}).get('rank') or 0)
+                if rank and (best is None or rank > best[1]):
+                    best = (name.split('-')[0], rank)
+            mine = self.profs.get('Enchanting')
+            if mine and (best is None or mine > best[1]):
+                best = (self.character().split('-')[0] or 'you', int(mine))
+            self._enchanter = best
+        return self._enchanter
+
+    def disenchant(self, iid: int) -> dict | None:
+        """What disenchanting one of this item gives, from ForeverRecipes' tables (WoW Classic reference data, its
+        author's provisional estimates; the user's yes to a labelled fallback, 2026-11-19): each material's chance x
+        average count x what it sells for. The Enchanting skill needed is the WoW Classic rule (estimated). None when the
+        item can't be disenchanted or there is no table."""
+        cache = self.__dict__.setdefault('_de_cache', {})
+        if iid in cache:
+            return cache[iid]
+        fr, it = getattr(self.w, 'forever_recipes', None), self.gd.items.get(iid)
+        out = None
+        if fr and it:
+            pid, _ = foreverrecipes_mod.disenchant_profile(fr, iid, it.class_id, it.subclass_id, it.quality, it.item_level)
+            mats = foreverrecipes_mod.disenchant_materials(fr, pid)
+            if mats:
+                rows, total = [], 0.0
+                for mid, chance, lo, hi in mats:
+                    each = self.sell_value(mid)[0]
+                    per = chance * (lo + hi) / 2
+                    total += per * each
+                    rows.append({'item_id': mid, 'name': self.name(mid), 'chance': chance, 'min': lo, 'max': hi,
+                                 'per_de': round(per, 3), 'each': each})
+                skill = foreverrecipes_mod.disenchant_skill(it.quality, it.item_level)
+                who = self.enchanter()
+                out = {'value': int(total), 'mats': rows, 'skill': skill, 'can': bool(who and who[1] >= skill),
+                       'enchanter': who[0] if who else None, 'enchanter_skill': who[1] if who else None,
+                       'source': 'ForeverRecipes disenchant table (WoW Classic reference data, provisional estimates)'}
+        cache[iid] = out
+        return out
+
     def tools_for(self, recipe) -> list[dict]:
         """The tools a recipe needs in your bags (SpellTotems: a Philosopher's Stone, Blacksmith Hammer, Runed rod...),
         whether you have one (None: bags not read), and the cheapest way to get one (vendor or AH)."""
@@ -446,107 +490,129 @@ class Engine:
             if unpriced:
                 continue
             unit_val, channel, q = self.sell_value(r.product_id)
-            revenue = int(unit_val * r.product_count)
-            profit = revenue - cost
-            if profit <= 0:
-                continue
-            crafts_demand = self.demand_per_day(r.product_id, channel) / max(r.product_count, 1)
-            crafts_uncapped = min(crafts_demand, MAX_UNITS_PER_DAY)          # as if you had the gold for it
-            mat_limit = None
-            for m in mats:
-                if m['source'] == 'vendor' and 'limited_stock' in m['flags']:
-                    cap = self.vendor_stock_cap(m['item_id']) or 0
-                    crafts_uncapped = min(crafts_uncapped, cap / m['count'])
-                elif m['source'] != 'vendor':
-                    # you can't buy more of an AH ingredient a day than its market trades at your share
-                    cap = sold_per_day(self.price(m['item_id'])) * self.share / m['count']
-                    if cap < crafts_uncapped:
-                        crafts_uncapped, mat_limit = cap, m['name']
-            per_cooldown = cooldown_per_day(r)
-            if per_cooldown is not None and per_cooldown < crafts_uncapped:
-                crafts_uncapped, mat_limit = per_cooldown, None
-            crafts_day = min(crafts_uncapped, self.affordable(cost))
-            req, exact = self.required_skill(r)
-            have = self.profs.get(r.profession)
-            flags = list(q.flags) if (q and channel == 'AH') else []
-            if not verified:
-                flags.append('unverified_recipe')
-            if per_cooldown is not None:
-                flags.append('cooldown')
-                if getattr(r, 'cooldown_group', ''):
-                    flags.append('shared_cooldown')
-            if not exact:
-                flags.append('skill_estimated')
-            if channel == 'vendor':
-                flags.append('sell_to_vendor')
-            if any('none_listed' in m['flags'] for m in mats):
-                flags.append('mat_not_listed')
-            if any('limited_stock' in m['flags'] for m in mats):
-                flags.append('limited_mat')
-            if any('event_vendor' in m['flags'] for m in mats):
-                flags.append('event_vendor')      # an ingredient is only sold during events
-            if self.affordable(cost) < 1:
-                flags.append('cant_afford')
-            level_req = (getattr(self.su, 'level_required', None) or {}).get(r.spell_id, 0)
-            if r.profession == gamedata.NO_PROFESSION:
-                needs, doable = '', True
-            elif have is None:
-                needs, doable = f'Learn {r.profession}', False
-                flags.append('other_profession')
-            elif level_req > int(self.s.get('level', 60) or 60):
-                needs, doable = f'Level {level_req} to learn it (you are {self.s.get("level")})', False
-            elif have < req:
-                needs, doable = f'{r.profession} {req}{"" if exact else "~"} (you have {have})', False
-            else:
-                needs, doable = '', True
-            owned = self.owns(tool) if tool else None
-            if tool and owned is False:
-                flags.append('needs_tool')
-                if doable:
-                    needs, doable = f'Get a {self.name(tool)} (once: you keep it)', False
-            elif tool and owned is None:
-                flags.append('tool_unchecked')
-            tools = self.tools_for(r)                 # a hammer, a Philosopher's Stone, a runed rod
-            missing = [t for t in tools if t['have'] is False]
-            if missing:
-                flags.append('needs_tool')
-                if doable:
-                    needs, doable = f'Get a {missing[0]["name"]} (once: you keep it)', False
-            elif any(t['have'] is None for t in tools) and 'tool_unchecked' not in flags:
-                flags.append('tool_unchecked')
-            product = self.gd.items.get(r.product_id)
-            count_text = f' x{r.product_count:g}' if r.product_count != 1 else ''
-            if use_item:      # "Turn 3 Lesser Eternal Essence into Greater Eternal Essence", "Combine 8 items into ..."
-                made = f'{r.product_count:g} {self.name(r.product_id)}' if r.product_count != 1 else self.name(r.product_id)
-                title = (f'Turn {r.reagents[0][1]} {self.name(r.reagents[0][0])} into {made}' if len(r.reagents) == 1
-                         else f'Combine {sum(c for _, c in r.reagents)} items into {made}')
-            else:
-                title = (f'{self.name(tool)}: make {self.name(r.product_id)}{count_text}' if tool
-                         else f'Craft {self.name(r.product_id)}{count_text}')
-            out.append(Opportunity(
-                kind='craft', key=f'craft:{r.spell_id}', item_id=r.product_id,
-                title=title,
-                profit_unit=profit, cost_unit=cost, units_day=round(crafts_day, 2), daily=int(profit * crafts_day),
-                doable=doable, needs=needs, profession=r.profession, preferred=r.profession in self.preferred,
-                flags=flags,
-                detail={'recipe_spell': r.spell_id,
-                        'recipe': f'use your {self.name(tool)} to make {self.name(r.product_id)}' if tool else r.name,
-                        'tool': {'item_id': tool, 'name': self.name(tool), 'owned': owned,
-                                 'charges': getattr(r, 'tool_charges', 0)} if tool else None,
-                        'tools': tools, 'use_item': use_item or None, 'level_required': level_req or None,
-                        'mats': mats, 'revenue': revenue,
-                        'sell_channel': channel, 'sell_source': q.source if q else 'vendor',
-                        'sell_price': q.value if (q and channel == 'AH') else None,
-                        'product_count': r.product_count, 'skill_required': req, 'skill_exact': exact,
-                        'thresholds': self.su.thresholds.get(r.spell_id), 'learn': self.learn_cost(r),
-                        'req_level': product.req_level if product else 0,
-                        'sold_per_day': sold_per_day(self.price(r.product_id)),
-                        'daily_if_affordable': int(profit * crafts_uncapped), 'limited_by_mat': mat_limit,
-                        'cooldown_hours': round(r.cooldown_ms / 3_600_000, 2) if per_cooldown is not None else None,
-                        'cooldown_group': getattr(r, 'cooldown_group', '') or None,
-                        'cooldown_shared_with': sum(1 for x in self.gd.recipes if x is not r and getattr(r, 'cooldown_group', '')
-                                                    and getattr(x, 'cooldown_group', '') == r.cooldown_group)}))
+            sale_revenue = int(unit_val * r.product_count)
+            variants = [('sell', sale_revenue, channel, q, None)] if sale_revenue > cost else []
+            de = self.disenchant(r.product_id)
+            if de and de['value'] > 0 and int(de['value'] * r.product_count) > max(cost, sale_revenue):
+                # craft it to disenchant it: a separate row, labelled, never a Top pick (Classic table)
+                variants.append(('disenchant', int(de['value'] * r.product_count), 'disenchant', None, de))
+            for variant, revenue, channel, q, de in variants:
+                self._craft_row(out, r, variant, revenue, channel, q, de, cost, mats, tool, use_item, verified)
         return out
+
+    def _craft_row(self, out, r, variant, revenue, channel, q, de, cost, mats, tool, use_item, verified):
+        """One craft row: sold (variant 'sell'), or disenchanted (variant 'disenchant', Classic table)."""
+        profit = revenue - cost
+        if variant == 'disenchant':
+            # what the markets of its materials take at your share, in crafts a day
+            crafts_demand = min((sold_per_day(self.price(m['item_id'])) * self.share / (m['per_de'] * r.product_count)
+                                 for m in de['mats'] if m['per_de'] * m['each'] >= 0.2 * max(de['value'], 1)),
+                                default=0.0)
+        else:
+            crafts_demand = self.demand_per_day(r.product_id, channel) / max(r.product_count, 1)
+        crafts_uncapped = min(crafts_demand, MAX_UNITS_PER_DAY)          # as if you had the gold for it
+        mat_limit = None
+        for m in mats:
+            if m['source'] == 'vendor' and 'limited_stock' in m['flags']:
+                cap = self.vendor_stock_cap(m['item_id']) or 0
+                crafts_uncapped = min(crafts_uncapped, cap / m['count'])
+            elif m['source'] != 'vendor':
+                # you can't buy more of an AH ingredient a day than its market trades at your share
+                cap = sold_per_day(self.price(m['item_id'])) * self.share / m['count']
+                if cap < crafts_uncapped:
+                    crafts_uncapped, mat_limit = cap, m['name']
+        per_cooldown = cooldown_per_day(r)
+        if per_cooldown is not None and per_cooldown < crafts_uncapped:
+            crafts_uncapped, mat_limit = per_cooldown, None
+        crafts_day = min(crafts_uncapped, self.affordable(cost))
+        req, exact = self.required_skill(r)
+        have = self.profs.get(r.profession)
+        flags = list(q.flags) if (q and channel == 'AH') else []
+        if not verified:
+            flags.append('unverified_recipe')
+        if per_cooldown is not None:
+            flags.append('cooldown')
+            if getattr(r, 'cooldown_group', ''):
+                flags.append('shared_cooldown')
+        if not exact:
+            flags.append('skill_estimated')
+        if channel == 'vendor':
+            flags.append('sell_to_vendor')
+        if any('none_listed' in m['flags'] for m in mats):
+            flags.append('mat_not_listed')
+        if any('limited_stock' in m['flags'] for m in mats):
+            flags.append('limited_mat')
+        if any('event_vendor' in m['flags'] for m in mats):
+            flags.append('event_vendor')      # an ingredient is only sold during events
+        if self.affordable(cost) < 1:
+            flags.append('cant_afford')
+        level_req = (getattr(self.su, 'level_required', None) or {}).get(r.spell_id, 0)
+        if r.profession == gamedata.NO_PROFESSION:
+            needs, doable = '', True
+        elif have is None:
+            needs, doable = f'Learn {r.profession}', False
+            flags.append('other_profession')
+        elif level_req > int(self.s.get('level', 60) or 60):
+            needs, doable = f'Level {level_req} to learn it (you are {self.s.get("level")})', False
+        elif have < req:
+            needs, doable = f'{r.profession} {req}{"" if exact else "~"} (you have {have})', False
+        else:
+            needs, doable = '', True
+        owned = self.owns(tool) if tool else None
+        if tool and owned is False:
+            flags.append('needs_tool')
+            if doable:
+                needs, doable = f'Get a {self.name(tool)} (once: you keep it)', False
+        elif tool and owned is None:
+            flags.append('tool_unchecked')
+        tools = self.tools_for(r)                 # a hammer, a Philosopher's Stone, a runed rod
+        missing = [t for t in tools if t['have'] is False]
+        if missing:
+            flags.append('needs_tool')
+            if doable:
+                needs, doable = f'Get a {missing[0]["name"]} (once: you keep it)', False
+        elif any(t['have'] is None for t in tools) and 'tool_unchecked' not in flags:
+            flags.append('tool_unchecked')
+        if variant == 'disenchant':
+            flags.append('classic_disenchant')
+            if not de['can'] and doable:
+                needs, doable = (f"Enchanting {de['skill']}~ on any character to disenchant it"
+                                 + (f" ({de['enchanter']} has {de['enchanter_skill']})" if de['enchanter'] else ''), False)
+        product = self.gd.items.get(r.product_id)
+        count_text = f' x{r.product_count:g}' if r.product_count != 1 else ''
+        if use_item:      # "Turn 3 Lesser Eternal Essence into Greater Eternal Essence", "Combine 8 items into ..."
+            made = f'{r.product_count:g} {self.name(r.product_id)}' if r.product_count != 1 else self.name(r.product_id)
+            title = (f'Turn {r.reagents[0][1]} {self.name(r.reagents[0][0])} into {made}' if len(r.reagents) == 1
+                     else f'Combine {sum(c for _, c in r.reagents)} items into {made}')
+        else:
+            title = (f'{self.name(tool)}: make {self.name(r.product_id)}{count_text}' if tool
+                     else f'Craft {self.name(r.product_id)}{count_text}')
+        if variant == 'disenchant':
+            title = f'Craft {self.name(r.product_id)}{count_text} and disenchant it'
+        out.append(Opportunity(
+            kind='craft', key=f'craft:{r.spell_id}' if variant == 'sell' else f'craft_de:{r.spell_id}',
+            item_id=r.product_id, title=title,
+            profit_unit=profit, cost_unit=cost, units_day=round(crafts_day, 2), daily=int(profit * crafts_day),
+            doable=doable, needs=needs, profession=r.profession, preferred=r.profession in self.preferred,
+            flags=flags,
+            detail={'recipe_spell': r.spell_id,
+                    'recipe': f'use your {self.name(tool)} to make {self.name(r.product_id)}' if tool else r.name,
+                    'tool': {'item_id': tool, 'name': self.name(tool), 'owned': owned,
+                             'charges': getattr(r, 'tool_charges', 0)} if tool else None,
+                    'tools': tools, 'use_item': use_item or None, 'level_required': level_req or None,
+                    'disenchant': de if variant == 'disenchant' else None,
+                    'mats': mats, 'revenue': revenue,
+                    'sell_channel': channel, 'sell_source': q.source if q else 'vendor',
+                    'sell_price': q.value if (q and channel == 'AH') else None,
+                    'product_count': r.product_count, 'skill_required': req, 'skill_exact': exact,
+                    'thresholds': self.su.thresholds.get(r.spell_id), 'learn': self.learn_cost(r),
+                    'req_level': product.req_level if product else 0,
+                    'sold_per_day': sold_per_day(self.price(r.product_id)),
+                    'daily_if_affordable': int(profit * crafts_uncapped), 'limited_by_mat': mat_limit,
+                    'cooldown_hours': round(r.cooldown_ms / 3_600_000, 2) if per_cooldown is not None else None,
+                    'cooldown_group': getattr(r, 'cooldown_group', '') or None,
+                    'cooldown_shared_with': sum(1 for x in self.gd.recipes if x is not r and getattr(r, 'cooldown_group', '')
+                                                and getattr(x, 'cooldown_group', '') == r.cooldown_group)}))
 
     def vendor_flips(self) -> list[Opportunity]:
         out = []
@@ -1651,7 +1717,7 @@ class Engine:
     def top_picks(self, opps: list[Opportunity], n: int = 15) -> dict:
         bonus = float(self.s.get('switch_bonus', 1.5))
         bad = {'price_check_fails', 'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe', 'above_region', 'black_market',
-               'event_vendor'}
+               'event_vendor', 'classic_disenchant'}
         if self.sale_basis == 'realm':
             bad.add('listed_far_above_sales')     # realm prices: a listing 3x+ above what sells is not a pick
         bad.add('done_today')                     # done for today: the next best takes its place

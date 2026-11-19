@@ -24,6 +24,20 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-19 Disenchanting valued from a Classic table, labelled (the user: "Yes, labelled", checklist C10).**
+  ForeverRecipes' Data/Disenchant.lua (its author: "independently reconstructed Classic baseline estimates ... not
+  verified Forever yields") gives each item's results: its own per-item list (8,479 items) first, else rules by class,
+  subclass, quality and item level; value = each material's chance x average count x what it sells for (AH after the
+  cut, or vendor). The Enchanting skill to disenchant is the WoW Classic rule, labelled estimated (greens and blues by
+  item level, 1 up to 20 ... 225 up to 65; epics 225 up to 60, 300 above): not in their data, not checked for Forever.
+  Who can: the character with the most Enchanting (any: items can be mailed). Where it shows: item details ("Disenchant
+  it", Classic table pill), My bags ("or disenchant it: about X"), flag `disenchant_more` when the table says more than
+  selling; never the chosen way to turn an item into gold (a Classic table must not change Forever-based advice); and
+  "Craft X and disenchant it" rows (key `craft_de:<spell>`, flag `classic_disenchant`, confidence x0.6, out of Top
+  picks and the plan; their crafts a day are capped by the main materials' markets at your share). On the user's
+  data: 22 such rows, none doable yet (the Enchanting alt has 3); the best, Defender's Leather Helm, about 3g 40s a day
+  at Enchanting 50. Destiny would give a Nexus Crystal (42g 75s) against 197g on the AH.
+
 - **2026-11-19 Every item interaction is enumerated and checked (user: "let's try to not miss things like the Salt Shaker
   anymore. We really need to cover all the items and their interactions").** A survey of the game data found every
   spell that creates an item (3,350) and how a player casts it. Now counted: all profession recipes (Poisons added:
@@ -626,6 +640,12 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-19** (third part) Disenchanting from ForeverRecipes' Classic table, labelled (`foreverrecipes.disenchant_profile`,
+  `disenchant_materials`, `disenchant_skill`; `Engine.disenchant`, `Engine.enchanter`, `Engine._craft_row` (crafts
+  split into a row builder so a product can be sold or disenchanted); `Value.disenchant`; item drawer, My bags, craft
+  drawer). Data health "Item interactions": disenchanting now "estimated". Consistency check skips the disenchant rows
+  when comparing with the levelling planner (another revenue on purpose). Tests: 270 (6 Lua with lupa).
 
 - **2026-11-19** (second part) Item interactions: Poisons as a profession, item uses (essences, Darkmoon cards, tools),
   recipe tools in your bags (`Engine.tools_for`, `owned_items`), the interactions report on Data health and

@@ -48,7 +48,7 @@ TYPE_LABEL = {'cash_ah': 'Cash in', 'cash_open': 'Cash in', 'cash_vendor': 'Cash
               'goal': 'Long-term goal'}
 BAD_FLAGS = {'done_today', 'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'cant_afford', 'unverified_recipe',
              'above_region', 'black_market', 'event_vendor', 'classic_unconfirmed', 'classic_yields',
-             'price_check_fails'}
+             'price_check_fails', 'classic_disenchant'}
 
 
 def gold(c: float | None) -> str:

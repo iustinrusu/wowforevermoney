@@ -346,6 +346,7 @@ class App:
             'vendor_price': (eng.vendor_price(iid) or (None,))[0], 'drops': drops, 'objects': objects,
             'fished_in': fished_in[:25],
             'made_by': made_by, 'used_in': used_in, 'best_use': r.get('best_use', {}).get(iid),
+            'disenchant': eng.disenchant(iid),
             'opportunities': [self.opp_view(o) for o in r['opportunities'] if o.item_id == iid],
             'tip': self.tips.get(str(iid)),
         }
@@ -520,6 +521,10 @@ class App:
                 action = v.how[:1].upper() + v.how[1:]
                 if v.channel == 'open' and v.contents:
                     action += ': ' + ', '.join(c['name'] for c in v.contents[:3]) + (', and more' if len(v.contents) > 3 else '')
+                if v.disenchant and 'disenchant_more' in v.flags:
+                    d = v.disenchant
+                    action += (f"; or disenchant it: about {fmt_money(d['value'])} each (Classic table, estimate"
+                               + ('' if d['can'] else f", needs Enchanting {d['skill']}") + ')')
                 worth = valuer.worth_for(iid, n)      # a capped craft: crafted worth only for what a day takes
                 total += worth
                 rows.append({'item_id': iid, 'name': it.name, 'quality': it.quality, 'count': n, 'action': action,

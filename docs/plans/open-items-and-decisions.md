@@ -33,7 +33,7 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       planner, niches first.
 - [ ] B3. Not counted in profits yet: AH deposits and listings that don't sell; buying several of an ingredient
       (each costed at the lowest listing); recipe learning costs (shown, not subtracted).
-- [ ] B4. Not valued yet: coins inside containers, disenchanting (the user has an Enchanting alt), quest-item
+- [ ] B4. Not valued yet: coins inside containers, quest-item
       rewards, lockboxes beyond their contents.
 - [ ] B5. Pool catches: the addon records which pool a catch came from by itself (no fishing logged yet on
       2026-11-15). After the user next fishes, check the saved file has `pools` entries (moved from D3).
@@ -93,7 +93,8 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       Oily Blackmouth, Firefin Snapper, Sagefish; 10x more chests; 2-4x more of some herbs). Claude's recommendation:
       yes, but it is a small gain (node weights per zone, where pools are), after the pool pages are read.
 
-- [ ] C10. (asked 2026-11-19) **Disenchanting values.** The app doesn't value disenchanting (your Enchanting alt; the
+- [x] C10. **Decided 2026-11-19: yes, labelled** (built the same day: item details, My bags, "craft and disenchant it"
+      rows; flag `classic_disenchant`, out of Top picks and the plan). Was: **Disenchanting values.** The app doesn't value disenchanting (your Enchanting alt; the
       Biggest markets list has Large Brilliant Shard at 389g traded a day). ForeverRecipes ships disenchant tables
       (by item level, quality and armor/weapon), but they are Classic reference data that its own author calls
       provisional estimates. Claude's recommendation: use them as a labelled fallback ("Classic disenchant table"),

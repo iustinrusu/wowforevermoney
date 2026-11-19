@@ -9,8 +9,10 @@ What the app uses:
   Data health.
 - the character level a recipe needs (`levelRequired`, Poisons: Instant Poison II at 30)
 - trainer fees and the skill the trainer asks for (Poisons: Instant Poison II costs 1g at Poisons 130)
-Not used yet: its disenchant tables (Classic reference, "provisional estimates" in its own words), recipe drops and
-sellers, Merchant's Favor items.
+- what disenchanting an item gives (Data/Disenchant.lua; the user's yes, 2026-11-19, as a labelled fallback): its own
+  words call these "independently reconstructed Classic baseline estimates ... not verified Forever yields", so the
+  app labels them "Classic table" everywhere and never lets them into Top picks or the plan
+Not used yet: recipe drops and sellers, Merchant's Favor items.
 """
 from __future__ import annotations
 
@@ -30,6 +32,12 @@ class ForeverRecipesData:
     trainers: dict[int, list] = field(default_factory=dict)    # spell -> [(npc, copper, skill)]
     automatic: set[int] = field(default_factory=set)           # learned with the profession
     source_build: str | None = None
+    # disenchanting (Classic reference): profile -> [(material, chance, min, max)] or None (unsupported)
+    de_profiles: dict[int, list | None] = field(default_factory=dict)
+    de_rules: list[tuple] = field(default_factory=list)        # (class, subclass or -1, quality, min ilvl, max ilvl, profile)
+    de_items: dict[int, int | None] = field(default_factory=dict)   # item -> profile, None = can't be estimated
+    de_eligible: set[int] = field(default_factory=set)
+    de_excluded: set[int] = field(default_factory=set)
 
 
 def load(data_dir: Path) -> ForeverRecipesData:
@@ -56,7 +64,65 @@ def load(data_dir: Path) -> ForeverRecipesData:
             out.trainers[int(spell)] = [(int(r[0]), int(r[1]), int(r[2])) for r in rows or []
                                         if isinstance(r, list) and len(r) >= 3]
         out.automatic = {int(k) for k, v in (d.get('AutomaticRecipes') or {}).items() if v}
+    de_path = data_dir / 'Disenchant.lua'
+    if de_path.exists():
+        d = parse_assignments(de_path.read_text(encoding='utf-8', errors='replace'))
+        for pid, rows in (d.get('DisenchantProfiles') or {}).items():
+            out.de_profiles[int(pid)] = None if rows is False else [
+                (int(r[0]), float(r[1]), int(r[2]), int(r[3])) for r in rows or [] if isinstance(r, list) and len(r) >= 4]
+        rules = d.get('DisenchantRules') or []
+        if isinstance(rules, dict):
+            rules = [rules[k] for k in sorted(rules)]
+        out.de_rules = [tuple(int(x) for x in r[:6]) for r in rules if isinstance(r, list) and len(r) >= 6]
+        for iid, v in (d.get('DisenchantItems') or {}).items():
+            out.de_items[int(iid)] = int(v[0]) if isinstance(v, list) and v and v[0] else None
+        out.de_eligible = {int(k) for k, v in (d.get('DisenchantEligible') or {}).items() if v}
+        out.de_excluded = {int(k) for k, v in (d.get('DisenchantExcluded') or {}).items() if v}
     return out
+
+
+def disenchant_profile(fr: ForeverRecipesData | None, iid: int, class_id: int, subclass_id: int, quality: int,
+                       item_level: int) -> tuple[int | None, str]:
+    """Which disenchant profile an item has, as ForeverRecipes works it out (Crafting.lua ResolveDEProfile): its own
+    per-item list first, else the rules by class, subclass, quality and item level (first match). Only weapons and
+    armour of green quality or better can be disenchanted."""
+    if not fr or not fr.de_profiles:
+        return None, 'no data'
+    if iid in fr.de_excluded:
+        return None, 'excluded'
+    if iid in fr.de_items:
+        pid = fr.de_items[iid]
+        return (pid, 'ok') if pid and fr.de_profiles.get(pid) else (None, 'unsupported')
+    if class_id not in (2, 4) or quality < 2:
+        return None, 'ineligible'
+    if quality > 4 or iid not in fr.de_eligible:
+        return None, 'unsupported'
+    for cls, sub, q, lo, hi, pid in fr.de_rules:
+        if cls == class_id and sub in (-1, subclass_id) and q == quality and lo <= item_level <= hi:
+            return (pid, 'ok') if pid and fr.de_profiles.get(pid) else (None, 'unsupported')
+    return None, 'unsupported'
+
+
+def disenchant_materials(fr: ForeverRecipesData | None, profile: int | None) -> list[tuple]:
+    """[(material, chance, min, max)] for a profile; empty if unknown. Chances are not normalised: a profile can
+    include getting nothing."""
+    if not fr or not profile:
+        return []
+    return list(fr.de_profiles.get(profile) or [])
+
+
+# Enchanting skill needed to disenchant, by item level: the WoW Classic rule (not in ForeverRecipes' data, not checked
+# for Forever), labelled "estimated" wherever it is shown. Green and blue items:
+DE_SKILL = [(20, 1), (25, 25), (30, 50), (35, 75), (40, 100), (45, 125), (50, 150), (55, 175), (60, 200), (65, 225)]
+
+
+def disenchant_skill(quality: int, item_level: int) -> int:
+    if quality >= 4:                       # epics: 225 up to item level 60, 300 above (estimate)
+        return 225 if item_level <= 60 else 300
+    for top, skill in DE_SKILL:
+        if item_level <= top:
+            return skill
+    return 275
 
 
 def merged(su: SkillUpData, fr: ForeverRecipesData | None) -> SkillUpData:

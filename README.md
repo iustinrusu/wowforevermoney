@@ -209,7 +209,7 @@ The **Data health** tab shows every source's age and version, plus the accuracy 
 - "Cheap relist" and "AH → vendor" rows come from one scan snapshot. Check them in game, or use TSM's Sniper.
 - AH deposits for listings that don't sell are not included.
 - Wowhead Forever zone counts mix open water and pools. Pool-only loot is set aside, but school fish that are also caught in open water (Oily Blackmouth, Firefin Snapper, Stonescale Eel) stay in, so open-water shares of those fish are slightly high.
-- Coins inside containers aren't counted (Wowhead doesn't list them). Disenchanting and quest rewards aren't valued yet.
+- Coins inside containers aren't counted (Wowhead doesn't list them). Quest rewards aren't valued yet. Disenchanting is an estimate from a WoW Classic table (in the ForeverRecipes addon), labelled "Classic table" and never used for Top picks or the plan.
 
 ## Tests and audits
 

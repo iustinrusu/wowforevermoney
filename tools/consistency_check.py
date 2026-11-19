@@ -68,7 +68,7 @@ for prof in ('Leatherworking', 'Tailoring', 'Alchemy'):
 levelling.plan = real_plan
 n = 0
 for o in res['opportunities']:
-    x = lev_opts.get(o.detail.get('recipe_spell')) if o.kind == 'craft' else None
+    x = lev_opts.get(o.detail.get('recipe_spell')) if o.kind == 'craft' and not o.detail.get('disenchant') else None   # disenchant rows: another revenue
     if x and not {'hard_to_sell', 'no_sales_data'} & set(o.flags) and o.detail.get('revenue') != max(x.ah_value, x.vendor_value):
         n += 1
         if n <= 3: P('levelling sale value != crafting revenue:', o.title, max(x.ah_value, x.vendor_value), o.detail.get('revenue'))

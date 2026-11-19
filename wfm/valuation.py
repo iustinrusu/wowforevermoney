@@ -5,6 +5,9 @@ Ways to turn an item into gold ("channels"):
 - sell it to a vendor,
 - use it in a recipe (the best craft it goes into),
 - open it (trunks, clams, crates, lockboxes): the expected value of its contents, each valued the same way.
+Disenchanting is shown beside them, never chosen as the best way: its results come from ForeverRecipes' WoW Classic
+reference table (the user's yes to a labelled fallback, 2026-11-19), so it informs, it doesn't decide (flag
+`disenchant_more` when the table says it may be worth more).
 
 Why this exists: items whose worth comes from opening them have no AH price (they're often soulbound) and a
 tiny vendor price, so judging by AH/vendor/crafting alone made a Mithril Bound Trunk "worth 2c" while it
@@ -44,6 +47,7 @@ class Value:
     craft_cap: float | None = None       # craft channel: units a day the recipe can use at that worth
     beyond: int = 0                      # craft channel: what each unit beyond the cap is worth (next best channel)
     cap_by: str = ''                     # 'cooldown' or 'market': what sets the cap
+    disenchant: dict | None = None       # Engine.disenchant: a Classic-table estimate, shown, never the chosen channel
 
 
 def capped_total(crafted: float, cap: float | None, beyond: float, qty: float) -> float:
@@ -174,9 +178,12 @@ class Valuer:
             cap_by = use.get('doable_cap_by') or 'market'
             # one unit: crafted worth for the share of it the recipe can use a day, the rest at the next best channel
             channels['craft'] = int(capped_total(crafted, cap, beyond, 1))
+        de = e.disenchant(iid) if item and item.class_id in (2, 4) and item.quality >= 2 and hasattr(e, 'disenchant') else None
+        if de and de['value'] > max([0] + list(channels.values())):
+            flags.append('disenchant_more')
         if not channels:
             return Value(0, 'none', 'no known way to turn it into gold', tuple(flags + ['no_value']), {},
-                         if_skilled=if_skilled)
+                         if_skilled=if_skilled, disenchant=de)
         best = max(channels, key=lambda k: channels[k])
         if best == 'open' and channels['open'] >= WORTH_OPENING * max(channels.get('AH', 0), vendor, 1):
             flags.append('open_it')
@@ -191,4 +198,4 @@ class Valuer:
         if best != 'craft':
             crafted, cap, beyond, cap_by = 0, None, 0, ''
         return Value(channels[best], best, how, tuple(flags), channels, contents[:12], source, if_skilled,
-                     crafted, cap, beyond, cap_by)
+                     crafted, cap, beyond, cap_by, de)
