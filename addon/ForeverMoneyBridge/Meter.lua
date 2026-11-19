@@ -1,15 +1,18 @@
 -- Gold Ever After farm meter (in the ForeverMoneyBridge addon): /gea start shows it and starts a session, /gea stop saves it and hides it.
--- Prices: the WoW Forever Money app's own values (Prices.lua, the same as the app's My bags), so the meter and the
--- app agree. An item missing from that table falls back to TSM's price (lowest listing, else market, after the 5% AH
--- cut), then to the vendor price; the window says how many fallbacks were used. Counts what loot windows from mobs,
--- fishing and nodes show, plus gold looted; things opened from your bags are skipped (they'd count twice).
+-- Works on its own, without the app (1.6.0, the user's wish): prices come from TSM in game, the same TSM data the app
+-- reads (your realm's lowest listing, else its average, else the region's, minus the 5% AH cut), or the vendor price
+-- when that is higher or TSM has none. "/gea prices app" uses the app's own values instead (Prices.lua, as its My bags
+-- shows them), with TSM and the vendor price for items the app did not list. Counts what loot windows from mobs,
+-- fishing and nodes show, gold looted and XP gained; things opened from your bags are skipped (they'd count twice).
 
 local CUT = 0.05
+local TSM_PRICE = "first(DBMinBuyout, DBMarket, DBRegionMarketAvg)"
 -- newer clients (WoW: Forever) moved these into C_Item / C_Spell; the old globals may not exist
 local GetItemInfo = GetItemInfo or (C_Item and C_Item.GetItemInfo) or function() return nil end
 local GetSpellInfo = GetSpellInfo or (C_Spell and C_Spell.GetSpellName) or function() return nil end
-local session                       -- {start, paused, pausedAt, pausedFor, money, items = {id = count}, loots = {}}
+local session                       -- {start, paused, pausedAt, pausedFor, money, xp, items = {id = count}, loots = {}}
 local win, lines, lootOpenUntil, lastMoney = nil, {}, 0, nil
+local cache = {}                    -- item id -> {copper, source}: TSM's data only changes on login or /reload
 
 local function db()
   ForeverMoneyBridgeDB = ForeverMoneyBridgeDB or {}
@@ -17,18 +20,105 @@ local function db()
   return ForeverMoneyBridgeDB.meter
 end
 
+local function priceMode() return db().prices == "app" and "app" or "tsm" end
+local function hasTSM() return TSM_API and TSM_API.GetCustomPriceValue and true or false end
+
+local function vendorPrice(id)
+  local sell = select(11, GetItemInfo(id))
+  return (sell and sell > 0) and sell or 0
+end
+
+local function tsmPrice(id)
+  if not hasTSM() then return 0 end
+  local ok, p = pcall(TSM_API.GetCustomPriceValue, TSM_PRICE, "i:" .. id)
+  return (ok and type(p) == "number" and p > 0) and math.floor(p * (1 - CUT)) or 0
+end
+
 -- what one item is worth, and where the number came from: "app", "tsm", "vendor" or "none"
 local function price(id)
-  local t = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.items
-  local v = t and t[id]
-  if v and v > 0 then return v, "app" end
-  if TSM_API and TSM_API.GetCustomPriceValue then
-    local ok, p = pcall(TSM_API.GetCustomPriceValue, "first(DBMinBuyout, DBMarket)", "i:" .. id)
-    if ok and p and p > 0 then return math.floor(p * (1 - CUT)), "tsm" end
+  local hit = cache[id]
+  if hit then return hit[1], hit[2] end
+  local v, src = 0, "none"
+  if priceMode() == "app" then
+    local t = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.items
+    local a = t and t[id]
+    if a and a > 0 then v, src = a, "app" end
   end
-  local sell = select(11, GetItemInfo(id))
-  if sell and sell > 0 then return sell, "vendor" end
-  return 0, "none"
+  if src == "none" then
+    local ah, sell = tsmPrice(id), vendorPrice(id)
+    if ah > 0 and ah >= sell then v, src = ah, "tsm" elseif sell > 0 then v, src = sell, "vendor" end
+  end
+  if GetItemInfo(id) then cache[id] = { v, src } end   -- item data not loaded yet: ask again next time
+  return v, src
+end
+
+-- Containers count 0 until opened: the app's list when there is one, else the item's tooltip says "<Right Click to
+-- Open>" or "Locked" (the game's own strings, so any language)
+local openable, scanTip = {}, nil
+local function tooltipLines(id)
+  local out = {}
+  if C_TooltipInfo and C_TooltipInfo.GetItemByID then
+    local data = C_TooltipInfo.GetItemByID(id)
+    for _, l in ipairs(data and data.lines or {}) do if l.leftText then out[#out + 1] = l.leftText end end
+  end
+  if #out == 0 then
+    scanTip = scanTip or CreateFrame("GameTooltip", "GoldEverAfterScanTip", nil, "GameTooltipTemplate")
+    scanTip:SetOwner(UIParent, "ANCHOR_NONE")
+    scanTip:SetHyperlink("item:" .. id)
+    for i = 1, scanTip:NumLines() do
+      local fs = _G["GoldEverAfterScanTipTextLeft" .. i]
+      local t = fs and fs:GetText()
+      if t then out[#out + 1] = t end
+    end
+    scanTip:Hide()
+  end
+  return out
+end
+
+local function isContainer(id)
+  local boxes = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.containers
+  if boxes and boxes[id] then return true end
+  if openable[id] == nil then
+    local ok, found = pcall(tooltipLines, id)
+    if ok and #found > 0 then                          -- an empty tooltip: not loaded yet, look again next time
+      openable[id] = false
+      for _, t in ipairs(found) do
+        if (ITEM_OPENABLE and t == ITEM_OPENABLE) or (LOCKED and t == LOCKED) then openable[id] = true end
+      end
+    end
+  end
+  return openable[id] == true
+end
+
+-- XP: what the XP bar gained while the meter runs (kills, quests, exploring); a level up in between counts the rest
+-- of the old level plus the new one
+local xpLast, xpMaxLast = nil, nil
+local function atMaxLevel()
+  local cap = (GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion())
+    or (GetMaxPlayerLevel and GetMaxPlayerLevel()) or MAX_PLAYER_LEVEL or 60
+  return (UnitLevel("player") or 0) >= cap
+end
+local function noteXP()
+  local cur, max = UnitXP("player") or 0, UnitXPMax("player") or 0
+  if xpLast and session and not session.paused then
+    local gained = cur >= xpLast and (cur - xpLast) or ((xpMaxLast or 0) - xpLast + cur)
+    if gained > 0 then session.xp = (session.xp or 0) + gained end
+  end
+  xpLast, xpMaxLast = cur, max
+end
+
+local function comma(n)
+  n = math.floor(n or 0)
+  if BreakUpLargeNumbers then return BreakUpLargeNumbers(n) end
+  local s, k = tostring(n), 1
+  while k > 0 do s, k = s:gsub("^(-?%d+)(%d%d%d)", "%1,%2") end
+  return s
+end
+
+local function duration(mins)
+  mins = math.floor(mins + 0.5)
+  if mins < 60 then return mins .. " min" end
+  return string.format("%d h %d min", mins / 60, mins % 60)
 end
 
 local function elapsed()
@@ -78,6 +168,18 @@ local function refresh()
   win.kv[1]:SetText(string.format("%d:%02d", secs / 60, secs % 60))
   win.kv[2]:SetText(money(value))
   win.kv[3]:SetText(money(session.money))
+  -- XP gained, an hour, and when the next level comes at this pace
+  local xp = session.xp or 0
+  if atMaxLevel() then
+    win.kv[4]:SetText("|cff888888max level|r")
+    win.kv[5]:SetText("|cff888888–|r")
+  else
+    local perHour = secs >= 60 and xp / secs * 3600 or 0
+    win.kv[4]:SetText(comma(xp) .. (perHour > 0 and ("  |cffaaaaaa(" .. comma(perHour) .. " an hour)|r") or ""))
+    local left = (UnitXPMax("player") or 0) - (UnitXP("player") or 0)
+    win.kv[5]:SetText(perHour > 0 and left > 0 and ("about " .. duration(left / perHour * 60) .. " at this pace")
+      or "|cff888888after the first XP|r")
+  end
   local l, parts = session.loots, {}
   for _, k in ipairs(ORDER) do if (l[k] or 0) > 0 then parts[#parts + 1] = LABEL[k] .. " " .. l[k] end end
   win.loots:SetText(#parts > 0 and table.concat(parts, "  ·  ") or "|cff999999Nothing looted yet|r")
@@ -97,13 +199,22 @@ local function refresh()
   end
   local boxes, inside = 0, 0
   for id, n in pairs(session.unopened) do boxes = boxes + n; inside = inside + price(id) * n end
-  win.remind:SetText(boxes > 0 and string.format("|cffffd100%d container%s not opened yet (about %s inside): open them to count them|r",
-    boxes, boxes == 1 and "" or "s", money(inside)) or "")
-  local made = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0
-  local note = made > 0 and string.format("Prices: the app's, from %.1f h ago", (time() - made) / 3600)
-    or "No app prices yet: start the app, then /reload"
-  local fb = sources.tsm + sources.vendor + sources.none
-  if fb > 0 then note = note .. string.format(" · %d by TSM, %d vendor, %d unpriced", sources.tsm, sources.vendor, sources.none) end
+  win.remind:SetText(boxes > 0 and string.format("|cffffd100%d container%s not opened yet%s: open them to count what is inside|r",
+    boxes, boxes == 1 and "" or "s", inside > 0 and (" (about " .. money(inside) .. " as they are)") or "") or "")
+  local note
+  if priceMode() == "app" then
+    local made = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0
+    note = made > 0 and string.format("Prices: the app's, from %.1f h ago", (time() - made) / 3600)
+      or "No app prices yet (start the app, then /reload): TSM and vendor prices"
+    local fb = sources.tsm + sources.vendor + sources.none
+    if fb > 0 then note = note .. string.format(" · %d by TSM, %d vendor, %d unpriced", sources.tsm, sources.vendor, sources.none) end
+  else
+    note = hasTSM() and "Prices: TSM in game, after the AH cut (vendor price if higher). /gea prices says more"
+      or "TSM is not loaded: vendor prices only"
+    if sources.vendor + sources.none > 0 then
+      note = note .. string.format(" · %d at vendor price, %d unpriced", sources.vendor, sources.none)
+    end
+  end
   win.note:SetText(note)
 end
 
@@ -118,7 +229,7 @@ local function makeWindow()
   if win then return win end
   win = CreateFrame("Frame", "ForeverMoneyBridgeMeter", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
   local m = db()
-  win:SetSize(m.w or 320, m.h or 300)
+  win:SetSize(m.w or 320, m.h or 340)
   if m.pos then win:SetPoint(m.pos[1], UIParent, m.pos[1], m.pos[2], m.pos[3]) else win:SetPoint("CENTER", UIParent, "CENTER", 300, 100) end
   if win.SetBackdrop then
     win:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -128,7 +239,7 @@ local function makeWindow()
   end
   win:SetMovable(true)
   win:SetResizable(true)
-  if win.SetResizeBounds then win:SetResizeBounds(260, 230, 600, 600) elseif win.SetMinResize then win:SetMinResize(260, 230) end
+  if win.SetResizeBounds then win:SetResizeBounds(260, 290, 600, 600) elseif win.SetMinResize then win:SetMinResize(260, 290) end
   win:SetClampedToScreen(true)
   win:EnableMouse(true)
   win:RegisterForDrag("LeftButton")
@@ -160,7 +271,7 @@ local function makeWindow()
 
   -- labelled figures
   win.kv = {}
-  local labels = { "Time", "Items", "Gold looted" }
+  local labels = { "Time", "Items", "Gold looted", "XP gained", "Next level" }
   local prev = win.total
   for i, label in ipairs(labels) do
     local k = text(win, "GameFontDisableSmall")
@@ -229,8 +340,11 @@ local function makeWindow()
 end
 
 local function start()
-  session = { start = GetTime(), paused = false, pausedFor = 0, money = 0, items = {}, unopened = {}, loots = {}, seen = {}, zone = GetRealZoneText and GetRealZoneText() or "?" }
+  session = { start = GetTime(), paused = false, pausedFor = 0, money = 0, xp = 0, items = {}, unopened = {}, loots = {}, seen = {}, zone = GetRealZoneText and GetRealZoneText() or "?" }
   lastMoney = GetMoney()
+  for k in pairs(cache) do cache[k] = nil end         -- prices as of now (a /reload may have brought new TSM data)
+  xpLast, xpMaxLast = nil, nil
+  noteXP()                                            -- the XP bar now: only what comes after counts
   makeWindow():Show()
   win.pause:SetText("Pause")
   refresh()
@@ -249,12 +363,16 @@ local function stop()
   local total = value + session.money
   local m = db()
   m.sessions = m.sessions or {}
+  local xp = session.xp or 0
   table.insert(m.sessions, 1, { ended = time(), zone = session.zone, minutes = math.floor(secs / 6 + 0.5) / 10,
     items = session.items, money = session.money, value = value, total = total,
-    perHour = secs > 0 and math.floor(total / secs * 3600) or 0, pricesMade = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0 })
+    perHour = secs > 0 and math.floor(total / secs * 3600) or 0, prices = priceMode(),
+    pricesMade = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0,
+    xp = xp, xpPerHour = secs > 0 and math.floor(xp / secs * 3600) or 0, level = UnitLevel("player") })
   while #m.sessions > 50 do table.remove(m.sessions) end
-  print(string.format("|cffe8c060Gold Ever After|r stopped: %s in %d min%s. Saved.", money(total), secs / 60,
-    secs >= 60 and (" (" .. money(total / secs * 3600) .. " an hour)") or ""))
+  print(string.format("|cffe8c060Gold Ever After|r stopped: %s in %d min%s%s. Saved.", money(total), secs / 60,
+    secs >= 60 and (" (" .. money(total / secs * 3600) .. " an hour)") or "",
+    xp > 0 and (", " .. comma(xp) .. " XP" .. (secs >= 60 and (" (" .. comma(xp / secs * 3600) .. " an hour)") or "")) or ""))
   session = nil
   if win then win:Hide() end
 end
@@ -346,11 +464,16 @@ local function addMoney(delta)
 end
 
 local ev = CreateFrame("Frame")
-for _, e in ipairs({ "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "CHAT_MSG_LOOT", "CHAT_MSG_MONEY", "PLAYER_MONEY" }) do
+for _, e in ipairs({ "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "CHAT_MSG_LOOT", "CHAT_MSG_MONEY", "PLAYER_MONEY",
+                    "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
 ev:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
+  if event == "PLAYER_XP_UPDATE" or event == "PLAYER_LEVEL_UP" then
+    if session then pcall(noteXP) end                  -- paused: the bar moves on, nothing is counted
+    return
+  end
   if event == "UNIT_SPELLCAST_SUCCEEDED" then
     if msg == "player" then
       local name = spellId and GetSpellInfo and GetSpellInfo(spellId)
@@ -376,8 +499,7 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
     local id = link and tonumber(link:match("item:(%d+)"))
     if not id then return end                          -- someone else's loot, or a quest or crafted item
     n = tonumber(n) or 1
-    local boxes = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.containers
-    if boxes and boxes[id] then                        -- a container: worth 0 until you open it
+    if isContainer(id) then                            -- a container: worth 0 until you open it
       session.unopened[id] = (session.unopened[id] or 0) + n
       say("container looted (counts when opened):", link, "x" .. n)
       return
@@ -411,6 +533,19 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
   elseif cmd == "debug" then
     debug = not debug
     print("|cffe8c060Gold Ever After|r debug " .. (debug and "on: what the meter counts is printed here" or "off"))
+  elseif cmd == "prices tsm" or cmd == "prices app" then
+    db().prices = cmd:sub(8)
+    for k in pairs(cache) do cache[k] = nil end
+    print("|cffe8c060Gold Ever After|r prices: " .. (priceMode() == "app"
+      and "the app's values (Prices.lua; TSM and vendor prices for the rest)" or "TSM in game (vendor price when higher)"))
+    refresh()
+  elseif cmd == "prices" then
+    print("|cffe8c060Gold Ever After|r prices now: " .. (priceMode() == "app" and "the app's" or "TSM in game") .. ".")
+    print("  /gea prices tsm: works without the app. Each item at your realm's lowest listing in TSM's data (else"
+      .. " its average there, else the region's), minus the 5% AH cut, or the vendor price when that is higher."
+      .. " TSM's data is as new as your last login or /reload.")
+    print("  /gea prices app: the WoW Forever Money app's values, as its My bags shows them (it also corrects odd"
+      .. " listings and counts what crafting adds); TSM and vendor prices for items it did not list.")
   elseif cmd == "resume" and session and session.paused then
     session.pausedFor = session.pausedFor + (GetTime() - session.pausedAt)
     session.paused = false
@@ -419,6 +554,6 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
     refresh()
   else
     if original then original(msg) end
-    print("|cffe8c060Gold Ever After|r: /gea start, /gea pause, /gea resume, /gea stop, /gea debug.")
+    print("|cffe8c060Gold Ever After|r: /gea start, /gea pause, /gea resume, /gea stop, /gea prices, /gea debug.")
   end
 end

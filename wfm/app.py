@@ -392,7 +392,8 @@ class App:
                                  s.get('professions') or {}, self._known_crafts())
 
     def levelling(self, qs) -> dict:
-        """The cheapest way to 300 in a crafting profession, for the character you play (Engine.levelling)."""
+        """The cheapest way from one skill to another (300 by default) in a crafting profession, for the character
+        you play (Engine.levelling)."""
         s = self.effective_settings()[0]
         profs = s.get('professions') or {}
         mine = [p for p in self.CRAFTING if p in profs]
@@ -403,10 +404,15 @@ class App:
             skill = int((qs.get('skill') or [''])[0] or profs.get(prof) or 1)
         except ValueError:
             skill = int(profs.get(prof) or 1)
-        skill = max(1, min(skill, 300))
+        skill = max(1, min(skill, 299))
+        try:
+            target = int((qs.get('target') or [''])[0] or 300)
+        except ValueError:
+            target = 300
+        target = max(skill + 1, min(target, 300))
         known = self._known_crafts()         # no learning cost for recipes you know
         crafts = [o for o in (self.result or {}).get('opportunities', []) if o.kind == 'craft']
-        out = Engine(self.world, s).levelling(prof, skill, known=known, crafts=crafts)
+        out = Engine(self.world, s).levelling(prof, skill, known=known, crafts=crafts, target=target)
         out['professions'] = list(self.CRAFTING)
         out['yours'] = {p: profs[p] for p in mine}
         out['known_source'] = 'TSM crafting data' if known else 'none found (TSM records the recipes a character knows)'

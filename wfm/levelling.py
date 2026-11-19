@@ -1,4 +1,5 @@
-"""Levelling planner: the cheapest way to raise a crafting profession from your skill to 300 (strategy item 2).
+"""Levelling planner: the cheapest way to raise a crafting profession from one skill to another (300 by default;
+strategy item 2).
 
 For every skill point it picks the recipe with the lowest expected cost for that point:
   cost of one craft = ingredients (cheapest of vendor and AH; a material your own gathering profession provides

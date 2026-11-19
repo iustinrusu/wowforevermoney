@@ -5,6 +5,10 @@ usage; do it in a new chat after the reset (after or alongside docs/plans/compre
 WoW: the user tests in game; ask them for screenshots or the saved file after a session.
 
 ## The key point: prices must match the app exactly
+**Superseded 2026-11-19 (the user: the addon should work standalone):** addon 1.6.0 prices with TSM in game by
+default and the app's table only after `/gea prices app`; XP gained, an hour and the time to the next level were added.
+See the project log, Decisions, 2026-11-19.
+
 TSM's in-game price API alone would value items differently from the app (realm lowest listing vs walls and freak
 sales, soulbound items, things that don't sell, crafted worth with its daily cap, containers' contents). So:
 - The app writes a price table into the addon folder, the way it already writes Checks.lua

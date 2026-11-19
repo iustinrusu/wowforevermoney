@@ -11,7 +11,8 @@ from pathlib import Path
 from .paths import DATA
 
 TABLES = ['ItemSparse', 'Item', 'SkillLine', 'SkillLineAbility', 'SpellEffect', 'SpellReagents', 'SpellName',
-          'AreaTable', 'SpellCooldowns', 'SpellCategories', 'SpellCategory', 'UiMap', 'UiMapAssignment']
+          'AreaTable', 'SpellCooldowns', 'SpellCategories', 'SpellCategory', 'UiMap', 'UiMapAssignment',
+          'ItemEffect', 'ItemXItemEffect']      # what an item does when used (the Salt Shaker), and its cooldown
 USER_AGENT = 'WoWForeverMoney/0.1 (personal gold tool)'
 CREATE_ITEM = '24'
 ITEM_FLAG_HAS_LOOT = 0x4   # ItemSparse Flags_0: the item can be opened (has its own loot)
@@ -100,6 +101,8 @@ class Item:
     source: str = 'client'     # client (game tables) | server / server-new (hotfix cache: update / item only it has) | wowhead | questie | in-game
     checked: dict | None = None   # once verified in game: {'against': previous source, 'differs': [fields]}
     untrusted: tuple = ()      # fields of this item's source that in-game checks show are often wrong
+    req_skill: int = 0         # profession (SkillLine id) needed to use it, e.g. Leatherworking for the Salt Shaker
+    req_skill_rank: int = 0    # and the skill in it
 
     @property
     def category(self) -> str:
@@ -122,6 +125,7 @@ class Recipe:
     min_rank: int
     cooldown_ms: int = 0                 # SpellCooldowns (e.g. Transmute: Arcanite 47 h, Mooncloth 95 h)
     cooldown_group: str = ''             # shared cooldown (SpellCategories), e.g. 'Transmute - Alchemy'
+    tool_id: int = 0                     # made by using an item you keep (the Salt Shaker), not a recipe you learn
 
 
 @dataclass
@@ -157,7 +161,8 @@ def load(build: str) -> GameData:
             item_level=_int(r.get('ItemLevel')), req_level=_int(r.get('RequiredLevel')),
             sell_price=_int(r.get('SellPrice')), buy_price=round(_int(r.get('BuyPrice')) / stack_count),
             stack=_int(r.get('Stackable'), 1), class_id=cls, subclass_id=sub, bonding=_int(r.get('Bonding')),
-            openable=bool(_int(r.get('Flags_0')) & ITEM_FLAG_HAS_LOOT), locked=_int(r.get('LockID')) > 0)
+            openable=bool(_int(r.get('Flags_0')) & ITEM_FLAG_HAS_LOOT), locked=_int(r.get('LockID')) > 0,
+            req_skill=_int(r.get('RequiredSkill')), req_skill_rank=_int(r.get('RequiredSkillRank')))
 
     for r in _rows(folder, 'SkillLine'):
         if _int(r.get('CategoryID')) in (9, 11):   # 11 = professions, 9 = secondary skills
@@ -218,6 +223,7 @@ def load(build: str) -> GameData:
             trivial_low=_int(r.get('TrivialSkillLineRankLow')), trivial_high=_int(r.get('TrivialSkillLineRankHigh')),
             min_rank=_int(r.get('MinSkillLineRank')), cooldown_ms=cooldowns.get(spell, 0),
             cooldown_group=groups.get(spell, '') if cooldowns.get(spell, 0) else ''))
+    gd.recipes.extend(tool_recipes(folder, gd, creates, reagents, names, seen))
     shared: dict[str, int] = {}
     for rec in gd.recipes:
         if rec.cooldown_group:
@@ -226,6 +232,37 @@ def load(build: str) -> GameData:
         if rec.cooldown_group and shared[rec.cooldown_group] < 2:
             rec.cooldown_group = ''
     return gd
+
+
+def tool_recipes(folder: Path, gd: GameData, creates: dict, reagents: dict, names: dict, recipe_spells: set) -> list[Recipe]:
+    """Things you make by using a tool you keep, not by a recipe: an item whose use (ItemEffect, trigger 0) turns
+    reagents into another item and needs a profession skill to use. The Salt Shaker (Leatherworking 250): 1 Deeprock
+    Salt -> 1 Refined Deeprock Salt, once every 71 hours in Forever (checked 2026-11-19 against the Forever tooltip:
+    "2 Days, 23 Hrs Cooldown"). These are not in SkillLineAbility, so the app never saw them (the user's question about
+    Cured Rugged Hide). They give no skill-ups. Left out: a use that consumes the item (combining essences, map pieces;
+    ItemEffect Charges not 0, e.g. Forever's single-use Brilliance of the Grand Sorcerer) and uses that need no
+    profession (quest items). Found on build 1.60.1.70959: the Salt Shaker and the Snowmaster 9000 (Engineering)."""
+    if not ((folder / 'ItemEffect.csv').exists() and (folder / 'ItemXItemEffect.csv').exists()):
+        return []                                   # older caches get the tables on the next start
+    effects = {_int(r['ID']): r for r in _rows(folder, 'ItemEffect') if _int(r.get('TriggerType')) == 0}
+    out, seen = [], set(recipe_spells)
+    for link in _rows(folder, 'ItemXItemEffect'):
+        tool, e = _int(link.get('ItemID')), effects.get(_int(link.get('ItemEffectID')))
+        it = gd.items.get(tool)
+        if not e or not it or it.req_skill not in gd.professions or _int(e.get('Charges')) != 0:
+            continue
+        spell = _int(e.get('SpellID'))
+        mats = reagents.get(spell) or []
+        if spell not in creates or not mats or spell in seen or any(m == tool for m, _ in mats):
+            continue
+        seen.add(spell)
+        product, count = creates[spell]
+        out.append(Recipe(
+            spell_id=spell, name=names.get(spell, '') or it.name, profession=gd.professions[it.req_skill],
+            skill_line=it.req_skill, product_id=product, product_count=count, reagents=mats, trivial_low=0,
+            trivial_high=0, min_rank=max(1, it.req_skill_rank),
+            cooldown_ms=max(_int(e.get('CoolDownMSec')), _int(e.get('CategoryCoolDownMSec'))), tool_id=tool))
+    return out
 
 
 # Classic dungeon, raid and battleground map ids (AreaTable ContinentID). Forever's new open-world zones sit on new

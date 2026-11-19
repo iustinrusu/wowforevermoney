@@ -106,7 +106,10 @@ GatherLite (Forever node locations from Wowhead) is read nowhere yet either. See
   - what each trunk, clam or crate gave you.
 - **When:** only on `/reload` or logout, because WoW doesn't let addons write files any other time.
 - **`/gea`** (or `/fmb`) takes a snapshot right away (then `/reload` to write it).
-- **`/gea start`** / **`/gea stop`**: the farm meter, what you loot valued at the app's prices, and gold an hour.
+- **`/gea start`** / **`/gea stop`**: the farm meter: what you loot and its worth, gold an hour, and XP gained (total,
+  an hour, and how long to the next level at that pace). It works without the app: prices come from TSM in game
+  (your realm's lowest listing, else its average, minus the 5% AH cut; the vendor price when that is higher).
+  `/gea prices app` uses the app's own values instead (as its My bags shows them); `/gea prices` explains both.
 - **Install without the app:** double-click `install_addon.bat`. It finds WoW: Forever (TSM desktop app
   settings, the Battle.net install entry, then the usual folders on drives C to H), or asks for the folder.
   It never overwrites the item-check list (`Checks.lua`) the app wrote.
@@ -215,4 +218,4 @@ python -m unittest discover -s tests -t .
 python -m wfm.audit
 ```
 
-The tests check every calculation against hand-worked numbers, plus regressions for bugs found while building. The audit cross-checks the live data sources against each other.
+The tests check every calculation against hand-worked numbers, plus regressions for bugs found while building. The audit cross-checks the live data sources against each other. The farm meter's tests (`tests/test_meter_lua.py`) run the addon under Lua 5.1, WoW's Lua, and need `pip install lupa`; without it they are skipped.

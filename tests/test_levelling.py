@@ -52,6 +52,28 @@ class PlanTests(unittest.TestCase):
         self.assertEqual((p['reached'], p['stuck_at']), (20, 20))
         self.assertEqual(plan([a, dropped], 1, 30, known={2})['reached'], 30)   # unless you know it
 
+    def test_any_range_from_x_to_y(self):
+        # the user (2026-11-19): not only to 300, any range
+        a = opt(1, (1, 100, 150, 200), 100)
+        p = plan([a], 40, 60)
+        self.assertEqual((p['skill'], p['target'], p['reached']), (40, 60, 60))
+        self.assertEqual(p['total'], 20 * 100)                      # 40 -> 60: 20 sure points at 100 each
+        self.assertEqual(plan([a], 40, 400)['target'], 300)         # never past 300
+
+
+class EngineRangeTests(unittest.TestCase):
+    def test_engine_and_unlocks_stop_at_the_target(self):
+        from tests.test_engine import MAT_VENDOR, PRODUCT, SETTINGS, make_world
+        from wfm.engine import Engine
+        from wfm.gamedata import Recipe
+        r = Recipe(spell_id=500, name='Tasty Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                   product_count=1, reagents=[(MAT_VENDOR, 2)], trivial_low=140, trivial_high=180, min_rank=1)
+        e = Engine(make_world({}, [r]), dict(SETTINGS))
+        out = e.levelling('Cooking', 100, known={500}, target=130)  # thresholds 100/140/160/180: orange to 140
+        self.assertEqual((out['skill'], out['target'], out['reached']), (100, 130, 130))
+        self.assertEqual(out['crafts'], 30)
+        self.assertEqual(e.levelling('Cooking', 100, target=50)['target'], 101)   # the target is above the start
+
 
 if __name__ == '__main__':
     unittest.main()

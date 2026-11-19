@@ -24,6 +24,32 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-19 Farm meter prices from TSM in game by default (user: "get price from tsm directly from ingame, not from
+  app, so the addon works standalone").** Supersedes the 2026-11-15 "prices must match the app's". Addon 1.6.0: each
+  item at TSM's `first(DBMinBuyout, DBMarket, DBRegionMarketAvg)` (the same TSM data the app reads: the realm's lowest
+  listing first, like the app's realm basis) minus the 5% cut, or the vendor price when that is higher; `/gea prices
+  app` switches back to the app's Prices.lua values (they also correct odd listings and count crafted worth; the meter
+  can't do that alone). Containers are recognised without the app too: the tooltip's "<Right Click to Open>" or
+  "Locked" (the game's own strings), besides the app's list.
+- **2026-11-19 Tools you keep make things too (user: "why is Cured Rugged Hide not profitable for me? I can use the Salt
+  Shaker every 3 days").** The Salt Shaker turns Deeprock Salt into Refined Deeprock Salt; it is an item's use, not a
+  recipe, so the app never saw it and only knew Refined Deeprock Salt at its AH price (57g). Now `gamedata.tool_recipes`
+  reads ItemEffect + ItemXItemEffect: an on-use effect of an item that needs a profession, creates an item from
+  reagents, and is not used up (Charges 0) becomes a craft row "Salt Shaker: make Refined Deeprock Salt" (exact skill
+  from the item, cooldown from ItemEffect, no skill-ups, nothing to learn; flag `needs_tool` when your bags, bank and
+  gear have none, `tool_unchecked` without Syndicator). Found on the Forever build: the Salt Shaker and the Snowmaster
+  9000 (Engineering 190, Snowballs, 23 h). A tool's profit stays on its own row: it does not raise its ingredient's
+  crafted worth (Deeprock Salt costs 3s 13c; otherwise every Deeprock Salt held or farmed would look worth ~18g).
+  Ingredients a tool makes are still costed at their price (selling them is what using them gives up) and say which
+  tool makes them. On the user's data: 54g 12s a use, 18g 29s a day, step 1 of the plan; Cured Rugged Hide itself adds
+  only 1g 83s over selling the salt at today's listing and loses 2g 33s at usual prices ("only pays at odd prices").
+- **2026-11-19 Why Wowhead data at all, when TSM is there (user's question).** TSM's data holds prices and how well
+  things sell, nothing about where items come from or how many you get. Wowhead Forever pages are the only Forever
+  source for rates: fish per cast by zone, what mobs drop and skin into, what nodes and containers give. Crafting,
+  flips, niches, investments, the market and the levelling planner use no Wowhead data. Without it, every gold-an-hour
+  row would fall back to Classic tables (never Top picks) or vanish; Everloot (player uploads) is too small to replace
+  it, and the user's own logs are never rates (2026-11-14). Kept as decided.
+
 - **2026-11-15 Realm prices; three profit views; own materials (user, after asking why Tailoring and Leatherworking
   earn so little).** "Prices should be based on my realm, because I play on a realm": the default sale price becomes
   the realm's lowest listing, replacing the 2026-11-14 "lower of lowest listing and region usual sale" (region data
@@ -436,6 +462,15 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-19: Salt Shaker (15846) in WoW: Forever, from ItemEffect/ItemXItemEffect (build 1.60.1.70959) and the Wowhead
+  Forever tooltip (tooltip API): needs Leatherworking 250; Use: spell 19566, 1 Deeprock Salt -> 1 Refined Deeprock Salt
+  (SpellEffect base points 0 = 1 made), 25 s cast, cooldown 255,600,000 ms = 71 h ("2 Days, 23 Hrs"), not used up
+  (Charges 0). Cured Rugged Hide (spell 19047) makes 2 in Forever (base points 2; SkillUpForever's output quantity 2):
+  1 Rugged Hide + 1 Refined Deeprock Salt; its Forever thresholds are yellow 225, grey 235 (orange not stored, so the
+  app estimates 185). SpellEffect `EffectBasePointsF` is the number made (Thorium Shells 200). On the AH that day: Salt
+  Shaker 2g 90s, Refined Deeprock Salt 57g 0s 89c (12 listed, region sale 53g 86s, 16.9 sold a day), Deeprock Salt 3s
+  13c, Cured Rugged Hide 30g 99s (42 listed).
+
 - 2026-11-15 review (to-do 6), on the user's data with the main's professions and as played: an independent
   recomputation from raw TSM rows (sale = min(lowest listing, region sale) after the cut; ingredients at the cheaper of
   vendor and lowest listing) matches the engine to the copper for the top 37 crafts and 35 vendor flips (the rest of
@@ -556,6 +591,18 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-19** Four things the user asked for. (1) Salt Shaker and other tools as craft rows (`gamedata.tool_recipes`,
+  `Engine.owns`, `tool_made`; Crafting drawer "Tool" line; ingredients a tool makes say so; "Farm Refined Deeprock Salt"
+  at 187g a day is gone: only the shaker makes it). (2) Levelling planner from any skill to any skill (`target`, Engine,
+  `/api/levelling?target=`, "to skill" box on the Professions tab; on the user's data Leatherworking 255 -> 270: 51
+  crafts, 180g 67s). (3) Farm meter 1.6.0 works without the app (TSM in game, see Decisions). (4) Farm meter XP: XP
+  gained, XP an hour and the time to the next level at that pace; level-ups and paused time handled; saved with each
+  session; "max level" at 60. Tested under Lua 5.1 with stand-ins for the game (`tests/test_meter_lua.py`,
+  `tests/addon_harness.lua`; needs `pip install lupa`, skipped without it). Not tested in game yet. Downloads:
+  ItemEffect.csv (403 KB) and ItemXItemEffect.csv (248 KB) from wago.tools, build 1.60.1.70959 (now in
+  `gamedata.TABLES`); lupa 2.8 from PyPI (about 4 MB, into Claude's scratch folder, for the Lua tests). Tests: 253 (+5
+  Lua tests with lupa).
 
 - **2026-11-15** Vendor stock (user: the plan said "buy 73 Copper Modulator", a limited-stock item?): stock was taken
   only from SkillUpForever's list (327 items; Copper Modulator isn't on it). Now also from ForeverMoneyBridge's vendor

@@ -32,7 +32,7 @@ DARKMOON_ZONES = {12, 215}       # Elwynn Forest + Mulgore: where the Darkmoon F
 # the numbers shown: a pick with doubtful prices ranks below an equally good one with solid prices.
 DOUBT = {'price_check': 0.7, 'price_check_fails': 0.4, 'listed_far_above_sales': 0.8, 'sale_price_outlier': 0.7, 'slow_to_sell': 0.7, 'crowded': 0.7, 'sells_lower': 0.6, 'price_looks_off': 0.6, 'none_listed': 0.8, 'mat_not_listed': 0.8, 'small_sample': 0.8,
          'limited_mat': 0.9, 'limited_stock': 0.9, 'seasonal': 0.9, 'vendor_price_unconfirmed': 0.95,
-         'skill_estimated': 0.95, 'assumed_rate': 0.95, 'assumed_kill_rate': 0.9, 'skins_partial': 0.95, 'classic_yields': 0.85, 'dungeon': 0.6, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
+         'skill_estimated': 0.95, 'tool_unchecked': 0.9, 'assumed_rate': 0.95, 'assumed_kill_rate': 0.9, 'skins_partial': 0.95, 'classic_yields': 0.85, 'dungeon': 0.6, 'snapshot': 0.9, 'craft_limited_demand': 0.8}
 
 
 def vendor_sell(item) -> int:
@@ -126,6 +126,8 @@ class Engine:
         self._vendor_flags: dict[int, tuple] = {}
         self._spell_to_recipe_items = self._index_recipe_items()
         self._valuer: valuation.Valuer | None = None
+        # things made by using a tool you keep (the Salt Shaker), not by a recipe: product -> its recipe
+        self.tool_made = {r.product_id: r for r in self.gd.recipes if getattr(r, 'tool_id', 0)}
 
     # ---------- shared helpers ----------
     def name(self, iid: int) -> str:
@@ -263,6 +265,8 @@ class Engine:
         return math.floor(self.gold / cost)
 
     def required_skill(self, recipe) -> tuple[int, bool]:
+        if getattr(recipe, 'tool_id', 0):          # a tool's own skill requirement (game data): Salt Shaker 250
+            return max(1, recipe.min_rank), True
         th = self.su.thresholds.get(recipe.spell_id)
         if th and th[0] and th[0] > 1:
             return int(th[0]), True
@@ -283,7 +287,21 @@ class Engine:
                     out[spell].append(scroll)
         return out
 
+    def owns(self, iid: int) -> bool | None:
+        """Does the character you play have this item in bags, bank or equipped (Syndicator)? None: bags not read."""
+        syn = getattr(self.w, 'syndicator', None) or {}
+        key = plan.character_key(syn, self.character())
+        if not key:
+            return None
+        have = set((getattr(self.w, 'inventory', None) or {}).get(key) or {}) | set(syn[key].get('equipped') or {})
+        return iid in have
+
     def learn_cost(self, recipe) -> dict | None:
+        tool = getattr(recipe, 'tool_id', 0)
+        if tool:                    # nothing to learn: you need the tool once (it is not used up)
+            q = self.cheapest(tool)
+            return {'how': 'tool', 'item_id': tool, 'name': self.name(tool), 'cost': q.value if q else None,
+                    'source': q.source if q else 'not on AH / vendor', 'owned': self.owns(tool)}
         fee = self.su.trainer_fees.get(recipe.spell_id)
         if fee:
             return {'how': 'trainer', 'cost': int(fee[0]), 'skill': int(fee[1]) if len(fee) > 1 else None}
@@ -299,10 +317,12 @@ class Engine:
         return best
 
     def levelling(self, profession: str, skill: int | None = None, known: set[int] | None = None,
-                  crafts: list | None = None) -> dict:
-        """The cheapest way from your skill to 300 in a crafting profession (levelling.py), and what it unlocks on the
-        way (crafts: this run's craft rows, for their profit once you have the skill)."""
+                  crafts: list | None = None, target: int = levelling_mod.MAX_SKILL) -> dict:
+        """The cheapest way from your skill (or any skill) to a target skill, 300 by default, in a crafting profession
+        (levelling.py), and what it unlocks on the way (crafts: this run's craft rows, for their profit once you have
+        the skill)."""
         skill = int(skill if skill is not None else (self.profs.get(profession) or 1))
+        target = max(skill + 1, min(int(target), levelling_mod.MAX_SKILL))
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         own_kinds = {sub for sub, prof in GATHER_PROFESSION.items() if prof in self.profs}
         options = []
@@ -347,7 +367,7 @@ class Engine:
                 learn=learn_cost,
                 learn_how=(learn or {}).get('how', 'starting recipe' if orange <= 1 else ''), product_id=r.product_id,
                 mats=mats))
-        out = levelling_mod.plan(options, skill, known=known)
+        out = levelling_mod.plan(options, skill, target, known=known)
         for st in out['steps']:
             st['product'] = self.name(st['product_id'])
             st['mats'] = [{'item_id': m, 'name': self.name(m), 'count': c, 'each': e, 'own': own}
@@ -355,7 +375,7 @@ class Engine:
         unlocks = []
         for o in crafts or []:
             req = o.detail.get('skill_required') or 0
-            if o.kind == 'craft' and o.profession == profession and skill < req <= levelling_mod.MAX_SKILL \
+            if o.kind == 'craft' and o.profession == profession and skill < req <= target \
                     and not (set(o.flags) & {'hard_to_sell', 'no_sales_data', 'price_check_fails', 'unverified_recipe'}):
                 at = next((st['cumulative'] for st in out['steps'] if st['to'] >= req), None)
                 unlocks.append({'skill': req, 'title': o.title, 'item_id': o.item_id, 'key': o.key,
@@ -375,7 +395,8 @@ class Engine:
         for r in self.gd.recipes:
             if r.profession not in PROFESSIONS or not r.reagents:
                 continue
-            verified = r.spell_id in self.su.thresholds
+            tool = getattr(r, 'tool_id', 0)
+            verified = r.spell_id in self.su.thresholds or bool(tool)     # a tool's use comes from the game data
             if not verified and not include_unverified:
                 continue
             mats, cost, unpriced = [], 0, []
@@ -387,6 +408,11 @@ class Engine:
                 cost += q.value * cnt
                 mats.append({'item_id': mid, 'name': self.name(mid), 'count': cnt, 'unit': q.value, 'source': q.source,
                              'flags': list(q.flags)})
+                made = self.tool_made.get(mid)
+                if made:          # Refined Deeprock Salt: costed at what it sells for, but your Salt Shaker makes it
+                    mats[-1]['made_with'] = {'tool': self.name(made.tool_id), 'tool_id': made.tool_id,
+                                             'key': f'craft:{made.spell_id}',
+                                             'cooldown_hours': round(made.cooldown_ms / 3_600_000, 2)}
             if unpriced:
                 continue
             unit_val, channel, q = self.sell_value(r.product_id)
@@ -438,14 +464,26 @@ class Engine:
                 needs, doable = f'{r.profession} {req}{"" if exact else "~"} (you have {have})', False
             else:
                 needs, doable = '', True
+            owned = self.owns(tool) if tool else None
+            if tool and owned is False:
+                flags.append('needs_tool')
+                if doable:
+                    needs, doable = f'Get a {self.name(tool)} (once: you keep it)', False
+            elif tool and owned is None:
+                flags.append('tool_unchecked')
             product = self.gd.items.get(r.product_id)
+            count_text = f' x{r.product_count:g}' if r.product_count != 1 else ''
             out.append(Opportunity(
                 kind='craft', key=f'craft:{r.spell_id}', item_id=r.product_id,
-                title=f'Craft {self.name(r.product_id)}' + (f' x{r.product_count:g}' if r.product_count != 1 else ''),
+                title=(f'{self.name(tool)}: make {self.name(r.product_id)}{count_text}' if tool
+                       else f'Craft {self.name(r.product_id)}{count_text}'),
                 profit_unit=profit, cost_unit=cost, units_day=round(crafts_day, 2), daily=int(profit * crafts_day),
                 doable=doable, needs=needs, profession=r.profession, preferred=r.profession in self.preferred,
                 flags=flags,
-                detail={'recipe_spell': r.spell_id, 'recipe': r.name, 'mats': mats, 'revenue': revenue,
+                detail={'recipe_spell': r.spell_id,
+                        'recipe': f'use your {self.name(tool)} to make {self.name(r.product_id)}' if tool else r.name,
+                        'tool': {'item_id': tool, 'name': self.name(tool), 'owned': owned} if tool else None,
+                        'mats': mats, 'revenue': revenue,
                         'sell_channel': channel, 'sell_source': q.source if q else 'vendor',
                         'sell_price': q.value if (q and channel == 'AH') else None,
                         'product_count': r.product_count, 'skill_required': req, 'skill_exact': exact,
@@ -564,6 +602,8 @@ class Engine:
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         for r in self.gd.recipes:
             if r.profession not in PROFESSIONS or r.spell_id not in self.su.thresholds:
+                # tools too (the Salt Shaker): one use every 71 h, and Deeprock Salt costs 3s on the AH, so the profit
+                # belongs to the tool's own row, not to every Deeprock Salt you hold or farm
                 continue
             unit_val, channel, _ = self.sell_value(r.product_id)
             if channel == 'AH' and {'hard_to_sell', 'no_sales_data'} & set(liquidity(self.price(r.product_id), min_spd)['flags']):
@@ -621,6 +661,9 @@ class Engine:
             # items are also gathered, e.g. Heavy Leather is skinned too, so being craftable alone isn't enough.)
             if iid in made and (item.class_id == 0 or item.name.startswith(('Cured ', 'Bolt of '))):
                 continue
+            if iid in self.tool_made and not (self.q and any((self.q.items.get(iid) or {}).get(k)
+                                                             for k in ('npcDrops', 'objectDrops', 'itemDrops'))):
+                continue      # Refined Deeprock Salt: only the Salt Shaker makes it ("Farm" it showed 187g a day)
             is_fish = bool(FISH_WORDS.search(item.name)) and item.class_id in (0, 7, 15) and item.quality <= 2
             if not is_fish and not (item.class_id == 7 and item.subclass_id in GATHER_SOURCE):
                 continue
@@ -1414,7 +1457,8 @@ class Engine:
             revenue, own, bought, hours, own_names, unknown = d.get('revenue', 0), 0, 0, 0.0, [], []
             for m in d.get('mats') or []:
                 it = self.gd.items.get(m['item_id'])
-                crafted_only = it and it.name.startswith(('Cured ', 'Bolt of '))      # made, not gathered
+                crafted_only = it and (it.name.startswith(('Cured ', 'Bolt of '))     # made, not gathered
+                                       or m['item_id'] in self.tool_made)
                 gatherable = (it and not crafted_only and not self.sold_by_vendor(m['item_id'])
                               and (it.class_id == 7 and it.subclass_id in GATHER_SOURCE or m['item_id'] in rates))
                 if gatherable:

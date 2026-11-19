@@ -63,7 +63,7 @@ Python 3.13: `%LOCALAPPDATA%\Programs\Python\Python313\python.exe` (only depende
 
 ```bash
 python run.py --no-browser --port 8765
-python -m unittest discover -s tests -t .
+python -m unittest discover -s tests -t .      # the farm meter tests need `pip install lupa` (Lua 5.1); skipped without
 python -m wfm.audit
 python -m wfm.anomalies
 python -m wfm.classicdb --update

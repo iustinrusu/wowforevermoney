@@ -36,6 +36,8 @@ const FLAGS = {
   limited_mat: ['warn', 'ingredient in limited stock', 'An ingredient comes from a limited-stock vendor'],
   limited_stock: ['warn', 'limited stock', 'Vendor has limited stock that restocks over time'],
   other_profession: ['', 'other profession', 'You don\'t have this profession'],
+  needs_tool: ['warn', 'needs the tool', 'Made by using a tool you keep (like the Salt Shaker), and your bags, bank and gear do not have one. You buy it once; open the row for its price'],
+  tool_unchecked: ['', 'needs the tool', 'Made by using a tool you keep (like the Salt Shaker). The app cannot see your bags (Syndicator), so it does not know whether you have one'],
   snapshot: ['warn', 'one listing, last scan', 'Based on one listing at the last scan; check in game'],
   often_below_vendor: ['good', 'often below vendor price', 'Usually listed below vendor price'],
   risky: ['bad', 'speculative', 'Speculative: depends on prices recovering'],
@@ -455,11 +457,12 @@ function wirePlan() {
 }
 
 // ---------- views ----------
-// Levelling planner (strategy item 2): the cheapest path from your skill to 300 in a crafting profession
+// Levelling planner (strategy item 2): the cheapest path from one skill to another (your skill to 300 by default)
 async function levellingPanel() {
   const prof = sessionStorage.getItem('levelProf') || '';
   const skill = sessionStorage.getItem('levelSkill') || '';
-  const d = await api(`/api/levelling?profession=${encodeURIComponent(prof)}&skill=${encodeURIComponent(skill)}`);
+  const target = sessionStorage.getItem('levelTarget') || '';
+  const d = await api(`/api/levelling?profession=${encodeURIComponent(prof)}&skill=${encodeURIComponent(skill)}&target=${encodeURIComponent(target)}`);
   if (d.error) return `<div class="panel"><h2>Levelling a profession</h2><div class="hint">${esc(d.error)}</div></div>`;
   const opts = d.professions.map((p) => `<option value="${esc(p)}" ${p === d.profession ? 'selected' : ''}>${esc(p)}${d.yours[p] !== undefined ? ` (you: ${d.yours[p]})` : ''}</option>`).join('');
   const mats = (st) => st.mats.map((m) => `${m.count}× ${itemLink(m.item_id, m.name)}${m.own ? ' <span class="pill" title="You gather this yourself: counted at what you would get for selling it">yours</span>' : ''}`).join(', ');
@@ -470,9 +473,9 @@ async function levellingPanel() {
   const unlocks = d.unlocks.length ? `<h3>What it unlocks on the way</h3><table><thead><tr><th class="num">Skill</th><th>Craft</th><th class="num" title="Profit a day once you have the skill (and the gold), from the Crafting table">Profit a day</th><th class="num" title="The path's total cost from your skill to this one (a minus: you would earn that much on the way)">Cost to get there</th></tr></thead><tbody>${d.unlocks.map((u) => `<tr class="row" data-item="${u.item_id}"><td class="num">${u.skill}</td><td>${esc(u.title)}</td><td class="num">${money(u.daily)}</td><td class="num">${u.cost_to_reach == null ? '–' : money(u.cost_to_reach)}</td></tr>`).join('')}</tbody></table>` : '';
   const ench = d.profession === 'Enchanting' ? `<div class="hint">⚠ Enchantments make no item, so they are not in the game's recipe tables this tool reads: the path below has only the Enchanting crafts that make an item (rods, wands, oils), and stops early. Plan Enchanting by hand for now.</div>` : '';
   const end = ench + (d.stuck_at ? `<div class="hint">⚠ The path stops at <b>${d.stuck_at}</b>: no recipe you can learn (a trainer recipe, or a pattern on the AH or from a vendor) gives a skill point there. Patterns that only drop are not counted unless TSM shows you already know them.</div>` : '');
-  return `<div class="panel" id="levelling"><h2>Levelling a profession <small>the cheapest path from your skill to 300, at today's prices</small></h2>
-    <div class="controls"><select id="lp">${opts}</select> <label class="chk">from skill <input id="ls" type="number" min="1" max="300" value="${d.skill}" style="width:5em"></label></div>
-    <div class="hint">${d.steps.length ? `From ${d.skill} to <b>${d.reached}</b>: about <b>${num(d.crafts, 0)} crafts</b> and <b>${money(d.total)}</b> in all (learning recipes: ${money(d.learn_total)}). A minus means you would earn that much: the products sell for more than the ingredients.` : 'Nothing to plan from here.'} Recipes you know: ${d.known} (${esc(d.known_source)}).</div>
+  return `<div class="panel" id="levelling"><h2>Levelling a profession <small>the cheapest path from one skill to another, at today's prices</small></h2>
+    <div class="controls"><select id="lp">${opts}</select> <label class="chk">from skill <input id="ls" type="number" min="1" max="299" value="${d.skill}" style="width:5em" title="Where you start: your skill now, or any skill"></label> <label class="chk">to skill <input id="lt" type="number" min="2" max="300" value="${d.target}" style="width:5em" title="Where you want to get to (300 is the most)"></label></div>
+    <div class="hint">${d.steps.length ? `From ${d.skill} to <b>${d.reached}</b>${d.reached < d.target && !d.stuck_at ? ` (of ${d.target})` : ''}: about <b>${num(d.crafts, 0)} crafts</b> and <b>${money(d.total)}</b> in all (learning recipes: ${money(d.learn_total)}). A minus means you would earn that much: the products sell for more than the ingredients.` : 'Nothing to plan from here.'} Recipes you know: ${d.known} (${esc(d.known_source)}).</div>
     ${end}
     ${d.steps.length ? `<table><thead><tr><th class="num">Skill</th><th>Recipe</th><th>Colour</th><th class="num" title="Expected crafts for this stretch: a yellow or green recipe does not always give a point">Crafts</th><th class="num" title="Ingredients minus what one product sells for (a minus: each craft makes money)">Each craft</th><th class="num" title="Expected cost of this stretch, learning cost included">Cost</th><th class="num" title="Total from your skill to the end of this stretch">Total so far</th><th>Learn</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
     ${unlocks}
@@ -806,6 +809,7 @@ function wireView() {
   if (TAB === 'profs' && $('#lp')) {
     $('#lp').onchange = (e) => { sessionStorage.setItem('levelProf', e.target.value); sessionStorage.removeItem('levelSkill'); render(); };
     $('#ls').onchange = (e) => { sessionStorage.setItem('levelSkill', e.target.value); render(); };
+    $('#lt').onchange = (e) => { sessionStorage.setItem('levelTarget', e.target.value); render(); };
   }
   if (TAB === 'craft') { $('#cp').onchange = (e) => { sessionStorage.setItem('craftProf', e.target.value); render(); }; $('#cd').onchange = (e) => { sessionStorage.setItem('craftDoable', e.target.checked ? '1' : ''); render(); }; }
   document.querySelectorAll('.sells-only').forEach((c) => c.onchange = (e) => { sessionStorage.setItem('sellsOnly', e.target.checked ? '1' : '0'); render(); });
@@ -872,10 +876,15 @@ function oppDetail(o) {
     <div>Listings that sell</div><div>${liq.sale_rate === null || liq.sale_rate === undefined ? '–' : (liq.sale_rate * 100).toFixed(0) + '%'}</div>
     <div>Listed on your realm</div><div>${liq.listed}${liq.days_of_supply !== null && liq.days_of_supply !== undefined ? ` (${num(liq.days_of_supply, 1)} days of the region's sales)` : ''}</div></div>${liq.why ? `<div class="hint">${esc(liq.why)}</div>` : ''}`;
   if (o.kind === 'craft') {
-    html += `<h3>Ingredients <small>per craft</small></h3><table><tbody>${d.mats.map((m) => `<tr><td>${m.count}×</td><td>${itemLink(m.item_id, m.name)}</td><td class="num">${money(m.unit)}</td><td>${esc(m.source)} ${flagHtml(m.flags)}</td></tr>`).join('')}</tbody></table>
+    const madeWith = (m) => m.made_with ? `<div class="hint">You can make this with a ${esc(m.made_with.tool)} (once every ${num(m.made_with.cooldown_hours, 0)} hours; see its own row on this tab). It is costed here at its price because selling it is what you give up by using it.</div>` : '';
+    const learnText = !d.learn ? 'unknown / already known'
+      : d.learn.how === 'trainer' ? `Trainer, ${money(d.learn.cost)}`
+      : d.learn.how === 'tool' ? `Nothing to learn: you need a ${itemLink(d.learn.item_id, d.learn.name)}, which you keep (it is not used up). ${d.learn.owned ? 'You have one.' : `${d.learn.owned === false ? 'Your bags, bank and gear have none: ' : ''}it costs ${d.learn.cost !== null ? money(d.learn.cost) : '? (not on AH / vendor)'} (${esc(d.learn.source || '')}), once.`}`
+      : `${esc(d.learn.name || 'recipe')}: ${d.learn.cost !== null ? money(d.learn.cost) : 'not on AH / vendor'} (${esc(d.learn.source || '')})`;
+    html += `<h3>Ingredients <small>per craft</small></h3><table><tbody>${d.mats.map((m) => `<tr><td>${m.count}×</td><td>${itemLink(m.item_id, m.name)}${madeWith(m)}</td><td class="num">${money(m.unit)}</td><td>${esc(m.source)} ${flagHtml(m.flags)}</td></tr>`).join('')}</tbody></table>
       <div class="kv" style="margin-top:8px"><div>Sells for (total)</div><div>${money(d.revenue)} via ${esc(d.sell_channel)} (${esc(d.sell_source)})</div>
       <div>Skill needed</div><div>${d.skill_required}${d.skill_exact ? '' : ' (estimated)'} ${d.thresholds ? `<span class="pill">orange/yellow/green/grey: ${d.thresholds.join(' / ')}</span>` : ''}</div>
-      <div>Learn it</div><div>${d.learn ? (d.learn.how === 'trainer' ? `Trainer, ${money(d.learn.cost)}` : `${esc(d.learn.name || 'recipe')}: ${d.learn.cost !== null ? money(d.learn.cost) : 'not on AH / vendor'} (${esc(d.learn.source || '')})`) : 'unknown / already known'}</div>
+      <div>${d.tool ? 'Tool' : 'Learn it'}</div><div>${learnText}</div>
       <div>Region sold/day</div><div>${num(d.sold_per_day)}</div>
       ${d.cooldown_hours ? `<div>Cooldown</div><div>${num(d.cooldown_hours, 1)} hours (game data): at most ${num(24 / d.cooldown_hours, 2)} a day${d.cooldown_group ? `<div class="needs">Shared with ${d.cooldown_shared_with} other recipes (${esc(d.cooldown_group)}): doing any of them starts this cooldown too</div>` : ''}</div>` : ''}</div>`;
   }
