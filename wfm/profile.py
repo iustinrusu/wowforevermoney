@@ -95,6 +95,7 @@ def build_profile(bridge: dict, tsm_chars: dict, char_mtimes: dict[str, float]) 
     return {'characters': chars, 'active': active, 'activity': bridge.get('activity') or {},
             'vendors': bridge.get('vendors') or {}, 'containers': bridge.get('containers') or {},
             'item_info': bridge.get('itemInfo') or {},
+            'tsm_vendor': bridge.get('tsmVendor') or {},       # TSM's VendorSell / VendorBuy, read in game (1.6.2)
             'has_bridge': bool(bridge), 'active_guessed': not last}
 
 

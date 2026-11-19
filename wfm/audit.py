@@ -239,6 +239,21 @@ def run(world, engine) -> list[dict]:
     except Exception as e:          # never let a check break the audit
         out.append(_check('Node positions: QuestieDB vs GatherLite', 'warn', f'Could not work it out: {e}'))
 
+    # Vendor prices from TSM (read in game by ForeverMoneyBridge 1.6.2) against the game files
+    rep = getattr(world, 'tsm_vendor_report', None) or {}
+    if not rep.get('sell') and not rep.get('buy'):
+        out.append(_check('Vendor prices from TSM', 'warn',
+                          'None yet: ForeverMoneyBridge 1.6.2 reads TSM\'s VendorSell and VendorBuy in game about 30 '
+                          'seconds after you log in; /reload after that minute to save them. Until then vendor prices '
+                          'come from the game files (checked in game where possible).'))
+    else:
+        d = rep.get('differ') or []
+        out.append(_check('Vendor prices from TSM', 'pass' if not d else 'info',
+                          f"TSM's in-game vendor prices are used first: what a vendor pays for {rep.get('sell', 0):,} "
+                          f"items, what a vendor charges for {rep.get('buy', 0):,} (TSM's merchant records). "
+                          f"{len(d)} game-file sell prices differed from TSM's and were replaced.",
+                          [f"{n} ({i}): game file {a}c ({src}), TSM {b}c" for i, n, a, b, src in d]))
+
     # Every way an item is made, and whether the app counts it (2026-11-19, after the Salt Shaker was missed)
     try:
         out.append(interactions.check(interactions.report(gd, prices), engine.name))

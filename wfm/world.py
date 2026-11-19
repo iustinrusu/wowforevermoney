@@ -495,6 +495,8 @@ class World:
             self.tooltips.want(sorted(need_fetch))
         # what your own game client reported (ForeverMoneyBridge item checks) overrides every other source
         gamedata.apply_ingame(self.gamedata, (self.profile or {}).get('item_info'))
+        # TSM's vendor sell prices, read in game: they beat the game files for unchecked items (2026-11-19)
+        self.tsm_vendor_report = gamedata.apply_tsm_vendor(self.gamedata, (self.profile or {}).get('tsm_vendor'))
         # stop trusting a source's field for unchecked items once the game shows it is often wrong
         self.source_grades = gamedata.grade_sources(self.gamedata)
         self.untrusted_items = gamedata.mark_untrusted(self.gamedata, self.source_grades)

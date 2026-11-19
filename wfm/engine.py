@@ -179,7 +179,9 @@ class Engine:
         """(copper per unit, vendor list) if a vendor you can use sells this item.
 
         Questie's Forever database decides *whether* a vendor sells it (an old Classic list in SkillUpForever
-        wrongly includes e.g. Refined Deeprock Salt). The price is ItemSparse BuyPrice / VendorStackCount.
+        wrongly includes e.g. Refined Deeprock Salt). The price, best first (2026-11-19, "TSM should be the king"):
+        what ForeverMoneyBridge saw at the vendor, TSM's VendorBuy (its merchant records, read in game), SkillUpForever's
+        list, and only then the game files (ItemSparse BuyPrice / VendorStackCount).
         """
         if iid in self._vendor_cache:
             return self._vendor_cache[iid]
@@ -191,7 +193,10 @@ class Engine:
             result = (seen, vendors)
             self._vendor_flags[iid] = ('vendor_price_seen',)
         else:
-            price = item.buy_price if item and item.buy_price > 0 else int(self.su.vendor_prices.get(iid, 0))
+            tsm_buy = int((((getattr(self.w, 'profile', None) or {}).get('tsm_vendor') or {}).get('buy') or {}).get(iid)
+                          or 0)
+            listed = int(self.su.vendor_prices.get(iid, 0) or 0)
+            price = tsm_buy or listed or (item.buy_price if item and item.buy_price > 0 else 0)
             if vendors and price > 0:
                 # Game files hold a base price; Black Market agents charge far more (Frilled Lichen: 4g 50s, not
                 # the file's 1s 20c, seen in game 2026-11-13). If only they sell it, the real price is unknown until
@@ -202,7 +207,8 @@ class Engine:
                     self._vendor_flags[iid] = ('black_market',)
                 else:
                     result = (price, vendors)
-                    self._vendor_flags[iid] = ('black_market',) if any(black) else ('vendor_price_unconfirmed',)
+                    self._vendor_flags[iid] = (('black_market',) if any(black) else
+                                               ('vendor_price_tsm',) if tsm_buy else ('vendor_price_unconfirmed',))
         if result and not any(v.get('located', True) and not v.get('event') for v in result[1]):
             # every vendor is event-only (Darkmoon Faire, holidays) or has no known location
             self._vendor_flags[iid] = self._vendor_flags.get(iid, ()) + ('event_vendor',)

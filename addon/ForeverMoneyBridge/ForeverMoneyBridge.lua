@@ -232,6 +232,38 @@ local function checkItems()
   end)
 end
 
+-- TSM's own vendor prices (1.6.2, the user: "TSM should be the king when it comes to pricing data"): VendorSell (what a
+-- vendor pays you; TSM takes it from the game client) and VendorBuy (what a vendor charges; TSM's merchant records),
+-- for every item the app prices (Prices.lua) and wants checked (Checks.lua). Saved in ForeverMoneyBridgeDB.tsmVendor;
+-- the app prefers them to the game files. A few hundred a tick after login, so the game doesn't stutter.
+local function tsmVendor()
+  if not (TSM_API and TSM_API.GetCustomPriceValue and C_Timer) then return end
+  local ids, seen = {}, {}
+  local function add(id) id = tonumber(id); if id and not seen[id] then seen[id] = true; ids[#ids + 1] = id end end
+  for id in pairs((ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.items) or {}) do add(id) end
+  for _, id in ipairs(ForeverMoneyBridge_Checks or {}) do add(id) end
+  if #ids == 0 then return end
+  local d = db()
+  d.tsmVendor = d.tsmVendor or {}
+  local out = d.tsmVendor
+  out.sell, out.buy = out.sell or {}, out.buy or {}
+  local function value(src, id)
+    local ok, v = pcall(TSM_API.GetCustomPriceValue, src, "i:" .. id)
+    return (ok and type(v) == "number" and v > 0) and math.floor(v + 0.5) or nil
+  end
+  local i, ticker = 0, nil
+  ticker = C_Timer.NewTicker(0.1, function()
+    for _ = 1, 250 do
+      i = i + 1
+      local id = ids[i]
+      if not id then out.at = time(); ticker:Cancel() return end
+      local s, b = value("VendorSell", id), value("VendorBuy", id)
+      if s then out.sell[id] = s end
+      if b then out.buy[id] = b end
+    end
+  end)
+end
+
 f:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 f:RegisterEvent("MERCHANT_SHOW")
 f:RegisterEvent("MERCHANT_UPDATE")
@@ -255,6 +287,7 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
     pcall(snapshot, event)
     if C_Timer then C_Timer.After(5, function() pcall(snapshot, "DELAYED_LOGIN") end) end   -- gold is loaded by then
     if C_Timer then C_Timer.After(15, function() pcall(checkItems) end) end   -- after the login rush
+    if C_Timer then C_Timer.After(30, function() pcall(tsmVendor) end) end    -- TSM's vendor prices, once it has loaded
   elseif event == "MERCHANT_SHOW" or event == "MERCHANT_UPDATE" then
     pcall(recordMerchant)
   elseif event == "UNIT_SPELLCAST_SUCCEEDED" then

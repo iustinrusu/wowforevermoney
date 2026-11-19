@@ -105,6 +105,7 @@ class Item:
     req_skill: int = 0         # profession (SkillLine id) needed to use it, e.g. Leatherworking for the Salt Shaker
     req_skill_rank: int = 0    # and the skill in it
     totem_category: int = 0    # the kind of tool it counts as (TotemCategory: Blacksmith Hammer, Runed Arcanite Rod)
+    sell_from_tsm: bool = False   # sell_price is TSM's VendorSell, read in game (apply_tsm_vendor)
 
     @property
     def category(self) -> str:
@@ -398,6 +399,32 @@ def apply_hotfixes(gd: GameData, rows: dict[int, dict]) -> dict:
 
 
 INGAME_FIELDS = {'s': 'sell_price', 'q': 'quality', 'l': 'item_level', 'r': 'req_level', 'k': 'stack', 'b': 'bonding'}
+
+
+def apply_tsm_vendor(gd: GameData, tsm_vendor: dict) -> dict:
+    """TSM's VendorSell, read in game by ForeverMoneyBridge 1.6.2 (TSM takes it from the game client): what a vendor
+    pays for each item. It wins over the game files for items your client hasn't checked (the user, 2026-11-19: "TSM
+    should be the king when it comes to pricing data"; the hotfix cache's prices for new items were wrong 91% of the
+    time). Returns counts and the items whose file price differed (Data health)."""
+    sells = (tsm_vendor or {}).get('sell') or {}
+    n, differ = 0, []
+    for iid, v in sells.items():
+        try:
+            iid, v = int(iid), int(v)
+        except (TypeError, ValueError):
+            continue
+        it = gd.items.get(iid)
+        if it is None or v <= 0:
+            continue
+        if it.source != 'in-game' and it.sell_price != v:
+            differ.append((iid, it.name, it.sell_price, v, it.source))
+        if it.source != 'in-game':
+            it.sell_price = v
+            it.untrusted = tuple(f for f in it.untrusted if f != 'sell_price')
+        it.sell_from_tsm = True
+        n += 1
+    return {'sell': n, 'buy': len((tsm_vendor or {}).get('buy') or {}), 'differ': differ,
+            'at': (tsm_vendor or {}).get('at')}
 
 
 def apply_ingame(gd: GameData, info: dict) -> int:

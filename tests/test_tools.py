@@ -272,6 +272,35 @@ class MoreInteractionTests(unittest.TestCase):
         self.assertIn('Poisons 130', rows['craft:2835'].needs)
 
 
+class TsmVendorPriceTests(unittest.TestCase):
+    """TSM is the king for prices (the user, 2026-11-19): its VendorSell and VendorBuy, read in game, beat the files."""
+
+    def test_vendor_sell_from_tsm_beats_the_game_files(self):
+        gd = GameData(build='test')
+        gd.items = {1: item(1, 'New Forever Item', sell=999), 2: item(2, 'Checked Item', sell=50), 3: item(3, 'Other', sell=7)}
+        gd.items[1].source, gd.items[1].untrusted = 'server-new', ('sell_price',)
+        gd.items[2].source = 'in-game'
+        rep = gamedata.apply_tsm_vendor(gd, {'sell': {1: 120, 2: 50, '3': 7}, 'buy': {5: 10}, 'at': 1795000000})
+        self.assertEqual(gd.items[1].sell_price, 120)                    # the hotfix cache said 999
+        self.assertNotIn('sell_price', gd.items[1].untrusted)
+        self.assertTrue(gd.items[1].sell_from_tsm)
+        self.assertEqual((rep['sell'], rep['buy']), (3, 1))
+        self.assertEqual(rep['differ'], [(1, 'New Forever Item', 999, 120, 'server-new')])
+
+    def test_vendor_buy_order(self):
+        e = MoreInteractionTests().world()[0]
+        q = QuestieDB(items={THORIUM: {'vendors': [100]}}, npcs={100: {'name': 'Trader', 'friendlyToFaction': 'AH', 'zoneID': 1}})
+        e.q = e.w.questie = q
+        e._vendor_cache.clear(); e._vendor_flags.clear()                  # built before the vendor existed
+        e.gd.items[THORIUM].buy_price = 5000                              # the game file
+        self.assertEqual(e.vendor_price(THORIUM)[0], 5000)
+        self.assertIn('vendor_price_unconfirmed', e.vendor_flags(THORIUM))
+        e._vendor_cache.clear(); e._vendor_flags.clear()
+        e.w.profile = {'tsm_vendor': {'buy': {THORIUM: 4800}}}           # TSM's merchant record wins
+        self.assertEqual(e.vendor_price(THORIUM)[0], 4800)
+        self.assertIn('vendor_price_tsm', e.vendor_flags(THORIUM))
+
+
 class DisenchantTests(unittest.TestCase):
     """Disenchanting from ForeverRecipes' Classic table (the user's yes to a labelled fallback, 2026-11-19)."""
     GREEN, DUST, ESSENCE_, CLOTH = 4240, 10940, 10938, 2996
