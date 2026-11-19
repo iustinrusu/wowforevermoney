@@ -26,6 +26,13 @@ class SkillUpData:
     requirement_known: set = field(default_factory=set)
     level_required: dict[int, int] = field(default_factory=dict)
     from_forever_recipes: set = field(default_factory=set)
+    # profession ranks above Apprentice (Journeyman, Expert, Artisan), by skill line. SkillUpForever generates these
+    # from the WoW Classic database (CMaNGOS classic-db npc_trainer, quest_template: base fees before reputation
+    # discounts), the books from the game files: the app labels them "Classic database" (A3, 2026-11-19).
+    rank_trainers: dict[int, list] = field(default_factory=dict)  # line -> [(cap, fee copper, required skill, level)]
+    rank_books: dict[int, list] = field(default_factory=dict)     # line -> [(cap, book item, list price, skill, level)]
+    rank_quests: dict[int, list] = field(default_factory=dict)    # line -> [(cap, quest, skill, level, side 'A'/'H')]
+    profession_trainers: dict[int, list] = field(default_factory=dict)   # line -> [(npc, highest cap it teaches)]
 
 
 def _load(path: Path) -> tuple[dict, str]:
@@ -43,11 +50,31 @@ def load_skillup(data_dir: Path) -> SkillUpData:
     out.source_build = m.group(1) if m else None
     tr, _ = _load(data_dir / 'Trainer.lua')
     out.trainer_fees = tr.get('TrainerFees', {}) or {}
+    out.rank_trainers = _rows(tr.get('TrainerRanks'), 4)
+    out.rank_quests = _rows(tr.get('RankQuests'), 5)
     src, _ = _load(data_dir / 'Sources.lua')
     out.limited_stock = src.get('LimitedStock', {}) or {}
+    out.profession_trainers = _rows(src.get('ProfessionTrainers'), 2)
     ven, _ = _load(data_dir / 'Vendor.lua')
     out.vendor_prices = ven.get('VendorPrices', {}) or {}
     rec, _ = _load(data_dir / 'Recipes.lua')
     out.recipe_data = rec.get('RecipeData', {}) or {}
     out.recipe_scrolls = rec.get('RecipeScrolls', {}) or {}
+    out.rank_books = _rows(rec.get('RankBooks'), 5)
+    return out
+
+
+def _rows(table, width: int) -> dict[int, list[tuple]]:
+    """{line: [{...}, {...}]} as the Lua parser gives it -> {line: [tuple of `width` values]}; short rows dropped."""
+    out = {}
+    for key, rows in (table or {}).items():
+        if isinstance(rows, dict):
+            rows = [rows[k] for k in sorted(rows)]
+        good = []
+        for r in rows or []:
+            if isinstance(r, dict):
+                r = [r[k] for k in sorted(r)]
+            if isinstance(r, list) and len(r) >= width:
+                good.append(tuple(r[:width]))
+        out[int(key)] = good
     return out

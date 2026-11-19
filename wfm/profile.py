@@ -118,6 +118,9 @@ def apply(settings: dict, profile: dict) -> tuple[dict, dict]:
     if c.get('professions'):
         profs = {p: int(v.get('rank') or 0) for p, v in c['professions'].items()}
         detected['professions'] = profs
+        # the most each skill can reach now (75, 150, 225, 300: the rank you trained); the levelling path leaves out
+        # the ranks you have
+        eff['profession_caps'] = {p: int(v.get('max') or 0) for p, v in c['professions'].items() if v.get('max')}
         if c.get('source') == 'ForeverMoneyBridge':
             eff['professions'] = profs          # the addon reads every skill line: a complete list
         else:

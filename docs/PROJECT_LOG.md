@@ -24,6 +24,25 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-19 The rest of the levelling work (to-do A3), Claude's choices with the reason.**
+  - Rank training: ForeverRecipes has no rank spells (checked), so the ranks come from SkillUpForever's tables
+    (TrainerRanks, RankBooks, RankQuests, ProfessionTrainers). Their fees, levels and trainers are the WoW Classic
+    database (CMaNGOS classic-db, before reputation discounts): labelled "Classic database" on every row, as the
+    disenchant table is. Books (Cooking and First Aid Expert) come from the game files of the Forever build: labelled
+    "Forever game files". The Artisan quests: which quest teaches the rank is Classic data; the quest's name, giver,
+    skill and level come from QuestieDB's Forever data. Fees count in the totals (5g 4s to 5g 55s from 1 to 300; about
+    1g for Cooking and First Aid): small, and leaving them out would understate the cost. A rank you have is left
+    out: your addon's skill cap (when you plan from your own skill), or a start past the rank's start.
+  - "Yours" only where Forever data says your gathering gives the material: Wowhead Forever's skinning pages,
+    QuestieDB's objectDrops from ore and herb nodes (GatherLite types the nodes), GatherLite's herb nodes by name, and
+    bars smelted from mined ore. Cloth, meat and elementals are never "yours": skinning sheep gives Wool Cloth in
+    Forever, but everyone farms cloth from mobs. Materials no Forever data confirms count at their buy price
+    (conservative): 16 skinning items whose Wowhead Forever pages are unread, such as Ruined Leather Scraps and Deviate
+    Scale, wait for the reading queue.
+  - "Farm" rows use the same data: an item mobs drop and no gathering is known to give needs no profession (12 rows,
+    Ironfeather to Guardian Stone); with no data at all, the item's kind decides, as before (Frostsaber Leather).
+  - A pattern no one is selling on your realm now is flagged "may have to wait"; its price still counts, and the
+    route does not avoid it (the brief: say so).
 - **2026-11-19 The farm meter gets a collapse / minimize button (user: "collapse feature / minimize feature for the gea
   farm meter", high priority).** A one-line bar that keeps showing gold an hour, total and time, remembered between
   sessions; the session keeps counting. Brief: `docs/plans/TODO.md` item A1. Built as addon 1.6.3. Claude's choices,
@@ -573,6 +592,21 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-19 (A3): ForeverRecipes 1.17.x holds no profession rank spells (its only "Journeyman"/"Expert" are campfires).
+  SkillUpForever's Trainer.lua `TrainerRanks` {cap, fee, skill, level}, from CMaNGOS classic-db: Leatherworking 150:
+  5s, 50, 10; 225: 50s, 125, 20; 300: 5g, 200, 35. Alchemy, Engineering 4s 50c / 50s or 45s / 4g 50s; Herbalism, Mining,
+  Skinning no level. `RankBooks` (Forever game files, build 1.60.1.70959): Expert Cookbook 16072, Expert First Aid -
+  Under Wraps 16084, list price 1g, skill 125. `RankQuests`: Cooking 6610, First Aid 6624 (A) / 6622 (H). QuestieDB
+  Forever: 6610 "Clamlette Surprise" from Dirge Quikcleave, Cooking 225, level 35; 6622 "Triage" from Doctor Gregory
+  Victor, First Aid 225, level 35. QuestieDB's quest fields: 1 name, 2 startedBy, 4 requiredLevel, 5 questLevel, 18
+  requiredSkill; 5,982 quests decode in a fraction of a second with only those fields.
+- 2026-11-19 (A3): GatherLite's scripts/nodes.lua types 175 objects (ore, herb, container, ...), Forever object ids.
+  QuestieDB's Forever objectDrops for Sungrass, Blindweed, Golden Sansam, Dreamfoil and Mountain Silversage list only
+  chests; GatherLite has their nodes ("golden_sansam"). Wowhead Forever: skinning Sheep (npc 1933) gave Wool Cloth 364
+  times out of 1,152. The gathered list from Forever data vs SkillUpForever's GatheredBy (classic-db, 10%+): 72 agree,
+  0 conflict, 67 only in Forever data (gems from ore veins, bars, Forever-only materials), 16 only in Classic (skinning
+  items whose Wowhead Forever pages are unread).
+
 - 2026-11-19: after the user's login + /reload, ForeverMoneyBridge 1.6.2 saved TSM's vendor prices: 22,265 VendorSell
   and 87 VendorBuy. WoW saved the moved meter window as `pos = {"BOTTOMRIGHT", -238.3, 121.7}` (it re-anchors a moved
   frame at its nearest corner, point = relative point), size 260 x 290 (the minimum).
@@ -706,6 +740,30 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-19** (eighth part) The rest of the levelling work (to-do A3). `skillup.py` reads `TrainerRanks`,
+  `RankQuests`, `ProfessionTrainers`, `RankBooks`; `questie.py` loads quests (name, giver, levels, required skill; it
+  skips fields the app doesn't read, and items, NPCs and objects load the same as before); `gatherlite.py` reads node
+  types and names from scripts/nodes.lua (watched for changes). `Engine.rank_training` (trainer with your faction's
+  trainers, book, or quest), `Engine.gathered`, `Engine.gather_profession`, `Engine.npc_place`; the profile passes
+  each profession's cap (`profession_caps`); `learn_cost` marks a pattern priced with none listed (`wait`).
+  `levelling.plan(training=...)`: a rank's cost is paid where the path reaches it and the step splits there
+  (`step['train']`, `training`, `train_total`, `to_wait`). Page: a training row before the stretch that needs it,
+  "may have to wait" on such patterns with a warning, "Learning" card = recipes + ranks, the "yours" pill says where it
+  comes from, "How this is worked out" rewritten; the find-it warning says "it" for one recipe. README: a Professions
+  row and a GatherLite row (the line saying GatherLite was read nowhere was stale). Real data, today's prices, net
+  1 -> 300 before -> after: each profession up by its rank fees (Alchemy -18g 41s -> -13g 36s, Blacksmithing 141g 91s
+  -> 147g 41s, Cooking -2g 21s -> -1g 18s, Enchanting 95g 61s -> 101g 16s, Engineering -9g 59s -> -4g 60s, First Aid
+  11g 27s -> 12g 32s, Tailoring 229g 66s -> 235g 16s); Leatherworking -10g 10s -> -3g 54s (5g 55s ranks, about 1g from
+  materials no longer "yours": Ironfeather, cured hides, Deviate Scale, Raptor Hide, Salt, Jet Black Feather, Ruined
+  Leather Scraps); from your 261: 30g 42s -> 30g 47s (no ranks: your cap is 300). Tailoring's Wizardweave Robe pattern
+  (from 259) says "may have to wait". Farm rows: 12 changed from Skinning or Mining to "Mobs", none the other way.
+  Checked in the browser: training rows (Leatherworking, Cooking's book and quest, First Aid's Triage), the wait flag
+  (Tailoring), a find-it row (a step's data marked find-it in the page: pill, drop sources and warning render); no
+  console errors. Tests: 293 pass (6 new: plan training, engine ranks, ranks you have, materials, waits, GatherLite
+  types); the 11 Lua meter tests were skipped (the scratchpad copy of lupa is gone; no Lua changed).
+  `tools/consistency_check.py`: 0 problems. Seen in passing, for the review (B1): the Professions comparison table
+  is wider than a 1,280-pixel window (the page scrolls sideways).
 
 - **2026-11-19** (seventh part) Levelling: slow sellers no longer drive the route (to-do A2). `levelling.AH_DAYS` (2,
   was `WEEK` 7), `Option.ah_per_day`, "AH for 0.4" (one decimal) in `resale`; `Engine.levelling` sells at the lower of

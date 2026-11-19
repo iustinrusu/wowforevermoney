@@ -9,6 +9,10 @@ such as 0.514/0.423, 0.514/0.425, 0.515/0.423), so they count once.
 
 Used for: a per-zone comparison with QuestieDB's spawns on Data health, and where fishing pools spawn (QuestieDB has no
 spawns for most pools). Re-read when the addon's file changes (it updates often).
+
+scripts/nodes.lua types each object ("ore", "herb", "container", ...; Forever object ids, checked against Wowhead's
+Forever listings by its author): with QuestieDB's objectDrops it says which materials Mining or Herbalism gives
+(Engine.gathered, 2026-11-19).
 """
 from __future__ import annotations
 
@@ -21,11 +25,41 @@ MERGE = 0.005            # points closer than this (normalized map units, ~1/200
 _OBJ = re.compile(r'^(?: {4}|\t)\[(\d+)\] = \{\s*$', re.M)               # an object's block
 _MAP = re.compile(r'^(?: {8}|\t\t)\[(\d+)\] = \{([^}]*)\}', re.M)        # a map's points inside it
 _NUM = re.compile(r'-?\d+(?:\.\d+)?')
+_NODE = re.compile(r'InsertObject\(\s*"(\w+)"\s*,\s*\{([^}]*)\}\s*,\s*"(\w+)"')   # ("ore", { 1731, 2055 }, "copper_vein"
 
 
 def data_file(addons_dir: Path | None) -> Path | None:
     p = addons_dir / 'GatherLite' / 'plugins' / 'database' / 'data' / 'forever.lua' if addons_dir else None
     return p if p and p.exists() else None
+
+
+def nodes_file(addons_dir: Path | None) -> Path | None:
+    p = addons_dir / 'GatherLite' / 'scripts' / 'nodes.lua' if addons_dir else None
+    return p if p and p.exists() else None
+
+
+def parse_nodes(text: str) -> dict[int, tuple[str, str]]:
+    """object id -> (GatherLite's node type 'ore' / 'herb' / 'container' / ..., its name: 'copper_vein', 'golden_sansam')
+    from its InsertObject lines. A herb node is named after its herb."""
+    out = {}
+    for m in _NODE.finditer(text):
+        for n in re.findall(r'\d+', m.group(2)):
+            out.setdefault(int(n), (m.group(1), m.group(3)))
+    return out
+
+
+def parse_types(text: str) -> dict[int, str]:
+    return {o: t for o, (t, _) in parse_nodes(text).items()}
+
+
+def node_key(name: str) -> str:
+    """An item name the way GatherLite names its nodes: "Khadgar's Whisker" -> 'khadgars_whisker'."""
+    return re.sub(r'[^a-z0-9]+', '_', (name or '').lower().replace("'", '')).strip('_')
+
+
+def nodes(addons_dir: Path | None) -> dict[int, tuple[str, str]]:
+    f = nodes_file(addons_dir)
+    return parse_nodes(f.read_text(encoding='utf-8', errors='replace')) if f else {}
 
 
 def parse(text: str) -> dict[int, dict[int, list[tuple[float, float]]]]:
@@ -91,10 +125,12 @@ def load(addons_dir: Path | None, gamedata_dir: Path | None) -> dict:
     if not f or not gamedata_dir:
         return {}
     parsed = parse(f.read_text(encoding='utf-8', errors='replace'))
+    typed = nodes(addons_dir)
     zones = map_zones(gamedata_dir)
     unmapped = sorted({um for maps in parsed.values() for um in maps if um not in zones})
     return {'nodes': nodes_by_zone(parsed, zones), 'points': sum(len(p) for m in parsed.values() for p in m.values()),
-            'objects': len(parsed), 'file': str(f), 'unmapped': unmapped}
+            'objects': len(parsed), 'file': str(f), 'unmapped': unmapped,
+            'types': {o: t for o, (t, _) in typed.items()}, 'names': {o: n for o, (_, n) in typed.items()}}
 
 
 def compare(gl: dict, questie_objects: dict, names=None) -> dict:

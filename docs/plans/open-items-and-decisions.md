@@ -51,10 +51,16 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       ago" show (the user's screenshot, nothing looted yet). Left: XP and loot counted after a few kills; a container
       as "not opened yet" without the app; addon 1.6.3's fold ("–" at the top right or /gea min: a screenshot folded
       and open, and that the window doesn't jump when folding).
-- [ ] B11. (2026-11-19) Levelling paths stop where the next patterns only drop (Leatherworking at 270): use
-      ForeverRecipes' pattern sellers and drop chances, and rank training fees (TODO 1d).
+- [x] B11. (done 2026-11-19: every recipe with where to learn it, then rank training in to-do A3) Levelling paths
+      stop where the next patterns only drop (Leatherworking at 270): use ForeverRecipes' pattern sellers and drop
+      chances, and rank training fees (TODO 1d).
 - [ ] B12. (2026-11-19) Compare TSM's vendor prices with the game files once they arrive; check every priced item in
       game, not only 800 a login (TODO 1f).
+- [ ] B13. (2026-11-19) Rank training fees in the levelling path (Journeyman, Expert, Artisan) come from SkillUpForever's
+      tables, which take them from the WoW Classic database (CMaNGOS classic-db, before reputation discounts), as do
+      the recipe trainer fees it lists: labelled "Classic database", not Forever fact. Next time you train a rank or a
+      recipe, tell Claude what the trainer asked for (or send a screenshot of the trainer window). If it differs,
+      Claude can make the addon read the trainer window, so the fees become Forever data.
 - [ ] B9. (2026-11-19) Big markets the app has no way into (Market tab, "only items the app has no way into"): Mote of
       Unstable Magic (215 kinds of mob drop it, 390g traded a day), Shellfish, Pristine Black Diamond, Vulture
       Gizzard; dungeon gear and patterns belong to the Dungeons view (to-do 8). Each needs its Wowhead Forever page

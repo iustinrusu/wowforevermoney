@@ -49,7 +49,9 @@ A2. [x] (done 2026-11-19: 2 days, setting levelling_ah_days; lower of listing an
        (`pricing.usual_sale`, as Big flips do); (3) the Back column says when a sale is slow ("about 1 sale every 4
        days"). Update tests (`test_the_ah_takes_only_so_many_then_the_vendor_price`), re-run every profession 1->300 on
        real data and compare totals before and after; update the "How this is worked out" text.
-A3. [ ] **The rest of the levelling work** (every recipe in the game and where to learn it: done 2026-11-19):
+A3. [x] (done 2026-11-19: rank training rows, "may have to wait" on patterns, "yours" from Forever data only,
+       find-it row checked in the browser; details in the project log's change log, eighth part)
+       **The rest of the levelling work** (every recipe in the game and where to learn it: done 2026-11-19):
        - rank training (Journeyman, Expert, Artisan): fee, the skill and character level each needs, at 75/150/225 the
          path must stop for it (ForeverRecipes `Trainers` may hold the rank spells; check, never assume Classic fees);
        - a recipe whose pattern is only on the AH at "market value (none listed now)" or "region market value": say

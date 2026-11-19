@@ -23,6 +23,9 @@ NPC_FIELDS = ['name', 'minLevelHealth', 'maxLevelHealth', 'minLevel', 'maxLevel'
               'waypoints', 'zoneID', 'questStarts', 'questEnds', 'factionID', 'friendlyToFaction',
               'subName', 'npcFlags']
 OBJECT_FIELDS = ['name', 'questStarts', 'questEnds', 'spawns', 'zoneID', 'factionID', 'waypoints']
+# quests: only the fields the app reads (name, who starts it, the levels, the profession skill it asks for), so the
+# 35,000 quests decode quickly; the others are skipped (2026-11-19: the Artisan Cooking and First Aid quests)
+QUEST_FIELDS = ['name', 'startedBy', 'finishedBy', 'requiredLevel', 'questLevel'] + [None] * 12 + ['requiredSkill']
 
 _LINE = re.compile(r'^## (X-[^:]+): ?(.*)$')
 
@@ -59,6 +62,7 @@ class QuestieDB:
     items: dict[int, dict] = field(default_factory=dict)
     npcs: dict[int, dict] = field(default_factory=dict)
     objects: dict[int, dict] = field(default_factory=dict)
+    quests: dict[int, dict] = field(default_factory=dict)       # name, startedBy, requiredLevel, requiredSkill
 
 
 def _read_store(toc: Path) -> dict[str, str]:
@@ -92,6 +96,8 @@ def _load_entities(store: dict[str, str], prefix: str, names: list[str]) -> dict
         if not m:
             continue
         ent_id, part = int(m.group(1)), m.group(2)
+        if part != 'S' and not (int(part) <= len(names) and names[int(part) - 1]):
+            continue                                   # a field the app doesn't read
         raw = _get(store, key)
         if not raw:
             continue
@@ -105,7 +111,7 @@ def _load_entities(store: dict[str, str], prefix: str, names: list[str]) -> dict
                 decoded = {i + 1: v for i, v in enumerate(decoded)}
             if isinstance(decoded, dict):
                 for idx, val in decoded.items():
-                    if isinstance(idx, int) and 1 <= idx <= len(names):
+                    if isinstance(idx, int) and 1 <= idx <= len(names) and names[idx - 1]:
                         row.setdefault(names[idx - 1], val)
         else:
             idx = int(part)
@@ -120,6 +126,7 @@ def load_questie(toc: Path) -> QuestieDB:
         items=_load_entities(store, 'Item-', ITEM_FIELDS),
         npcs=_load_entities(store, 'Npc-', NPC_FIELDS),
         objects=_load_entities(store, 'Object-', OBJECT_FIELDS),
+        quests=_load_entities(store, 'Quest-', QUEST_FIELDS),
     )
 
 

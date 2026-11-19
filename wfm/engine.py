@@ -14,6 +14,7 @@ from . import anomalies, fishing, gamedata, nodes, plan, pricing, skinning, valu
 from . import everloot as everloot_mod
 from . import levelling as levelling_mod
 from . import foreverrecipes as foreverrecipes_mod
+from . import gatherlite as gatherlite_mod
 from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
@@ -23,7 +24,15 @@ PROFESSIONS = {'Alchemy', 'Blacksmithing', 'Cooking', 'Enchanting', 'Engineering
                gamedata.NO_PROFESSION}             # made by using an item anyone can use (essences, Darkmoon cards)
 GATHER_SOURCE = {5: 'Mobs (cloth)', 6: 'Skinning', 7: 'Mining', 8: 'Mobs (meat)', 9: 'Herbalism', 10: 'Mobs / gathering',
                  12: 'Enchanting'}
-GATHER_PROFESSION = {6: 'Skinning', 7: 'Mining', 9: 'Herbalism'}
+GATHER_PROFESSION = {6: 'Skinning', 7: 'Mining', 9: 'Herbalism'}     # a guess from the item's kind only
+GATHERING = ('Herbalism', 'Mining', 'Skinning')
+# kinds of trade goods everyone farms from mobs (cloth, meat, elementals): never "yours" or a gathering row's profession,
+# even where a gathering skill gives some too (Wowhead Forever: skinning sheep gives Wool Cloth)
+MOB_KINDS = {5, 8, 10}
+NODE_PROFESSION = {'ore': 'Mining', 'herb': 'Herbalism'}           # GatherLite's node types
+ORE_NODE = re.compile(r'\b(Vein|Deposit|Chunk|Formation)\b')       # QuestieDB object names, where GatherLite is missing
+# profession ranks by the skill they let you reach (Apprentice comes with the profession)
+RANK_NAMES = {75: 'Apprentice', 150: 'Journeyman', 225: 'Expert', 300: 'Artisan'}
 FISH_WORDS = re.compile(r'\b(Fish|Snapper|Lobster|Eel|Squid|Salmon|Sagefish|Yellowtail|Catfish|Mackerel|Grouper|'
                         r'Bass|Redgill|Mudfish|Albacore|Loach|Darter|Mightfish|Clam|Mullet|Smallfish|Whisker|'
                         r'Longjaw|Firefin|Blackmouth|Stonescale|Sunscale|Nightfin|Bristle|Trout|Perch|Bluegill|'
@@ -430,7 +439,9 @@ class Engine:
             q = self.cheapest(scroll)
             if q and (best is None or best['cost'] is None or q.value < best['cost']):
                 best = {'how': 'recipe item', 'item_id': scroll, 'name': self.name(scroll), 'cost': q.value,
-                        'source': q.source}
+                        'source': q.source,
+                        # none on your realm's AH now (a market value, or the region's): you may have to wait for one
+                        'wait': q.source != 'vendor' and bool({'none_listed', 'no_realm_data'} & set(q.flags))}
             elif best is None:
                 best = {'how': 'recipe item', 'item_id': scroll, 'name': self.name(scroll), 'cost': None,
                         'source': 'drop / not on AH'}
@@ -442,6 +453,140 @@ class Engine:
                         'source': f"vendor {v['name']}{' (limited stock)' if v['limited'] else ''} (ForeverRecipes)"}
         return best
 
+    def gathered(self) -> dict[int, set[str]]:
+        """item -> the gathering professions that give it, from Forever data only (2026-11-19: by the item's kind it was
+        too wide, Ironfeather and Cured Rugged Hide showed "yours" to a skinner):
+        - Skinning: Wowhead Forever's "Skinned from" pages (data/wowhead_forever_skinning.json, the items read and the
+          skinning items still to read)
+        - Mining, Herbalism: QuestieDB's objectDrops from an ore or herb node; GatherLite types the nodes (else an ore
+          node by its name, a herb node named like the herb). Herbalism also: GatherLite's herb nodes by their names
+          ('golden_sansam'): QuestieDB lists only chests for Sungrass, Blindweed, Golden Sansam, Dreamfoil and Mountain
+          Silversage
+        - Mining also: a bar you smelt when its ores are mined (or sold by a vendor, Coal)"""
+        if '_gathered' in self.__dict__:
+            return self._gathered
+        out: dict[int, set[str]] = {}
+        sk = getattr(self.w, 'forever_skinning', None) or {}
+        for iid in list(sk.get('items') or {}) + list(sk.get('not_read') or {}):
+            out.setdefault(int(iid), set()).add('Skinning')
+        gl = getattr(self.w, 'gatherlite', None) or {}
+        types = gl.get('types') or {}
+        herbs = {it.name for it in self.gd.items.values() if it.class_id == 7 and it.subclass_id == 9 and it.name}
+        herb_ids = {gatherlite_mod.node_key(it.name): iid for iid, it in self.gd.items.items()
+                    if it.class_id == 7 and it.subclass_id == 9 and it.name}
+        for o, node in (gl.get('names') or {}).items():
+            if types.get(o) == 'herb' and node in herb_ids:
+                out.setdefault(herb_ids[node], set()).add('Herbalism')
+        kind_of = {}
+        for iid, qi in (self.q.items.items() if self.q else []):
+            for o in qi.get('objectDrops') or []:
+                if o not in kind_of:
+                    kind = types.get(o)
+                    if kind is None:
+                        name = (self.q.objects.get(o) or {}).get('name') or ''
+                        kind = 'ore' if ORE_NODE.search(name) else ('herb' if name in herbs else None)
+                    kind_of[o] = kind
+                prof = NODE_PROFESSION.get(kind_of[o])
+                if prof:
+                    out.setdefault(int(iid), set()).add(prof)
+        smelt = [r for r in self.gd.recipes if r.profession == 'Mining' and r.reagents]
+        grew = True
+        while grew:                      # Bronze Bar: from Copper and Tin Bars, smelted from mined ore
+            grew = False
+            for r in smelt:
+                mined = ['Mining' in out.get(m, ()) for m, _ in r.reagents]
+                if 'Mining' not in out.get(r.product_id, ()) and any(mined) and \
+                        all(x or self.sold_by_vendor(m) for x, (m, _) in zip(mined, r.reagents)):
+                    out.setdefault(r.product_id, set()).add('Mining')
+                    grew = True
+        self._gathered = out
+        return out
+
+    def gather_profession(self, iid: int, item, gathered: dict | None = None) -> str | None:
+        """The gathering profession a "Farm" row needs: Forever data first (Engine.gathered); a herb, ore or leather that
+        mobs drop and no gathering is known to give needs none (Ironfeather, Deeprock Salt); with no data at all, a guess
+        from the item's kind, as before 2026-11-19 (Frostsaber Leather: no Forever skinning page read yet)."""
+        kind = item.subclass_id if item and item.class_id == 7 else None
+        if kind in MOB_KINDS:
+            return None
+        got = (gathered if gathered is not None else self.gathered()).get(iid) or set()
+        guess = GATHER_PROFESSION.get(kind)
+        if guess in got:
+            return guess
+        mobs = bool(self.q and (self.q.items.get(iid) or {}).get('npcDrops'))
+        if got:
+            return None if mobs else sorted(got)[0]
+        return None if (guess and mobs) else guess
+
+    def skill_line(self, profession: str) -> int | None:
+        line = next((k for k, v in (getattr(self.gd, 'professions', None) or {}).items() if v == profession), None)
+        return line or next((r.skill_line for r in self.gd.recipes if r.profession == profession), None)
+
+    def npc_place(self, npc: int) -> dict | None:
+        """An NPC's name, faction ('A', 'H' or '' for both) and where: ForeverRecipes first, then QuestieDB."""
+        fr = getattr(self.w, 'forever_recipes', None)
+        if fr and npc in fr.npcs:
+            name, f, zone, x, y = fr.npcs[npc]
+            return {'npc': npc, 'name': name, 'faction': f, 'zone': zone, 'x': x, 'y': y}
+        n = (self.q.npcs.get(npc) if self.q else None) or {}
+        if not n.get('name'):
+            return None
+        side = n.get('friendlyToFaction') or ''
+        return {'npc': npc, 'name': n['name'], 'faction': '' if side in ('', 'AH') else side,
+                'zone': self.gd.zones.get(n.get('zoneID'), '') if n.get('zoneID') else '', 'x': None, 'y': None}
+
+    def rank_training(self, profession: str, skill: int, target: int) -> list[dict]:
+        """The profession ranks to train on the way from skill to target (Journeyman to pass 75, Expert 150, Artisan
+        225): at a trainer for a fee, from a book (Cooking, First Aid: Expert) or a quest (their Artisan), with the skill
+        and character level each asks for. From SkillUpForever's tables, which take them from the WoW Classic database
+        (CMaNGOS classic-db, base fees before reputation discounts; books from the game files): labelled, never
+        presented as Forever fact. A rank you have is left out: the cap your addon reads (ForeverMoneyBridge or TSM)
+        when you plan from your own skill, else any skill past the rank's start."""
+        line = self.skill_line(profession)
+        if not line or not self.su:
+            return []
+        level = int(self.s.get('level') or 0)
+        have_cap = int((self.s.get('profession_caps') or {}).get(profession) or 0)
+        mine = self.profs.get(profession) == skill
+        ranks: dict[int, dict] = {}
+        for cap, fee, req, lvl in (getattr(self.su, 'rank_trainers', None) or {}).get(line, []):
+            trainers = []
+            for npc, top in (getattr(self.su, 'profession_trainers', None) or {}).get(line, []):
+                p = self.npc_place(int(npc)) if int(top) >= cap else None
+                if p and p['faction'] in ('', self.faction):
+                    trainers.append(p)
+            ranks[int(cap)] = {'how': 'trainer', 'cost': int(fee), 'trainers': trainers[:3],
+                               'trainer_count': len(trainers), 'skill': int(req), 'level': int(lvl)}
+        for cap, book, price, req, lvl in (getattr(self.su, 'rank_books', None) or {}).get(line, []):
+            if int(cap) not in ranks:
+                q = self.cheapest(int(book))
+                ranks[int(cap)] = {'how': 'book', 'item_id': int(book), 'book_name': self.name(int(book)),
+                                   'cost': q.value if q else int(price),
+                                   'source': q.source if q else 'its list price (game files)',
+                                   'skill': int(req), 'level': int(lvl)}
+        for cap, quest, req, lvl, side in (getattr(self.su, 'rank_quests', None) or {}).get(line, []):
+            if int(cap) not in ranks and side in ('', self.faction):
+                # the quest itself from QuestieDB's Forever data where it has it: its name, who gives it, the skill
+                # and level it asks for (Clamlette Surprise: Cooking 225, level 35, Dirge Quikcleave)
+                fr = getattr(self.w, 'forever_recipes', None)
+                qq = ((getattr(self.q, 'quests', None) or {}).get(int(quest)) if self.q else None) or {}
+                qm = (fr.quests.get(int(quest)) if fr else None) or {}
+                need = qq.get('requiredSkill') or []
+                givers = ((qq.get('startedBy') or [[]])[0] or []) if isinstance(qq.get('startedBy'), list) else []
+                ranks[int(cap)] = {'how': 'quest', 'quest': int(quest), 'quest_name': qq.get('name') or qm.get('name'),
+                                   'givers': [p for p in (self.npc_place(int(n)) for n in givers[:3]) if p],
+                                   'cost': 0, 'skill': int(need[1]) if len(need) > 1 and need[0] == line else int(req),
+                                   'level': int(qq.get('requiredLevel') or lvl), 'forever_quest': bool(qq)}
+        out = []
+        for cap in sorted(ranks):
+            start = cap - 75                       # the skill where the rank below stops you
+            if not (skill <= start < target) or (mine and have_cap >= cap):
+                continue
+            r = dict(ranks[cap], at=start, cap=cap, name=RANK_NAMES.get(cap, f'rank to {cap}'))
+            r['level_short'] = bool(r['level'] and level and level < r['level'])
+            out.append(r)
+        return out
+
     def levelling(self, profession: str, skill: int | None = None, known: set[int] | None = None,
                   crafts: list | None = None, target: int = levelling_mod.MAX_SKILL, use_de: bool = True) -> dict:
         """The cheapest way from your skill (or any skill) to a target skill, 300 by default, in a crafting profession
@@ -450,7 +595,8 @@ class Engine:
         skill = int(skill if skill is not None else (self.profs.get(profession) or 1))
         target = max(skill + 1, min(int(target), levelling_mod.MAX_SKILL))
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
-        own_kinds = {sub for sub, prof in GATHER_PROFESSION.items() if prof in self.profs}
+        gather = set(GATHERING) & set(self.profs)            # the gathering professions you have
+        gathered = self.gathered()
         # the AH takes only a couple of days of your share of a product's sales (the user, 2026-11-19: slow sellers must
         # not drive the route); setting levelling_ah_days
         days = self.s.get('levelling_ah_days')
@@ -470,9 +616,10 @@ class Engine:
             colors = (orange, int(th[1]), int(th[2]), int(th[3]))
             mats, cost, ok = [], 0, True
             for mid, cnt in r.reagents:
-                it = self.gd.items.get(mid)
                 q = self.cheapest(mid)
-                own = bool(it and it.class_id == 7 and it.subclass_id in own_kinds)
+                it = self.gd.items.get(mid)
+                own = bool(gathered.get(mid, set()) & gather) and not (it and it.class_id == 7 and
+                                                                       it.subclass_id in MOB_KINDS)
                 each = q.value if q else None
                 if own:          # a material you gather yourself costs what you'd get for selling it
                     sold = self.sell_value(mid)[0]
@@ -511,11 +658,12 @@ class Engine:
                 spell_id=r.spell_id, name=r.name, colors=colors, ingredients=int(cost),
                 ah_value=ah_value, vendor_value=int(vendor_sell(item) * r.product_count),
                 ah_cap=per_day * ah_days / max(r.product_count, 1), ah_per_day=per_day,
-                learn=learn_cost,
+                learn=learn_cost, learn_wait=bool((learn or {}).get('wait')),
                 learn_how=(learn or {}).get('how', 'starting recipe' if orange <= 1 else ''), product_id=r.product_id,
                 mats=mats, de_value=int(de['value'] * r.product_count) if de else 0, de_can=bool(de and de['can']),
                 find=find))
-        out = levelling_mod.plan(options, skill, target, known=known, use_de=use_de)
+        training = self.rank_training(profession, skill, target)
+        out = levelling_mod.plan(options, skill, target, known=known, use_de=use_de, training=training)
         for m in out['shopping']:
             m['name'] = self.name(m['item_id'])
         who = self.enchanter()
@@ -538,7 +686,8 @@ class Engine:
                                 'profit_unit': o.profit_unit, 'cost_to_reach': at})
         unlocks.sort(key=lambda u: -u['daily'])
         out.update(profession=profession, unlocks=unlocks[:12], options=len(options), ah_days=ah_days,
-                   known=len(known or ()), own_materials=sorted(GATHER_PROFESSION[k] for k in own_kinds))
+                   known=len(known or ()), own_materials=sorted(gather), level=int(self.s.get('level') or 0) or None,
+                   cap=int((self.s.get('profession_caps') or {}).get(profession) or 0) or None)
         return out
 
     # ---------- opportunity builders ----------
@@ -855,6 +1004,7 @@ class Engine:
         out = []
         rates = {int(k): float(v) for k, v in (self.s.get('farm_rates') or {}).items()}
         made = {r.product_id for r in self.gd.recipes}
+        gathered = self.gathered()
         for iid, item in self.gd.items.items():
             # processed goods are crafted, not farmed: cooked food/potions, cured hides, cloth bolts. (Some crafted
             # items are also gathered, e.g. Heavy Leather is skinned too, so being craftable alone isn't enough.)
@@ -886,8 +1036,9 @@ class Engine:
             # crafted worth only for as many a day as the recipe can use; the rest at the sale price (2026-11-15)
             daily = valuation.capped_total(value, cap, sell, demand)
             unit = daily / demand if demand > 0 else valuation.capped_total(value, cap, sell, 1)
-            source = 'Fishing' if is_fish else GATHER_SOURCE.get(item.subclass_id, 'Gathering')
-            prof = 'Fishing' if is_fish else GATHER_PROFESSION.get(item.subclass_id)
+            prof = 'Fishing' if is_fish else self.gather_profession(iid, item, gathered)
+            source = 'Fishing' if is_fish else (prof or ('Mobs' if item.subclass_id in GATHER_PROFESSION
+                                                          else GATHER_SOURCE.get(item.subclass_id, 'Gathering')))
             doable = prof is None or prof in self.profs
             out.append(Opportunity(
                 kind='gather', key=f'gather:{iid}', item_id=iid, title=f'Farm {item.name}',

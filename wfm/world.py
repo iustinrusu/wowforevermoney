@@ -228,7 +228,8 @@ class World:
     def _load_gatherlite(self):
         st = self.status.setdefault('gatherlite', SourceStatus('gatherlite', 'GatherLite node positions (Forever)'))
         f = gatherlite_mod.data_file(self.paths.addons)
-        st.files = [str(f)] if f else []
+        nf = gatherlite_mod.nodes_file(self.paths.addons)
+        st.files = [str(x) for x in (f, nf) if x]
         if not f or not self.gamedata:
             st.status, st.note = 'missing', 'GatherLite is not installed (optional: node and pool positions).'
             self.gatherlite = {}
@@ -239,7 +240,8 @@ class World:
         g = self.gatherlite
         st.note = (f"{g.get('objects', 0)} nodes, chests and pools, {g.get('points', 0):,} positions "
                    f"({sum(sum(z.values()) for z in (g.get('nodes') or {}).values()):,} distinct after merging repeats). "
-                   'Compared with QuestieDB on Data health.')
+                   f"Compared with QuestieDB on Data health. {len(g.get('types') or {})} node types (which ore and herb "
+                   'nodes there are: with QuestieDB, which materials you gather).')
         self.version += 1
 
     def _load_angler(self):
@@ -458,7 +460,8 @@ class World:
         'questie': ('_load_questie', lambda self: [self.paths.questie_toc, self.paths.questie_drops]),
         'skillup': ('_load_skillup', lambda self: [self.paths.skillup_data, self.paths.foreverrecipes_data]),
         'angler': ('_load_angler', lambda self: [self._sv('ForeverAngler.lua') or '']),
-        'gatherlite': ('_load_gatherlite', lambda self: [gatherlite_mod.data_file(self.paths.addons) or '']),
+        'gatherlite': ('_load_gatherlite', lambda self: [gatherlite_mod.data_file(self.paths.addons) or '',
+                                                         gatherlite_mod.nodes_file(self.paths.addons) or '']),
         'classicdb': ('_load_classic', lambda self: [classicdb.CACHE]),
         'checks': ('_load_checks', lambda self: [WOWHEAD_FISHING, WOWHEAD_CONTAINERS, skinning_mod.SNAPSHOT,
                                                  wowhead_items.SNAPSHOT, datapack_mod.PACK, *everloot_mod.files()]),

@@ -41,8 +41,12 @@ with no source known at all (UNKNOWN) comes after them.
 Chance of a skill point: the WoW Classic rule, labelled as such (Forever has not been checked): orange and below
 yellow always; from yellow to grey (grey - skill) / (grey - yellow); grey never. Colours are SkillUpForever's
 Forever thresholds (ForeverRecipes fills its gaps). Crafts with a cooldown (Mooncloth, transmutes) are left out: one craft every few days.
-Not counted: rank training at the trainer (Journeyman, Expert,
-Artisan) and the level it needs, AH deposits, buying many of an ingredient (each costed at the lowest listing).
+Rank training (2026-11-19): to pass 75, 150 and 225 you train Journeyman, Expert and Artisan (a fee at a trainer, or a
+book or quest for Cooking and First Aid); `training` puts each on the path where it is needed and adds its cost. The
+fees, skills and levels are SkillUpForever's, from the WoW Classic database (Engine.rank_training), labelled.
+A pattern priced from TSM's market value with none listed now, or the region's, may take a while to find: its step says
+so (`learn_wait`); the price still counts.
+Not counted: AH deposits, buying many of an ingredient (each costed at the lowest listing).
 """
 from __future__ import annotations
 
@@ -74,6 +78,7 @@ class Option:
     de_can: bool = False     # one of your characters has the Enchanting skill to disenchant it
     find: str = ''           # can't be bought with gold now: 'drop', 'quest', 'vendor' (another currency), 'unknown'
     ah_per_day: float = 0.0  # products your share sells a day on the AH (units): under 1 is a slow sale, said on the page
+    learn_wait: bool = False  # its pattern is not listed on your realm now (priced from a market value): may take a wait
 
 
 def chance(colors: tuple, skill: int) -> float:
@@ -202,8 +207,10 @@ def _choose(options: list[Option], points: list[int], known: set, use_de: bool) 
 
 
 def plan(options: list[Option], skill: int, target: int = MAX_SKILL, known: set[int] | None = None,
-         use_de: bool = True) -> dict:
-    """The cheapest path. known: recipe spells you have already (no learning cost)."""
+         use_de: bool = True, training: list[dict] | None = None) -> dict:
+    """The cheapest path. known: recipe spells you have already (no learning cost). training: the profession ranks to
+    train on the way, each {'at': the skill it is needed at (75, 150, 225), 'cost': copper, ...}: paid when the path
+    gets there, and shown before the recipe that comes next (step['train'])."""
     known = set(known or ())
     options = [o for o in options if o.spell_id in known or o.learn is not None or o.find]
     by_id = {o.spell_id: o for o in options}
@@ -212,12 +219,20 @@ def plan(options: list[Option], skill: int, target: int = MAX_SKILL, known: set[
     stuck_at = next((s for s in points if s not in choice), None)
     # walk the path in order: the AH takes the first products of each recipe, the rest go to the next best
     steps, used, learned = [], {}, set(known)
-    total = learn_total = crafts_total = mats_total = back_total = 0.0
+    total = learn_total = crafts_total = mats_total = back_total = train_total = 0.0
     shopping: dict[int, dict] = {}
+    train_at = {int(t['at']): t for t in training or ()}
+    trained, pending = [], None
     for s in points:
         r = choice.get(s)
         if r is None:
             break
+        if s in train_at:                     # the rank below stops here: train the next one first
+            t = train_at[s]
+            total += t.get('cost') or 0
+            train_total += t.get('cost') or 0
+            pending = dict(t, cumulative=int(round(total)))
+            trained.append(pending)
         o = by_id[r]
         p = chance(o.colors, s)
         crafts = 1 / p
@@ -237,7 +252,7 @@ def plan(options: list[Option], skill: int, target: int = MAX_SKILL, known: set[
         mats_total += crafts * o.ingredients
         back_total += back
         last = steps[-1] if steps else None
-        if last and last['spell_id'] == r:
+        if last and last['spell_id'] == r and not pending:
             last.update(to=s + 1, crafts=last['crafts'] + crafts, cost=last['cost'] + cost, cumulative=total,
                         mats_cost=last['mats_cost'] + crafts * o.ingredients, back=last['back'] + back, back_how=how)
         else:
@@ -249,7 +264,10 @@ def plan(options: list[Option], skill: int, target: int = MAX_SKILL, known: set[
                           'ingredients': o.ingredients, 'mats_cost': crafts * o.ingredients, 'back': back,
                           'back_how': how, 'channels': {'AH': o.ah_value, 'vendor': o.vendor_value,
                                                         'disenchant': o.de_value, 'disenchant_can': o.de_can},
-                          'ah_cap': o.ah_cap, 'ah_per_day': o.ah_per_day})
+                          'ah_cap': o.ah_cap, 'ah_per_day': o.ah_per_day,
+                          'learn_wait': o.learn_wait and r not in known and fee > 0})
+            if pending:
+                steps[-1]['train'], pending = pending, None
     for st in steps:
         st['crafts_to_buy'] = math.ceil(st['crafts'] - 1e-9)       # whole crafts: what to buy for this stretch
         for mid, cnt, each, own in st['mats']:
@@ -267,5 +285,8 @@ def plan(options: list[Option], skill: int, target: int = MAX_SKILL, known: set[
     return {'skill': skill, 'target': min(target, MAX_SKILL), 'reached': reached, 'stuck_at': stuck_at,
             'to_find': to_find,
             'steps': steps, 'total': int(round(total)), 'learn_total': int(learn_total), 'crafts': round(crafts_total),
+            'training': trained, 'train_total': int(train_total),
+            'to_wait': [{'spell_id': st['spell_id'], 'recipe': st['recipe'], 'from': st['from']}
+                        for st in steps if st['learn_wait']],
             'materials_total': int(round(mats_total)), 'back_total': int(round(back_total)), 'shopping': shop,
             'use_disenchant': use_de}

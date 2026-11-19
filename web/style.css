@@ -206,3 +206,5 @@ tr.yours > td { background: rgba(232, 192, 96, .05); }
 .stat .hint { margin: 0; }
 table.level tr.sub td { border-bottom: 1px solid var(--line); padding-top: 0; }
 table.level tr:not(.sub) td { border-bottom: none; }
+/* a profession rank to train before the path goes on (Journeyman, Expert, Artisan) */
+table.level tr.train td { background: color-mix(in srgb, var(--gold, #d4a017) 10%, transparent); border-bottom: 1px solid var(--line); }

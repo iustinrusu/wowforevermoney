@@ -188,5 +188,190 @@ class EngineRangeTests(unittest.TestCase):
         self.assertEqual({st['spell_id'] for st in out['steps']}, {500})
 
 
+class RankTrainingTests(unittest.TestCase):
+    """A3 (2026-11-19): the next profession rank is trained where the path needs it, with its cost."""
+
+    def test_the_plan_pays_for_a_rank_where_it_is_needed(self):
+        a = opt(1, (1, 400, 401, 402), 100)                         # orange all the way: 100 a point
+        t = [{'at': 75, 'cost': 500, 'name': 'Journeyman'}]
+        p = plan([a], 60, 90, training=t)
+        self.assertEqual(p['total'], 30 * 100 + 500)
+        self.assertEqual(p['train_total'], 500)
+        # the step stops at 75 for the training, though the same recipe goes on after it
+        self.assertEqual([(s['from'], s['to']) for s in p['steps']], [(60, 75), (75, 90)])
+        self.assertNotIn('train', p['steps'][0])
+        self.assertEqual(p['steps'][1]['train']['name'], 'Journeyman')
+        self.assertEqual(p['steps'][1]['train']['cumulative'], 15 * 100 + 500)   # the total once it is paid
+        self.assertEqual(p['steps'][1]['cumulative'], 30 * 100 + 500)
+        self.assertEqual(sum(s['cost'] for s in p['steps']) + p['train_total'], p['total'])
+        self.assertEqual([x['name'] for x in p['training']], ['Journeyman'])
+        # a path that doesn't get there pays nothing
+        stuck = plan([opt(1, (1, 70, 71, 72), 100)], 60, 90, training=t)
+        self.assertEqual((stuck['stuck_at'], stuck['train_total']), (72, 0))         # grey at 72
+
+    def _world(self):
+        from tests.test_engine import MAT_VENDOR, PRODUCT, make_world
+        from wfm.gamedata import Recipe
+        r = Recipe(spell_id=500, name='Tasty Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                   product_count=1, reagents=[(MAT_VENDOR, 2)], trivial_low=400, trivial_high=402, min_rank=1)
+        w = make_world({}, [r])
+        w.skillup.thresholds[500] = [2, 400, 401, 402]          # orange from 2 to 300 (an orange of 1 is "unknown")
+        # SkillUpForever's tables for Cooking (line 185): a trainer to 150, a book to 225, a quest a side to 300
+        w.skillup.rank_trainers = {185: [(150, 500, 50, 10)]}
+        w.skillup.rank_books = {185: [(225, 16072, 10000, 125, 0)]}
+        w.skillup.rank_quests = {185: [(300, 6610, 225, 35, 'A'), (300, 6611, 225, 35, 'H')]}
+        # trainers and the most they teach: 100 (both factions) and 101 (Alliance) to 150, 102 only to 75
+        w.skillup.profession_trainers = {185: [(100, 150), (101, 150), (102, 75)]}
+        w.questie.npcs[102] = {'name': 'Novice Cook', 'friendlyToFaction': 'AH', 'zoneID': 1}
+        return w
+
+    def test_engine_ranks_with_fee_skill_level_and_who_teaches_them(self):
+        from tests.test_engine import SETTINGS
+        from wfm.engine import Engine
+        e = Engine(self._world(), dict(SETTINGS, level=30))
+        out = e.levelling('Cooking', 2, known={500}, target=300)
+        tr = out['training']
+        self.assertEqual([(t['name'], t['at'], t['cap'], t['how'], t['cost']) for t in tr],
+                         [('Journeyman', 75, 150, 'trainer', 500), ('Expert', 150, 225, 'book', 10000),
+                          ('Artisan', 225, 300, 'quest', 0)])
+        self.assertEqual([p['name'] for p in tr[0]['trainers']], ['Horde Trader'])   # yours, and teaches to 150
+        self.assertEqual((tr[0]['skill'], tr[0]['level'], tr[0]['level_short']), (50, 10, False))
+        self.assertEqual((tr[1]['item_id'], tr[1]['source']), (16072, 'its list price (game files)'))
+        self.assertEqual(tr[1]['book_name'], 'Item 16072')
+        self.assertEqual(tr[2]['quest'], 6611)                       # the Horde's quest
+        self.assertTrue(tr[2]['level_short'])                        # it asks for 35; you are 30
+        self.assertFalse(tr[2]['forever_quest'])                     # QuestieDB doesn't have it here
+        # with QuestieDB's Forever quest: its name, giver, skill and level win
+        w = self._world()
+        w.questie.quests = {6611: {'name': 'Clamlette Surprise', 'startedBy': [[100]], 'requiredSkill': [185, 230],
+                                   'requiredLevel': 28}}
+        art = Engine(w, dict(SETTINGS, level=30)).levelling('Cooking', 2, known={500})['training'][2]
+        self.assertEqual((art['quest_name'], [g['name'] for g in art['givers']], art['skill'], art['level'],
+                          art['level_short'], art['forever_quest']),
+                         ('Clamlette Surprise', ['Horde Trader'], 230, 28, False, True))
+        self.assertEqual(out['train_total'], 10500)
+        self.assertEqual(sum(s['cost'] for s in out['steps']) + 10500, out['total'])
+        self.assertEqual([s['train']['name'] for s in out['steps'] if 'train' in s], ['Journeyman', 'Expert', 'Artisan'])
+
+    def test_a_rank_you_have_is_left_out(self):
+        from tests.test_engine import SETTINGS
+        from wfm.engine import Engine
+        w = self._world()
+        # your Cooking is 150 (SETTINGS): with a cap of 225 the addon read, you have Expert already
+        mine = Engine(w, dict(SETTINGS, profession_caps={'Cooking': 225})).levelling('Cooking', 150, known={500})
+        self.assertEqual([t['name'] for t in mine['training']], ['Artisan'])
+        self.assertEqual(mine['cap'], 225)
+        # no cap known: at exactly 150 you may still need it
+        self.assertEqual([t['name'] for t in Engine(w, dict(SETTINGS)).levelling('Cooking', 150, known={500})['training']],
+                         ['Expert', 'Artisan'])
+        # planning from another skill: your cap doesn't count, a skill past a rank's start does
+        other = Engine(w, dict(SETTINGS, profession_caps={'Cooking': 225})).levelling('Cooking', 100, known={500})
+        self.assertEqual([t['name'] for t in other['training']], ['Expert', 'Artisan'])
+
+
+class MaterialsAndPatternsTests(unittest.TestCase):
+    def test_yours_only_where_forever_data_says_your_gathering_gives_it(self):
+        # 2026-11-19: by the item's kind, a skinner saw Ironfeather (a bird drop) and Cured Rugged Hide (made by
+        # Leatherworking) marked "yours" on the Leatherworking path
+        from tests.test_engine import SETTINGS, item, make_world
+        from wfm.engine import Engine
+        from wfm.gamedata import Recipe
+        HIDE, FEATHER, CURED, HERB, ORE, BAR, CHEST_HERB, ODD, VEST, COAL, STEEL, SANSAM, WOOL = range(20, 33)
+        w = make_world({}, [])
+        for it in (item(HIDE, 'Rugged Hide', sub=6), item(FEATHER, 'Ironfeather', sub=6),
+                   item(CURED, 'Cured Rugged Hide', sub=6), item(HERB, 'Peacebloom', sub=9),
+                   item(ORE, 'Copper Ore', sub=7), item(BAR, 'Copper Bar', sub=7), item(CHEST_HERB, 'Bruiseweed', sub=9),
+                   item(ODD, 'Frostsaber Leather', sub=6), item(VEST, 'Rugged Vest', cls=4, sell=50),
+                   item(COAL, 'Coal', sub=7, buy=500), item(STEEL, 'Steel Bar', sub=7),
+                   item(SANSAM, 'Golden Sansam', sub=9), item(WOOL, 'Wool Cloth', sub=5)):
+            w.gamedata.items[it.id] = it
+        w.gamedata.recipes = [
+            Recipe(spell_id=600, name='Smelt Copper', profession='Mining', skill_line=186, product_id=BAR,
+                   product_count=1, reagents=[(ORE, 1)], trivial_low=25, trivial_high=50, min_rank=1),
+            Recipe(spell_id=601, name='Smelt Steel', profession='Mining', skill_line=186, product_id=STEEL,
+                   product_count=1, reagents=[(BAR, 1), (COAL, 1)], trivial_low=25, trivial_high=50, min_rank=1),
+            Recipe(spell_id=602, name='Cured Rugged Hide', profession='Leatherworking', skill_line=165,
+                   product_id=CURED, product_count=1, reagents=[(HIDE, 1)], trivial_low=250, trivial_high=260,
+                   min_rank=1),
+            Recipe(spell_id=603, name='Rugged Vest', profession='Leatherworking', skill_line=165, product_id=VEST,
+                   product_count=1, reagents=[(HIDE, 1), (FEATHER, 1), (CURED, 1), (ODD, 1), (WOOL, 1)], trivial_low=280,
+                   trivial_high=300, min_rank=1)]
+        w.skillup.thresholds[603] = [250, 280, 290, 300]
+        w.questie.items.update({HERB: {'objectDrops': [900]}, ORE: {'objectDrops': [901]},
+                                CHEST_HERB: {'objectDrops': [902]}, FEATHER: {'npcDrops': [5]},
+                                COAL: {'vendors': [100]}})
+        w.questie.objects.update({900: {'name': 'Peacebloom'}, 901: {'name': 'Copper Vein'},
+                                  902: {'name': 'Battered Chest'}})
+        # Wowhead Forever "Skinned from": sheep give Wool Cloth too
+        w.forever_skinning = {'items': {str(HIDE): {'npcs': []}, str(WOOL): {'npcs': []}}, 'not_read': {}}
+        w.gatherlite = {'types': {900: 'herb', 902: 'container', 903: 'herb'},     # 901 has no type: an ore node by its name
+                        'names': {900: 'peacebloom', 902: 'battered_chest', 903: 'golden_sansam'}}
+        e = Engine(w, dict(SETTINGS, professions={'Leatherworking': 250, 'Skinning': 250}))
+        # Steel: your bar plus vendor Coal. Golden Sansam: QuestieDB lists only chests, GatherLite has its node
+        self.assertEqual(e.gathered(), {HIDE: {'Skinning'}, HERB: {'Herbalism'}, ORE: {'Mining'}, BAR: {'Mining'},
+                                        STEEL: {'Mining'}, SANSAM: {'Herbalism'}, WOOL: {'Skinning'}})
+        prices = {m: {'numAuctions': 3, 'minBuyout': 100, 'marketValue': 100, 'regionSoldPerDay': 5}
+                  for m in (HIDE, FEATHER, CURED, ODD, WOOL)}
+        w.prices = prices
+        e = Engine(w, dict(SETTINGS, professions={'Leatherworking': 250, 'Skinning': 250}))
+        out = e.levelling('Leatherworking', 250, known={603}, target=255)
+        own = {m['name']: m['own'] for m in out['steps'][0]['mats']}
+        # cloth everyone farms from mobs: not "yours" because a skinner gets a little from sheep
+        self.assertEqual(own, {'Rugged Hide': True, 'Ironfeather': False, 'Cured Rugged Hide': False,
+                               'Frostsaber Leather': False, 'Wool Cloth': False})
+        self.assertEqual(out['own_materials'], ['Skinning'])
+        # "Farm" rows: mobs drop Ironfeather (no profession needed); no data at all: the item's kind, as before
+        self.assertIsNone(e.gather_profession(FEATHER, w.gamedata.items[FEATHER]))
+        self.assertEqual(e.gather_profession(ODD, w.gamedata.items[ODD]), 'Skinning')
+        self.assertEqual(e.gather_profession(HERB, w.gamedata.items[HERB]), 'Herbalism')
+        self.assertIsNone(e.gather_profession(WOOL, w.gamedata.items[WOOL]))
+        # a herb only chests drop: not gathered as far as the data says; no mob drops it either, so the guess stays
+        self.assertEqual(e.gather_profession(CHEST_HERB, w.gamedata.items[CHEST_HERB]), 'Herbalism')
+
+    def test_a_pattern_no_one_is_selling_now_may_take_a_wait(self):
+        from tests.test_engine import MAT_VENDOR, PRODUCT, SETTINGS, item, make_world
+        from wfm.engine import Engine
+        from wfm.gamedata import Recipe
+        LISTED, UNLISTED = 40, 41
+        a = Recipe(spell_id=700, name='Dish A', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                   product_count=1, reagents=[(MAT_VENDOR, 1)], trivial_low=140, trivial_high=180, min_rank=1)
+        b = Recipe(spell_id=701, name='Dish B', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                   product_count=1, reagents=[(MAT_VENDOR, 1)], trivial_low=140, trivial_high=180, min_rank=1)
+        w = make_world({LISTED: {'numAuctions': 2, 'minBuyout': 300, 'marketValue': 300},
+                        UNLISTED: {'numAuctions': 0, 'marketValue': 400}}, [a, b])
+        for it in (item(LISTED, 'Recipe: Dish A', cls=9), item(UNLISTED, 'Recipe: Dish B', cls=9)):
+            w.gamedata.items[it.id] = it
+        w.skillup.thresholds.update({700: [100, 140, 160, 180], 701: [100, 140, 160, 180]})
+        e = Engine(w, dict(SETTINGS))
+        e._spell_to_recipe_items.update({700: [LISTED], 701: [UNLISTED]})
+        self.assertFalse(e.learn_cost(a)['wait'])
+        self.assertEqual(e.learn_cost(b)['source'], 'market value (none listed now)')
+        self.assertTrue(e.learn_cost(b)['wait'])
+        # the path takes the cheaper, listed one: nothing to wait for; with only B, the step and the list say so
+        self.assertEqual(e.levelling('Cooking', 100, target=110)['to_wait'], [])
+        w.gamedata.recipes = [b]
+        e = Engine(w, dict(SETTINGS))
+        e._spell_to_recipe_items.update({701: [UNLISTED]})
+        out = e.levelling('Cooking', 100, target=110)
+        self.assertTrue(out['steps'][0]['learn_wait'])
+        self.assertEqual(out['steps'][0]['learn'], 400)              # the price still counts
+        self.assertEqual(out['to_wait'], [{'spell_id': 701, 'recipe': 'Dish B', 'from': 100}])
+        # a recipe you know: nothing to buy, nothing to wait for
+        self.assertEqual(e.levelling('Cooking', 100, known={701}, target=110)['to_wait'], [])
+
+
+class GatherLiteTypesTests(unittest.TestCase):
+    def test_node_types_from_insert_object_lines(self):
+        from wfm.gatherlite import node_key, parse_nodes, parse_types
+        text = '''InsertObject("ore", { 1731, 2055, 3763 }, "copper_vein", "Ore\\\\copper", { 1, 25, 50, 100 })
+-- Herbs
+InsertObject("herb", { 1617 }, "silverleaf", "Herb\\\\silverleaf", { 1, 25, 50, 100 }, { "stunted_silverleaf" })
+InsertObject("container", { 2843, 1731 }, "battered_chest", "Container\\\\chest", { 0 })'''
+        self.assertEqual(parse_types(text), {1731: 'ore', 2055: 'ore', 3763: 'ore', 1617: 'herb', 2843: 'container'})
+        self.assertEqual(parse_nodes(text)[1617], ('herb', 'silverleaf'))
+        self.assertEqual([node_key(n) for n in ("Khadgar's Whisker", 'Golden Sansam', "Arthas' Tears")],
+                         ['khadgars_whisker', 'golden_sansam', 'arthas_tears'])
+
+
 if __name__ == '__main__':
     unittest.main()
