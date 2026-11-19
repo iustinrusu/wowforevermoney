@@ -24,6 +24,19 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-19 Every recipe in the game in the levelling path, with where to learn it (user: "it should be with all
+  recipes in game, and where to get them or learn them").** The planner already used every trainer recipe and every
+  pattern it could price, but it didn't know which item teaches many Forever recipes (QuestieDB lacks them), so those
+  patterns had no price and were left out: Leatherworking stopped at 270. Now ForeverRecipes' Recipes.lua (`RecipeItems`,
+  the 5th field) links recipe to pattern, its Sources.lua and Npcs.lua say where each is learned (trainers and fee,
+  vendors and price or currency, limited stock, top 5 recorded drop chances in %, chests, quests; your faction only),
+  and a vendor price only ForeverRecipes knows is used when the AH and QuestieDB have none. A recipe that can't be
+  bought with gold now (drop only, quest, Merchant's Favor) is still a candidate: the path uses it only for skill points
+  nothing you can buy reaches (penalty `FIND`, a recipe with no known source after it, `UNKNOWN`), its cost is not in
+  the totals, and the page lists it ("find it") with where to find it. Crafts with a cooldown are left out (the path
+  used Mooncloth for 22 points and Transmute: Arcanite for 15, which no one can do; caught on real data). Result on
+  real data: every crafting profession reaches 300 from 1 with recipes you can buy (Leatherworking 255->300 about
+  -244g, i.e. it earns; Tailoring 1->300 +38g instead of -944g with Mooncloth). Not done yet: rank training fees.
 - **2026-11-19 TSM is the king for prices (user: "vendor price and AH price should ideally only come from TSM, no data
   mining ... Are we already doing that?").** Answer: AH prices were already TSM only (AppData.lua). Vendor prices were
   not: what a vendor pays came from the game files (wago tables, the client's hotfix cache, Wowhead tooltips), checked
@@ -672,6 +685,13 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-19** (fifth part) Levelling with every recipe in the game: `foreverrecipes.sources()` / `find_how()` (Sellers,
+  Drops, OtherDrops, QuestRewards, RecipeVendorCosts, SourceMeta, RecipeItemBinding, Npcs, Quests), `Engine.recipe_sources`,
+  `learn_cost` reads ForeverRecipes' recipe items, automatic recipes and vendor prices (and no longer crashes when a
+  recipe's first pattern item has no price), `levelling.Option.find`, `FIND`/`UNKNOWN`, `to_find`, cooldown crafts left
+  out; levelling page "Where to learn it" under each recipe, "find it" in the Learn column; Professions tab counts
+  recipes to find. Tests: 279 + 2 (sources), all pass.
 
 - **2026-11-19** (fourth part) Biggest markets complete and ranked (`markets.score`, `markets.page`, `/api/markets?sort=&filter=
   &offset=&limit=`, built once per recompute), glowing border (style.css `yours-glow`); levelling planner overhaul

@@ -107,7 +107,7 @@ def build(engine, opps: list, profs: dict, known: set | None = None) -> dict:
             r.update(kind='crafting', craft=crafting(prof, opps))
             if prof != 'Enchanting':        # enchantments make no item: not in the recipe tables, no path
                 lev = engine.levelling(prof, int(profs.get(prof) or 1), known=known if have else set(), crafts=[])
-                r['levelling'] = {k: lev[k] for k in ('total', 'crafts', 'reached', 'stuck_at', 'learn_total')}
+                r['levelling'] = {k: lev.get(k) for k in ('total', 'crafts', 'reached', 'stuck_at', 'learn_total', 'to_find')}
             r['now_value'], r['full_value'] = r['craft']['now_daily'], r['craft']['full_daily']
         r['verdict'] = verdict(r)
         rows.append(r)

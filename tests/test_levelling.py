@@ -4,9 +4,9 @@ import unittest
 from wfm.levelling import Option, chance, color, plan
 
 
-def opt(sid, colors, ingredients, ah=0, vendor=0, cap=0.0, learn=0, name=None):
+def opt(sid, colors, ingredients, ah=0, vendor=0, cap=0.0, learn=0, name=None, find=''):
     return Option(spell_id=sid, name=name or f'R{sid}', colors=colors, ingredients=ingredients, ah_value=ah,
-                  vendor_value=vendor, ah_cap=cap, learn=learn)
+                  vendor_value=vendor, ah_cap=cap, learn=learn, find=find)
 
 
 class ChanceTests(unittest.TestCase):
@@ -95,6 +95,30 @@ class PlanTests(unittest.TestCase):
         self.assertEqual((p['reached'], p['stuck_at']), (20, 20))
         self.assertEqual(plan([a, dropped], 1, 30, known={2})['reached'], 30)   # unless you know it
 
+    def test_a_pattern_you_have_to_find_fills_only_the_gap(self):
+        # the user (2026-11-19): every recipe in the game, and where to get it. A pattern that can't be bought with gold
+        # (it only drops) is used only where nothing you can buy gives a point; its cost is unknown, so not in the total
+        a = opt(1, (1, 10, 15, 20), 100)
+        dropped = opt(2, (15, 30, 40, 50), 10, learn=None, find='drop')      # far cheaper, but you'd have to find it
+        p = plan([a, dropped], 1, 30)
+        self.assertEqual((p['reached'], p['stuck_at']), (30, None))
+        self.assertEqual([st['spell_id'] for st in p['steps']], [1, 2])     # a, then the drop (a stops at 20)
+        # once you have to find it anyway, it is used wherever it is cheaper: from 15, not only from 20
+        self.assertEqual(p['to_find'], [{'spell_id': 2, 'recipe': 'R2', 'how': 'drop', 'from': 15}])
+        a_cost = 9 * 100 + sum(100 / ((20 - s) / 10) for s in range(10, 15))  # orange to 10, then yellow
+        self.assertEqual(p['total'], round(a_cost + 15 * 10))              # its learning cost isn't known: not counted
+        self.assertEqual(p['learn_total'], 0)
+        bought = opt(3, (15, 30, 40, 50), 500, learn=10_000)                # one you can buy, even dear, comes first
+        self.assertEqual([st['spell_id'] for st in plan([a, dropped, bought], 1, 30)['steps']], [1, 3])
+        self.assertEqual(plan([a, dropped], 1, 30, known={2})['to_find'], [])   # you know it: nothing to find
+
+    def test_a_recipe_with_no_known_source_comes_last(self):
+        a = opt(1, (1, 10, 15, 20), 100)
+        nowhere = opt(2, (15, 30, 40, 50), 1, learn=None, find='unknown')
+        quest = opt(3, (15, 30, 40, 50), 50, learn=None, find='quest')
+        self.assertEqual([st['spell_id'] for st in plan([a, nowhere, quest], 1, 30)['steps']], [1, 3])
+        self.assertEqual(plan([a, nowhere], 1, 30)['to_find'][0]['how'], 'unknown')
+
     def test_any_range_from_x_to_y(self):
         # the user (2026-11-19): not only to 300, any range
         a = opt(1, (1, 100, 150, 200), 100)
@@ -116,6 +140,22 @@ class EngineRangeTests(unittest.TestCase):
         self.assertEqual((out['skill'], out['target'], out['reached']), (100, 130, 130))
         self.assertEqual(out['crafts'], 30)
         self.assertEqual(e.levelling('Cooking', 100, target=50)['target'], 101)   # the target is above the start
+
+    def test_cooldown_crafts_are_left_out(self):
+        # one craft every few days (Mooncloth, Transmute: Arcanite): the path used them for 20 points in a row
+        from tests.test_engine import MAT_VENDOR, PRODUCT, SETTINGS, make_world
+        from wfm.engine import Engine
+        from wfm.gamedata import Recipe
+        r = Recipe(spell_id=500, name='Tasty Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                   product_count=1, reagents=[(MAT_VENDOR, 2)], trivial_low=140, trivial_high=180, min_rank=1)
+        cd = Recipe(spell_id=501, name='Moon Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                    product_count=1, reagents=[(MAT_VENDOR, 1)], trivial_low=140, trivial_high=180, min_rank=1,
+                    cooldown_ms=48 * 3_600_000)
+        w = make_world({}, [r, cd])
+        w.skillup.thresholds[501] = [100, 140, 160, 180]
+        out = Engine(w, dict(SETTINGS)).levelling('Cooking', 100, known={500, 501}, target=130)
+        self.assertEqual(out['options'], 1)
+        self.assertEqual({st['spell_id'] for st in out['steps']}, {500})
 
 
 if __name__ == '__main__':

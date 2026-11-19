@@ -81,7 +81,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/gamedata.py` | wago.tools DB2 CSVs pinned to the client build: items, recipes, zones |
 | `wfm/questie.py` | QuestieDB baked TOC (base64 CBOR): vendors, NPC drops, objects; drop rates |
 | `wfm/skillup.py` | SkillUpForever: exact recipe skill levels, trainer fees, limited stock |
-| `wfm/foreverrecipes.py` | ForeverRecipes (second recipe source): poisons, missing skill levels, level to learn, trainer fees |
+| `wfm/foreverrecipes.py` | ForeverRecipes (second recipe source): poisons, missing skill levels, level to learn, trainer fees, where each recipe is learned (trainers, vendors, drops, quests) |
 | `wfm/interactions.py` | every way an item is made (recipes, item uses, other spells) and whether the app counts it; `python -m wfm.interactions` |
 | `wfm/markets.py` | Market tab "Biggest markets": every item that sells, ranked by price and market size, how it's obtained, the app's way in |
 | `wfm/classicdb.py` | cMaNGOS classic-db fishing/pool tables (Classic 1.12: fallback only, never Forever fact) |

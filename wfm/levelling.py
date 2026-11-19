@@ -28,9 +28,17 @@ that was cheaper for one point. Now (`_choose`):
      so the path is never worse than the first planner's. (Averaging the AH's share over a recipe's whole use made
      the choice flip between recipes: Leatherworking 255-270 came out at 386g instead of 209g; caught by comparing.)
 
+Every recipe in the game is a candidate (2026-11-19, the user: "it should be with all recipes in game, and where to
+get them or learn them"), not only the ones you know: trainer recipes, patterns on the AH or from a vendor (priced),
+and patterns you can't buy with gold now (they only drop, come from a quest, or cost another currency). Those last
+ones have no price, so the path uses one only for skill points no recipe you can buy reaches (a large fixed penalty,
+FIND, far below the cost of an uncovered point), as few as it can, and the page says where to find each. A recipe
+with no source known at all (UNKNOWN) comes after them.
+
 Chance of a skill point: the WoW Classic rule, labelled as such (Forever has not been checked): orange and below
 yellow always; from yellow to grey (grey - skill) / (grey - yellow); grey never. Colours are SkillUpForever's
-Forever thresholds (ForeverRecipes fills its gaps). Not counted: rank training at the trainer (Journeyman, Expert,
+Forever thresholds (ForeverRecipes fills its gaps). Crafts with a cooldown (Mooncloth, transmutes) are left out: one craft every few days.
+Not counted: rank training at the trainer (Journeyman, Expert,
 Artisan) and the level it needs, AH deposits, buying many of an ingredient (each costed at the lowest listing).
 """
 from __future__ import annotations
@@ -41,6 +49,8 @@ from dataclasses import dataclass, field
 MAX_SKILL = 300
 WEEK = 7.0               # product resale at the AH price for a week of your share of its sales
 BIG = 1e13               # cost of a point no learned recipe can give: finite, so totals stay comparable
+FIND = 1e11              # a recipe you'd have to find (drop, quest, another currency): only where nothing bought helps
+UNKNOWN = 1e12           # a recipe with no source known: after every recipe you can find
 
 
 @dataclass
@@ -59,6 +69,7 @@ class Option:
     mats: list = field(default_factory=list)   # [(item id, count, copper each, own material?)]
     de_value: int = 0        # copper per craft if disenchanted (Classic table); counted only if de_can
     de_can: bool = False     # one of your characters has the Enchanting skill to disenchant it
+    find: str = ''           # can't be bought with gold now: 'drop', 'quest', 'vendor' (another currency), 'unknown'
 
 
 def chance(colors: tuple, skill: int) -> float:
@@ -175,7 +186,8 @@ def _choose(options: list[Option], points: list[int], known: set, use_de: bool) 
     """The cheapest path found: the facility-location choice walked point by point, and two checks (the old
     point-by-point planner, and both together); the cheapest of the three by the same exact cost."""
     by_id = {o.spell_id: o for o in options}
-    fee = {o.spell_id: (0 if o.spell_id in known else (o.learn or 0)) for o in options}
+    fee = {o.spell_id: (0 if o.spell_id in known else o.learn if o.learn is not None else
+                        UNKNOWN if o.find == 'unknown' else FIND) for o in options}
     opened = _open_set(options, points, fee, use_de)
     tries = [_walk(by_id, opened, points, fee, use_de)]
     old_total, old_choice = _walk(by_id, list(by_id), points, fee, use_de, fees_now=True)
@@ -188,7 +200,7 @@ def plan(options: list[Option], skill: int, target: int = MAX_SKILL, known: set[
          use_de: bool = True) -> dict:
     """The cheapest path. known: recipe spells you have already (no learning cost)."""
     known = set(known or ())
-    options = [o for o in options if o.spell_id in known or o.learn is not None]
+    options = [o for o in options if o.spell_id in known or o.learn is not None or o.find]
     by_id = {o.spell_id: o for o in options}
     points = list(range(max(1, skill), min(target, MAX_SKILL)))
     choice = _choose(options, points, known, use_de)
@@ -226,7 +238,8 @@ def plan(options: list[Option], skill: int, target: int = MAX_SKILL, known: set[
         else:
             steps.append({'from': s, 'to': s + 1, 'spell_id': r, 'recipe': o.name, 'product_id': o.product_id,
                           'color': color(o.colors, s), 'crafts': crafts, 'cost': cost, 'cumulative': total,
-                          'learn': fee, 'learn_how': o.learn_how, 'mats': o.mats,
+                          'learn': fee, 'learn_how': o.learn_how, 'mats': o.mats, 'known': r in known,
+                          'find': o.find if (r not in known and o.learn is None) else '',
                           'per_craft': o.ingredients - resale(o, 1.0, use_de)[0],
                           'ingredients': o.ingredients, 'mats_cost': crafts * o.ingredients, 'back': back,
                           'back_how': how, 'channels': {'AH': o.ah_value, 'vendor': o.vendor_value,
@@ -244,7 +257,10 @@ def plan(options: list[Option], skill: int, target: int = MAX_SKILL, known: set[
     shop = sorted(shopping.values(), key=lambda m: -m['count'] * m['each'])
     for m in shop:
         m['total'] = m['count'] * m['each']
+    to_find = [{'spell_id': st['spell_id'], 'recipe': st['recipe'], 'how': st['find'], 'from': st['from']}
+               for st in steps if st['find']]
     return {'skill': skill, 'target': min(target, MAX_SKILL), 'reached': reached, 'stuck_at': stuck_at,
+            'to_find': to_find,
             'steps': steps, 'total': int(round(total)), 'learn_total': int(learn_total), 'crafts': round(crafts_total),
             'materials_total': int(round(mats_total)), 'back_total': int(round(back_total)), 'shopping': shop,
             'use_disenchant': use_de}

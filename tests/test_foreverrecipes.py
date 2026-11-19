@@ -124,5 +124,103 @@ class ForeverRecipesTests(unittest.TestCase):
         self.assertEqual(c['only_forever_recipes'], [2149, 2835])
 
 
+
+# where recipes come from: shaped like ForeverRecipes 1.17.1's Sources.lua and Npcs.lua (made-up NPC names)
+WHERE_RECIPES = """local _, ns = ...
+ns.Recipes = {
+[2158]={165,{65,95,110,125},{2318,7,2320,2},{2307,1.0},2406,2560},
+[3397]={165,{90,115,130,145},{2318,1},{3000,1.0},3734,2560},
+}
+ns.RecipeItems = {
+[2158]={2406},
+}
+"""
+WHERE_SOURCES = """local _, ns = ...
+ns.Trainers = {
+[3397]={{[1]=10,[2]=500,[3]=90},{[1]=11,[2]=500,[3]=90}},
+}
+ns.Sellers = {
+[3734]={20,21},
+}
+ns.Drops = {
+[2406]={{30,0.21},{31,0.41841}},
+}
+ns.OtherDrops = {
+[2406]={{["name"]="Battered Chest"}},
+}
+ns.QuestRewards = {
+[3734]={7,8},
+}
+ns.RecipeVendorCosts = {
+[3734]={[20]="1600 copper",[21]="40 Merchant's Favor"},
+}
+ns.SourceMeta = {
+[3397]={["limitedStockVendors"]={[3734]={[20]=true}}},
+}
+ns.RecipeItemBinding = {
+[2406]="none",
+[3734]="onPickup",
+}
+"""
+WHERE_NPCS = """local _, ns = ...
+ns.Npcs = {
+[10]={"Hide Trainer","A",{[1]="Elwynn Forest",[2]=1429,[3]=41.8,[4]=67}},
+[11]={"Pelt Trainer","H",{[1]="Durotar",[2]=1411,[3]=52,[4]=40,["approximate"]=true}},
+[20]={"Pattern Seller",false,{[1]="Desolace",[2]=1443,[3]=40.4,[4]=79.2}},
+[21]={"Favor Seller","A"},
+[30]={"Bog Lurker",false,{[1]="Wetlands"}},
+[31]={"Cave Prowler",false,{[1]="Durotar",[2]=1411,[3]=52.6,[4]=8.8,["approximate"]=true}},
+}
+ns.Quests = {
+[7]={"The Lost Pattern"},
+[8]={"Horde Errand"},
+}
+ns.QuestMeta = {
+[7]={["name"]="The Lost Pattern",["requiredLevel"]=17,["side"]="Both",["starts"]={{["location"]={["zone"]="Hillsbrad Foothills"},["name"]="Old Tanner"}}},
+[8]={["name"]="Horde Errand",["requiredLevel"]=20,["side"]="Horde"},
+}
+"""
+
+
+class RecipeSourcesTests(unittest.TestCase):
+    """Where each recipe is learned (the user, 2026-11-19: "all recipes in game, and where to get them or learn them")."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        d = Path(tmp.name)
+        (d / 'Recipes.lua').write_text(WHERE_RECIPES, encoding='utf-8')
+        (d / 'Sources.lua').write_text(WHERE_SOURCES, encoding='utf-8')
+        (d / 'Npcs.lua').write_text(WHERE_NPCS, encoding='utf-8')
+        self.fr = foreverrecipes.load(d)
+
+    def test_drops_chests_and_find_how(self):
+        s = foreverrecipes.sources(self.fr, 2158, 'A')
+        self.assertEqual(s['items'], [2406])
+        self.assertEqual([(r['name'], r['chance']) for r in s['dropped_by']],
+                         [('Cave Prowler', 0.41841), ('Bog Lurker', 0.21)])        # in %, best first
+        self.assertEqual(s['dropped_by'][0]['zone'], 'Durotar')
+        self.assertEqual(s['other_drops'], [{'name': 'Battered Chest', 'chance': None, 'item': 2406}])
+        self.assertTrue(s['tradeable'])
+        self.assertEqual(foreverrecipes.find_how(s), 'drop')
+
+    def test_trainers_vendors_and_quests_for_your_faction(self):
+        s = foreverrecipes.sources(self.fr, 3397, 'A')
+        self.assertEqual([(t['name'], t['cost'], t['skill']) for t in s['trainers']], [('Hide Trainer', 500, 90)])
+        self.assertEqual([(v['name'], v['copper'], v['cost_text'], v['limited']) for v in s['sold_by']],
+                         [('Pattern Seller', 1600, '1600 copper', True),            # gold first, then other currencies
+                          ('Favor Seller', None, "40 Merchant's Favor", False)])
+        self.assertEqual([(q['name'], q['level'], q['start'], q['zone']) for q in s['quests']],
+                         [('The Lost Pattern', 17, 'Old Tanner', 'Hillsbrad Foothills')])   # the Horde one is left out
+        self.assertFalse(s['tradeable'])
+        h = foreverrecipes.sources(self.fr, 3397, 'H')
+        self.assertEqual([t['name'] for t in h['trainers']], ['Pelt Trainer'])
+        self.assertEqual([v['name'] for v in h['sold_by']], ['Pattern Seller'])
+        self.assertEqual(len(h['quests']), 2)
+        self.assertEqual(foreverrecipes.sources(self.fr, 9999, 'A')['items'], [])
+        self.assertEqual(foreverrecipes.find_how(foreverrecipes.sources(self.fr, 9999, 'A')), '')
+        self.assertIsNone(foreverrecipes.sources(None, 3397))
+
+
 if __name__ == '__main__':
     unittest.main()

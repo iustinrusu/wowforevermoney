@@ -22,11 +22,15 @@ NOT started: the user asked for these instead. Next, in order:
 1a. [ ] **Comprehensive review** (UI, UX, logic, accuracy, how all systems work together; the user's request,
        2026-11-15): `docs/plans/comprehensive-review.md`. Include what 2026-11-19 added: the levelling planner's
        new algorithm on every profession, item-use crafts, Biggest markets, disenchant labels.
-1d. [ ] **Levelling paths stop where patterns only drop** (2026-11-19: Leatherworking stops at 270). ForeverRecipes'
-       Sources.lua has who sells each pattern (`Sellers`, `RecipeVendorCosts`, limited stock in `SourceMeta`) and the
-       top drop chances (`Drops`): use its vendor-sold patterns as learnable (with their price and limited stock), show
-       drop-only ones as "you'd have to find this", so a path can reach 300. Also count rank training (Journeyman,
-       Expert, Artisan) fees and levels.
+1d. [~] **Levelling with every recipe** (done 2026-11-19, fifth part: every recipe in the game, where to learn each,
+       drop-only ones as "find it", cooldown crafts out; every profession reaches 300). Left:
+       - rank training (Journeyman, Expert, Artisan): fee, the skill and character level each needs, at 75/150/225 the
+         path must stop for it (ForeverRecipes `Trainers` may hold the rank spells; check, never assume Classic fees);
+       - a recipe whose pattern is only on the AH at "market value (none listed now)" or "region market value": say
+         you may have to wait for one (the price is shown; nothing flags it yet);
+       - materials marked "yours" that aren't gathered (Ironfeather, Cured Rugged Hide showed "yours" on the
+         Leatherworking path: GATHER_PROFESSION by trade-goods subclass is too wide; check it);
+       - check a "find it" row in the browser: none came up on real data (every path uses buyable recipes).
 1e. [ ] **Wowhead reading session** (pace in CLAUDE.md, at most 20 pages): checklist A0 (vendor stock for flips),
        B10 (one Power Crystal transmutation spell page: who casts them?), B9 (Mote of Unstable Magic, Shellfish,
        Pristine Black Diamond, Vulture Gizzard: the biggest markets the app has no way into), then A1, A2.

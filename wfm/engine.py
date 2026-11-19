@@ -374,6 +374,41 @@ class Engine:
                         'cost': q.value if q else None, 'source': q.source if q else 'not on AH / vendor'})
         return out
 
+    def _fr_sources(self, spell: int) -> dict | None:
+        """ForeverRecipes' sources for a recipe, for your faction (cached)."""
+        cache = self.__dict__.setdefault('_fr_src', {})
+        if spell not in cache:
+            cache[spell] = foreverrecipes_mod.sources(getattr(self.w, 'forever_recipes', None), spell, self.faction)
+        return cache[spell]
+
+    def recipe_sources(self, recipe) -> dict:
+        """Every way to learn a recipe, for the levelling page: the trainers (fee and the skill they ask for), the
+        recipe items (on the AH now, from TSM), who sells them (price, limited stock), who drops them (top recorded
+        chances), chests, quests. Trainers, vendors, drops and quests from ForeverRecipes (Forever client data and its
+        author's observations; some drop chances are Classic reference data), vendors also from QuestieDB."""
+        src = dict(self._fr_sources(recipe.spell_id) or {'automatic': False, 'trainers': [], 'items': [],
+                                                          'sold_by': [], 'dropped_by': [], 'other_drops': [],
+                                                          'quests': [], 'tradeable': None})
+        sold = list(src['sold_by'])
+        items = list(dict.fromkeys(list(src['items']) + self._spell_to_recipe_items.get(recipe.spell_id, [])))
+        src['items'] = []
+        for i in items:
+            q = ah_buy(self.price(i))
+            src['items'].append({'item_id': i, 'name': self.name(i),
+                                 'ah': {'cost': q.value, 'source': q.source} if q else None})
+            vp = self.vendor_price(i)
+            if vp and not any(v['item'] == i for v in sold):          # QuestieDB's vendors, the app's price
+                sold += [{'npc': v['npc'], 'name': v['name'], 'zone': v['zone'], 'x': (v['coords'] or [None, None])[0],
+                          'y': (v['coords'] or [None, None])[1], 'item': i, 'cost_text': None, 'copper': vp[0],
+                          'limited': bool(v.get('stock'))} for v in vp[1]]
+        src['sold_by'] = sold
+        fee = self.su.trainer_fees.get(recipe.spell_id)
+        src['fee'] = int(fee[0]) if fee else None
+        src['fee_skill'] = int(fee[1]) if fee and len(fee) > 1 else None
+        src['trainer_count'] = len(src['trainers'])
+        src['trainers'] = src['trainers'][:3]
+        return src
+
     def learn_cost(self, recipe) -> dict | None:
         if getattr(recipe, 'use_item', 0):
             return {'how': 'item use', 'cost': 0}
@@ -382,18 +417,29 @@ class Engine:
             q = self.cheapest(tool)
             return {'how': 'tool', 'item_id': tool, 'name': self.name(tool), 'cost': q.value if q else None,
                     'source': q.source if q else 'not on AH / vendor', 'owned': self.owns(tool)}
+        fr = getattr(self.w, 'forever_recipes', None)
+        if fr and recipe.spell_id in fr.automatic:          # learned with the profession (ForeverRecipes)
+            return {'how': 'with profession', 'cost': 0}
         fee = self.su.trainer_fees.get(recipe.spell_id)
         if fee:
             return {'how': 'trainer', 'cost': int(fee[0]), 'skill': int(fee[1]) if len(fee) > 1 else None}
         best = None
-        for scroll in self._spell_to_recipe_items.get(recipe.spell_id, []):
+        scrolls = list(dict.fromkeys(self._spell_to_recipe_items.get(recipe.spell_id, [])
+                                     + list((fr.teach.get(recipe.spell_id) if fr else None) or [])))
+        for scroll in scrolls:
             q = self.cheapest(scroll)
-            if q and (best is None or q.value < best['cost']):
+            if q and (best is None or best['cost'] is None or q.value < best['cost']):
                 best = {'how': 'recipe item', 'item_id': scroll, 'name': self.name(scroll), 'cost': q.value,
                         'source': q.source}
             elif best is None:
                 best = {'how': 'recipe item', 'item_id': scroll, 'name': self.name(scroll), 'cost': None,
                         'source': 'drop / not on AH'}
+        if best is None or best['cost'] is None:     # a vendor price only ForeverRecipes knows (your faction)
+            sold = [v for v in (self._fr_sources(recipe.spell_id) or {}).get('sold_by', []) if v['copper']]
+            if sold:
+                v = sold[0]
+                best = {'how': 'recipe item', 'item_id': v['item'], 'name': self.name(v['item']), 'cost': v['copper'],
+                        'source': f"vendor {v['name']}{' (limited stock)' if v['limited'] else ''} (ForeverRecipes)"}
         return best
 
     def levelling(self, profession: str, skill: int | None = None, known: set[int] | None = None,
@@ -409,6 +455,10 @@ class Engine:
         for r in self.gd.recipes:
             th = self.su.thresholds.get(r.spell_id)
             if r.profession != profession or not th or len(th) < 4 or not th[3]:
+                continue
+            if getattr(r, 'cooldown_ms', 0):
+                # one craft per cooldown (Mooncloth 4 days, Transmute: Arcanite 2 days): no use for levelling, and
+                # the path used them for 20 points in a row (caught on real data, 2026-11-19)
                 continue
             # SkillUpForever stores 0/1 as the orange threshold when it doesn't know it: the engine's estimate then
             # (yellow - 40), never "craftable from skill 1" (Heavy Scorpid Bracers needs 255)
@@ -441,20 +491,28 @@ class Engine:
                 learn_cost = 0 if orange <= 1 else None
             else:                            # a recipe item that is not on the AH (a drop) can't be bought
                 learn_cost = None if learn.get('cost') is None else int(learn['cost'])
+            # every recipe in the game counts (the user, 2026-11-19): one you can't buy with gold now is used only
+            # where nothing you can buy gives a point, and the page says where to find it
+            find = '' if learn_cost is not None else (
+                foreverrecipes_mod.find_how(self._fr_sources(r.spell_id)) or 'unknown')
             options.append(levelling_mod.Option(
                 spell_id=r.spell_id, name=r.name, colors=colors, ingredients=int(cost),
                 ah_value=ah_value, vendor_value=int(vendor_sell(item) * r.product_count),
                 ah_cap=sold_per_day(self.price(r.product_id)) * self.share * levelling_mod.WEEK / max(r.product_count, 1),
                 learn=learn_cost,
                 learn_how=(learn or {}).get('how', 'starting recipe' if orange <= 1 else ''), product_id=r.product_id,
-                mats=mats, de_value=int(de['value'] * r.product_count) if de else 0, de_can=bool(de and de['can'])))
+                mats=mats, de_value=int(de['value'] * r.product_count) if de else 0, de_can=bool(de and de['can']),
+                find=find))
         out = levelling_mod.plan(options, skill, target, known=known, use_de=use_de)
         for m in out['shopping']:
             m['name'] = self.name(m['item_id'])
         who = self.enchanter()
         out['enchanter'] = {'name': who[0], 'skill': who[1]} if who else None
+        by_spell = {r.spell_id: r for r in self.gd.recipes if r.profession == profession}
         for st in out['steps']:
             st['product'] = self.name(st['product_id'])
+            if not st['known'] and st['spell_id'] in by_spell:
+                st['sources'] = self.recipe_sources(by_spell[st['spell_id']])
             st['mats'] = [{'item_id': m, 'name': self.name(m), 'count': c, 'each': e, 'own': own}
                           for m, c, e, own in st['mats']]
         unlocks = []
