@@ -26,7 +26,7 @@ from . import everloot as everloot_mod
 from . import gatherlite as gatherlite_mod
 from . import wowhead_items
 from .questie import QuestieDB, load_drop_rates, load_questie
-from .skillup import SkillUpData, load_skillup
+from .skillup import SAVED as SKILLUP_SAVED, SkillUpData, load_copy, load_skillup, save_copy
 from . import foreverrecipes as foreverrecipes_mod
 from .tooltips import TooltipCache
 from .tsm import PriceData, parse_appdata
@@ -79,8 +79,8 @@ class World:
         self.syndicator: dict = {}
         self.source_grades: dict = {}
         self.untrusted_items = 0
-        self.skillup: SkillUpData = SkillUpData()          # SkillUpForever with ForeverRecipes filling its holes
-        self.skillup_raw: SkillUpData = SkillUpData()      # SkillUpForever alone (for the cross-check)
+        self.skillup: SkillUpData = SkillUpData()          # ForeverRecipes, with SkillUpForever (optional) filling gaps
+        self.skillup_raw: SkillUpData = SkillUpData()      # SkillUpForever alone (empty when not installed)
         self.forever_recipes = None                        # ForeverRecipes addon data (foreverrecipes.py)
         self.angler: dict | None = None
         self.classic_fishing: classicdb.ClassicFishing | None = None
@@ -180,21 +180,41 @@ class World:
         self.version += 1
 
     def _load_skillup(self):
-        st = self.status.setdefault('skillup', SourceStatus('skillup', 'SkillUpForever (recipe skill, trainers, stock)'))
+        st = self.status.setdefault('skillup', SourceStatus(
+            'skillup', 'SkillUpForever (optional: rank training, stock limits, gaps in ForeverRecipes)'))
         d = self.paths.skillup_data
         st.files = [str(d)]
-        if not d.exists():
-            st.status, st.note = 'missing', ('Not installed: recipes can\'t be checked as learnable in Forever, so crafts '
-                                             'are marked "unverified recipe" and kept out of Top picks, and recipe skill '
-                                             'levels are estimated. Install the SkillUpForever addon.')
-            self.skillup_raw = SkillUpData()
-        else:
+        copy_info = {}
+        if d.exists():
             self.skillup_raw = load_skillup(d)
+            save_copy(self.skillup_raw, self.paths.addon_version('SkillUpForever'))   # for when it is deleted
+        else:
+            # optional since 2026-11-19 (the user: "make skillupforever optional so I can delete the addon"): the copy
+            # of its tables the app saved while it was installed (stock limits, rank fees), else nothing
+            saved, copy_info = load_copy()
+            self.skillup_raw = saved or SkillUpData()
         self._load_forever_recipes()
         self.skillup = foreverrecipes_mod.merged(self.skillup_raw, self.forever_recipes)
+        fr_ok = bool(self.forever_recipes and self.forever_recipes.recipes)
         if not d.exists():
-            if self.forever_recipes and self.forever_recipes.recipes:
-                st.note += ' ForeverRecipes is installed and fills in for it where it can.'
+            if copy_info:
+                st.status = 'ok'
+                st.files = [str(SKILLUP_SAVED)]
+                st.note = (f"Not installed (optional). Using the copy of its tables the app saved on "
+                           f"{copy_info.get('saved')} (version {copy_info.get('version') or '?'}): stock limits at "
+                           'vendors, rank training fees, a few required skills ForeverRecipes lacks. They come from '
+                           "the WoW Classic database and the game files, and don't change.")
+            elif fr_ok:
+                st.status = 'missing'
+                st.note = ('Optional, not installed. ForeverRecipes is the main recipe source. Without SkillUpForever '
+                           '(and no saved copy of its tables): the levelling path shows where to train the next rank '
+                           'but not its fee, and stock limits are known only for pattern vendors and the vendors you '
+                           'have opened.')
+            else:
+                st.status = 'missing'
+                st.note = ('Not installed, and neither is ForeverRecipes: recipes can\'t be checked as learnable in '
+                           'Forever, so crafts are marked "unverified recipe" and kept out of Top picks. Install '
+                           'ForeverRecipes.')
             self.version += 1
             return
         st.version = self.paths.addon_version('SkillUpForever')
@@ -204,19 +224,24 @@ class World:
             st.status = 'warn'
             st.note = f'Its data was generated for build {self.skillup.source_build}; your client is {cb}.'
         else:
-            st.status, st.note = 'ok', ''
+            st.status = 'ok'
+            st.note = (f'Optional: fills {len(self.skillup.from_skillup)} required skills ForeverRecipes doesn\'t know, '
+                       'rank training fees, stock limits at other vendors.' if fr_ok else
+                       'Used alone: ForeverRecipes is not installed.')
         self.version += 1
 
     def _load_forever_recipes(self):
-        """ForeverRecipes (a second source of Forever recipe facts; merged into self.skillup by _load_skillup)."""
+        """ForeverRecipes: the main source of Forever recipe facts (merged with SkillUpForever by _load_skillup)."""
         st = self.status.setdefault('foreverrecipes', SourceStatus(
-            'foreverrecipes', 'ForeverRecipes (recipe skill, poisons, trainers: second source)'))
+            'foreverrecipes', 'ForeverRecipes (the main recipe source: which recipes, skill, trainers, where to learn)'))
         d = self.paths.foreverrecipes_data
         st.files = [str(d)]
         if not d.exists():
             self.forever_recipes = None
-            st.status, st.note = 'missing', ('Optional. Not installed: SkillUpForever alone gives recipe skill levels, '
-                                             'and rogue poisons are not covered.')
+            st.status, st.note = 'warn', ('Not installed. It is the main recipe source: which recipes can be learned '
+                                          'in Forever, the skill each needs, trainers, where to learn them, rogue '
+                                          'poisons. Without it SkillUpForever is used if installed. Install '
+                                          'ForeverRecipes through the CurseForge app.')
             return
         self.forever_recipes = foreverrecipes_mod.load(d)
         st.version = self.paths.addon_version('ForeverRecipes')

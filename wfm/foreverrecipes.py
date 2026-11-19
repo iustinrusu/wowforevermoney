@@ -1,4 +1,5 @@
-"""Read the ForeverRecipes addon's data (the user installed it 2026-11-19): a second source of Forever recipe facts.
+"""Read the ForeverRecipes addon's data (the user installed it 2026-11-19): the main source of Forever recipe facts
+since 2026-11-19 (the user: "make skillupforever optional so I can delete the addon"; see merged()).
 
 Its tables are generated from the Forever client (build 1.60.1.70938 in version 1.17.1) plus the author's own
 observations and frozen Classic reference data (CMaNGOS), GPL-3.0; read here from the user's install, never copied.
@@ -254,42 +255,73 @@ def disenchant_skill(quality: int, item_level: int) -> int:
     return 275
 
 
-def merged(su: SkillUpData, fr: ForeverRecipesData | None) -> SkillUpData:
-    """SkillUpForever's data with ForeverRecipes filling its holes (a new object; the inputs are not changed).
-    - a recipe SkillUpForever lacks (Poisons) or whose orange it doesn't know (stored 0/1) takes ForeverRecipes'
-      colours when ForeverRecipes knows the requirement; an orange of 0 (Poisons: no skill to craft once learned) is
-      raised to the skill the trainer asks for, the real gate (Instant Poison II: Poisons 130)
-    - trainer fees SkillUpForever lacks: the cheapest trainer
-    - the character level a recipe needs
-    Provenance: `requirement_known` (spells whose required skill is exact), `from_forever_recipes` (whose colours
-    came from ForeverRecipes)."""
+def merged(su: SkillUpData | None, fr: ForeverRecipesData | None) -> SkillUpData:
+    """The recipe facts the app uses (a new object; the inputs are not changed).
+
+    ForeverRecipes first (the user, 2026-11-19: "make skillupforever optional so I can delete the addon"; ForeverRecipes
+    will keep being updated, so a gap in it now is fine). Its validated list decides which recipes can be learned in
+    Forever, with their colours, the skill and character level they need and the trainer fee (the cheapest trainer's).
+    SkillUpForever, when installed, only fills gaps: the required skill where ForeverRecipes doesn't know it, a fee it
+    lacks, limited stock at other vendors, its vendor price list, the profession ranks. A recipe only SkillUpForever
+    lists is left out, so the app shows the same with or without it: its list is every recipe in the client's tables
+    (307 of its 315 extra recipes on 2026-11-19 had products that never sell in Forever's region). Without
+    ForeverRecipes, SkillUpForever alone is used as before.
+    - required skill known with an orange of 0 or 1: Poisons need no skill to craft once learned, so it is raised to
+      the skill the trainer asks for, the real gate (Instant Poison II: Poisons 130); a starting recipe keeps 1
+    - required skill unknown to both: orange 0, and the engine estimates it (yellow - 40), flagged
+    - limited stock: ForeverRecipes marks pattern vendors limited without a count: 1 a restock (SkillUpForever's count
+      where it has one; it said 1 for 246 of the 254 it counts)
+    Provenance: `requirement_known` (spells whose required skill is exact), `from_forever_recipes` (whose colours came
+    from ForeverRecipes), `from_skillup` (whose required skill came from SkillUpForever)."""
+    su = su or SkillUpData()
     out = copy.copy(su)
     out.thresholds = dict(su.thresholds)
     out.trainer_fees = dict(su.trainer_fees)
+    out.limited_stock = {k: dict(v) for k, v in (su.limited_stock or {}).items()}
     out.requirement_known = {s for s, th in su.thresholds.items() if th and th[0] and th[0] > 1}
-    out.level_required, out.from_forever_recipes = {}, set()
-    if not fr:
+    out.level_required, out.from_forever_recipes, out.from_skillup = {}, set(), set()
+    if not fr or not fr.recipes:
         return out
+    out.thresholds, out.requirement_known, fees = {}, set(), {}
     for spell, r in fr.recipes.items():
         meta = fr.meta.get(spell) or {}
         th = r['thresholds']
         trainers = fr.trainers.get(spell) or []
-        if trainers and spell not in out.trainer_fees:
+        if trainers:
             cost, skill = min((c, s) for _, c, s in trainers)
-            out.trainer_fees[spell] = [cost, skill]
+            fees[spell] = [cost, skill]
         if meta.get('levelRequired'):
             out.level_required[spell] = int(meta['levelRequired'])
-        if len(th) < 4 or not meta.get('requirementKnown') or not meta.get('thresholdsKnown', True):
+        theirs = su.thresholds.get(spell)
+        theirs_known = bool(theirs and len(theirs) >= 4 and theirs[0] and theirs[0] > 1)
+        if len(th) < 4 or meta.get('thresholdsKnown') is False:      # colours unknown to ForeverRecipes
+            if theirs and len(theirs) >= 4:
+                out.thresholds[spell] = [int(x) for x in theirs[:4]]
+                if theirs_known:
+                    out.requirement_known.add(spell)
+                    out.from_skillup.add(spell)
             continue
-        have = out.thresholds.get(spell)
-        if have and have[0] and have[0] > 1:
-            continue                                         # SkillUpForever knows it: it stays first
-        orange = th[0]
-        if orange <= 1 and trainers:
-            orange = min(s for _, _, s in trainers)          # learnable from this skill on
-        out.thresholds[spell] = [max(1, orange), th[1], th[2], th[3]]
-        out.requirement_known.add(spell)
+        if meta.get('requirementKnown'):
+            orange = th[0]
+            if orange <= 1 and trainers:
+                orange = min(s for _, _, s in trainers)              # learnable from this skill on
+            orange = max(1, orange)
+            out.requirement_known.add(spell)
+        elif theirs_known:
+            orange = int(theirs[0])
+            out.requirement_known.add(spell)
+            out.from_skillup.add(spell)
+        else:
+            orange = 0                                               # unknown: the engine estimates it
+        out.thresholds[spell] = [orange, th[1], th[2], th[3]]
         out.from_forever_recipes.add(spell)
+    out.trainer_fees.update(fees)                                    # ForeverRecipes' fee first
+    for m in fr.source_meta.values():
+        lim = m.get('limitedStockVendors') if isinstance(m, dict) else None
+        for it, npcs in (lim.items() if isinstance(lim, dict) else []):
+            for npc, on in ((npcs or {}).items() if isinstance(npcs, dict) else []):
+                if on:
+                    out.limited_stock.setdefault(int(it), {}).setdefault(int(npc), 1)
     return out
 
 

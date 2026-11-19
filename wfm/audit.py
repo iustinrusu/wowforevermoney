@@ -24,21 +24,43 @@ def run(world, engine) -> list[dict]:
     out.append(_check('Game data matches your client build', 'pass' if cb == gd.build else 'fail',
                       f'client {cb}, tables {gd.build}'))
 
-    # 2. Vendor prices: ours vs SkillUpForever's independent list.
-    diffs = [(i, engine.name(i), p, gd.items[i].buy_price) for i, p in su.vendor_prices.items()
-             if i in gd.items and gd.items[i].buy_price and gd.items[i].buy_price != p]
-    out.append(_check('Vendor prices agree with SkillUpForever', 'pass' if not diffs else 'warn',
-                      f'{len(su.vendor_prices)} compared, {len(diffs)} differ', [f'{n} ({i}): {a} vs {b}' for i, n, a, b in diffs]))
+    # 2-4. SkillUpForever's cross-checks, when it is installed (optional since 2026-11-19)
+    raw = getattr(world, 'skillup_raw', None) or su
+    if raw.vendor_prices:
+        # 2. Vendor prices: ours vs SkillUpForever's independent list.
+        diffs = [(i, engine.name(i), p, gd.items[i].buy_price) for i, p in raw.vendor_prices.items()
+                 if i in gd.items and gd.items[i].buy_price and gd.items[i].buy_price != p]
+        out.append(_check('Vendor prices agree with SkillUpForever', 'pass' if not diffs else 'warn',
+                          f'{len(raw.vendor_prices)} compared, {len(diffs)} differ',
+                          [f'{n} ({i}): {a} vs {b}' for i, n, a, b in diffs]))
+        # 3. Items an old list says vendors sell, but Questie's Forever data has no vendor for.
+        phantom = [f'{engine.name(i)} ({i})' for i in raw.vendor_prices if not engine.vendor_price(i)]
+        out.append(_check('Vendor-sold items confirmed by a Forever vendor', 'pass' if not phantom else 'warn',
+                          f'{len(phantom)} listed as vendor-sold with no vendor you can use (treated as not vendor-sold)',
+                          phantom))
 
-    # 3. Items an old list says vendors sell, but Questie's Forever data has no vendor for.
-    phantom = [f'{engine.name(i)} ({i})' for i in su.vendor_prices if not engine.vendor_price(i)]
-    out.append(_check('Vendor-sold items confirmed by a Forever vendor', 'pass' if not phantom else 'warn',
-                      f'{len(phantom)} listed as vendor-sold with no vendor you can use (treated as not vendor-sold)', phantom))
-
-    # 4. Recipes: ours vs SkillUpForever's.
+    # 4. Recipes: ours (the game tables) vs ForeverRecipes', and SkillUpForever's when it is installed.
     ours = {r.spell_id: r for r in gd.recipes}
+    fr = getattr(world, 'forever_recipes', None)
+    if fr and fr.recipes:
+        f_reag, f_out = [], []
+        for sid, d in fr.recipes.items():
+            r = ours.get(sid)
+            if not r or not d.get('product'):
+                continue
+            if sorted(d['reagents']) != sorted(r.reagents):
+                f_reag.append(f'{r.name}: ForeverRecipes {sorted(d["reagents"])} vs game {sorted(r.reagents)}')
+            if d['product'] != r.product_id or abs(float(d['count']) - r.product_count) > 0.01:
+                f_out.append(f'{r.name}: ForeverRecipes {d["product"]} x{d["count"]:g} vs game {r.product_id} '
+                             f'x{r.product_count:g}')
+        fnote = '' if fr.source_build == gd.build else (f' (its data is from build {fr.source_build}, your tables '
+                                                        f'{gd.build}; differences may be real game changes)')
+        out.append(_check('Recipe ingredients agree with ForeverRecipes', 'pass' if not f_reag else 'warn',
+                          f'{len(f_reag)} recipes differ{fnote}', f_reag))
+        out.append(_check('Recipe outputs agree with ForeverRecipes', 'pass' if not f_out else 'warn',
+                          f'{len(f_out)} differ', f_out))
     reag_diff, out_diff = [], []
-    for sid, d in (su.recipe_data or {}).items():
+    for sid, d in (raw.recipe_data or {}).items():
         r = ours.get(sid)
         if not r:
             continue
@@ -48,19 +70,25 @@ def run(world, engine) -> list[dict]:
         o = d.get('output')
         if isinstance(o, dict) and (o.get('itemID') != r.product_id or abs(float(o.get('quantity', 1)) - r.product_count) > 0.01):
             out_diff.append(f'{r.name}: SkillUp {o} vs game {r.product_id} x{r.product_count}')
-    note = '' if su.source_build == gd.build else f' (SkillUp data is from build {su.source_build}; differences may be real game changes)'
-    out.append(_check('Recipe ingredients agree with SkillUpForever', 'pass' if not reag_diff else 'warn',
-                      f'{len(reag_diff)} recipes differ{note}', reag_diff))
-    out.append(_check('Recipe outputs agree with SkillUpForever', 'pass' if not out_diff else 'warn',
-                      f'{len(out_diff)} differ', out_diff))
+    if raw.recipe_data:
+        note = '' if raw.source_build == gd.build else (f' (SkillUp data is from build {raw.source_build}; differences '
+                                                        'may be real game changes)')
+        out.append(_check('Recipe ingredients agree with SkillUpForever', 'pass' if not reag_diff else 'warn',
+                          f'{len(reag_diff)} recipes differ{note}', reag_diff))
+        out.append(_check('Recipe outputs agree with SkillUpForever', 'pass' if not out_diff else 'warn',
+                          f'{len(out_diff)} differ', out_diff))
 
     # 5. Skill requirements known exactly.
-    crafts = [r for r in gd.recipes if r.profession in PROFESSIONS and r.reagents]
-    exact = sum(1 for r in crafts if (su.thresholds.get(r.spell_id) or [0])[0] > 1)
+    crafts = [r for r in gd.recipes if r.profession in PROFESSIONS and r.reagents and not getattr(r, 'tool_id', 0)
+              and not getattr(r, 'use_item', 0)]
+    known = getattr(su, 'requirement_known', None) or set()
+    exact = sum(1 for r in crafts if r.spell_id in known or (su.thresholds.get(r.spell_id) or [0])[0] > 1)
     unverified = sum(1 for r in crafts if r.spell_id not in su.thresholds)
+    source = "ForeverRecipes'" if fr and fr.recipes else "SkillUpForever's"
     out.append(_check('Recipe skill requirements', 'pass' if exact / max(len(crafts), 1) > 0.8 else 'warn',
                       f'{exact} of {len(crafts)} exact; others estimated as yellow - 40. '
-                      f'{unverified} recipes not in SkillUp\'s list are hidden unless you enable unverified recipes.'))
+                      f'{unverified} recipes in the game tables but not in {source} list of recipes you can learn '
+                      'in Forever are hidden unless you enable unverified recipes.'))
 
     # 6. TSM values are in range.
     bad_rate = [i for i, p in prices.items() if not 0 <= p.get('regionSalePercent', 0) <= 1]
@@ -260,16 +288,15 @@ def run(world, engine) -> list[dict]:
     except Exception as e:          # never let a check break the audit
         out.append(_check('Item interactions covered (every way an item is made)', 'warn', f'Could not work it out: {e}'))
 
-    # ForeverRecipes: a second source of recipe skill levels, compared with SkillUpForever
-    fr = getattr(world, 'forever_recipes', None)
-    if fr and fr.recipes:
-        c = foreverrecipes.compare(getattr(world, 'skillup_raw', None) or su, fr)
-        filled = len(getattr(su, 'from_forever_recipes', ()) or ())
+    # ForeverRecipes (the main source) vs SkillUpForever, when both are installed
+    if fr and fr.recipes and raw.thresholds:
+        c = foreverrecipes.compare(raw, fr)
+        filled = len(getattr(su, 'from_skillup', ()) or ())
         out.append(_check('Recipe skill levels: SkillUpForever vs ForeverRecipes', 'pass' if not c['diff'] else 'warn',
                           f"{c['both']:,} recipes in both: {c['same']:,} have the same colours (yellow, green, grey), "
-                          f"{len(c['diff'])} differ. ForeverRecipes fills {filled} gaps (recipes SkillUpForever lacks, "
-                          f"like rogue poisons, or whose required skill it doesn't know, like Cured Rugged Hide); "
-                          f"{len(c['only_forever_recipes'])} recipes only it has.",
+                          f"{len(c['diff'])} differ. ForeverRecipes is the main source; SkillUpForever fills {filled} "
+                          f"required skills it doesn't know. {len(c['only_forever_recipes'])} recipes only "
+                          "ForeverRecipes has (rogue poisons among them).",
                           [f"{engine.name(ours[s].product_id) if s in ours else s} ({s}): SkillUpForever {a}, ForeverRecipes {b}"
                            for s, a, b in c['diff']]))
 

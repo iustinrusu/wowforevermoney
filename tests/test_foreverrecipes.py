@@ -1,4 +1,5 @@
-"""ForeverRecipes (second recipe source): reading its generated tables and filling SkillUpForever's holes."""
+"""ForeverRecipes (the main recipe source since 2026-11-19): reading its generated tables, SkillUpForever (optional)
+filling its gaps."""
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,12 +15,16 @@ ns.Recipes = {
 [19047]={165,{225,225,230,235},{8171,1,15409,1},{15407,2.0},false,2550},
 [2149]={165,{1,40,55,70},{2318,2,2320,1},{2302,1.0},false,2560},
 [9999]={165,{50,60,70,80},{2318,1},{2302,1.0},false,2560},
+[7153]={197,{0,180,190,200},{4305,3},{5965,1.0},false,2560},
+[7777]={197,{0,0,0,0},{4305,1},{5966,1.0},false,2560},
 }
 ns.RecipeMeta = {
 [2835]={["levelRequired"]=30,["requirementKnown"]=true,["thresholdsKnown"]=true},
 [19047]={["requirementKnown"]=true,["thresholdsKnown"]=true},
 [2149]={["requirementKnown"]=true,["thresholdsKnown"]=true},
 [9999]={["thresholdsKnown"]=true},
+[7153]={["requirementKnown"]=false,["thresholdsKnown"]=true},
+[7777]={["thresholdsKnown"]=false},
 }
 '''
 SOURCES = '''local _, ns = ...
@@ -29,6 +34,9 @@ ns.Trainers = {
 }
 ns.AutomaticRecipes = {
 [2149]=true,
+}
+ns.SourceMeta = {
+[2158]={["limitedStockVendors"]={[2406]={[1300]=true,[1301]=true}}},
 }
 '''
 
@@ -93,22 +101,66 @@ class ForeverRecipesTests(unittest.TestCase):
         self.assertEqual(self.fr.automatic, {2149})
         self.assertEqual(self.fr.source_build, '1.60.1.70938')
 
-    def test_fills_skillupforevers_holes_and_keeps_what_it_knows(self):
-        # SkillUpForever: Cured Rugged Hide's orange unknown (stored 1), no poisons, 2149 known exactly
-        su = SkillUpData(thresholds={19047: [1, 225, 230, 235], 2149: [1, 40, 55, 70], 9999: [55, 60, 70, 80]},
-                         trainer_fees={19047: [4300, 225]})
+    def test_forever_recipes_first_skillupforever_fills_gaps(self):
+        # the user, 2026-11-19: "make skillupforever optional so I can delete the addon"
+        su = SkillUpData(thresholds={19047: [1, 225, 230, 235], 2149: [1, 40, 55, 70], 9999: [55, 60, 70, 80],
+                                     7777: [150, 160, 170, 180], 4242: [100, 120, 130, 140]},
+                         trainer_fees={19047: [3870, 225], 4242: [500, 100]},
+                         limited_stock={2406: {1300: 2}, 9000: {77: 3}})
         m = foreverrecipes.merged(su, self.fr)
         self.assertEqual(m.thresholds[19047], [225, 225, 230, 235])      # the app guessed 185 (yellow - 40)
         self.assertEqual(m.thresholds[2835], [130, 175, 200, 225])       # poisons: orange 0 -> the trainer's skill
         self.assertEqual(m.level_required, {2835: 30})
         self.assertEqual(m.trainer_fees[2835], [10000, 130])             # the cheapest trainer
-        self.assertEqual(m.trainer_fees[19047], [4300, 225])             # SkillUpForever's own fee stays
-        self.assertEqual(m.thresholds[9999], [55, 60, 70, 80])           # SkillUpForever knows it: it stays first
+        self.assertEqual(m.trainer_fees[19047], [4300, 250])             # ForeverRecipes' fee first (the full price)
+        self.assertEqual(m.thresholds[9999], [55, 60, 70, 80])           # its required skill unknown: SkillUpForever's
+        self.assertEqual(m.from_skillup, {9999, 7777})
         self.assertEqual(m.thresholds[2149], [1, 40, 55, 70])            # orange 1 is real (a starting recipe)
-        self.assertIn(2149, m.requirement_known)
-        self.assertEqual(m.from_forever_recipes, {19047, 2835, 2149})
-        self.assertEqual(su.thresholds[19047], [1, 225, 230, 235])        # the input is not changed
+        self.assertEqual(m.thresholds[7153], [0, 180, 190, 200])         # unknown to both: the engine estimates it
+        self.assertNotIn(7153, m.requirement_known)
+        self.assertEqual(m.thresholds[7777], [150, 160, 170, 180])       # colours unknown to ForeverRecipes
+        self.assertEqual(m.requirement_known, {19047, 2835, 2149, 9999, 7777})
+        self.assertNotIn(4242, m.thresholds)                             # only SkillUpForever lists it: left out
+        self.assertEqual(m.from_forever_recipes, {19047, 2835, 2149, 9999, 7153})
+        # stock: SkillUpForever's count where it has one, else 1 a restock; its other vendors stay
+        self.assertEqual(m.limited_stock, {2406: {1300: 2, 1301: 1}, 9000: {77: 3}})
+        self.assertEqual(su.thresholds[19047], [1, 225, 230, 235])        # the inputs are not changed
+        self.assertEqual(su.limited_stock[2406], {1300: 2})
         self.assertNotIn(2835, su.thresholds)
+
+    def test_forever_recipes_alone(self):
+        # SkillUpForever deleted: the same recipes, every required skill ForeverRecipes knows, pattern stock limits
+        m = foreverrecipes.merged(None, self.fr)
+        self.assertEqual(sorted(m.thresholds), [2149, 2835, 7153, 9999, 19047])
+        self.assertEqual(m.thresholds[9999], [0, 60, 70, 80])
+        self.assertEqual(m.requirement_known, {19047, 2835, 2149})
+        self.assertEqual(m.trainer_fees, {2835: [10000, 130], 19047: [4300, 250]})
+        self.assertEqual(m.limited_stock, {2406: {1300: 1, 1301: 1}})
+        self.assertEqual((m.rank_trainers, m.vendor_prices, m.from_skillup), ({}, {}, set()))
+
+    def test_a_saved_copy_of_skillupforevers_tables(self):
+        # kept for when the addon is deleted (2026-11-19): stock limits and rank fees go on working
+        from wfm.skillup import load_copy, save_copy
+        su = SkillUpData(thresholds={19047: [1, 225, 230, 235]}, trainer_fees={19047: [4300, 225]},
+                         limited_stock={8846: {1300: 2}}, vendor_prices={3371: 4},
+                         recipe_scrolls={2158: [2406, 65]}, rank_trainers={165: [(150, 500, 50, 10)]},
+                         rank_quests={185: [(300, 6610, 225, 35, 'A')]}, profession_trainers={165: [(1385, 150)]},
+                         source_build='1.60.1.70959')
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'skillup_saved.json'
+            self.assertTrue(save_copy(su, '2.4.0', path))
+            back, info = load_copy(path)
+            self.assertEqual(info['version'], '2.4.0')
+            for f in ('thresholds', 'trainer_fees', 'limited_stock', 'vendor_prices', 'recipe_scrolls', 'rank_trainers',
+                      'rank_quests', 'profession_trainers', 'source_build'):
+                self.assertEqual(getattr(back, f), getattr(su, f), f)
+            self.assertFalse(save_copy(su, '2.4.0', path))                # unchanged: the first date stays
+            self.assertFalse(save_copy(SkillUpData(), None, path))        # nothing to save
+            self.assertEqual(load_copy(Path(tmp) / 'none.json'), (None, {}))
+            # merged with ForeverRecipes as if the addon were installed
+            m = foreverrecipes.merged(back, self.fr)
+            self.assertEqual(m.limited_stock[8846], {1300: 2})
+            self.assertEqual(m.rank_trainers, {165: [(150, 500, 50, 10)]})
 
     def test_without_forever_recipes(self):
         su = SkillUpData(thresholds={19047: [1, 225, 230, 235], 1: [100, 120, 130, 140]})
@@ -121,7 +173,7 @@ class ForeverRecipesTests(unittest.TestCase):
         c = foreverrecipes.compare(su, self.fr)
         self.assertEqual((c['both'], c['same']), (2, 1))
         self.assertEqual(c['diff'], [(9999, [61, 70, 80], [60, 70, 80])])
-        self.assertEqual(c['only_forever_recipes'], [2149, 2835])
+        self.assertEqual(c['only_forever_recipes'], [2149, 2835, 7153, 7777])
 
 
 

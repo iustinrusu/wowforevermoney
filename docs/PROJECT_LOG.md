@@ -24,6 +24,24 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-19 ForeverRecipes is the main recipe source; SkillUpForever is optional (the user: "keep in mind that
+  forever recipes might will probably get updated, so we can proceed even if it's missing some data right now. make
+  skillupforever optional so I can delete the addon").** `foreverrecipes.merged` now takes ForeverRecipes first: its
+  validated list decides which recipes count, with its colours, required skill, level and trainer fee (the full list
+  price). SkillUpForever only fills gaps. Claude's choices, with the reason:
+  - A recipe only SkillUpForever lists is left out even while it is installed, so the app shows the same with or
+    without it. Its list is every recipe in the client's tables: 307 of its 315 extra recipes had products that never
+    sell in Forever's region. Lost until ForeverRecipes adds them (the user accepted gaps): Runecloth Bandage, Heavy
+    Runecloth Bandage, Invoker's Mantle and Cord, Phoenix Bindings, Dimensional Ripper - Everlook, Ultrasafe
+    Transporter: Gadgetzan.
+  - A required skill neither knows is estimated (yellow - 40), as before (Guardian Cloak: ForeverRecipes has it, without
+    its skill; until now that made it "unverified").
+  - While SkillUpForever is installed the app saves a copy of its tables (`data/skillup_saved.json`, 124 KB, never
+    committed) and uses it once the addon is gone. Without the copy, stock limits at herb and other vendors were lost
+    and 40 crafts looked up to 10 times better (Elixir of Shadow Power 1g 55s a day -> 11g 69s; the plan suggested
+    buying 59 Gromsblood from Vi'el). The tables are WoW Classic database and game-file data that don't change.
+    With neither the addon nor the copy, the levelling path still shows where your skill stops (75, 150, 225) with no
+    fee, and pattern vendors' stock limits come from ForeverRecipes (1 a restock).
 - **2026-11-19 The rest of the levelling work (to-do A3), Claude's choices with the reason.**
   - Rank training: ForeverRecipes has no rank spells (checked), so the ranks come from SkillUpForever's tables
     (TrainerRanks, RankBooks, RankQuests, ProfessionTrainers). Their fees, levels and trainers are the WoW Classic
@@ -592,6 +610,18 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-19, SkillUpForever (v1.14.5, build 1.60.1.70959) vs ForeverRecipes (1.17.x / 1.18.0, build 1.60.1.70938) on
+  the user's install: game recipes 2,335; SkillUpForever lists 2,302, ForeverRecipes 2,011 (both 1,987; 315 only
+  SkillUpForever, 24 only ForeverRecipes: rogue poisons, Cleansing Stew, The Mortar: Reloaded, Winter Boots). Yellow,
+  green and grey the same on all 1,987. Required skill known: SkillUpForever 1,672, ForeverRecipes 1,997, both 1,541
+  (1,517 agree; 24 differ by 10-45 points, e.g. Imperial Plate Shoulders 240 vs 265). Trainer fees on 409 recipes in
+  both: 198 the same; most others are SkillUpForever = 90% of ForeverRecipes' (a fee seen with a reputation discount,
+  e.g. 4,140 vs 4,600). SkillUpForever's 50 vendor prices all equal the game files. Its stock limits: 327 items, 39 of
+  them recipe materials (herbs, leathers, potions); ForeverRecipes marks 155 pattern items limited, without a count
+  (SkillUpForever counts 1 for 246 of 254). SkillUpForever's RecipeScrolls became {spell: {item, skill}}; the app read
+  it as nothing until 2026-11-19 (ForeverRecipes' 1,707 recipe items covered it). With the saved copy, the app's
+  results with SkillUpForever installed and deleted are identical (crafts, Top picks, plan, levelling).
+
 - 2026-11-19 (A3): ForeverRecipes 1.17.x holds no profession rank spells (its only "Journeyman"/"Expert" are campfires).
   SkillUpForever's Trainer.lua `TrainerRanks` {cap, fee, skill, level}, from CMaNGOS classic-db: Leatherworking 150:
   5s, 50, 10; 225: 50s, 125, 20; 300: 5g, 200, 35. Alchemy, Engineering 4s 50c / 50s or 45s / 4g 50s; Herbalism, Mining,
@@ -740,6 +770,21 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-19** (ninth part) SkillUpForever optional, ForeverRecipes the main recipe source. `foreverrecipes.merged`
+  rewritten (ForeverRecipes first; SkillUpForever fills a required skill, a fee, stock limits; `from_skillup`;
+  ForeverRecipes' pattern-vendor stock limits at 1 a restock); `skillup.save_copy` / `load_copy`
+  (`data/skillup_saved.json`); `World._load_skillup` saves the copy while the addon is installed and uses it after;
+  status texts (ForeverRecipes missing is now a warning); `Engine._index_recipe_items` reads SkillUpForever's new
+  RecipeScrolls form; `Engine.rank_training` without rank tables gives rows with no fee (`how: 'unknown'`, Poisons
+  none); page: those rows ("not known ... not counted", "?"), the Learning card, the "unverified recipe" tooltip;
+  Data health: SkillUpForever's cross-checks only when it is installed, new "Recipe ingredients / outputs agree with
+  ForeverRecipes" (0 differ), "Recipe skill requirements" counts exact skills from either source (1,999 of 2,335:
+  pass). README and CLAUDE.md updated. Real data before -> after (installed): 769 -> 762 crafts (the 7 recipes above),
+  62 trainer fees up to ForeverRecipes' list price (Advanced Target Dummy 10s 80c -> 12s), First Aid 1 -> 300 12g 32s ->
+  10g 2s, others within 0.5g; Top picks and the plan the same. Installed vs deleted (with the copy): identical. Tests:
+  297 pass (4 new, 1 rewritten: merge order, ForeverRecipes alone, the saved copy, recipe items in both forms, rank rows
+  with no fee); consistency check 0 problems; checked in the browser (Data health, the levelling rows with no fee).
 
 - **2026-11-19** (eighth part) The rest of the levelling work (to-do A3). `skillup.py` reads `TrainerRanks`,
   `RankQuests`, `ProfessionTrainers`, `RankBooks`; `questie.py` loads quests (name, giver, levels, required skill; it

@@ -33,6 +33,7 @@ NODE_PROFESSION = {'ore': 'Mining', 'herb': 'Herbalism'}           # GatherLite'
 ORE_NODE = re.compile(r'\b(Vein|Deposit|Chunk|Formation)\b')       # QuestieDB object names, where GatherLite is missing
 # profession ranks by the skill they let you reach (Apprentice comes with the profession)
 RANK_NAMES = {75: 'Apprentice', 150: 'Journeyman', 225: 'Expert', 300: 'Artisan'}
+NO_RANKS = {'Poisons'}          # rogue poisons rise with the character's level (your Poisons cap: 250 at level 50)
 FISH_WORDS = re.compile(r'\b(Fish|Snapper|Lobster|Eel|Squid|Salmon|Sagefish|Yellowtail|Catfish|Mackerel|Grouper|'
                         r'Bass|Redgill|Mudfish|Albacore|Loach|Darter|Mightfish|Clam|Mullet|Smallfish|Whisker|'
                         r'Longjaw|Firefin|Blackmouth|Stonescale|Sunscale|Nightfin|Bristle|Trout|Perch|Bluegill|'
@@ -298,11 +299,16 @@ class Engine:
             spell = qi.get('teachesSpell')
             if spell:
                 out.setdefault(int(spell), []).append(iid)
-        for scroll, spell in (self.su.recipe_scrolls or {}).items():
-            if isinstance(spell, int):
-                out.setdefault(spell, [])
-                if scroll not in out[spell]:
-                    out[spell].append(scroll)
+        for k, v in (self.su.recipe_scrolls or {}).items():
+            if isinstance(v, int):                  # older SkillUpForever: {item: spell}
+                scroll, spell = k, v
+            elif isinstance(v, list) and v and isinstance(v[0], int):
+                spell, scroll = k, v[0]             # since 2026-11: {spell: [item, skill]} (was read as nothing)
+            else:
+                continue
+            out.setdefault(int(spell), [])
+            if scroll not in out[int(spell)]:
+                out[int(spell)].append(scroll)
         return out
 
     def owned_items(self) -> set | None:
@@ -577,6 +583,10 @@ class Engine:
                                    'givers': [p for p in (self.npc_place(int(n)) for n in givers[:3]) if p],
                                    'cost': 0, 'skill': int(need[1]) if len(need) > 1 and need[0] == line else int(req),
                                    'level': int(qq.get('requiredLevel') or lvl), 'forever_quest': bool(qq)}
+        if not ranks and profession not in NO_RANKS:
+            # no rank tables (SkillUpForever not installed, 2026-11-19): the rows still say where your skill stops,
+            # with no fee or place (not counted in the totals)
+            ranks = {cap: {'how': 'unknown', 'cost': 0, 'skill': 0, 'level': 0} for cap in (150, 225, 300)}
         out = []
         for cap in sorted(ranks):
             start = cap - 75                       # the skill where the rank below stops you

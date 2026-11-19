@@ -269,7 +269,37 @@ class RankTrainingTests(unittest.TestCase):
         self.assertEqual([t['name'] for t in other['training']], ['Expert', 'Artisan'])
 
 
+    def test_without_rank_tables_the_path_still_says_where_it_stops(self):
+        # SkillUpForever deleted (2026-11-19): no fee or place, nothing counted, but the stops at 75, 150, 225 stay
+        from tests.test_engine import SETTINGS
+        from wfm.engine import Engine
+        w = self._world()
+        w.skillup.rank_trainers, w.skillup.rank_books, w.skillup.rank_quests = {}, {}, {}
+        out = Engine(w, dict(SETTINGS, level=30)).levelling('Cooking', 2, known={500})
+        self.assertEqual([(t['name'], t['at'], t['how'], t['cost']) for t in out['training']],
+                         [('Journeyman', 75, 'unknown', 0), ('Expert', 150, 'unknown', 0), ('Artisan', 225, 'unknown', 0)])
+        self.assertEqual(out['train_total'], 0)
+        self.assertFalse(any(t['level_short'] for t in out['training']))
+        # rogue poisons have no ranks
+        from wfm.gamedata import Recipe
+        from tests.test_engine import MAT_VENDOR, PRODUCT
+        w.gamedata.recipes.append(Recipe(spell_id=900, name='Poison', profession='Poisons', skill_line=40,
+                                         product_id=PRODUCT, product_count=1, reagents=[(MAT_VENDOR, 1)],
+                                         trivial_low=400, trivial_high=402, min_rank=1))
+        w.skillup.thresholds[900] = [2, 400, 401, 402]
+        self.assertEqual(Engine(w, dict(SETTINGS)).levelling('Poisons', 2, known={900})['training'], [])
+
+
 class MaterialsAndPatternsTests(unittest.TestCase):
+    def test_skillupforevers_recipe_items_in_both_formats(self):
+        # SkillUpForever changed RecipeScrolls to {spell: {item, skill}}; the app read it as nothing until 2026-11-19
+        from tests.test_engine import SETTINGS, make_world
+        from wfm.engine import Engine
+        w = make_world({}, [])
+        w.skillup.recipe_scrolls = {2158: [2406, 65], 5000: 2163}          # new form, then the older {item: spell}
+        idx = Engine(w, dict(SETTINGS))._spell_to_recipe_items
+        self.assertEqual((idx[2158], idx[2163]), ([2406], [5000]))
+
     def test_yours_only_where_forever_data_says_your_gathering_gives_it(self):
         # 2026-11-19: by the item's kind, a skinner saw Ironfeather (a bird drop) and Cured Rugged Hide (made by
         # Leatherworking) marked "yours" on the Leatherworking path

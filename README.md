@@ -88,8 +88,8 @@ them automatically after every update. Only ForeverMoneyBridge comes from this t
 |---|---|---|---|
 | **TSM desktop app** + **TradeSkillMaster** + **TradeSkillMaster_AppHelper** | **Required** | Auction prices: the desktop app writes them into AppHelper's folder about hourly | Addons: CurseForge app. Desktop app: tradeskillmaster.com |
 | **ForeverMoneyBridge** (this tool's addon) | **Required** | Your level, gold, professions, real vendor prices, loot and time per zone, trunk contents, in-game item checks | Installed by `start.bat` or `install_addon.bat` |
-| **SkillUpForever** | Strongly recommended | Which recipes can really be learned in Forever, exact skill levels. Without it, crafts are marked "unverified recipe" and never reach Top picks | CurseForge app |
-| **ForeverRecipes** | Recommended | A second source of recipe facts: rogue poisons (SkillUpForever has none), the exact skill for recipes SkillUpForever doesn't know, the character level to learn a recipe, trainer fees. Compared with SkillUpForever on Data health | CurseForge app |
+| **ForeverRecipes** | Strongly recommended | The main recipe source: which recipes can really be learned in Forever, the skill and character level each needs, trainer fees, where to learn each recipe (trainers, vendors, drops, quests), rogue poisons. Without it (and without SkillUpForever), crafts are marked "unverified recipe" and never reach Top picks | CurseForge app |
+| **SkillUpForever** | Optional | Fills gaps in ForeverRecipes: rank training fees in the levelling path, stock limits at vendors (herb sellers and others), a few required skills. While it is installed the app saves a copy of these tables (`data/skillup_saved.json`), so you can delete the addon afterwards and nothing changes | CurseForge app |
 | **Questie** (with **QuestieDB**) | Strongly recommended | Vendors, who drops what, herb and ore node locations (Forever data) | CurseForge app |
 | **Syndicator** | Recommended | Your bags and bank: enables the My bags tab | CurseForge app |
 | **ForeverAngler** | Optional | Fishing log (pace and got-away rate) | CurseForge app |
@@ -161,8 +161,8 @@ Checks GitHub for a newer Classic fishing dump, and downloads and extracts it if
 | Your client's hotfix cache (`_forever_/Cache/ADB/enUS/DBCache.bin`) | exact Forever data for ~5,200 items the client tables don't ship, and ~1,500 server updates to items they do | re-read whenever the game updates the file |
 | Your game client (ForeverMoneyBridge item checks) | the final word on sell price, quality, levels, stack size and binding for the items the app asks about | after you log in (or `/reload`), wait a minute, then `/reload` again |
 | QuestieDB addon | which NPCs sell, drop and contain each item, faction, location | re-read whenever the addon updates |
-| SkillUpForever addon | exact recipe skill levels, trainer fees, limited-stock vendors | re-read whenever the addon updates |
-| ForeverRecipes addon | rogue poisons, skill levels SkillUpForever lacks, level to learn a recipe, trainer fees | re-read whenever the addon updates |
+| ForeverRecipes addon | the main recipe source: which recipes you can learn, skill and level each needs, trainer fees, where to learn them, rogue poisons | re-read whenever the addon updates |
+| SkillUpForever addon (optional) | rank training fees, vendor stock limits, a few required skills ForeverRecipes lacks (WoW Classic database tables) | re-read whenever the addon updates; after you delete it, the copy the app saved |
 | ForeverMoneyBridge (our addon, auto-installed) | your level, gold, professions, real vendor prices, loot by zone with time spent | on logout or `/reload` |
 | ForeverAngler, Syndicator | your fishing catch log; your bags | on logout or `/reload` |
 | Wowhead Forever (read by hand) | real Forever fishing counts for 5 zones; what 5 trunks/clams contain | a dated snapshot in `data/wowhead_forever_*.json`; re-read the pages to refresh |

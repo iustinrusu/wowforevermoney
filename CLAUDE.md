@@ -80,8 +80,8 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/tsm.py` | parses TSM `AppData.lua` (base-32 numbers; sale % and sold/day are raw/1000) |
 | `wfm/gamedata.py` | wago.tools DB2 CSVs pinned to the client build: items, recipes, zones |
 | `wfm/questie.py` | QuestieDB baked TOC (base64 CBOR): vendors, NPC drops, objects; drop rates |
-| `wfm/skillup.py` | SkillUpForever: exact recipe skill levels, trainer fees, limited stock |
-| `wfm/foreverrecipes.py` | ForeverRecipes (second recipe source): poisons, missing skill levels, level to learn, trainer fees, where each recipe is learned (trainers, vendors, drops, quests) |
+| `wfm/foreverrecipes.py` | ForeverRecipes, the main recipe source (`merged`): which recipes, skill and level, trainer fees, poisons, where each recipe is learned (trainers, vendors, drops, quests), disenchanting (Classic table) |
+| `wfm/skillup.py` | SkillUpForever, optional since 2026-11-19 (fills gaps: rank training, vendor stock limits); saves a copy of its tables to `data/skillup_saved.json` for when the user deletes it |
 | `wfm/interactions.py` | every way an item is made (recipes, item uses, other spells) and whether the app counts it; `python -m wfm.interactions` |
 | `wfm/markets.py` | Market tab "Biggest markets": every item that sells, ranked by price and market size, how it's obtained, the app's way in |
 | `wfm/classicdb.py` | cMaNGOS classic-db fishing/pool tables (Classic 1.12: fallback only, never Forever fact) |
