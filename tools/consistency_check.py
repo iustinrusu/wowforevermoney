@@ -66,12 +66,19 @@ levelling.plan = lambda options, *a, **k: (lev_opts.update({x.spell_id: x for x 
 for prof in ('Leatherworking', 'Tailoring', 'Alchemy'):
     e.levelling(prof, 1)
 levelling.plan = real_plan
+from wfm.pricing import usual_sale
 n = 0
 for o in res['opportunities']:
     x = lev_opts.get(o.detail.get('recipe_spell')) if o.kind == 'craft' and not o.detail.get('disenchant') else None   # disenchant rows: another revenue
-    if x and not {'hard_to_sell', 'no_sales_data'} & set(o.flags) and o.detail.get('revenue') != max(x.ah_value, x.vendor_value):
+    if not x or {'hard_to_sell', 'no_sales_data'} & set(o.flags):
+        continue
+    rev = o.detail.get('revenue')
+    sp, usual = o.detail.get('sell_price'), usual_sale(w.prices.get(o.item_id))
+    if sp and usual and usual < sp:      # the planner sells at the lower of the listing and the usual sale (2026-11-19)
+        rev = max(int(int(usual * (1 - e.cut)) * (o.detail.get('product_count') or 1)), x.vendor_value)
+    if rev != max(x.ah_value, x.vendor_value):
         n += 1
-        if n <= 3: P('levelling sale value != crafting revenue:', o.title, max(x.ah_value, x.vendor_value), o.detail.get('revenue'))
+        if n <= 3: P('levelling sale value != crafting revenue:', o.title, max(x.ah_value, x.vendor_value), rev)
 if n > 3: P(f'... {n} recipes in all')
 
 # 6. purse bags+bank vs My bags total for the same character

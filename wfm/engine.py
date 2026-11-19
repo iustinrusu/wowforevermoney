@@ -451,6 +451,10 @@ class Engine:
         target = max(skill + 1, min(int(target), levelling_mod.MAX_SKILL))
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         own_kinds = {sub for sub, prof in GATHER_PROFESSION.items() if prof in self.profs}
+        # the AH takes only a couple of days of your share of a product's sales (the user, 2026-11-19: slow sellers must
+        # not drive the route); setting levelling_ah_days
+        days = self.s.get('levelling_ah_days')
+        ah_days = max(0.0, float(levelling_mod.AH_DAYS if days is None else days))
         options = []
         for r in self.gd.recipes:
             th = self.su.thresholds.get(r.spell_id)
@@ -481,10 +485,18 @@ class Engine:
             if not ok:
                 continue
             item = self.gd.items.get(r.product_id)
-            q = ah_sell(self.price(r.product_id), self.sale_basis)
+            p = self.price(r.product_id)
+            q = ah_sell(p, self.sale_basis)
             sells = q and item and item.bonding != 1 and not ({'hard_to_sell', 'no_sales_data'} &
-                                                            set(liquidity(self.price(r.product_id), min_spd)['flags']))
-            ah_value = int(proceeds(q, self.cut) * r.product_count) if sells else 0
+                                                            set(liquidity(p, min_spd)['flags']))
+            # each sale at the lower of the lowest listing and the region's usual sale price: what you can count on
+            # (a listing above what buyers usually pay may sit unsold), as the Crafting table's "at the average sale"
+            each = q.value if q else 0
+            usual = pricing.usual_sale(p)
+            if usual and usual < each:
+                each = usual
+            ah_value = int(int(each * (1 - self.cut)) * r.product_count) if sells else 0
+            per_day = sold_per_day(p) * self.share                # products your share sells a day
             de = self.disenchant(r.product_id)                 # Classic table, labelled; counted if you can
             learn = self.learn_cost(r)
             if learn is None:                # starting recipes (orange at 1) come with the profession
@@ -498,7 +510,7 @@ class Engine:
             options.append(levelling_mod.Option(
                 spell_id=r.spell_id, name=r.name, colors=colors, ingredients=int(cost),
                 ah_value=ah_value, vendor_value=int(vendor_sell(item) * r.product_count),
-                ah_cap=sold_per_day(self.price(r.product_id)) * self.share * levelling_mod.WEEK / max(r.product_count, 1),
+                ah_cap=per_day * ah_days / max(r.product_count, 1), ah_per_day=per_day,
                 learn=learn_cost,
                 learn_how=(learn or {}).get('how', 'starting recipe' if orange <= 1 else ''), product_id=r.product_id,
                 mats=mats, de_value=int(de['value'] * r.product_count) if de else 0, de_can=bool(de and de['can']),
@@ -525,7 +537,7 @@ class Engine:
                                 'daily': int(o.detail.get('daily_if_affordable', o.daily) or 0),
                                 'profit_unit': o.profit_unit, 'cost_to_reach': at})
         unlocks.sort(key=lambda u: -u['daily'])
-        out.update(profession=profession, unlocks=unlocks[:12], options=len(options),
+        out.update(profession=profession, unlocks=unlocks[:12], options=len(options), ah_days=ah_days,
                    known=len(known or ()), own_materials=sorted(GATHER_PROFESSION[k] for k in own_kinds))
         return out
 

@@ -7,8 +7,11 @@ The cost of one skill point with a recipe:
                           counts at what you would get for selling it) - what you get back for the product
   expected cost of the point = net cost of one craft / chance that a craft gives a skill point
 What you get back for a product is the best of three, per unit:
-  - the AH (after the cut), but only for as many as your share of a week's sales takes (crafting 60 of something that
-    sells 2 a day floods the market); the rest go to the next best
+  - the AH (after the cut), at the lower of the lowest listing and the region's usual sale price, and only for as many
+    as your share of AH_DAYS days of its sales takes (crafting 60 of something that sells 2 a day floods the market);
+    the rest go to the next best. Until 2026-11-19 it was a week at the lowest listing, and slow, valuable products
+    made a route look like it earns gold: Living Shoulders 255-257 "earned" 61g from 2 sales at 37g, one every 3-4
+    days (the user: "slow sells should not rank that high in the algorithm deciding best route")
   - a vendor
   - disenchanting it, valued from ForeverRecipes' WoW Classic table (labelled; only when one of your characters has
     the Enchanting skill for it, and only if you leave "count disenchanting" on)
@@ -47,7 +50,7 @@ import math
 from dataclasses import dataclass, field
 
 MAX_SKILL = 300
-WEEK = 7.0               # product resale at the AH price for a week of your share of its sales
+AH_DAYS = 2.0            # the AH takes this many days of your share of a product's sales (setting levelling_ah_days)
 BIG = 1e13               # cost of a point no learned recipe can give: finite, so totals stay comparable
 FIND = 1e11              # a recipe you'd have to find (drop, quest, another currency): only where nothing bought helps
 UNKNOWN = 1e12           # a recipe with no source known: after every recipe you can find
@@ -62,7 +65,7 @@ class Option:
     ingredients: int         # copper per craft
     ah_value: int            # copper per craft if sold on the AH (after the cut), 0 if it doesn't sell there
     vendor_value: int        # copper per craft sold to a vendor
-    ah_cap: float            # crafts whose product the AH takes (a week of your share of its sales)
+    ah_cap: float            # crafts whose product the AH takes (AH_DAYS days of your share of its sales)
     learn: int | None        # one-time learning cost, None = can't be bought (drop / not on the AH)
     learn_how: str = ''
     product_id: int = 0
@@ -70,6 +73,7 @@ class Option:
     de_value: int = 0        # copper per craft if disenchanted (Classic table); counted only if de_can
     de_can: bool = False     # one of your characters has the Enchanting skill to disenchant it
     find: str = ''           # can't be bought with gold now: 'drop', 'quest', 'vendor' (another currency), 'unknown'
+    ah_per_day: float = 0.0  # products your share sells a day on the AH (units): under 1 is a slow sale, said on the page
 
 
 def chance(colors: tuple, skill: int) -> float:
@@ -99,7 +103,8 @@ def resale(o: Option, n: float, use_de: bool = True) -> tuple[float, str]:
     if o.ah_value > rest and o.ah_cap > 0:
         if n <= o.ah_cap:
             return float(o.ah_value), 'AH'
-        return (o.ah_cap * o.ah_value + (n - o.ah_cap) * rest) / n, f'AH for {o.ah_cap:.0f}, then {rest_how}'
+        # "AH for 0.4": a slow seller's share of 2 days is under one sale (the page says how slow)
+        return (o.ah_cap * o.ah_value + (n - o.ah_cap) * rest) / n, f'AH for {round(o.ah_cap, 1):g}, then {rest_how}'
     return float(rest), rest_how
 
 
@@ -244,7 +249,7 @@ def plan(options: list[Option], skill: int, target: int = MAX_SKILL, known: set[
                           'ingredients': o.ingredients, 'mats_cost': crafts * o.ingredients, 'back': back,
                           'back_how': how, 'channels': {'AH': o.ah_value, 'vendor': o.vendor_value,
                                                         'disenchant': o.de_value, 'disenchant_can': o.de_can},
-                          'ah_cap': o.ah_cap})
+                          'ah_cap': o.ah_cap, 'ah_per_day': o.ah_per_day})
     for st in steps:
         st['crafts_to_buy'] = math.ceil(st['crafts'] - 1e-9)       # whole crafts: what to buy for this stretch
         for mid, cnt, each, own in st['mats']:

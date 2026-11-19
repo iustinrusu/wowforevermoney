@@ -37,7 +37,9 @@ A1. [x] (built 2026-11-19, addon 1.6.3, 5 Lua tests; left: a screenshot folded a
        - tests in `tests/test_meter_lua.py` with `tests/addon_harness.lua` (lupa): toggling, the saved state, the
          one-line text; bump ForeverMoneyBridge's version (1.6.3) and note it in README and docs/plans/farm-meter.md;
        - check in game with the user (a screenshot collapsed and open).
-A2. [ ] **Slow sellers must not drive the levelling route** (the user: "slow sells should not rank that high in the
+A2. [x] (done 2026-11-19: 2 days, setting levelling_ah_days; lower of listing and usual sale; "slow: about 1 sale
+       every N days" under Back; before/after on every profession in the project log's change log)
+       **Slow sellers must not drive the levelling route** (the user: "slow sells should not rank that high in the
        algorithm deciding best route"; agreed 2026-11-19, to be built after the usage reset). Today `levelling.WEEK`
        lets the AH take a week of your share of a product's sales, at the lowest listing (`ah_sell` in
        `Engine.levelling`). Living Shoulders 255-257 earns 61g only from 2 slow sales at 37g (one every 3-4 days at a

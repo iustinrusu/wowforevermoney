@@ -21,6 +21,9 @@ DEFAULTS = {
     'ah_cut': 0.05,                 # auction house cut on sales
     'market_share': 0.2,            # share of the region's daily sales you can expect to capture
     'min_sold_per_day': 0.5,        # hide items selling less than this (region, TSM-tracked)
+    # Levelling planner: the AH takes this many days of your share of a product's sales; the rest go to a vendor or
+    # disenchanting (the user, 2026-11-19: slow sellers must not drive the route; it was a week until then)
+    'levelling_ah_days': 2.0,
     'show_other_professions': True,
     'include_unverified_recipes': False,
     'farm_rates': {},               # item id -> units you gather per hour (enables gold/hour)

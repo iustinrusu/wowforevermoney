@@ -141,6 +141,36 @@ class EngineRangeTests(unittest.TestCase):
         self.assertEqual(out['crafts'], 30)
         self.assertEqual(e.levelling('Cooking', 100, target=50)['target'], 101)   # the target is above the start
 
+    def test_the_ah_takes_two_days_of_sales_at_the_usual_sale_price(self):
+        # the user (2026-11-19): "slow sells should not rank that high in the algorithm deciding best route". Until then
+        # the AH took a week of your share at the lowest listing.
+        from tests.test_engine import MAT_VENDOR, PRODUCT, SETTINGS, make_world
+        from wfm.engine import Engine
+        from wfm.gamedata import Recipe
+        r = Recipe(spell_id=500, name='Tasty Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                   product_count=1, reagents=[(MAT_VENDOR, 2)], trivial_low=140, trivial_high=180, min_rank=1)
+        p = {'numAuctions': 5, 'minBuyout': 1000, 'marketValue': 1000, 'regionMarketValue': 900, 'regionSale': 600,
+             'regionSoldPerDay': 5, 'regionSalePercent': 0.5}
+        out = Engine(make_world({PRODUCT: p}, [r]), dict(SETTINGS)).levelling('Cooking', 100, known={500}, target=130)
+        st = out['steps'][0]                                   # 30 sure crafts (orange to 140), 2 Vendor Spice at 10 each
+        self.assertEqual(st['channels']['AH'], 570)            # the lower of 1,000 listed and 600 usually paid, minus 5%
+        self.assertAlmostEqual(st['ah_cap'], 2.0)              # 5 a day x your 20% share x 2 days
+        self.assertAlmostEqual(st['ah_per_day'], 1.0)
+        self.assertEqual(st['back'], 2 * 570 + 28 * 20)        # 2 on the AH, the other 28 to a vendor for 20
+        self.assertEqual(out['total'], 30 * 20 - 1700)
+        self.assertEqual(out['ah_days'], 2)
+        # a slow seller: 1 a day in the region, 0.2 at your share (one sale every 5 days): 0.4 of a sale counts
+        slow = {**p, 'regionSoldPerDay': 1}
+        st = Engine(make_world({PRODUCT: slow}, [r]), dict(SETTINGS)).levelling('Cooking', 100, known={500}, target=130)['steps'][0]
+        self.assertAlmostEqual(st['ah_per_day'], 0.2)
+        self.assertEqual(st['back'], round(0.4 * 570 + 29.6 * 20))      # 820
+        self.assertEqual(st['back_how'], 'AH for 0.4, then vendor')
+        # the setting: a week, as before 2026-11-19
+        week = Engine(make_world({PRODUCT: p}, [r]), dict(SETTINGS, levelling_ah_days=7))
+        st = week.levelling('Cooking', 100, known={500}, target=130)['steps'][0]
+        self.assertAlmostEqual(st['ah_cap'], 7.0)
+        self.assertEqual(st['back'], 7 * 570 + 23 * 20)
+
     def test_cooldown_crafts_are_left_out(self):
         # one craft every few days (Mooncloth, Transmute: Arcanite): the path used them for 20 points in a row
         from tests.test_engine import MAT_VENDOR, PRODUCT, SETTINGS, make_world

@@ -57,7 +57,7 @@ prices aren't recorded.
 | **Item search** | Look up any of the ~32,000 items: prices, price history, who sells or drops it, recipes, where to fish it. |
 | **Changes** | A history of new top picks, snipes, watched price moves and newly spotted undervalued items. |
 | **Data health** | How old each data source is, and accuracy checks. Includes Classic fishing vs Forever, and "possibly undervalued items". The dot on the tab turns yellow or red when something needs attention. |
-| **Settings** | Your detected characters, the manual fallback values (gold, level, professions), and the assumptions: AH cut, your share of daily sales, casts per hour, alerts, and when data counts as stale. |
+| **Settings** | Your detected characters, the manual fallback values (gold, level, professions), and the assumptions: AH cut, your share of daily sales, how many days of AH sales the levelling planner counts (2: a product that sells once every few days can't make a path look cheap), casts per hour, alerts, and when data counts as stale. |
 
 **In an item's details** (click any item):
 - **Open on Wowhead** for comments and tips.

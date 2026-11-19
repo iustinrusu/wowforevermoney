@@ -37,7 +37,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   algorithm deciding best route"; agreed, to be built after the usage reset).** The path counted a week of your
   share of AH sales at the lowest listing as money in hand, so slow, valuable products (Living Shoulders, Devilsaur
   Leggings) made a route look like it earns gold. Plan: about 2 days of sales, at the lower of listing and actual
-  sale price, slow sales labelled. Brief: `docs/plans/TODO.md` item A2.
+  sale price, slow sales labelled. Brief: `docs/plans/TODO.md` item A2. Built the same day: `levelling.AH_DAYS` = 2,
+  a setting (`levelling_ah_days`, Settings "Levelling: AH sales within N days") for anyone who wants to wait longer;
+  each AH sale at the lower of the realm's lowest listing (the user's sale basis) and `pricing.usual_sale` (only in
+  the planner: the Crafting table keeps the realm price, its "at the average sale" column already shows the other).
 - **2026-11-19 Every recipe in the game in the levelling path, with where to learn it (user: "it should be with all
   recipes in game, and where to get them or learn them").** The planner already used every trainer recipe and every
   pattern it could price, but it didn't know which item teaches many Forever recipes (QuestieDB lacks them), so those
@@ -703,6 +706,20 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-19** (seventh part) Levelling: slow sellers no longer drive the route (to-do A2). `levelling.AH_DAYS` (2,
+  was `WEEK` 7), `Option.ah_per_day`, "AH for 0.4" (one decimal) in `resale`; `Engine.levelling` sells at the lower of
+  the lowest listing and `pricing.usual_sale`, setting `levelling_ah_days`, `ah_days` in the result; page: "slow: about
+  1 sale every N days" under Back (when your share sells under one every 2 days), "in 2 days at your share" on the
+  sub-row, Back header and "How this is worked out" rewritten; Settings field; `tools/consistency_check.py` check 5
+  expects the planner's lower price (0 problems). Real data, net cost 1 -> 300 before -> after (minus = earns):
+  Alchemy -128g -> -13g, Blacksmithing -47g -> +171g, Cooking -21g -> -3g, Enchanting +93g -> +101g, Engineering
+  -144g -> -8g (its 285-299 stretch had counted 14 Delicate Arcanite Converters at 54g: 760g back), First Aid +9g ->
+  +11g, Leatherworking -366g -> +18g (from 255: -250g -> +17g; Living Shoulders now 0.55 of a sale at 20g, the
+  region's usual price, not 2 at the realm's 36g listing average), Poisons +4g -> +6g, Tailoring -113g -> +221g. Spot
+  check against raw TSM: Devilsaur Gauntlets 13g 77s (lowest listing 14g 49s, usual 15g 9s), Chimeric Vest 3g 80s
+  (usual 4g, listing 4g 99s), Blue Suede Hat 2g 18s: equal to the copper. Tests: 1 new engine-level test (15 in
+  test_levelling.py). Checked in the browser (Leatherworking 255 -> 300, Settings): no console errors.
 
 - **2026-11-19** (sixth part) Farm meter 1.6.3, fold and hide (to-do A1): `Meter.lua` `applyFolded`, `pinTopLeft`,
   `setBounds`, `clock`, `money(c, plain, coarse)`, a body frame that holds everything under the title bar, the fold
