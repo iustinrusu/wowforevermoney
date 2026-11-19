@@ -529,21 +529,37 @@ class World:
         self.source_grades = gamedata.grade_sources(self.gamedata)
         self.untrusted_items = gamedata.mark_untrusted(self.gamedata, self.source_grades)
 
+    RECHECK_DAYS = 3        # a check this old that TSM now disagrees with is done again (a server hotfix since?)
+
+    def recheck_ids(self) -> list[int]:
+        """Items your client checked RECHECK_DAYS or more ago whose price TSM now reads differently (2026-11-19, A4)."""
+        rep = getattr(self, 'tsm_vendor_report', None) or {}
+        old = time.time() - self.RECHECK_DAYS * 86400
+        return [r[0] for r in rep.get('client_differ') or [] if not r[4] or r[4] < old]
+
     def source_disagreements(self) -> list[int]:
-        """Items whose server data (hotfix cache) and Wowhead Forever tooltip disagree on the sell price."""
+        """Items worth checking in game first, most useful first (2026-11-19, A4: TSM covers nearly every vendor price,
+        so the checks go where sources disagree rather than to every item):
+        1. TSM now reads a price your client checked days ago differently (recheck_ids)
+        2. TSM's vendor sell price and the game files differ (items not checked yet): the ones the AH prices first,
+           the biggest difference first (1,390 on 2026-11-19: two logins at 800 a login)
+        3. the hotfix cache and the Wowhead Forever tooltip disagree on the sell price"""
         gd = self.gamedata
-        out = []
+        rep = getattr(self, 'tsm_vendor_report', None) or {}
+        disputes = sorted(rep.get('differ') or [], key=lambda r: (r[0] not in self.prices, -abs(r[2] - r[3]), r[0]))
+        out = self.recheck_ids() + [r[0] for r in disputes]
         for iid, it in (gd.items.items() if gd else ()):
             if it.source in ('server', 'server-new'):
                 t = self.tooltips.get(iid)
                 if t and t.get('sell_price') is not None and t['sell_price'] != it.sell_price:
                     out.append(iid)
-        return out
+        return list(dict.fromkeys(out))
 
     def item_checks_wanted(self, important: set[int], limit: int = 800) -> list[int]:
-        """Items for the addon to look up in game, most useful first: where sources disagree, items behind the
-        current recommendations, items known only from Wowhead/Questie, then a sample that rotates daily. Items
-        verified in the last week are skipped."""
+        """Items for the addon to look up in game, most useful first: where sources disagree (TSM against the game
+        files or against an older check; see source_disagreements), items behind the current recommendations, items
+        known only from Wowhead/Questie, then a sample that rotates daily. Items verified in the last week are skipped,
+        unless TSM now disagrees with a check RECHECK_DAYS old."""
         gd = self.gamedata
         if not gd:
             return []
@@ -557,7 +573,7 @@ class World:
                     fresh.add(int(k))
             except (TypeError, ValueError):
                 continue
-        out, seen = [], set(fresh)
+        out, seen = [], set(fresh) - set(self.recheck_ids())
 
         def add(ids):
             for i in ids:
@@ -567,7 +583,7 @@ class World:
                     seen.add(i)
                     out.append(i)
 
-        add(sorted(self.source_disagreements()))
+        add(self.source_disagreements())
         add(sorted(important))
         # items whose source is unreliable for a field, the ones with prices first
         add(sorted(i for i, it in gd.items.items() if it.untrusted and i in self.prices))

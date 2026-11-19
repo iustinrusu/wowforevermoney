@@ -287,6 +287,68 @@ class TsmVendorPriceTests(unittest.TestCase):
         self.assertEqual((rep['sell'], rep['buy']), (3, 1))
         self.assertEqual(rep['differ'], [(1, 'New Forever Item', 999, 120, 'server-new')])
 
+    def test_tsm_against_your_clients_checks(self):
+        # A4 (2026-11-19): TSM matched the client on 2,966 of 2,969; 3 were 5% low after a server change
+        gd = GameData(build='test')
+        gd.items = {1: item(1, 'Grovekeeper Leggings', sell=35696), 2: item(2, 'Checked Same', sell=50),
+                    3: item(3, 'Old Hide', sell=7)}
+        for i in (1, 2):
+            gd.items[i].source = 'in-game'
+        gd.items[1].checked = {'against': 'server-new', 'differs': [], 'at': 1795000000}
+        rep = gamedata.apply_tsm_vendor(gd, {'sell': {1: 33997, 2: 50, 3: 9}, 'at': 1795200000})
+        self.assertEqual(gd.items[1].sell_price, 35696)                  # your client's check wins over TSM
+        self.assertEqual(gd.items[3].sell_price, 9)                      # TSM wins over the game files
+        self.assertEqual(rep['client_same'], 1)
+        self.assertEqual(rep['client_differ'], [(1, 'Grovekeeper Leggings', 35696, 33997, 1795000000)])
+        self.assertEqual(rep['differ'], [(3, 'Old Hide', 7, 9, 'client')])
+
+    def test_checks_go_where_tsm_and_the_files_disagree(self):
+        import time
+        from wfm.world import World
+        w = World.__new__(World)
+        gd = GameData(build='test')
+        gd.items = {i: item(i, f'Item {i}', sell=10) for i in range(1, 9)}
+        w.gamedata, w.tooltips = gd, {}
+        w.prices = {4: {'minBuyout': 100}, 5: {'minBuyout': 100}}
+        now = time.time()
+        w.profile = {'item_info': {'1': {'n': 'Item 1', 't': now - 5 * 86400}, '2': {'n': 'Item 2', 't': now - 86400},
+                                   '8': {'n': 'Item 8', 't': now - 86400}}}
+        # 1 and 2: checked, TSM now differs (5 days ago: check again; yesterday: not yet); 3-6: TSM vs the files
+        w.tsm_vendor_report = {'client_differ': [(1, 'Item 1', 10, 9, now - 5 * 86400), (2, 'Item 2', 10, 9, now - 86400)],
+                               'differ': [(3, 'Item 3', 10, 500, 'client'), (4, 'Item 4', 10, 12, 'server-new'),
+                                          (5, 'Item 5', 10, 900, 'server-new'), (6, 'Item 6', 10, 11, 'client')]}
+        self.assertEqual(w.recheck_ids(), [1])
+        # the AH-priced ones first, the biggest difference first
+        self.assertEqual(w.source_disagreements(), [1, 5, 4, 3, 6])
+        got = w.item_checks_wanted(set(), limit=5)
+        self.assertEqual(got, [1, 5, 4, 3, 6])                          # 1 again though checked this week; 2 and 8 not
+
+    def test_the_data_health_check_reads_plainly(self):
+        from types import SimpleNamespace
+        from wfm.audit import vendor_price_check
+        gd = GameData(build='test')
+        gd.items = {1: item(1, 'Checked', sell=35696), 2: item(2, 'From TSM', sell=9), 3: item(3, 'Files Only', sell=3)}
+        gd.items[1].source, gd.items[2].sell_from_tsm = 'in-game', True
+        w = SimpleNamespace(gamedata=gd, RECHECK_DAYS=3, profile={'tsm_vendor': {'buy': {5: 9}}},
+                            tsm_vendor_report={'sell': 2, 'buy': 1, 'client_same': 2966,
+                                               'client_differ': [(1, 'Checked', 35696, 33997, 0)],
+                                               'differ': [(2, 'From TSM', 7, 9, 'client')]},
+                            source_grades={('client', 'sell_price'): {'checked': 1173, 'wrong': 51},
+                                           ('server-new', 'sell_price'): {'checked': 2011, 'wrong': 340},
+                                           ('client', 'quality'): {'checked': 1173, 'wrong': 0}})
+        gd.items[5] = item(5, 'Coal')
+        gd.items[5].buy_price = 500
+        c = vendor_price_check(w)
+        self.assertEqual(c['status'], 'info')
+        self.assertIn('On the 2,967 items your client checked, TSM agreed on 2,966; the game files were wrong on 391 of '
+                      '3,184 (the client tables 51 of 1,173, the hotfix cache (new items) 340 of 2,011)', c['detail'])
+        self.assertIn('1 items have a vendor price from them alone', c['detail'])
+        self.assertIn('1 are below', c['detail'])
+        self.assertEqual(c['examples'][:3], ['Checked (1): your client 35696c, TSM 33997c',
+                                             'Files Only (3): only the game files (the client tables), 3c',
+                                             'From TSM (2): game file 7c (the client tables), TSM 9c'])
+        self.assertEqual(vendor_price_check(SimpleNamespace(gamedata=gd, tsm_vendor_report={}))['status'], 'warn')
+
     def test_vendor_buy_order(self):
         e = MoreInteractionTests().world()[0]
         q = QuestieDB(items={THORIUM: {'vendors': [100]}}, npcs={100: {'name': 'Trader', 'friendlyToFaction': 'AH', 'zoneID': 1}})

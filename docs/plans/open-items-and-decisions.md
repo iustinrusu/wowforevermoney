@@ -54,8 +54,10 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 - [x] B11. (done 2026-11-19: every recipe with where to learn it, then rank training in to-do A3) Levelling paths
       stop where the next patterns only drop (Leatherworking at 270): use ForeverRecipes' pattern sellers and drop
       chances, and rank training fees (TODO 1d).
-- [ ] B12. (2026-11-19) Compare TSM's vendor prices with the game files once they arrive; check every priced item in
-      game, not only 800 a login (TODO 1f).
+- [x] B12. (done 2026-11-19, to-do A4) Compare TSM's vendor prices with the game files once they arrive; check every
+      priced item in game, not only 800 a login (TODO 1f). Decided: not every item. TSM gives a vendor price for every
+      item but 15 and matches your client on 2,966 of 2,969, so the 800 checks a login go where TSM and the game files
+      disagree (1,471 on 2026-11-19: two logins), and to checks TSM now disagrees with that are 3+ days old.
 - [ ] B13. (2026-11-19) Rank training fees in the levelling path (Journeyman, Expert, Artisan) come from SkillUpForever's
       tables, which take them from the WoW Classic database (CMaNGOS classic-db, before reputation discounts), as do
       the recipe trainer fees it lists: labelled "Classic database", not Forever fact. Next time you train a rank or a

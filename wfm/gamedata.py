@@ -405,9 +405,13 @@ def apply_tsm_vendor(gd: GameData, tsm_vendor: dict) -> dict:
     """TSM's VendorSell, read in game by ForeverMoneyBridge 1.6.2 (TSM takes it from the game client): what a vendor
     pays for each item. It wins over the game files for items your client hasn't checked (the user, 2026-11-19: "TSM
     should be the king when it comes to pricing data"; the hotfix cache's prices for new items were wrong 91% of the
-    time). Returns counts and the items whose file price differed (Data health)."""
+    time). Your client's own check (apply_ingame, run first) still wins: TSM keeps an item's price in its own saved item
+    info, and on 2026-11-19 it was 5% low for 3 items a server hotfix had changed (Grovekeeper Leggings: 33,997 vs
+    35,696), while it matched your client on the other 2,966 checked. Returns counts, the unchecked items whose file
+    price differed (`differ`), and how TSM compared with your client (`client_same`, `client_differ` with the check's
+    time) for Data health and the in-game check queue."""
     sells = (tsm_vendor or {}).get('sell') or {}
-    n, differ = 0, []
+    n, differ, client_same, client_differ = 0, [], 0, []
     for iid, v in sells.items():
         try:
             iid, v = int(iid), int(v)
@@ -416,7 +420,12 @@ def apply_tsm_vendor(gd: GameData, tsm_vendor: dict) -> dict:
         it = gd.items.get(iid)
         if it is None or v <= 0:
             continue
-        if it.source != 'in-game' and it.sell_price != v:
+        if it.source == 'in-game':
+            if it.sell_price == v:
+                client_same += 1
+            else:
+                client_differ.append((iid, it.name, it.sell_price, v, int((it.checked or {}).get('at') or 0)))
+        elif it.sell_price != v:
             differ.append((iid, it.name, it.sell_price, v, it.source))
         if it.source != 'in-game':
             it.sell_price = v
@@ -424,7 +433,7 @@ def apply_tsm_vendor(gd: GameData, tsm_vendor: dict) -> dict:
         it.sell_from_tsm = True
         n += 1
     return {'sell': n, 'buy': len((tsm_vendor or {}).get('buy') or {}), 'differ': differ,
-            'at': (tsm_vendor or {}).get('at')}
+            'client_same': client_same, 'client_differ': client_differ, 'at': (tsm_vendor or {}).get('at')}
 
 
 def apply_ingame(gd: GameData, info: dict) -> int:

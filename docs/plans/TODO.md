@@ -59,7 +59,10 @@ A3. [x] (done 2026-11-19: rank training rows, "may have to wait" on patterns, "y
        - materials marked "yours" that aren't gathered (Ironfeather, Cured Rugged Hide showed "yours" on the
          Leatherworking path: GATHER_PROFESSION by trade-goods subclass is too wide; check it);
        - check a "find it" row in the browser: none came up on real data (every path uses buyable recipes).
-A4. [ ] **Compare TSM's vendor prices with the game files** (after A0; "TSM is the king"): the addon checks up to 800
+A4. [x] (done 2026-11-19: TSM matches your client on 2,966 of 2,969, the game files are wrong on 393 of 3,274; the
+       files stay only as the fallback for 15 items; disputes go first in the in-game checks; Data health compares all
+       three. Project log, change log tenth part)
+       **Compare TSM's vendor prices with the game files** (after A0; "TSM is the king"): the addon checks up to 800
        items a login; once TSM's vendor prices arrive, compare them on Data health and decide whether the game files
        are still needed for vendor sell prices at all.
 A5. [ ] **Wowhead reading session** (pace in CLAUDE.md, at most 20 pages): checklist B10 (one Power Crystal

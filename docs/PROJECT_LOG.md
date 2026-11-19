@@ -24,6 +24,16 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-19 Vendor sell prices: your client, then TSM, then the game files (to-do A4: "decide whether the game files
+  are still needed for vendor sell prices at all").** Claude's decision, with the reason: the game files stay, but only
+  as the last fallback. TSM's VendorSell (read in game) gives a price for every item with one but 15 and matched your
+  client's own checks on 2,966 of 2,969; the files were wrong on 393 of 3,274 checked (the client tables 4%, the
+  hotfix cache's new items 17%). They are still needed for those 15 items and for anyone before their first TSM read
+  (a friend's first run). Your client's check stays above TSM: TSM was 5% low on the 3 it missed, where your client and
+  the current hotfix cache agree (TSM keeps item prices in its own saved data and seems to miss a server change). The
+  in-game checks (800 a login) no longer try to cover every priced item (checklist B12): they go first where TSM and
+  the files disagree (1,471, the AH-priced and biggest differences first), and to a check 3+ days old that TSM now
+  disagrees with. No new flag for file-only prices: AH-to-vendor flips need AH data, and TSM covers every such item.
 - **2026-11-19 ForeverRecipes is the main recipe source; SkillUpForever is optional (the user: "keep in mind that
   forever recipes might will probably get updated, so we can proceed even if it's missing some data right now. make
   skillupforever optional so I can delete the addon").** `foreverrecipes.merged` now takes ForeverRecipes first: its
@@ -610,6 +620,17 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-19 (A4), the user's install: TSM's VendorSell read in game at 20:37 for 17,352 items (of 27,152 asked,
+  9,800 with none: items that sell for 0); TSM VendorBuy 138. Your client's checks: 3,274 (11-13 to 11-19). Of the
+  2,969 with both: all three agree 2,573; game files wrong and TSM right 393 (client tables 51, hotfix cache changed
+  items 2, new items 340); TSM wrong and the files right 3 (Grovekeeper Leggings 35,696 vs TSM 33,997, Demonheart
+  Gloves 14,530 vs 13,838, Spiritcaller Kilt 40,208 vs 38,293: each exactly 5% low; checked 11-14 and 11-17); both wrong
+  0. Your client says 305 items sell for 0; TSM has a price for none of them. Unchecked items where TSM and the files
+  differ: 1,104 hotfix-cache new items, 246 client-table items, 40 changed items. Items with a vendor price only from
+  the files: 15 (Gilded Blademaster's set at 2-3c, Sash of the Tipsy Sage, Angler's Mantle, Adventurer's Tent 75g...).
+  TSM VendorBuy is what you paid: 90 of the 138 are below the files' list price, most by 10% (Coal 450 vs 500, Strong
+  Flux 1,800 vs 2,000), a reputation discount.
+
 - 2026-11-19, SkillUpForever (v1.14.5, build 1.60.1.70959) vs ForeverRecipes (1.17.x / 1.18.0, build 1.60.1.70938) on
   the user's install: game recipes 2,335; SkillUpForever lists 2,302, ForeverRecipes 2,011 (both 1,987; 315 only
   SkillUpForever, 24 only ForeverRecipes: rogue poisons, Cleansing Stew, The Mortar: Reloaded, Winter Boots). Yellow,
@@ -770,6 +791,15 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-19** (tenth part) Vendor prices three ways (to-do A4, checklist B12). `gamedata.apply_tsm_vendor` also
+  reports TSM against your client's checks (`client_same`, `client_differ` with the check's time);
+  `World.recheck_ids` (a check 3+ days old that TSM now disagrees with) and `World.source_disagreements` (re-checks,
+  then TSM vs the files, AH-priced and biggest differences first, then hotfix cache vs Wowhead) order the in-game
+  check queue; `item_checks_wanted` lets a re-check through the one-week skip. Data health: "Vendor prices: TSM vs your
+  client vs the game files" (`audit.vendor_price_check`) replaces "Vendor prices from TSM": the order used, coverage,
+  agreement, the files' error rates by source, file-only items, disputes, VendorBuy. Real data: the next login checks
+  800 disputed items (Spiritcaller Kilt's re-check first). Tests: 300 pass (3 new). Checked in the browser.
 
 - **2026-11-19** (ninth part) SkillUpForever optional, ForeverRecipes the main recipe source. `foreverrecipes.merged`
   rewritten (ForeverRecipes first; SkillUpForever fills a required skill, a fee, stock limits; `from_skillup`;

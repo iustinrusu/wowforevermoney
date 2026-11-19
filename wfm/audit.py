@@ -267,20 +267,8 @@ def run(world, engine) -> list[dict]:
     except Exception as e:          # never let a check break the audit
         out.append(_check('Node positions: QuestieDB vs GatherLite', 'warn', f'Could not work it out: {e}'))
 
-    # Vendor prices from TSM (read in game by ForeverMoneyBridge 1.6.2) against the game files
-    rep = getattr(world, 'tsm_vendor_report', None) or {}
-    if not rep.get('sell') and not rep.get('buy'):
-        out.append(_check('Vendor prices from TSM', 'warn',
-                          'None yet: ForeverMoneyBridge 1.6.2 reads TSM\'s VendorSell and VendorBuy in game about 30 '
-                          'seconds after you log in; /reload after that minute to save them. Until then vendor prices '
-                          'come from the game files (checked in game where possible).'))
-    else:
-        d = rep.get('differ') or []
-        out.append(_check('Vendor prices from TSM', 'pass' if not d else 'info',
-                          f"TSM's in-game vendor prices are used first: what a vendor pays for {rep.get('sell', 0):,} "
-                          f"items, what a vendor charges for {rep.get('buy', 0):,} (TSM's merchant records). "
-                          f"{len(d)} game-file sell prices differed from TSM's and were replaced.",
-                          [f"{n} ({i}): game file {a}c ({src}), TSM {b}c" for i, n, a, b, src in d]))
+    # Vendor prices: TSM (read in game) vs your own client's checks vs the game files (to-do A4, 2026-11-19)
+    out.append(vendor_price_check(world))
 
     # Every way an item is made, and whether the app counts it (2026-11-19, after the Salt Shaker was missed)
     try:
@@ -307,6 +295,54 @@ def run(world, engine) -> list[dict]:
     except Exception as e:          # never let a check break the audit
         out.append(_check('Drop rates: Wowhead Forever vs Everloot', 'warn', f'Could not work it out: {e}'))
     return out
+
+
+FILE_SOURCES = {'client': 'the client tables', 'server': 'the hotfix cache (changed items)',
+                'server-new': 'the hotfix cache (new items)', 'wowhead': 'Wowhead tooltips', 'questie': 'QuestieDB'}
+
+
+def vendor_price_check(world) -> dict:
+    """What a vendor pays for each item, three ways (to-do A4): TSM's VendorSell read in game, your own client's checks
+    (ForeverMoneyBridge), the game files. The order the app uses: your client, then TSM, then the files."""
+    name = 'Vendor prices: TSM vs your client vs the game files'
+    gd = world.gamedata
+    rep = getattr(world, 'tsm_vendor_report', None) or {}
+    if not rep.get('sell') and not rep.get('buy'):
+        return _check(name, 'warn', "None from TSM yet: ForeverMoneyBridge reads TSM's VendorSell and VendorBuy in game "
+                      'about 30 seconds after you log in; /reload after that minute to save them. Until then vendor '
+                      'prices come from your client\'s checks and the game files.')
+    grades = {src: g for (src, attr), g in (getattr(world, 'source_grades', None) or {}).items() if attr == 'sell_price'}
+    f_checked, f_wrong = sum(g['checked'] for g in grades.values()), sum(g['wrong'] for g in grades.values())
+    per = ', '.join(f"{FILE_SOURCES.get(s, s)} {g['wrong']:,} of {g['checked']:,}"
+                    for s, g in sorted(grades.items()) if g['checked'])
+    same, cd, d = rep.get('client_same', 0), rep.get('client_differ') or [], rep.get('differ') or []
+    priced = [it for it in gd.items.values() if it.sell_price > 0]
+    only_files = sorted((it for it in priced if not it.sell_from_tsm and it.source != 'in-game'), key=lambda it: it.id)
+    buys = (((getattr(world, 'profile', None) or {}).get('tsm_vendor') or {}).get('buy') or {})
+    lower = 0
+    for k, v in buys.items():
+        try:
+            it = gd.items.get(int(k))
+            lower += bool(it and it.buy_price and int(v) < it.buy_price)
+        except (TypeError, ValueError):
+            continue
+    text = (f"What a vendor pays you, best source first: your own client's check, then TSM's VendorSell (read in game), "
+            f"then the game files. TSM has a price for {rep.get('sell', 0):,} items: every item with a vendor price but "
+            f"{len(only_files)}. On the {same + len(cd):,} items your client checked, TSM agreed on {same:,}; the game files "
+            f"were wrong on {f_wrong:,} of {f_checked:,} ({per}). So the game files are only the fallback now: "
+            f"{len(only_files)} items have a vendor price from them alone (examples below). TSM and the game files disagree "
+            f"on {len(d):,} items your client hasn't checked: TSM's price is used, and they go first in the in-game checks "
+            f"(800 a login). TSM differs from your client on {len(cd)}: your client's price is used (TSM keeps an item's "
+            f"price in its own saved data and can miss a server change), and the item is checked again when the check is "
+            f"{world.RECHECK_DAYS if hasattr(world, 'RECHECK_DAYS') else 3}+ days old. What a vendor charges: TSM's VendorBuy "
+            f"for {rep.get('buy', 0):,} items, the price you paid (with any reputation discount: {lower} are below the "
+            f"game files' list price); a price ForeverMoneyBridge saw at the vendor comes first.")
+    rows = ([f"{n} ({i}): your client {a}c, TSM {b}c" for i, n, a, b, _ in cd]
+            + [f"{it.name} ({it.id}): only the game files ({FILE_SOURCES.get(it.source, it.source)}), {it.sell_price}c"
+               for it in only_files]
+            + [f"{n} ({i}): game file {a}c ({FILE_SOURCES.get(src, src)}), TSM {b}c" for i, n, a, b, src in
+               sorted(d, key=lambda r: -abs(r[2] - r[3]))])
+    return _check(name, 'pass' if not cd else 'info', text, rows)
 
 
 def everloot_check(ev: dict, pages: dict, item_name, q=None) -> dict:
