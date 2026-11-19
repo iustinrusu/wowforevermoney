@@ -24,6 +24,15 @@ NOT started: the user asked for these instead. Next, in order:
        new algorithm on every profession, item-use crafts, Biggest markets, disenchant labels.
 1d. [~] **Levelling with every recipe** (done 2026-11-19, fifth part: every recipe in the game, where to learn each,
        drop-only ones as "find it", cooldown crafts out; every profession reaches 300). Left:
+       - FIRST (the user's yes, 2026-11-19, "after the reset"): **slow sellers must not drive the route.** Today
+         `levelling.WEEK` lets the AH take a week of your share of a product's sales, at the lowest listing
+         (`ah_sell` in `Engine.levelling`). Living Shoulders 255-257 earns 61g only from 2 slow sales at 37g (one every
+         3-4 days at a 20% share; at the vendor price those 2 points cost about 7g); Devilsaur Leggings -113g the same.
+         Change: (1) the AH takes only about 2 days of your share (a constant, or a setting "count AH sales within N
+         days", default 2); (2) price each sale at the lower of the lowest listing and the region's actual sale
+         average (`pricing.usual_sale`, as Big flips do); (3) the Back column says when a sale is slow ("about 1 sale
+         every 4 days"). Update tests (`test_the_ah_takes_only_so_many_then_the_vendor_price`), re-run every profession
+         1->300 on real data and compare totals before and after; update the "How this is worked out" text.
        - rank training (Journeyman, Expert, Artisan): fee, the skill and character level each needs, at 75/150/225 the
          path must stop for it (ForeverRecipes `Trainers` may hold the rank spells; check, never assume Classic fees);
        - a recipe whose pattern is only on the AH at "market value (none listed now)" or "region market value": say
