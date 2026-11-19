@@ -106,6 +106,9 @@ GatherLite (Forever node locations from Wowhead) is read nowhere yet either. See
   - real vendor prices when you open a vendor;
   - what each trunk, clam or crate gave you.
 - **When:** only on `/reload` or logout, because WoW doesn't let addons write files any other time.
+- **TSM's vendor prices:** about 30 seconds after you log in, the addon reads TSM's own vendor prices (what a vendor
+  pays, what a vendor charges) for every item the app prices; `/reload` after that to save them. The app uses them
+  before the game files.
 - **`/gea`** (or `/fmb`) takes a snapshot right away (then `/reload` to write it).
 - **`/gea start`** / **`/gea stop`**: the farm meter: what you loot and its worth, gold an hour, and XP gained (total,
   an hour, and how long to the next level at that pace). Prices: the app's own values (as its My bags shows them)

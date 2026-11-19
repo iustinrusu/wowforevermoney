@@ -44,8 +44,13 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 - [ ] B7. Comprehensive review of the whole app (UI, UX, logic, accuracy, no discrepancies between views): planned
       for a new chat after the usage reset, `docs/plans/comprehensive-review.md` (the user, 2026-11-15).
 
-- [ ] B8. (2026-11-19) Farm meter 1.6.1 in game: XP line, prices (the app's while under 12 h old, else TSM), a
+- [ ] B8. (2026-11-19) Farm meter 1.6.x in game: XP line, prices (the app's while under 12 h old, else TSM), a
       container from a mob or fishing shown as "not opened yet" without the app. Claude can't run WoW: a screenshot.
+      Same login: addon 1.6.2 saves TSM's vendor prices about 30 s after login (then /reload); Data health shows them.
+- [ ] B11. (2026-11-19) Levelling paths stop where the next patterns only drop (Leatherworking at 270): use
+      ForeverRecipes' pattern sellers and drop chances, and rank training fees (TODO 1d).
+- [ ] B12. (2026-11-19) Compare TSM's vendor prices with the game files once they arrive; check every priced item in
+      game, not only 800 a login (TODO 1f).
 - [ ] B9. (2026-11-19) Big markets the app has no way into (Market tab, "only items the app has no way into"): Mote of
       Unstable Magic (215 kinds of mob drop it, 390g traded a day), Shellfish, Pristine Black Diamond, Vulture
       Gizzard; dungeon gear and patterns belong to the Dungeons view (to-do 8). Each needs its Wowhead Forever page

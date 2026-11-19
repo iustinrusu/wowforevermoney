@@ -24,6 +24,38 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-19 TSM is the king for prices (user: "vendor price and AH price should ideally only come from TSM, no data
+  mining ... Are we already doing that?").** Answer: AH prices were already TSM only (AppData.lua). Vendor prices were
+  not: what a vendor pays came from the game files (wago tables, the client's hotfix cache, Wowhead tooltips), checked
+  in game for up to 800 items a login; what a vendor charges from the addon's merchant visits, SkillUpForever's list
+  or the game files. TSM's own files hold only 226 vendor buy prices (`g@ @internalData@vendorItems`) and no sell
+  prices: in game, TSM's VendorSell reads the client (GetItemInfo), the same number as the in-game checks. So addon
+  1.6.2 reads TSM's VendorSell and VendorBuy in game for every item the app prices (about 30 s after login, 250 a
+  tick) and saves them; the app uses TSM's sell price over the game files for unchecked items, and the vendor buy order
+  is: seen at the vendor > TSM VendorBuy > SkillUpForever > game files. Data health "Vendor prices from TSM" lists how
+  many and which file prices differed. Needs one login + /reload to fill.
+- **2026-11-19 Levelling planner chooses the whole path (user: "the most efficient and cheap path is the only thing we
+  want ... be mindful of success % of crafts"; like wowcraft.io).** The first planner (2026-11-15) went point by point
+  and charged a recipe's whole fee to its first point, and its totals were optimistic (a whole stretch sold on the AH
+  if the market wasn't full when the stretch began). Now `levelling._choose`: (1) which recipes to learn, a
+  facility-location choice (each point costs (ingredients - long-run resale) / chance; a fee is lowered by the AH's
+  extra for a recipe's first products), add the best saver net of its fee, drop any that no longer pays, repeat; (2)
+  walk the points in order with the AH taking the first products of each recipe exactly; (3) also walk the old
+  point-by-point plan and both together; keep the cheapest by the same exact cost, so never worse than before. Products
+  bring back the best of AH (capped at a week of your share), vendor, disenchanting (Classic table, only where your
+  Enchanting can, box on the panel). Uncovered points cost a large finite penalty (an infinite one made totals equal
+  and dropped needed recipes: LW stopped at 265). On the user's data, costed the same way: LW 255-270 217g (old path
+  223g), LW 1-270 212g (228g), Blacksmithing 747g (928g), Tailoring 60g (80g). Panel: totals (materials, back,
+  learning, net), per stretch materials / back / net and each product's AH, vendor and disenchant value, a shopping
+  list (whole crafts). Leatherworking still stops at 270: the next recipes' patterns only drop (follow-up in TODO).
+- **2026-11-19 Biggest markets is a complete list (user: "a complete list, ranked by individual value (and market cap
+  should matter too), and the ones that I can obtain or craft should be highlighted with glowing border").** The old
+  checkbox only filtered to items without a way in (the user read it as hiding things). Now every item with recorded
+  sales (6,623), ranked by price x square root of sold a day (= square root of price x gold traded a day; other orders:
+  gold traded a day, price each), filter all / you can get now (676) / the app has a way in / no way in, 100 at a time.
+  "You can get it now" = an app row for it you can do (a craft or flip with skill and tools, a farming spot); those
+  rows have an animated gold border (static under reduced motion).
+
 - **2026-11-19 Disenchanting valued from a Classic table, labelled (the user: "Yes, labelled", checklist C10).**
   ForeverRecipes' Data/Disenchant.lua (its author: "independently reconstructed Classic baseline estimates ... not
   verified Forever yields") gives each item's results: its own per-item list (8,479 items) first, else rules by class,
@@ -640,6 +672,13 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-19** (fourth part) Biggest markets complete and ranked (`markets.score`, `markets.page`, `/api/markets?sort=&filter=
+  &offset=&limit=`, built once per recompute), glowing border (style.css `yours-glow`); levelling planner overhaul
+  (`levelling._open_set`, `_walk`, `_choose`; `Option.de_value/de_can`; totals, shopping list; `/api/levelling?de=0|1`;
+  new panel with summary cards); vendor prices from TSM (addon 1.6.2 `tsmVendor`, `gamedata.apply_tsm_vendor`,
+  `Item.sell_from_tsm`, vendor buy order in `Engine.vendor_price`, flag `vendor_price_tsm`, Data health entry).
+  Tests: 278 (6 Lua with lupa). Consistency check: 0 problems.
 
 - **2026-11-19** (third part) Disenchanting from ForeverRecipes' Classic table, labelled (`foreverrecipes.disenchant_profile`,
   `disenchant_materials`, `disenchant_skill`; `Engine.disenchant`, `Engine.enchanter`, `Engine._craft_row` (crafts

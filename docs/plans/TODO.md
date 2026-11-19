@@ -8,15 +8,31 @@ Each item points to a plan file with the full brief. Follow CLAUDE.md's standing
 step, commit and push each finished piece, tick it off here and note it in docs/PROJECT_LOG.md. If usage gets
 tight: finish the current piece, commit, update this list, and set a reminder that runs nothing.
 
-**Where it stands (2026-11-15, end of a night session; stopped at 80% of the weekly usage with 4 days left):**
-done that night: 2b, 2c, 6, 7 items 1, 2 and 10, and 20 Wowhead pages (the session's limit). Next, in order:
-(a) item 2: 20 more Wowhead pages (Kingsblood 3356, Iridescent Pearl 5500, the 4 skinning items, then the pools
-list), pace as in CLAUDE.md; (b) item 7: strategy item 3 (vertical integration), then 4-9; (c) item 8, Dungeons;
-(d) item 4: mobs' own pages (part of the Wowhead budget). 2a, C8 (Everloot fills mob-drop gaps), C9 and item 5 were done the
-same night; nothing waits on the user.
+**Where it stands (2026-11-19, end of a long day session; 5-hour window at about 85%, weekly 20%):** done that day,
+all pushed (details: PROJECT_LOG decisions and change log of 2026-11-19): Salt Shaker and every item interaction
+(item uses, essences, Darkmoon cards, recipe tools, Poisons, Data health "Item interactions"), ForeverRecipes as a
+second recipe source, disenchanting from a labelled Classic table, Biggest markets (complete, ranked, glowing border),
+levelling planner overhaul (whole-path optimisation, every way back, shopping list), farm meter 1.6.x (XP; the app's
+prices while fresh, else TSM in game), vendor prices from TSM first (addon 1.6.2). The comprehensive review (1a) was
+NOT started: the user asked for these instead. Next, in order:
 
-1a. [ ] **FIRST, IN A NEW CHAT AFTER THE USAGE RESET (19 Nov): comprehensive review** (UI, UX, logic, accuracy,
-       how all systems work together; the user's request, 2026-11-15): `docs/plans/comprehensive-review.md`.
+0b. [ ] **The user, in game (no Claude needed, 2 minutes):** log in, wait a minute, /reload. That saves TSM's vendor
+       prices (addon 1.6.2; Data health "Vendor prices from TSM" then fills in) and lets Claude check the farm meter
+       (checklist B8: start /gea start, kill a few mobs, a screenshot with the XP line).
+1a. [ ] **Comprehensive review** (UI, UX, logic, accuracy, how all systems work together; the user's request,
+       2026-11-15): `docs/plans/comprehensive-review.md`. Include what 2026-11-19 added: the levelling planner's
+       new algorithm on every profession, item-use crafts, Biggest markets, disenchant labels.
+1d. [ ] **Levelling paths stop where patterns only drop** (2026-11-19: Leatherworking stops at 270). ForeverRecipes'
+       Sources.lua has who sells each pattern (`Sellers`, `RecipeVendorCosts`, limited stock in `SourceMeta`) and the
+       top drop chances (`Drops`): use its vendor-sold patterns as learnable (with their price and limited stock), show
+       drop-only ones as "you'd have to find this", so a path can reach 300. Also count rank training (Journeyman,
+       Expert, Artisan) fees and levels.
+1e. [ ] **Wowhead reading session** (pace in CLAUDE.md, at most 20 pages): checklist A0 (vendor stock for flips),
+       B10 (one Power Crystal transmutation spell page: who casts them?), B9 (Mote of Unstable Magic, Shellfish,
+       Pristine Black Diamond, Vulture Gizzard: the biggest markets the app has no way into), then A1, A2.
+1f. [ ] **In-game checks for every priced item** (2026-11-19 idea, "TSM is the king"): the addon checks up to 800
+       items a login; after TSM's vendor prices arrive, compare them with the game files on Data health and decide
+       whether the game files are still needed for vendor sell prices at all.
 1c. [x] (built 2026-11-15, addon 1.5.0; untested in game until the user tries it) **Farm meter in ForeverMoneyBridge** (the user, 2026-11-15; prices must match the app's):
        `docs/plans/farm-meter.md`. After the comprehensive review, or alongside it.
 1b. [x] (done 2026-11-15, the user said "do it now") **Realm prices, own materials, three profit views** (the user's decisions, 2026-11-15):
