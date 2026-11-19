@@ -99,11 +99,24 @@ def unpack(passphrase: str, data_dir: Path | None = None, path: Path | None = No
         return str(e)
     except (ValueError, OSError):
         return 'the pack could not be read'
-    changed = 0
+    changed = kept = 0
+    pack_time = path.stat().st_mtime
     for name, text in files.items():
-        if name in FILES and ((d / name).read_text(encoding='utf-8') if (d / name).exists() else None) != text:
-            (d / name).write_text(text, encoding='utf-8')
-            changed += 1
+        if name not in FILES:
+            continue
+        local = d / name
+        if local.exists() and local.read_text(encoding='utf-8') == text:
+            continue
+        if local.exists() and local.stat().st_mtime > pack_time:
+            # newer here than the pack (pages imported since it was built; the pre-commit hook packs them): keep it.
+            # Until 2026-11-20 any difference was overwritten, so an import was lost on the next start if the app
+            # loaded before the commit rebuilt the pack.
+            kept += 1
+            continue
+        local.write_text(text, encoding='utf-8')
+        changed += 1
+    if kept:
+        return f'{changed} of {len(files)} files updated, {kept} kept (newer here than the pack)'
     return f'{changed} of {len(files)} files updated' if changed else 'up to date'
 
 

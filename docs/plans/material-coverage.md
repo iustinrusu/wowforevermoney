@@ -38,6 +38,13 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   6471 3864 249391 249427 12184 4232 6037 13464 1529 4387 3182 (102 item pages in all). Left of the top 100: 3356
   Kingsblood, 5500 Iridescent Pearl; then the skinning items 7286 8165 15412 15423, the pools (step 3 list), Javnir
   Nashak (checklist A7). A saved batch is checked against a SHA-256 of the tab's store before importing.
+- Session 4 (2026-11-20, just after midnight): 20 pages at 2 minutes apart, no block: spell 1289305 (B10), items
+  274964 13545 18335 8396 (B9), vendors 3364 15419 4453 260565 16015 248200 2664 265346 2832 (checklist A0), 3356
+  5500 (the top 100 is done), 7286 8165 15412 15423 (the skinning items are done). The tab's storage had lost the
+  reader: set up again (`wfm_fn` now also keeps a vendor's Sells tab: [item, stock (-1 = unlimited), price, standing,
+  1 if it costs a currency or items]; `wfm_go3` waits until 2 minutes since the last page and throws if more than 40 s
+  are left). Batch checked with SHA-256 (16,481 bytes), saved in the tab as `wfm_pages_saved_004`. Next: the
+  Philosopher's Stone page (B10), more vendors (A0), Fizzlefuse again, Javnir Nashak (A7), then the pools (step 3).
 - How to read (works): in the Wowhead tab, `localStorage` keys `wfm_fn` (reader: throws on a blocked or non-Forever
   page, stores the page under `wfm_pages`) and `wfm_go2` (waits until 60 s since the last page, at most 40 s);
   per page a batch of [wait 10, wait 10, run wfm_go2, navigate, run wfm_fn]; 3 pages per batch (the tool stops a call

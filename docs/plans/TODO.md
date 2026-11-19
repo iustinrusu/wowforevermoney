@@ -65,7 +65,9 @@ A4. [x] (done 2026-11-19: TSM matches your client on 2,966 of 2,969, the game fi
        **Compare TSM's vendor prices with the game files** (after A0; "TSM is the king"): the addon checks up to 800
        items a login; once TSM's vendor prices arrive, compare them on Data health and decide whether the game files
        are still needed for vendor sell prices at all.
-A5. [ ] **Wowhead reading session** (pace in CLAUDE.md, at most 20 pages): checklist B10 (one Power Crystal
+A5. [x] (done 2026-11-20: 20 pages, 2 minutes apart, no block: B10's spell, B9's 4 items, 9 vendors for A0, A1's 2,
+       A2's 4. Details in the project log, change log eleventh part, and the checklist.)
+       **Wowhead reading session** (pace in CLAUDE.md, at most 20 pages): checklist B10 (one Power Crystal
        transmutation spell page: who casts them?), B9 (Mote of Unstable Magic, Shellfish, Pristine Black Diamond,
        Vulture Gizzard: the biggest markets the app has no way into), A0 (vendor stock for flips), then A1, A2.
 

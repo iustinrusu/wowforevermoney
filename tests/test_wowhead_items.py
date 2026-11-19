@@ -270,5 +270,61 @@ class ImportTests(unittest.TestCase):
             self.assertIn(str(CLOTH), wi.load(target)['items'])
 
 
+class VendorPageTests(unittest.TestCase):
+    """A vendor's Sells tab (checklist A0, 2026-11-20): what it sells in Forever, the stock, the price."""
+    MODULATOR, CARROT, SCHEMATIC, PATTERN, OTHER = 4363, 11122, 264211, 215369, 6270
+    KORGAR, WIZZLE, FIZZLE = 260565, 4453, 248200
+
+    def pages(self):
+        url = 'https://www.wowhead.com/forever/npc=1'
+        return {f'npc={self.KORGAR}': {**page("Kor'gar", {}, url=url), 'sells': [[self.MODULATOR, 2, 210, 0],
+                                                                                [self.OTHER, -1, 100]]},
+                f'npc={self.WIZZLE}': {**page('Wizzle Brassbolts', {}, url=url), 'sells': [[self.CARROT, -1, 28650, 0]]},
+                f'npc={self.FIZZLE}': {**page('Fizzlefuse', {}, url=url),
+                                       'sells': [[self.SCHEMATIC, -1, 0, 0], [self.PATTERN, -1, 500, 0, 1]]}}
+
+    def test_sells_rows_are_kept_and_checked(self):
+        data, saved, problems = wi.merge({}, self.pages())
+        self.assertEqual(problems, [])
+        self.assertEqual(data['npcs'][str(self.KORGAR)]['sells'][0], {'id': self.MODULATOR, 'stock': 2, 'cost': 210})
+        lists = wi.vendor_lists(data)
+        self.assertEqual(sorted(lists), [self.WIZZLE, self.FIZZLE, self.KORGAR])
+        self.assertEqual(lists[self.FIZZLE][self.PATTERN], {'id': self.PATTERN, 'stock': -1, 'cost': 500, 'other_cost': True})
+        bad = self.pages()
+        bad[f'npc={self.KORGAR}']['sells'][0][1] = -5                    # a stock below -1 is not a stock
+        self.assertEqual(wi.merge({}, bad)[2][0].split(':')[0], f'npc={self.KORGAR}')
+
+    def test_the_forever_list_decides_who_sells_what(self):
+        from types import SimpleNamespace
+        from tests.test_engine import SETTINGS, item, make_world
+        from wfm.engine import Engine
+        from wfm.questie import QuestieDB
+        w = make_world({}, [])
+        for i in (self.MODULATOR, self.CARROT, self.SCHEMATIC, self.PATTERN, self.OTHER):
+            w.gamedata.items[i] = item(i, f'Item {i}', buy=300)
+        # QuestieDB: Wizzle and Kor'gar sell the Modulator; Borya-like 3364 (unread) sells the other; Fizzlefuse the schematic
+        w.questie = QuestieDB(items={self.MODULATOR: {'vendors': [self.WIZZLE, self.KORGAR]}, self.OTHER: {'vendors': [3364]},
+                                     self.SCHEMATIC: {'vendors': [self.FIZZLE]}, self.PATTERN: {'vendors': [self.FIZZLE]}},
+                              npcs={n: {'name': f'NPC {n}', 'friendlyToFaction': 'AH', 'zoneID': 1}
+                                    for n in (self.WIZZLE, self.KORGAR, self.FIZZLE, 3364)})
+        w.forever_pages = wi.merge({}, self.pages())[0]
+        e = Engine(w, dict(SETTINGS))
+        v = e.vendors_for(self.MODULATOR)
+        self.assertEqual([(x['npc'], x['stock'], x['stock_known'], x['stock_source']) for x in v],
+                         [(self.KORGAR, 2, True, 'Wowhead Forever')])            # Wizzle's Forever page lacks it
+        self.assertEqual(e.vendor_price(self.MODULATOR)[0], 210)                 # the page's price, not the file's 300
+        self.assertIn('vendor_price_wowhead', e.vendor_flags(self.MODULATOR))
+        self.assertEqual(e.vendor_stock_cap(self.MODULATOR), 2)
+        # Kor'gar's page adds a vendor QuestieDB didn't list; unlimited is known, not a stock
+        other = {x['npc']: x for x in e.vendors_for(self.OTHER)}
+        self.assertEqual(sorted(other), [3364, self.KORGAR])
+        self.assertEqual((other[self.KORGAR]['stock'], other[self.KORGAR]['stock_known']), (None, True))
+        self.assertEqual(other[3364]['stock_source'], None)                       # unread: as before
+        # sold for a currency or items, not gold: not a vendor to buy from with gold
+        self.assertEqual(e.vendors_for(self.SCHEMATIC), [])
+        self.assertEqual(e.vendors_for(self.PATTERN), [])
+        self.assertIsNone(e.vendor_price(self.SCHEMATIC))
+
+
 if __name__ == '__main__':
     unittest.main()

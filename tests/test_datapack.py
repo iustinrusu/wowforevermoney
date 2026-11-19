@@ -31,6 +31,23 @@ class DataPackTests(unittest.TestCase):
             self.assertEqual((theirs / 'wowhead_forever_items.json').read_text(encoding='utf-8'), '{"items": {}}')
             self.assertEqual(datapack.unpack('k', theirs, pack), 'up to date')
 
+    def test_pages_imported_since_the_pack_are_kept(self):
+        # 2026-11-20: an import was overwritten by the older pack on the next start, before a commit rebuilt the pack
+        import os
+        with tempfile.TemporaryDirectory() as d:
+            here = Path(d)
+            items = here / 'wowhead_forever_items.json'
+            items.write_text('{"items": {"1": {}}}', encoding='utf-8')
+            pack = Path(d, 'p.pack')
+            datapack.pack('k', here, pack)
+            os.utime(pack, (1_700_000_000, 1_700_000_000))
+            items.write_text('{"items": {"1": {}, "2": {}}}', encoding='utf-8')        # imported after the pack
+            self.assertEqual(datapack.unpack('k', here, pack), '0 of 1 files updated, 1 kept (newer here than the pack)')
+            self.assertIn('"2"', items.read_text(encoding='utf-8'))
+            os.utime(items, (1_600_000_000, 1_600_000_000))                            # older than a pack just pulled
+            self.assertEqual(datapack.unpack('k', here, pack), '1 of 1 files updated')
+            self.assertNotIn('"2"', items.read_text(encoding='utf-8'))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -45,6 +45,7 @@ const FLAGS = {
   risky: ['bad', 'speculative', 'Speculative: depends on prices recovering'],
   small_sample: ['warn', 'small sample', 'Not many catches/loots logged here yet'],
   vendor_price_tsm: ['good', 'vendor price from TSM', 'What a vendor charges, from TSM\'s merchant records (read in game by ForeverMoneyBridge)'],
+  vendor_price_wowhead: ['good', 'vendor price from Wowhead Forever', 'What a vendor charges, from its Wowhead Forever page (its Sells tab, read by hand)'],
   vendor_price_unconfirmed: ['', 'vendor price from game files', 'Base price from the game files; open the vendor once with ForeverMoneyBridge to confirm the real price'],
   price_check_fails: ['bad', 'only pays at odd prices', 'Second opinion: at typical prices (the median of the realm and region listing averages and the usual sale price) this loses money. It only pays at today\'s unusual prices, so it is kept out of Top picks and the plan. The details show the numbers'],
   price_check: ['warn', 'check the price', 'Second opinion: at typical prices (the median of the realm and region listing averages and the usual sale price) this makes under a third of the profit shown. Check the prices in game before acting; the details show the numbers'],

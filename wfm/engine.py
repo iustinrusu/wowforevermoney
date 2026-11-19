@@ -153,11 +153,30 @@ class Engine:
     def price(self, iid: int) -> dict | None:
         return self.prices.get(iid)
 
+    def wowhead_vendors(self) -> dict[int, dict[int, dict]]:
+        """Vendors whose Wowhead Forever page was read: npc -> {item: {'stock', 'cost'}} (wowhead_items.vendor_lists)."""
+        if '_wh_vendors' not in self.__dict__:
+            self._wh_vendors = wowhead_items.vendor_lists(getattr(self.w, 'forever_pages', None) or {})
+        return self._wh_vendors
+
     def vendors_for(self, iid: int) -> list[dict]:
+        """The vendors you can use that sell an item: QuestieDB's Forever data, and where a vendor's Wowhead Forever
+        page was read (checklist A0, 2026-11-20), that page's Sells list instead: it says what the vendor sells in
+        Forever, how many a restock (or unlimited) and the price. QuestieDB had Borya selling Pattern: Invoker's Cord and
+        Wizzle Brassbolts selling Copper Modulator; their Forever pages list neither."""
         out = []
         qi = self.q.items.get(iid) if self.q else None
-        for npc_id in (qi or {}).get('vendors') or []:
-            npc = self.q.npcs.get(npc_id, {})
+        wh = self.wowhead_vendors()
+        npcs = list((qi or {}).get('vendors') or [])
+        npcs += [n for n, items in wh.items() if iid in items and n not in npcs]   # Forever vendors QuestieDB lacks
+        for npc_id in npcs:
+            sold = wh.get(npc_id)
+            if sold is not None and iid not in sold:
+                continue                       # its Forever page's Sells list doesn't have this item
+            row = (sold or {}).get(iid)
+            if row is not None and (row.get('other_cost') or row.get('cost') == 0):
+                continue                       # sold for a currency or items, not gold (Fizzlefuse's schematics)
+            npc = (self.q.npcs.get(npc_id, {}) if self.q else {}) or {}
             friendly = npc.get('friendlyToFaction') or ''
             if friendly and self.faction not in friendly:
                 continue
@@ -174,14 +193,21 @@ class Engine:
             # Event-only vendors: holiday vendors, and the Darkmoon Faire (its NPCs spawn in both Elwynn Forest
             # and Mulgore, where the Faire alternates). Vendors with no known spawn may not be reachable at all.
             event = any(w in sub for w in EVENT_WORDS) or DARKMOON_ZONES <= spawn_zones
-            listed = (self.su.limited_stock.get(iid) or {}).get(npc_id)
             seen = (((getattr(self.w, 'profile', None) or {}).get('vendors') or {}).get(npc_id) or {}).get('items') or {}
             seen_stock = (seen.get(iid) or {}).get('stock')
-            if listed is None and seen_stock is not None and seen_stock > 0:
-                listed = int(seen_stock)       # limited, as the addon saw it (what was left then: a floor)
+            if row is not None and row.get('stock') is not None:
+                # Wowhead Forever: how many a restock, -1 = unlimited (Forever data: before the Classic list)
+                listed, known, source = (row['stock'] if row['stock'] > 0 else None), True, 'Wowhead Forever'
+            else:
+                listed = (self.su.limited_stock.get(iid) or {}).get(npc_id)
+                source = 'Classic database' if listed is not None else None
+                if listed is None and seen_stock is not None and seen_stock > 0:
+                    listed, source = int(seen_stock), 'your visit'   # as the addon saw it (what was left then: a floor)
+                known = listed is not None or seen_stock is not None
             out.append({'npc': npc_id, 'name': npc.get('name', f'NPC {npc_id}'), 'zone': self.gd.zones.get(zone_id, ''),
                         'coords': spawn, 'friendly': friendly, 'stock': listed,
-                        'stock_known': listed is not None or seen_stock is not None,
+                        'stock_known': known, 'stock_source': source,
+                        'wowhead_cost': (row or {}).get('cost'),
                         'event': event, 'located': bool(spawn_zones or zone_id)})
         return out
 
@@ -206,19 +232,22 @@ class Engine:
             tsm_buy = int((((getattr(self.w, 'profile', None) or {}).get('tsm_vendor') or {}).get('buy') or {}).get(iid)
                           or 0)
             listed = int(self.su.vendor_prices.get(iid, 0) or 0)
-            price = tsm_buy or listed or (item.buy_price if item and item.buy_price > 0 else 0)
+            # a vendor's Wowhead Forever page gives its price too (Forever data, after TSM's record of what you paid)
+            wh_cost = min((int(v['wowhead_cost']) for v in vendors if v.get('wowhead_cost')), default=0)
+            price = tsm_buy or wh_cost or listed or (item.buy_price if item and item.buy_price > 0 else 0)
             if vendors and price > 0:
                 # Game files hold a base price; Black Market agents charge far more (Frilled Lichen: 4g 50s, not
                 # the file's 1s 20c, seen in game 2026-11-13). If only they sell it, the real price is unknown until
                 # ForeverMoneyBridge sees it, so this vendor isn't used for flips or ingredient costs at all.
                 black = ['black market' in str((self.q.npcs.get(v['npc']) or {}).get('subName', '')).lower()
                          for v in vendors]
-                if all(black):
+                if all(black) and not wh_cost:
                     self._vendor_flags[iid] = ('black_market',)
                 else:
                     result = (price, vendors)
                     self._vendor_flags[iid] = (('black_market',) if any(black) else
-                                               ('vendor_price_tsm',) if tsm_buy else ('vendor_price_unconfirmed',))
+                                               ('vendor_price_tsm',) if tsm_buy else
+                                               ('vendor_price_wowhead',) if wh_cost else ('vendor_price_unconfirmed',))
         if result and not any(v.get('located', True) and not v.get('event') for v in result[1]):
             # every vendor is event-only (Darkmoon Faire, holidays) or has no known location
             self._vendor_flags[iid] = self._vendor_flags.get(iid, ()) + ('event_vendor',)
@@ -857,7 +886,8 @@ class Engine:
     def vendor_flips(self) -> list[Opportunity]:
         out = []
         candidates = set(self.su.vendor_prices) | {iid for iid, qi in (self.q.items.items() if self.q else [])
-                                                   if qi.get('vendors')}
+                                                   if qi.get('vendors')} \
+            | {i for items in self.wowhead_vendors().values() for i in items}     # Wowhead Forever vendor pages
         for iid in candidates:
             vp = self.vendor_price(iid)
             if not vp:

@@ -24,6 +24,18 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-20 A vendor's Wowhead Forever page decides what it sells (checklist A0; the user, 2026-11-15: "Wowhead
+  always has more accurate data").** Once a vendor's page is read, its Sells list replaces QuestieDB's for that vendor:
+  an item not on it isn't sold there (QuestieDB had Borya selling Pattern: Invoker's Cord, a Season of Discovery item,
+  behind the app's biggest vendor flip at 46g a day, and Wizzle Brassbolts selling Copper Modulator); an item on it
+  that QuestieDB lacks is added (Recipe: Rockscale Cod at Kelsey Yance). Its stock comes first (Forever data: before
+  SkillUpForever's Classic list and before what the addon saw, which is only what was left), and its price comes after
+  what you paid (TSM's VendorBuy) and before the game files. An item it sells for a currency or items, not gold
+  (price 0: Fizzlefuse's schematics), doesn't count as a vendor to buy from.
+- **2026-11-20 The data pack never overwrites newer local pages.** `datapack.unpack` replaced a local Wowhead file
+  whenever it differed from the pack, so pages imported before the next commit were lost when the app started (it
+  happened during this session's import; nothing was lost, the batch was re-imported). Now a pack file replaces only a
+  missing local file or one older than the pack, as its docstring said; the pre-commit hook still packs new pages.
 - **2026-11-19 Vendor sell prices: your client, then TSM, then the game files (to-do A4: "decide whether the game files
   are still needed for vendor sell prices at all").** Claude's decision, with the reason: the game files stay, but only
   as the last fallback. TSM's VendorSell (read in game) gives a price for every item with one but 15 and matched your
@@ -620,6 +632,25 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-20, Wowhead Forever pages (session 4, 20 pages):
+  - Spell 1289305 "Transmute: Red Power Crystal to Blue Power Crystal": 2 s cast, tool Philosopher's Stone, reagent 1
+    Red Power Crystal, creates 1 Blue Power Crystal (11184); no skill line, no "taught by" tab; added in 1.60.1.
+  - Mote of Unstable Magic (274964): 200 Forever mobs drop it (60 kept: most looted); Shellfish (13545): only Shellfish
+    Trap (object 176582, Desolace), 1,251 of 1,484 openings, 1-2 each; Pristine Black Diamond (18335): 88 Forever mob
+    rows, each 1-8 drops in 150-1,200 kills (114 Classic rows dropped); Vulture Gizzard (8396): one Forever mob (5982),
+    505 of 1,842 kills.
+  - Vendor pages store the stock as `avail` (-1 = unlimited) and the price as cost[0][0] in copper (cost[0][1] and
+    cost[0][2]: currencies and items). Borya sells 22 items (5 patterns limited to 1; no Invoker's Cord). Kania: 18,
+    only Lesser Magic Essence (2) and Strange Dust (4) limited. Wizzle Brassbolts: only Carrot on a Stick. Kor'gar: 19,
+    Copper Modulator 2 at 2s 10c, 7 more limited engineering parts. Vi'el: Gromsblood 5 at 10s, Felcloth 2, Fel
+    Elemental Rod unlimited at 40g. Fizzlefuse: 29 schematics, price 0 in gold. Kelsey Yance: 18, all unlimited (her
+    recipes 14,400, the game files 16,000). Aurian Highgrove and Nixxrax Fillamug: Junglevine Wine unlimited; Short
+    Stout 3, Darkmoon Special Reserve 4, Jug of Badlands Bourbon 2 at Aurian. Wowhead's vendor prices are often 10%
+    under the game files' (Coarse Thread 9 vs 10, Bleach 23 vs 25), the same as TSM's VendorBuy for the user: a
+    reputation discount in both, or Forever's real prices; not settled.
+  - Black Whelp Scale is skinned in Forever (Black Whelp 441: 6,900 of 22,950 skins); Worn Dragonscale, Green
+    Dragonscale and Chimera Leather have Forever "Skinned from" rows too, so every skinning item is read.
+
 - 2026-11-19 (A4), the user's install: TSM's VendorSell read in game at 20:37 for 17,352 items (of 27,152 asked,
   9,800 with none: items that sell for 0); TSM VendorBuy 138. Your client's checks: 3,274 (11-13 to 11-19). Of the
   2,969 with both: all three agree 2,573; game files wrong and TSM right 393 (client tables 51, hotfix cache changed
@@ -791,6 +822,16 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-20** (eleventh part) Wowhead reading session (to-do A5): 20 pages, 2 minutes apart, no block (list in
+  docs/plans/material-coverage.md, session 4). Code: `wowhead_items.clean_sell`, `vendor_lists`, npc pages keep
+  `sells`; `Engine.wowhead_vendors`, `vendors_for` (a read vendor page decides, its stock and price; currency-only
+  items left out), vendor price chain (seen at the vendor, TSM VendorBuy, Wowhead Forever, SkillUpForever, files),
+  flag `vendor_price_wowhead`, vendor-flip candidates include items only a read vendor page lists; `datapack.unpack`
+  keeps newer local files. Real data, before -> after: vendor flips 370 -> 362 (gone: Pattern: Invoker's Cord 46g 38s a
+  day, 8 Fizzlefuse schematics; new: Recipe: Rockscale Cod), Copper Modulator 1g 74s -> 6s a day (Kor'gar only, 2 a
+  restock; it left Top picks), 24 flips with Wowhead's stock or price; skinning spots flagged "some skins not counted"
+  40 -> 0; mob farming rows 812 -> 880. Tests: 303 pass (3 new: vendor pages, who sells what, newer local files kept).
 
 - **2026-11-19** (tenth part) Vendor prices three ways (to-do A4, checklist B12). `gamedata.apply_tsm_vendor` also
   reports TSM against your client's checks (`client_same`, `client_differ` with the check's time);

@@ -10,14 +10,19 @@ are done or decided (with the date). Don't drop an item without the user's say.
 Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session (the exact reading order:
 `docs/plans/material-coverage.md`, Progress section).
 
-- [ ] A0. **First in the next Wowhead session (the user, 2026-11-15: "Wowhead always has more accurate data"):** vendor
+- [ ] A0. (2026-11-20: 9 vendors read: Borya, Kania, Wizzle Brassbolts, Kor'gar, Vi'el, Fizzlefuse, Kelsey Yance,
+      Aurian Highgrove, Nixxrax Fillamug. Borya doesn't sell Pattern: Invoker's Cord in Forever (QuestieDB's 46g-a-day
+      flip was a phantom); Wizzle doesn't sell Copper Modulator, Kor'gar does, 2 a restock; Fizzlefuse's schematics
+      cost a currency, not gold. The app now trusts a read vendor page over QuestieDB. Next, by profit at stake: the Hand
+      Axe weapon vendors (Jyn Stonehoof, Urtharo, ...), Yaelika Farclaw, Timothy Weldon; re-read Fizzlefuse with the
+      fixed reader to see the currency.) **First in the next Wowhead session (the user, 2026-11-15: "Wowhead always has more accurate data"):** vendor
       stock from Wowhead Forever NPC pages ("Sells" tab, Stock column: a number = limited, ∞ = unlimited) for the vendors
       behind vendor flips flagged "stock unknown", most profitable first (Wizzle Brassbolts and Kor'gar for Copper
       Modulator first). Store per npc and item like the addon's records; the engine already caps by stock.
-- [ ] A1. The rest of the top 100 coverage queue: 2 item pages left (Kingsblood 3356, Iridescent Pearl 5500; 20 read
-      on 2026-11-15).
-- [ ] A2. The 4 skinning items left: Black Whelp Scale (7286), Worn Dragonscale (8165), Green Dragonscale (15412),
-      Chimera Leather (15423). Then "some skins not counted" goes away.
+- [x] A1. (done 2026-11-20) The rest of the top 100 coverage queue: 2 item pages left (Kingsblood 3356, Iridescent
+      Pearl 5500; 20 read on 2026-11-15).
+- [x] A2. (done 2026-11-20: "some skins not counted" is gone from all 40 skinning spots) The 4 skinning items left:
+      Black Whelp Scale (7286), Worn Dragonscale (8165), Green Dragonscale (15412), Chimera Leather (15423).
 - [ ] A3. 26 fishing-pool object pages, debris and wreckage first (list in the plan, step 3). Answers whether floating
       debris is where most of the fishing gold is (the user's hunch).
 - [ ] A4. Each herb and ore node's own page, so node values have no Classic parts left.
@@ -63,11 +68,18 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       the recipe trainer fees it lists: labelled "Classic database", not Forever fact. Next time you train a rank or a
       recipe, tell Claude what the trainer asked for (or send a screenshot of the trainer window). If it differs,
       Claude can make the addon read the trainer window, so the fees become Forever data.
-- [ ] B9. (2026-11-19) Big markets the app has no way into (Market tab, "only items the app has no way into"): Mote of
+- [ ] B9. (2026-11-20: all 4 pages read. Mote of Unstable Magic: 60 Forever mobs, 68 new mob farming rows, mostly
+      dungeon bosses; best open-world: Blackmaw Devotee in Blackmaw Hold. Shellfish: only from Shellfish Traps in
+      Desolace, 84% of openings (1-2 each); the app has no row for opening objects like that yet. Pristine Black
+      Diamond: a rare world drop in Forever (1 in 200-1,200 kills). Vulture Gizzard: one Forever mob, 27% of kills.
+      Left: a farming row for objects such as the Shellfish Trap.) (2026-11-19) Big markets the app has no way into (Market tab, "only items the app has no way into"): Mote of
       Unstable Magic (215 kinds of mob drop it, 390g traded a day), Shellfish, Pristine Black Diamond, Vulture
       Gizzard; dungeon gear and patterns belong to the Dungeons view (to-do 8). Each needs its Wowhead Forever page
       (Wowhead budget) to become a farming row.
-- [ ] B10. (2026-11-19) Power Crystal transmutations (Forever-only spells 1289305, 1308151-1308225: 5 crystals of one
+- [ ] B10. (2026-11-20: spell 1289305 read. "Transmute: Red Power Crystal to Blue Power Crystal": 2-second cast,
+      tool Philosopher's Stone, 1 Red Power Crystal makes 1 Blue. Wowhead lists no profession skill and nothing that
+      teaches it, so who can cast it is still open; the Philosopher's Stone's own page is the next one to read.)
+      (2026-11-19) Power Crystal transmutations (Forever-only spells 1289305, 1308151-1308225: 5 crystals of one
       colour into 5 of another; Red sells for 14s, Green 2s): the game data has no player source. Read one spell's
       Wowhead Forever page to find who or what casts them (an object in Un'Goro?); if players can, they are a flip.
       Data health "Item interactions" lists them.

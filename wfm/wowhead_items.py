@@ -8,7 +8,11 @@ Three kinds of page, each a section of the file:
              Contained in (items)                                 outof = times that container was opened
              Fished in (zones)                                    Wowhead's own denominator: zone pages give catch rates
   objects  A node, chest or fishing pool: its Contains tab (rows = items, outof = times it was opened or gathered).
-  npcs     A mob: its Drops / Skinning / Pickpocketing tabs (rows = items, outof = times it was looted).
+  npcs     A mob: its Drops / Skinning / Pickpocketing tabs (rows = items, outof = times it was looted). A vendor:
+           its Sells tab (`sells`: every item it sells in Forever, the stock, -1 = unlimited, and the price; 2026-11-20,
+           checklist A0). Once a vendor's page is read, what it sells comes from here, not QuestieDB: QuestieDB had
+           Borya selling Pattern: Invoker's Cord (a Season of Discovery item) and Wizzle Brassbolts selling Copper
+           Modulator, and neither does in Forever.
 
 Rows Wowhead marks as Classic Era data are left out when a page is read (counted in `classic`), and so are rows
 from fewer than MIN_LOOTED loots (counted in `small`): a handful of loots says nothing. Rates from fewer than SOLID
@@ -138,6 +142,26 @@ def clean_row(r) -> dict:
     return out
 
 
+def clean_sell(r) -> dict:
+    """A vendor's Sells row, compact [item, stock (-1 = unlimited, else how many a restock), price in copper, the
+    reputation it needs, 1 if it also costs a currency or items] or an object. A price of 0 means not gold (Fizzlefuse's
+    schematics: some other currency; read before the reader kept that)."""
+    if isinstance(r, list):
+        r = dict(zip(('id', 'stock', 'cost', 'standing', 'other_cost'), r))
+    if not isinstance(r, dict):
+        raise ValueError('a sells row must be a list or an object')
+    out = {'id': _int(r.get('id'), 1, 10**8)}
+    if r.get('stock') is not None:
+        out['stock'] = _int(r['stock'], -1, 10**6)
+    if r.get('cost') is not None:
+        out['cost'] = _int(r['cost'], 0, 10**10)
+    if r.get('standing'):
+        out['standing'] = _int(r['standing'], 0, 10)
+    if r.get('other_cost'):
+        out['other_cost'] = True
+    return out
+
+
 def clean_page(page: dict) -> dict:
     if not isinstance(page, dict) or not isinstance(page.get('tabs'), dict):
         raise ValueError('a page needs tabs')
@@ -162,6 +186,11 @@ def clean_page(page: dict) -> dict:
                             'classic': _int(tab.get('classic', 0)), 'small': _int(tab.get('small', 0)) + small,
                             'note': re.sub(r'<[^>]+>', '', _text(tab.get('note') or '', 300)),
                             'rows': rows[:MAX_ROWS]}
+    if page.get('sells') is not None:
+        if not isinstance(page['sells'], list):
+            raise ValueError('sells must be a list')
+        out['sells'] = [clean_sell(r) for r in page['sells'][:500]]
+        out['sells_classic'] = _int(page.get('sells_classic') or 0)
     return out
 
 
@@ -192,6 +221,16 @@ def merge(data: dict, pages: dict) -> tuple[dict, list[str], list[str]]:
         out[sec][pid] = clean
         saved.append(f'{sec[:-1]}={pid}')
     return out, saved, problems
+
+
+def vendor_lists(data: dict) -> dict[int, dict[int, dict]]:
+    """npc id -> {item id: {'stock': -1 or how many, 'cost': copper}} for every vendor whose Forever page was read:
+    what it sells in Forever, the whole list."""
+    out = {}
+    for nid, page in ((data or {}).get('npcs') or {}).items():
+        if isinstance(page.get('sells'), list):
+            out[int(nid)] = {int(r['id']): r for r in page['sells']}
+    return out
 
 
 def page_ids(data: dict, section: str = 'items') -> set[int]:
