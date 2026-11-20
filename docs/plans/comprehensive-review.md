@@ -62,6 +62,14 @@ fix the clear bugs, ask the user only about real decisions. Never skip a check o
   higher and are not "doable now" in a zone whose mobs are mostly 4+ levels above you (`Engine.zone_level`, flag
   `zone_above_you`). Both known items done. Crafted-worth cap, good day, own materials, effort, ranking: unchanged
   since the 2026-11-15 review, which checked them.
+- Part 3 done 2026-11-20: the data layer started with each source missing (TSM, QuestieDB, SkillUpForever,
+  ForeverRecipes, both, no SavedVariables at all, a friend without the data key, GatherLite and Everloot): it loads,
+  runs and says what's missing every time. Addon folders are watched file by file (`_mtime` reads the newest .lua), so
+  updates reload. Fixed notes: TSM missing now says there are no prices and how to get them; QuestieDB missing says
+  what is lost and how to install it; the Wowhead pages' status said "No zones read yet" whenever no fishing zone was
+  read, and for a friend without the data key it now says the pages are locked and the key unlocks them. The pack:
+  key, wrong key and newer local pages are tested (`tests/test_datapack.py`). Classic labels: every row kind that uses
+  Classic data carries its flag (fishing tables, node yields, gathers per node, disenchanting, Everloot, skill rule).
 
 ## Known items to look at (from 2026-11-15)
 - Levelling planner values products with no recorded sales at vendor price where Crafting shows the listing

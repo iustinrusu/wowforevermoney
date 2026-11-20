@@ -152,7 +152,10 @@ class World:
         path = self.paths.tsm_appdata
         st.files = [str(path)]
         if not path.exists():
-            st.status, st.note = 'missing', 'TSM AppHelper AppData.lua not found.'
+            st.status, st.note = 'missing', ('TSM AppHelper AppData.lua not found, so there are no auction prices: crafts, '
+                                             'flips and values all need them. Install the TSM desktop app and the '
+                                             'TradeSkillMaster and TradeSkillMaster_AppHelper addons (CurseForge app), '
+                                             'log in once, and keep the desktop app running.')
             return
         self.price_data = parse_appdata(path)
         realm = self.settings.snapshot().get('realm')
@@ -169,7 +172,9 @@ class World:
         toc, drops = self.paths.questie_toc, self.paths.questie_drops
         st.files = [str(toc), str(drops)]
         if not toc.exists():
-            st.status, st.note = 'missing', 'QuestieDB not installed; vendor and drop info unavailable.'
+            st.status, st.note = 'missing', ('QuestieDB not installed: no vendors, mob drops or node locations, so no vendor flips, ingredient '
+                                             'prices from vendors or herb and ore spots. Install Questie (it brings QuestieDB) '
+                                             'through the CurseForge app.')
             self.questie = QuestieDB()
             return
         self.questie = load_questie(toc)
@@ -384,8 +389,14 @@ class World:
                        | {pg.get('read', '') for sec in wowhead_items.SECTIONS
                           for pg in (self.forever_pages.get(sec) or {}).values()} - {''})
         st.version = dates[-1] if dates else None
-        if not self.forever_fishing:
-            st.status, st.note = 'missing', 'No zones read from Wowhead Forever yet.'
+        if not self.forever_fishing and not any(self.forever_pages.get(sec) for sec in wowhead_items.SECTIONS):
+            locked = datapack_mod.PACK.exists() and self.pack_status in ('no data key set',
+                                                                          'wrong key, or the pack is damaged')
+            st.status = 'missing'
+            st.note = (('The Wowhead Forever pages (drop, skinning and fishing counts, vendor lists) come locked in '
+                        'data/wowhead_forever.pack: enter the shared data key in Settings to unlock them '
+                        f'({self.pack_status}). Until then there are no mob farming rows and fewer Forever-backed '
+                        'farming spots.') if locked else 'No pages read from Wowhead Forever yet.')
         else:
             st.status = 'ok'
             st.note = (f'{len(self.forever_fishing)} zones ({", ".join(sorted(self.forever_fishing))}), '
