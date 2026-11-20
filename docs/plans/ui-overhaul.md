@@ -109,3 +109,6 @@ and the Settings switch turn the motion off; tests pass.
     recalculation; the off rule; new keyframes move only transform and opacity). The mock-up page is removed.
   - Left as it was: the Biggest markets glow (`yours-glow`, the user's request of 2026-11-19) animates outline and
     shadow, not transform/opacity; it stops with Motion off.
+- **2026-11-20 Signed off by the user ("Signed off") on the after pictures (`data/screenshots/after/`). Done.**
+  Every "done when" point met: sign-off; no tab scrolls sideways at 375 px; console clean; Motion off and the system's
+  reduce-motion (with "follow Windows") stop every animation; tests pass.

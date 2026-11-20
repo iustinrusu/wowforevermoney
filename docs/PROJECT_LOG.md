@@ -836,6 +836,9 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (sixteenth part) The user signed off on the Night watch look ("Signed off", after pictures of every tab
+  wide and at 375 px). To-do B2 ticked; next is part C (`docs/plans/TODO.md`).
+
 - **2026-11-20** (fifteenth part) UI overhaul built: the Night watch look (details in `docs/plans/ui-overhaul.md`,
   Progress). `web/style.css` (theme section at the end), `web/index.html` (sky, tab line, loading shimmer, motion set
   before the first paint), `web/app.js` (motion, sky, parallax, `placeInk`, `countUp`, `runCounts`, `sparkle`,
