@@ -378,3 +378,8 @@ table.profs .amt { white-space: nowrap; }
   table.profs col.c-good { width: 10%; } table.profs col.c-cost { width: 12%; } table.profs col.c-short { width: 24%; }
   table.profs th { white-space: normal; }
 }
+
+/* NPC and mob names link to Wowhead (2026-11-20): normal text colour with a dotted underline, so they stay easy to read
+   beside the quality-coloured item names */
+a.npc { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+a.npc:hover { color: var(--gold); }

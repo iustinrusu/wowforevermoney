@@ -879,6 +879,15 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (twenty-seventh part) (1) Reading session from the new queue (the user: "Do it now"): 20 pages, no
+  block (`docs/plans/material-coverage.md`, session 6); 140 item and 21 npc pages now. Mob farming after it: Toxic
+  Horror still first (about 32g an hour); new farms in Forever-only zones (Alcaz Prison, Blackmaw Hold) whose levels
+  aren't known yet. (2) NPC and mob names link to their Wowhead Forever pages (the user: "mobs names should also link
+  to wowhead pages", "npcs too"): `npcLink`, `farmTitle` in `web/app.js` (mob farming and skinning row titles, the
+  levelling planner's trainers, vendors, droppers and quest givers, where to buy, the item details' sold by and dropped
+  by), a dotted-underline style. Fixed on the way: "Devilsaur" was linked inside "Tyrant Devilsaur" (longest names
+  first now). Checked in the browser: links and hrefs right, every tab without script errors; tests pass.
+
 - **2026-11-20** (twenty-sixth part) Fixed: four dungeons counted as open world. The AreaTable puts Blackrock Spire
   (1583), Blackrock Depths (1584), The Temple of Atal'Hakkar (1477) and Onyxia's Lair (2159) on a continent, while
   QuestieDB files those dungeons' 165 mobs under these areas, so they showed as open-world mob farms and their drops

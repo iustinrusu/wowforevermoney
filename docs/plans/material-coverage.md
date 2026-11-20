@@ -44,6 +44,12 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   the market limit and its kill speed, minus what Forever data shows; rare and named mobs (under 5 spawn points in
   QuestieDB) left out. An item without Forever source data: your share of the region's trade in it a day; items only
   dungeon mobs drop are left for the Dungeons view (C4). Read it from the top, skip pages read in the last month.
+- Session 6 (2026-11-20, late evening, the first from the reading queue; the user: "Do it now"): 20 pages, 2 minutes
+  apart, no block, the queue's top 20: items 13486 16713 287020 4500 16723 12692 12809 16710 12820 13047 18362 16673
+  273127 13443 287033 13466 18333 13444, npcs 11745 8546. The coins ("Worth") now come from the coin icons (Dark
+  Adept 5s 82c). Saved with every special character as a \u escape, so the copy was exact the first time (SHA-256,
+  15,467 characters); kept in the tab as `wfm_pages_saved_006`. No Forever drops recorded yet: Cyclone Warrior.
+  Pages: 140 items, 21 npcs.
 - Session 5 (2026-11-20, evening, the mob farming review): 20 pages, 2 minutes apart, no block. Items 7081 16252
   14505 13499 12808 16246 15753 7069 7079 13496, npcs 8667 4494 8526 8550 14455 8525 7372 6138 7132 9397 (order: the
   user asked for high-level, high-interest pages first). The reader now keeps an npc page's Quick Facts (`facts`:

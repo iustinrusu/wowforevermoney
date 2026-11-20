@@ -110,6 +110,23 @@ const flagHtml = (flags) => (flags || []).map((f) => { const d = FLAGS[f] || [''
 // a title or sentence with the item's name in it, the name linked to its Wowhead Forever page (the user, 2026-11-20:
 // "every item name in the whole app should be clickable")
 const linkName = (text, id, name, q) => { const t = esc(text || ''); return id && name && t.includes(esc(name)) ? t.replace(esc(name), itemLink(id, name, q)) : t; };
+// an NPC or mob linked to its Wowhead Forever page (the user, 2026-11-20: "mobs names should also link to wowhead
+// pages", "npcs too"): vendors, trainers, quest givers, mobs that drop or are skinned
+const npcLink = (id, name) => id ? `<a class="npc" href="https://www.wowhead.com/forever/npc=${+id}" target="_blank" rel="noopener" data-wowhead="npc=${+id}&domain=forever" title="Open on Wowhead">${esc(name)}</a>` : esc(name);
+// a farming row's title with its mobs' names linked: "Kill Toxic Horror in Felwood", "Skin in Felwood: Angerclaw Grizzly, ..."
+const farmTitle = (o) => {
+  const d = (o && o.detail) || {}, t = String((o && o.title) || '');
+  const mobs = o.kind === 'mob_spot' && d.npc ? [{npc: d.npc, name: t.replace(/^(Spend an hour: )?Kill /, '').replace(new RegExp(' in ' + String(d.zone || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$'), '')}]
+    : (d.mobs || []).filter((m) => m.npc && m.name);
+  // longest names first, through placeholders, so "Devilsaur" is never linked inside "Tyrant Devilsaur"
+  let out = esc(t);
+  const links = [];
+  for (const m of [...mobs].sort((a, b) => b.name.length - a.name.length)) {
+    const e = esc(m.name);
+    if (out.includes(e)) { out = out.replace(e, `\u0000${links.length}\u0000`); links.push(npcLink(m.npc, m.name)); }
+  }
+  return out.replace(/\u0000(\d+)\u0000/g, (_, i) => links[+i]);
+};
 const itemLink = (id, name, q) => `<a class="q${q ?? 1}" href="https://www.wowhead.com/forever/item=${id}" target="_blank" rel="noopener" data-wowhead="item=${id}&domain=forever">${esc(name)}</a>`;
 // ---------- motion (the Night watch look, 2026-11-20) ----------
 // Settings "Motion": 'system' follows the system's reduce-motion setting (Windows: Settings > Accessibility > Visual
@@ -289,7 +306,7 @@ function oppTable(rows, opts = {}) {
     const cells = cols.map((c) => {
       if (c === 'title') {
         const name = o.name || o.title;
-        const label = ['fishing_zone', 'fishing_spot', 'skin_spot', 'herb_spot', 'mine_spot', 'farm_zone', 'mob_spot'].includes(o.kind) ? esc(o.title) : esc(o.title).replace(esc(name), itemLink(o.item_id, name, o.quality));
+        const label = ['fishing_zone', 'fishing_spot', 'skin_spot', 'herb_spot', 'mine_spot', 'farm_zone', 'mob_spot'].includes(o.kind) ? farmTitle(o) : esc(o.title).replace(esc(name), itemLink(o.item_id, name, o.quality));
         return `<td>${tickButton(o.key, o.kind)}${label}${o.needs ? `<div class="needs">needs ${esc(o.needs)}</div>` : ''}${o.tip ? `<div class="pill">💡 ${esc(o.tip)}</div>` : ''}${doneNote(o)}</td>`;
       }
       if (c === 'rank') return rankCell(ranks.get(o.key));
@@ -626,7 +643,7 @@ async function levellingPanel() {
     return st.channels.AH && /^AH/.test(st.back_how) && every >= 2 ? `<div class="hint" title="Your share (${num(STATE.settings.market_share * 100, 0)}%) of the region's sales of this product, from TSM. The path counts only the sales within ${num(d.ah_days, 0)} days; the rest go to a vendor or disenchanting.">slow: about 1 sale every ${every} days</div>` : '';
   };
   const FIND = {drop: 'it only drops', quest: 'a quest reward', vendor: 'sold for another currency, not gold', unknown: 'no source known'};
-  const at = (n) => `${esc(n.name)}${n.zone ? ` (${esc(n.zone)}${n.x != null ? ` ${num(n.x, 0)}, ${num(n.y, 0)}` : ''})` : ''}`;
+  const at = (n) => `${npcLink(n.npc, n.name)}${n.zone ? ` (${esc(n.zone)}${n.x != null ? ` ${num(n.x, 0)}, ${num(n.y, 0)}` : ''})` : ''}`;
   const where = (st) => {
     if (st.known) return '<div class="hint">You know this recipe.</div>';
     const s = st.sources;
@@ -1111,7 +1128,7 @@ function oppDetail(o) {
   const d = o.detail || {};
   const notes = (o.flags || []).filter((f) => FLAGS[f]);
   const farmKind = ['fishing_zone', 'fishing_spot', 'skin_spot', 'herb_spot', 'mine_spot', 'farm_zone', 'mob_spot'].includes(o.kind);
-  let html = `<h3>${farmKind ? esc(o.title) : linkName(o.title, o.item_id, o.name, o.quality)} <small>${esc(KIND[o.kind] || o.kind)}</small></h3>${notes.length ? `<ul class="notes">${notes.map((f) => `<li><span class="flag ${FLAGS[f][0]}">${esc(FLAGS[f][1])}</span> ${esc(FLAGS[f][2])}</li>`).join('')}</ul>` : ''}
+  let html = `<h3>${farmKind ? farmTitle(o) : linkName(o.title, o.item_id, o.name, o.quality)} <small>${esc(KIND[o.kind] || o.kind)}</small></h3>${notes.length ? `<ul class="notes">${notes.map((f) => `<li><span class="flag ${FLAGS[f][0]}">${esc(FLAGS[f][1])}</span> ${esc(FLAGS[f][2])}</li>`).join('')}</ul>` : ''}
     <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot', 'mob_spot'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
     ${cdHours(o) ? `<div>How often</div><div>One craft every ${esc(cdEvery(cdHours(o)))} (its cooldown) → ${money(o.profit_unit)} on the day you craft it<div class="pill" title="${esc(cdTip(o))}">about ${esc(moneyText(o.daily))} a day on average</div></div>` : `<div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
     ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>${d.price_check ? `<div class="hint">⚠ Second opinion: ${esc(d.price_check.text)}</div>` : ''}`;
@@ -1148,7 +1165,7 @@ function oppDetail(o) {
       ${d.cooldown_hours ? `<div>Cooldown</div><div>${num(d.cooldown_hours, 1)} hours (game data): at most ${num(24 / d.cooldown_hours, 2)} a day${d.cooldown_group ? `<div class="needs">Shared with ${d.cooldown_shared_with} other recipes (${esc(d.cooldown_group)}): doing any of them starts this cooldown too</div>` : ''}</div>` : ''}</div>`;
   }
   if (o.kind === 'vendor_flip') {
-    html += `<h3>Where to buy</h3><table><tbody>${(d.vendors || []).map((v) => `<tr><td>${esc(v.name)}</td><td>${esc(v.zone)}</td><td>${v.coords ? v.coords.map((c) => (+c).toFixed(1)).join(', ') : ''}</td><td>${v.stock ? 'stock ' + v.stock : ''}</td></tr>`).join('')}</tbody></table>
+    html += `<h3>Where to buy</h3><table><tbody>${(d.vendors || []).map((v) => `<tr><td>${npcLink(v.npc, v.name)}</td><td>${esc(v.zone)}</td><td>${v.coords ? v.coords.map((c) => (+c).toFixed(1)).join(', ') : ''}</td><td>${v.stock ? 'stock ' + v.stock : ''}</td></tr>`).join('')}</tbody></table>
       <div class="pill">${d.vendor_count > (d.vendors || []).length ? `+${d.vendor_count - d.vendors.length} more vendors` : ''}</div>`;
   }
   if (o.kind === 'fishing_zone') {
@@ -1168,7 +1185,7 @@ function oppDetail(o) {
       <div>Forever skins counted</div><div>${num(d.skins, 0)} <span class="pill">${esc(d.source)}</span></div>
       ${(d.skins_not_read || []).length ? `<div>Not read yet</div><div>${d.skins_not_read.map(esc).join(', ')} <span class="pill">mobs that give these are worth a bit more than shown</span></div>` : ''}</div>
       <h3>Mobs here <small>value per skin at current prices</small></h3><table><thead><tr><th>Mob</th><th>Level</th><th class="num">Skinned</th><th class="num">Per skin</th><th>Gives</th></tr></thead><tbody>
-      ${d.mobs.map((m) => `<tr><td>${esc(m.name)}${m.can_skin ? '' : ` <span class="needs">Skinning ${m.skill_needed}</span>`}${m.can_kill ? '' : ' <span class="needs">too high</span>'}</td><td>${esc(m.levels)}</td><td class="num">${num(m.skinned, 0)}</td><td class="num">${money(m.value)}</td>
+      ${d.mobs.map((m) => `<tr><td>${npcLink(m.npc, m.name)}${m.can_skin ? '' : ` <span class="needs">Skinning ${m.skill_needed}</span>`}${m.can_kill ? '' : ' <span class="needs">too high</span>'}</td><td>${esc(m.levels)}</td><td class="num">${num(m.skinned, 0)}</td><td class="num">${money(m.value)}</td>
         <td>${m.items.slice(0, 3).map((i) => `${itemLink(i.item_id, i.name)} ${(i.share * 100).toFixed(0)}%`).join(', ')}</td></tr>`).join('')}</tbody></table>`;
   }
   if (o.kind === 'mob_spot') {
@@ -1259,9 +1276,9 @@ async function openItem(id, opp) {
       ${it.disenchant ? `<div>Disenchant it <span class="pill" title="${esc(it.disenchant.source)}">Classic table</span></div><div>about ${money(it.disenchant.value)} each: ${deMats(it.disenchant)}${deWho(it.disenchant)}</div>` : ''}
     </div>${spark(it.history)}`;
   if (it.opportunities.length && !opp) html += `<h3>Ways to make money with it</h3>${oppTable(it.opportunities, {cols: ['title', 'profit_unit', 'daily', 'flags'], export: false})}`;
-  if (it.vendors.length) html += `<h3>Sold by <small>your faction</small></h3><table><tbody>${it.vendors.slice(0, 15).map((v) => `<tr><td>${esc(v.name)}</td><td>${esc(v.zone)}</td><td>${v.coords ? v.coords.map((c) => (+c).toFixed(1)).join(', ') : ''}</td><td>${v.stock ? 'limited: ' + v.stock : ''}</td></tr>`).join('')}</tbody></table>`;
+  if (it.vendors.length) html += `<h3>Sold by <small>your faction</small></h3><table><tbody>${it.vendors.slice(0, 15).map((v) => `<tr><td>${npcLink(v.npc, v.name)}</td><td>${esc(v.zone)}</td><td>${v.coords ? v.coords.map((c) => (+c).toFixed(1)).join(', ') : ''}</td><td>${v.stock ? 'limited: ' + v.stock : ''}</td></tr>`).join('')}</tbody></table>`;
   if ((it.fished_in || []).length) html += `<h3>Where to catch it <small>share per catch; Classic rows are unconfirmed in Forever</small></h3><table><tbody>${it.fished_in.map((f) => `<tr><td>${esc(f.title)}</td><td class="num">${pct(f.share)}</td><td>${f.count ? `<span class="pill">you caught ${f.count}</span>` : ''}${flagHtml(f.flags.filter((x) => ['classic_unconfirmed', 'wowhead_forever', 'forever_only', 'seasonal', 'forever_change'].includes(x)))}</td><td class="pill">zone skill ${f.zone_skill ?? '?'}</td></tr>`).join('')}</tbody></table>`;
-  if (it.drops.length) html += `<h3>Dropped by <small>NPCs from QuestieDB Forever; drop % is Wowhead <b>Classic</b> data bundled with QuestieDB, Forever may differ</small></h3><table><tbody>${it.drops.slice(0, 20).map((d) => `<tr><td>${esc(d.name)}</td><td>${esc(d.zone)}</td><td>lvl ${esc(d.level)}</td><td class="num">${d.rate ? d.rate.toFixed(1) + '%' : ''}</td></tr>`).join('')}</tbody></table>`;
+  if (it.drops.length) html += `<h3>Dropped by <small>NPCs from QuestieDB Forever; drop % is Wowhead <b>Classic</b> data bundled with QuestieDB, Forever may differ</small></h3><table><tbody>${it.drops.slice(0, 20).map((d) => `<tr><td>${npcLink(d.npc, d.name)}</td><td>${esc(d.zone)}</td><td>lvl ${esc(d.level)}</td><td class="num">${d.rate ? d.rate.toFixed(1) + '%' : ''}</td></tr>`).join('')}</tbody></table>`;
   if (it.objects.length) html += `<h3>Found in</h3><table><tbody>${it.objects.map((o) => `<tr><td>${esc(o.name)}</td><td>${esc(o.zone)}</td></tr>`).join('')}</tbody></table>`;
   if (it.made_by.length) html += `<h3>Made by</h3><table><tbody>${it.made_by.map((r) => `<tr><td>${esc(r.profession)}</td><td>${esc(r.name)}${r.count !== 1 ? ' ×' + r.count : ''}</td><td>${r.mats.map((m) => `${m.count}× ${itemLink(m.item_id, m.name)}`).join(', ')}</td><td class="pill">${r.thresholds ? r.thresholds.join('/') : ''}</td></tr>`).join('')}</tbody></table>`;
   if (it.used_in.length) html += `<h3>Used in <small>${it.used_in.length} recipes</small></h3><table><tbody>${it.used_in.slice(0, 30).map((r) => `<tr class="row" data-item="${r.product_id}"><td>${esc(r.profession)}</td><td>${r.count}× → ${itemLink(r.product_id, r.product)}</td></tr>`).join('')}</tbody></table>`;
