@@ -2065,8 +2065,6 @@ class Engine:
         best_own = max((o.daily for o in own), default=0)
         stretch = [o for o in later if not o.doable and 'other_profession' in o.flags
                    and o.detail.get('daily_if_affordable', o.daily) >= bonus * best_own]
-        # snipes you can afford first, then the rest (still shown, flagged "can't afford")
-        speculative = [o for o in opps if o.kind in ('realm_dip', 'ah_to_vendor') and clean(o, allow_unaffordable=True)]
         # data from another WoW version can't reach top picks until Forever data confirms it
         # (a fishing spot needs confirming Forever data and 30+ Forever catches: a few lucky trunks in a
         # small sample can make a zone look 3x better than it is)
