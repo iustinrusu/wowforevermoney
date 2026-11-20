@@ -84,6 +84,7 @@ const FLAGS = {
   assumed_kill_rate: ['', 'skins/hour from Settings', 'Gold per hour uses your skins-per-hour number in Settings (60 by default); your own skinning time is never used, because time in a zone includes questing and travel'],
   cooldown: ['', 'cooldown', 'The recipe has a cooldown in the game data (Transmute: Arcanite 47 hours, Mooncloth 95 hours): per day counts only the crafts it allows'],
   shared_cooldown: ['warn', 'shared cooldown', 'Shares one cooldown with other recipes (all Forever transmutes share Transmute - Alchemy): doing one blocks the rest, so Top picks only suggest the best of them'],
+  zone_above_you: ['warn', 'zone above your level', 'Most of the mobs in this zone (QuestieDB, Forever) are more than 3 levels above you: gathering here means fighting or dodging them. The same reach as for mob farming.'],
   classic_yields: ['bad', 'Classic yields', 'What a node gives comes (at least partly) from WoW Classic loot tables, not Forever data; kept out of Top picks until the Wowhead Forever pages of its herbs, ores, stones and gems (or the node itself) are read'],
   forever_yields_partial: ['warn', 'partly Forever yields', 'Some of what these nodes give is from Wowhead Forever pages read by hand, the rest still from WoW Classic tables (each item in the details says which)'],
   drops_partial: ['warn', 'only some drops counted', 'Only the drops whose Wowhead Forever item pages are read so far count (mostly materials): coins, gray items, gear and the other drops are not, so a kill is worth more than shown'],

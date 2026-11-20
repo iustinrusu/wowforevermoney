@@ -537,6 +537,20 @@ class Engine:
         self._gathered = out
         return out
 
+    def farm_source(self, iid: int, gathered: dict | None = None) -> bool:
+        """Something other than a recipe gives this item: a mob, a node or object, a container (QuestieDB), a gathering
+        profession (Engine.gathered), a container read on Wowhead Forever, or a Wowhead Forever item page's source tab."""
+        qi = (self.q.items.get(iid) or {}) if self.q else {}
+        if qi.get('npcDrops') or qi.get('objectDrops') or qi.get('itemDrops'):
+            return True
+        if iid in (gathered if gathered is not None else self.gathered()):
+            return True
+        if any(str(iid) in {str(r[0]) for r in (c.get('items') or [])}
+               for c in (getattr(self.w, 'forever_containers', None) or {}).values()):
+            return True
+        page = ((getattr(self.w, 'forever_pages', None) or {}).get('items') or {}).get(str(iid)) or {}
+        return any(t.get('rows') for t in (page.get('tabs') or {}).values())
+
     def gather_profession(self, iid: int, item, gathered: dict | None = None) -> str | None:
         """The gathering profession a "Farm" row needs: Forever data first (Engine.gathered); a herb, ore or leather that
         mobs drop and no gathering is known to give needs none (Ironfeather, Deeprock Salt); with no data at all, a guess
@@ -1045,6 +1059,12 @@ class Engine:
         rates = {int(k): float(v) for k, v in (self.s.get('farm_rates') or {}).items()}
         made = {r.product_id for r in self.gd.recipes}
         gathered = self.gathered()
+        fr = getattr(self.w, 'forever_recipes', None)
+        de_mats = {m for prof in ((fr.de_profiles if fr else None) or {}).values() if prof for m, *_ in prof}
+        # enchanting materials a profession never makes (essences: only split or combined): from disenchanting too,
+        # also where ForeverRecipes' disenchant table is missing
+        pro_made = {r.product_id for r in self.gd.recipes if r.profession != gamedata.NO_PROFESSION}
+        de_mats |= {i for i, it in self.gd.items.items() if it.class_id == 7 and it.subclass_id == 12 and i not in pro_made}
         for iid, item in self.gd.items.items():
             # processed goods are crafted, not farmed: cooked food/potions, cured hides, cloth bolts. (Some crafted
             # items are also gathered, e.g. Heavy Leather is skinned too, so being craftable alone isn't enough.)
@@ -1055,6 +1075,11 @@ class Engine:
                 continue      # Refined Deeprock Salt: only the Salt Shaker makes it ("Farm" it showed 187g a day)
             is_fish = bool(FISH_WORDS.search(item.name)) and item.class_id in (0, 7, 15) and item.quality <= 2
             if not is_fish and not (item.class_id == 7 and item.subclass_id in GATHER_SOURCE):
+                continue
+            if iid in made and iid not in de_mats and not self.farm_source(iid, gathered):
+                # made by a recipe and nothing else gives it: crafted, not farmed (review 2026-11-20: "Farm Arcanite
+                # Bar" showed 341g a day as Mining, Mooncloth 53g, Arcanite Rod 84g, Blackmouth Oil as "fish"; 27
+                # such rows). What disenchanting gives (dusts, essences, shards) is farmed by disenchanting.
                 continue
             if not is_fish and self.sold_by_vendor(iid):
                 continue          # a vendor sells it (Silken Thread): you'd buy it, not farm it (event vendors aside)
@@ -1254,8 +1279,27 @@ class Engine:
                         'source': 'Wowhead Forever "Dropped by" counts' + (' and "Skinned from" counts' if sk else '')}))
         return out
 
+    def zone_level(self, zone_id: int) -> float | None:
+        """How high a zone's mobs are: the 25th percentile of its hostile mobs' levels in QuestieDB's Forever data
+        (Winterspring 55, Felwood 51, Stranglethorn Vale 35, The Barrens 15); None with under 10 mobs known."""
+        cache = self.__dict__.setdefault('_zone_levels', None)
+        if cache is None:
+            cache = {}
+            for n in ((self.q.npcs.values() if self.q else []) or []):
+                sp = n.get('spawns')
+                lo, hi = n.get('minLevel') or 0, n.get('maxLevel') or 0
+                if not isinstance(sp, dict) or n.get('friendlyToFaction') or not lo or lo > 63:
+                    continue
+                for z in sp:
+                    cache.setdefault(int(z), []).append((lo + (hi or lo)) / 2)
+            cache = {z: sorted(v)[len(v) // 4] for z, v in cache.items() if len(v) >= 10}
+            self._zone_levels = cache
+        return cache.get(int(zone_id))
+
     def node_spots(self, best_use: dict[int, dict]) -> list[Opportunity]:
-        """Herbalism and mining spots: Forever node locations (QuestieDB), Classic node loot (labelled)."""
+        """Herbalism and mining spots: Forever node locations (QuestieDB, and GatherLite's where it knows more),
+        Classic node loot (labelled). A zone whose mobs are mostly above you is not "doable now" (review 2026-11-20:
+        Winterspring mining showed for a level 42)."""
         q, gd = self.q, self.gd
         if not q:
             return []
@@ -1277,10 +1321,15 @@ class Engine:
         node_rate = {'herbalism': float(self.s.get('herb_nodes_per_hour', 40) or 40),
                      'mining': float(self.s.get('ore_nodes_per_hour', 40) or 40)}
         node_list = []
+        gl_nodes = (getattr(self.w, 'gatherlite', None) or {}).get('nodes') or {}
         for oid, iid in main.items():
             ob = q.objects.get(oid) or {}
             spawns = ob.get('spawns') or {}
             zones = {int(z): len(c) for z, c in spawns.items()} if isinstance(spawns, dict) else {}
+            # GatherLite's Forever map positions where they know more nodes than QuestieDB (or zones only it has)
+            for z, c in (gl_nodes.get(oid) or {}).items():
+                if int(z) > 0 and c > zones.get(int(z), 0):
+                    zones[int(z)] = int(c)
             classic = (loot.get('nodes') or {}).get(str(oid))
             classic_items = nodes.per_node(classic, loot.get('refs') or {}) if classic else {}
             fy = forever.get(oid)
@@ -1298,6 +1347,7 @@ class Engine:
                               'forever_complete': bool((fy or {}).get('complete')),
                               'small_sample': bool(fy and fy.get('small_sample'))})
         activity = (getattr(self.w, 'profile', None) or {}).get('activity')
+        level = int(self.s.get('level') or 0)
         out = []
         for kind, prof, label, setting in (('herbalism', 'Herbalism', 'Gather herbs in', 'herb_nodes_per_hour'),
                                            ('mining', 'Mining', 'Mine in', 'ore_nodes_per_hour')):
@@ -1328,13 +1378,20 @@ class Engine:
                     flags.append('yield_unknown')
                 needs = '' if sp['doable'] else (f'Learn {prof}' if skill is None else
                                                  f'{prof} {sp["skill_needed"]} (you have {skill}; Classic rule)')
+                zl = self.zone_level(sp['zone_id'])
+                doable = sp['doable']
+                if zl and level and zl > level + skinning.LEVEL_REACH:
+                    flags.append('zone_above_you')          # the same reach as mob spots: up to 3 levels above you
+                    if doable:
+                        doable, needs = False, f'Level {int(zl) - skinning.LEVEL_REACH}+ (most mobs here are level {int(zl)}+; you are {level})'
                 best_item = max(top[0]['items'], key=lambda i: top[0]['items'][i] * top[0]['worth'][i]) if top else 0
                 out.append(Opportunity(
                     kind='herb_spot' if kind == 'herbalism' else 'mine_spot', key=f'{kind}:{sp["zone_id"]}',
                     item_id=best_item, title=f'{label} {sp["zone"]}: ' + ', '.join(n['name'] for n in top),
                     profit_unit=sp['value'], cost_unit=0, units_day=0, daily=0, gph=int(sp['value'] * per_hour),
-                    doable=sp['doable'], needs=needs, profession=prof, preferred=prof in self.preferred, flags=flags,
+                    doable=doable, needs=needs, profession=prof, preferred=prof in self.preferred, flags=flags,
                     detail={'zone': sp['zone'], 'zone_id': sp['zone_id'], 'node_count': sp['node_count'],
+                            'zone_level': int(zl) if zl else None,
                             'nodes_per_hour': round(per_hour, 1),
                             'pace_source': 'your nodes-per-hour setting',
                             'nodes': [{'id': n['id'], 'name': n['name'], 'count': n['count'], 'skill': n['skill'],

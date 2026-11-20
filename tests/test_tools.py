@@ -237,6 +237,46 @@ class MoreInteractionTests(unittest.TestCase):
         e = Engine(w, s)
         return e, {o.key: o for o in e.crafts()}
 
+    def test_nothing_only_a_recipe_makes_gets_a_farm_row(self):
+        # review 2026-11-20: "Farm Arcanite Bar" showed 341g a day as Mining (only a transmute makes it)
+        e, _ = self.world(bags={})
+        e.gd.items[ARCANITE].subclass_id = 7                 # Metal & Stone: the kind "Farm" rows look at
+        farm = {o.item_id: o for o in e.gathering(e.best_uses())}
+        self.assertNotIn(ARCANITE, farm)
+        self.assertIn(GREATER_ETERNAL, farm)            # essences: disenchanting gives them, splitting only converts
+        self.assertIn(LESSER_ETERNAL, farm)
+        # a source of its own brings it back: a mob that drops it (QuestieDB)
+        e.q.items[ARCANITE] = {'npcDrops': [1234]}
+        self.assertIn(ARCANITE, {o.item_id for o in e.gathering(e.best_uses())})
+
+    def test_node_spots_use_gatherlite_counts_and_your_level(self):
+        # review 2026-11-20: Winterspring mining showed as doable for a level 42; GatherLite often knows more nodes
+        from unittest import mock
+        from wfm import nodes as nodes_mod
+        HERB, NODE, ZONE = 2447, 1618, 618
+        gd = GameData(build='test')
+        gd.items[HERB] = item(HERB, 'Peacebloom', sub=9, sell=10)
+        gd.zones = {ZONE: 'Winterspring'}
+        mobs = {100 + i: {'name': f'Mob {i}', 'minLevel': 55, 'maxLevel': 56, 'spawns': {ZONE: [[1, 1]]}} for i in range(12)}
+        q = QuestieDB(items={HERB: {'objectDrops': [NODE]}},
+                      objects={NODE: {'name': 'Peacebloom', 'spawns': {ZONE: [[1, 1], [2, 2], [3, 3]]}}}, npcs=mobs)
+        prices = {HERB: {'numAuctions': 5, 'minBuyout': 500, 'marketValue': 500, 'regionSoldPerDay': 50,
+                         'regionSalePercent': 0.5, 'regionSale': 500}}
+        w = SimpleNamespace(gamedata=gd, prices=prices, questie=q, skillup=SkillUpData(), angler=None,
+                            gatherlite={'nodes': {NODE: {ZONE: 20}}})
+        s = {'gold': 1000, 'ah_cut': 0.05, 'market_share': 0.2, 'faction': 'H', 'professions': {'Herbalism': 300},
+             'level': 50}
+        with mock.patch.object(nodes_mod, 'load_or_build', lambda ids, log=print: {}):
+            e = Engine(w, s)
+            self.assertEqual(e.zone_level(ZONE), 55.5)
+            spot = next(o for o in e.node_spots({}) if o.kind == 'herb_spot')
+            self.assertEqual(spot.detail['node_count'], 20)               # GatherLite's 20, not QuestieDB's 3
+            self.assertFalse(spot.doable)                                 # mobs 55+, you are 50
+            self.assertIn('zone_above_you', spot.flags)
+            self.assertEqual(spot.needs, 'Level 52+ (most mobs here are level 55+; you are 50)')
+            spot = next(o for o in Engine(w, {**s, 'level': 53}).node_spots({}) if o.kind == 'herb_spot')
+            self.assertTrue(spot.doable)                                  # 55 is within 3 levels of 53
+
     def test_splitting_a_greater_essence_is_a_flip_anyone_can_do(self):
         e, rows = self.world(bags={})
         o = rows['craft:20040']

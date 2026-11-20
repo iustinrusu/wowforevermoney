@@ -52,6 +52,16 @@ fix the clear bugs, ask the user only about real decisions. Never skip a check o
   drawer, Biggest markets vs TSM and rows, Sniper vs TSM, levelling vs Crafting, purse vs My bags, plan cash-in vs My
   bags, Data health counts vs tabs. 0 problems on real data. Found: the plan cash-in check had compared nothing since
   it was written (it looked for a field `each`; the item lines say `unit`). Units and labels: in part 4 (UI).
+- Part 2 done 2026-11-20: rebuilt from raw TSM rows and source files (scratch script, not the engine's pricing code):
+  top 60 crafts and top 60 vendor flips match to the copper; top 30 skinning, herb and ore spots (value x pace),
+  top 30 fishing spots (value x casts x share kept - lures where they pay) and top 40 mob rows (rounding only) match.
+  Invariants: no Classic data in Top picks or the plan (only the skinning spots' `skill_classic_rule`, which changes
+  nothing at Skinning 300), no negative gold an hour, every pick in the right section, cooldown caps hold (the Salt
+  Shaker's 0.34 is 0.338 rounded). Fixed: 27 "Farm" rows for things only a recipe makes (Farm Arcanite Bar 341g a day
+  as Mining, Arcanite Rod 84g, Mooncloth 53g, oils counted as fish); node spots now use GatherLite's node counts where
+  higher and are not "doable now" in a zone whose mobs are mostly 4+ levels above you (`Engine.zone_level`, flag
+  `zone_above_you`). Both known items done. Crafted-worth cap, good day, own materials, effort, ranking: unchanged
+  since the 2026-11-15 review, which checked them.
 
 ## Known items to look at (from 2026-11-15)
 - Levelling planner values products with no recorded sales at vendor price where Crafting shows the listing

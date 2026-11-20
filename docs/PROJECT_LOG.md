@@ -823,6 +823,15 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (twelfth part) Comprehensive review (to-do B1), parts 1-2 (`docs/plans/comprehensive-review.md`,
+  Progress). Part 1: `tools/consistency_check.py` builds the app as it runs and compares 16 pairs of views (0
+  problems); the plan cash-in pair had compared nothing since it was written. Part 2: an independent rebuild from raw
+  data matches crafts and flips to the copper and every farming kind; fixed 27 "Farm" rows for crafted-only items
+  (`Engine.farm_source`; disenchanting materials kept: ForeverRecipes' table, or enchanting materials no profession
+  makes), node spots use GatherLite's counts where higher and check your level (`Engine.zone_level`: the 25th
+  percentile of the zone's hostile QuestieDB mobs; flag `zone_above_you`, the same 3-level reach as mob spots).
+  Opportunities 2,475 -> 2,430. Tests: 305 pass (2 new).
+
 - **2026-11-20** (eleventh part) Wowhead reading session (to-do A5): 20 pages, 2 minutes apart, no block (list in
   docs/plans/material-coverage.md, session 4). Code: `wowhead_items.clean_sell`, `vendor_lists`, npc pages keep
   `sells`; `Engine.wowhead_vendors`, `vendors_for` (a read vendor page decides, its stock and price; currency-only
