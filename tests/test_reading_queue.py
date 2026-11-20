@@ -81,5 +81,20 @@ class ReadingQueueTests(unittest.TestCase):
         self.assertIn('https://www.wowhead.com/forever/npc=900', entry['examples'][0])
 
 
+class InstanceAreaTests(unittest.TestCase):
+    """Dungeons whose area the AreaTable puts on a continent (2026-11-20: Blackrock Spire's mobs counted as open world)."""
+
+    def test_entrance_areas_and_names(self):
+        from wfm.gamedata import GameData, is_instance
+        gd = GameData(build='test')
+        gd.zones = {1583: 'Blackrock Spire', 17804: 'Blackrock Spire', 1477: "The Temple of Atal'Hakkar",
+                    9000: 'Some Keep', 9001: 'Some Keep', 361: 'Felwood'}
+        gd.zone_continent = {1583: 0, 17804: 229, 1477: 0, 9000: 0, 9001: 329, 361: 1}
+        self.assertTrue(is_instance(gd, 1583))       # known, and named like an instance area
+        self.assertTrue(is_instance(gd, 1477))       # known
+        self.assertTrue(is_instance(gd, 9000))       # named like an instance area
+        self.assertFalse(is_instance(gd, 361))
+
+
 if __name__ == '__main__':
     unittest.main()

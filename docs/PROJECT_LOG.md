@@ -879,6 +879,12 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (twenty-sixth part) Fixed: four dungeons counted as open world. The AreaTable puts Blackrock Spire
+  (1583), Blackrock Depths (1584), The Temple of Atal'Hakkar (1477) and Onyxia's Lair (2159) on a continent, while
+  QuestieDB files those dungeons' 165 mobs under these areas, so they showed as open-world mob farms and their drops
+  stayed in the reading queue. `gamedata.is_instance` now also knows these areas and any area named like one on an
+  instance map. Test: 1 new.
+
 - **2026-11-20** (twenty-fifth part) The Wowhead reading queue (the user's idea: "start with reading high interest,
   high level items and mobs first"; "Do it"): `coverage.reading_queue`, `mob_candidates`, `level_weight`,
   `dungeon_only`, `queue_check`; `wfm/classicmobs.py` (2,654 normal Classic mobs, cached in

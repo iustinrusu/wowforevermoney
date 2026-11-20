@@ -366,8 +366,22 @@ INSTANCE_MAPS = {30, 33, 34, 36, 43, 47, 48, 70, 90, 109, 129, 189, 209, 229, 23
                  409, 429, 469, 489, 509, 529, 531, 533}
 
 
+# Dungeons and raids whose area the game's AreaTable puts on a continent (the entrance area), while QuestieDB files the
+# dungeon's mobs under it (2026-11-20: Blackrock Spire's 96 mobs, Blackrock Depths 24, Sunken Temple 42 and Onyxia's
+# Lair 3 counted as open-world farms): Blackrock Spire, Blackrock Depths, The Temple of Atal'Hakkar, Onyxia's Lair.
+INSTANCE_AREAS = {1583, 1584, 1477, 2159}
+
+
 def is_instance(gd: GameData, zone_id: int) -> bool:
-    return gd.zone_continent.get(zone_id, 0) in INSTANCE_MAPS
+    """A dungeon, raid or battleground: on an instance map, a known instance area, or an area named like one that is
+    (the AreaTable keeps an entrance area beside the instance's own: Blackrock Spire 1583 and 17804)."""
+    if gd.zone_continent.get(zone_id, 0) in INSTANCE_MAPS or zone_id in INSTANCE_AREAS:
+        return True
+    names = gd.__dict__.get('_instance_names')
+    if names is None:
+        names = gd.__dict__['_instance_names'] = {gd.zones.get(a) for a, c in gd.zone_continent.items()
+                                                   if c in INSTANCE_MAPS and gd.zones.get(a)}
+    return gd.zones.get(zone_id) in names
 
 
 def apply_hotfixes(gd: GameData, rows: dict[int, dict]) -> dict:
