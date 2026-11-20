@@ -24,6 +24,20 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-20 Three value guards, so a value like the 2g 66s Rugged Hide can't come back unnoticed (the user: "how can
+  we prevent those issues in the future?", then "Yes, build them").** Why it got through: tests check the math does
+  what it was designed to do, the consistency check compares views that all used the same wrong value, the
+  crafted-worth monitor only looked at markets under one a day (Cured Rugged Hide: 1.1), and the second opinion only
+  judged rows: the Cured Rugged Hide row was already flagged `price_check_fails` while it still gave the hide its
+  margin. The guards: (1) `Engine.best_uses` runs the rows' second opinion (`anomalies.second_opinion`) on every
+  recipe; one that only pays at today's unusual prices gives its ingredients no crafted worth (that alone would have
+  stopped the 2g 66s; it also covers items nobody lists, which the buy-price cap doesn't). (2) The buy-price rule as a
+  safety net in `valuation.Valuer`: any channel (opening it, a future one) that comes out above `Engine.buy_now` is
+  held there (a vendor's price aside), flag `held_at_buy_price`, and Data health "Values never above the buy price"
+  turns red. (3) "Values that swing" (`App._track_swings`, `anomalies.swings`): at every new TSM scan with the same
+  settings, a value that moved 1.5x beyond its own price's move (and 10s+) is listed for 24 hours, with what it is
+  valued by. Considered and left for later: marking odd prices in the farm meter itself (the user can ask).
+
 - **2026-11-20 An ingredient is never worth more than buying one costs (the user: "Yes, cap it").** The farm meter
   showed one Rugged Hide at 2g 66s 43c (the user: "rugged hide price seems werid"); it sells for 5-8s, 486 listed at
   7s 77c. Cause: `Engine.best_uses` gave each ingredient the craft's whole margin. Cured Rugged Hide makes 2 in Forever
@@ -848,6 +862,16 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-20** (nineteenth part) The three value guards (decision above). `wfm/engine.py` (`best_uses` second
+  opinion, `no_crafted_worth`, `item_values` worked out once in the run, `_CraftCheck`), `wfm/valuation.py` (safety
+  net, `breaches`), `wfm/anomalies.py` (`check_values`, `own_price`, `swings`, `value_rule_check`, `swing_check`),
+  `wfm/app.py` (`_track_swings`, `_scan_time`; `_write_prices` uses the run's values), `web/app.js` (flag label),
+  README. Real data: 17,812 values checked, none above the buy price; 75 crafts that only pay at unusual prices (and
+  981 that lose even today) give no crafted worth; that changed 40 values (Elemental Air 76s 83c -> 20s 57c, Thunder
+  Ale 13s 83c -> 4s 75c, Refined Deeprock Salt 66g 16s -> 62g 85s) and 145 rows (small drops); the run still takes
+  about 1 s; consistency check 0 problems. Tests: 10 new (`tests/test_value_guards.py`, `SecondOpinionValueTests`),
+  the cap tests moved to a craft that is sound at typical prices. 328 pass. The user's app restarted with the code.
 
 - **2026-11-20** (eighteenth part) Crafted worth capped at the buy price (decision above). `wfm/engine.py`
   (`buy_now`, `best_uses`: `margin`, `capped`, `buy_now`, `doable_margin`, `doable_capped`; gathering text),

@@ -16,6 +16,12 @@ Every run, three checks, each a generalization of a real error found that day:
    monitor ('info'): it lists them so a wrong recipe or price behind a crafted worth still stands out.
 3. Data monitor. Counts in TSM's data that point at odd prices: freak sale averages, walls of listings far above
    sales, lone listings far above the region with no sales. Shown on Data health each run, so a jump stands out.
+4. Item values (2026-11-20, after the farm meter valued one Rugged Hide at 2g 66s; it costs 7s 77c to buy): no value
+   may be above what buying one costs on your realm's AH (a vendor's price aside). The valuer holds any that is
+   (valuation.Valuer.breaches), and Data health shows it as an error. Crafts that fail the second opinion give their
+   ingredients no crafted worth (Engine.best_uses), listed here too.
+5. Values that swing (the app, at every price update): a value that moved by half or more beyond its own price's move
+   rests on other items' prices (a thin margin between big ones), so it is listed for 24 hours (`swings`).
 
 New findings on Top picks or the plan become events (alerts). `python -m wfm.anomalies` prints the full report.
 """
@@ -154,12 +160,67 @@ def scan_prices(prices: dict) -> dict:
             'examples': {'freak_sales': top(freak), 'walls': top(wall), 'lone_listings': top(lone)}}
 
 
+def check_values(engine, best_use: dict) -> tuple[list[dict], dict]:
+    """The buy-price rule: the values the valuer had to hold at the buy price (each an error: some part of the app
+    worked out more), and a summary for Data health: values checked, crafted values capped by design, crafts that
+    give no crafted worth because they fail the second opinion."""
+    valuer = engine.valuer(best_use)
+    out = []
+    for b in valuer.breaches.values():
+        out.append({'check': 'value_rule', 'severity': 'high', 'item_id': b['item_id'], 'key': f"value:{b['item_id']}",
+                    'title': b['name'], 'impact': int(b['value'] - b['held']),
+                    'text': f"{b['name']} came out at {fmt_money(b['value'])} ({b['how']}), above what buying one costs "
+                            f"on your realm's AH ({fmt_money(b['buy'])}): held at {fmt_money(b['held'])}."})
+    skipped = sorted(getattr(engine, 'no_crafted_worth', None) or [], key=lambda r: -r['today'])
+
+    def example(r):
+        typical = f"loses {fmt_money(-r['typical'])}" if r['typical'] < 0 else 'makes nothing'
+        return (f"{r['recipe']} ({r['profession']}): makes {fmt_money(r['today'])} a craft at today's prices but "
+                f"{typical} at typical prices, so it adds nothing to the worth of "
+                f"{', '.join(engine.name(m) for m in r['mats'])}")
+    summary = {'checked': len({k[0] for k in valuer._cache}), 'held': len(out),
+               'capped': sum(1 for u in (best_use or {}).values() if u.get('doable_capped')),
+               'no_crafted_worth': sum(1 for r in skipped if r['today'] > 0),
+               'crafts_losing': sum(1 for r in skipped if r['today'] <= 0),
+               'no_crafted_worth_examples': [example(r) for r in skipped if r['today'] > 0][:5]}
+    return out, summary
+
+
+SWING, SWING_MIN = 1.5, 1000       # a value 1.5x beyond its own price's move, and 10s or more: it swings
+SWING_KEEP = 24 * 3600             # listed for a day
+
+
+def own_price(p: dict | None) -> int:
+    """An item's own price on your realm: the lowest listing, else the realm's listing average, else 0."""
+    p = p or {}
+    return int(p['minBuyout']) if listed(p) else int(p.get('marketValue') or 0)
+
+
+def swings(prev: dict, cur: dict) -> list[int]:
+    """Items whose value moved by SWING or more beyond their own price's move (and SWING_MIN or more): their value
+    rests on other items' prices. prev and cur: item -> (value, own price), from two price updates in a row."""
+    out = []
+    for iid, (now, own_now) in cur.items():
+        if iid not in prev:
+            continue
+        before, own_before = prev[iid]
+        if abs(now - before) < SWING_MIN:
+            continue
+        moved = max(now, before) / max(min(now, before), 1)
+        own_moved = max(own_now, own_before) / max(min(own_now, own_before), 1) if own_now and own_before else 1.0
+        if moved >= SWING * own_moved:
+            out.append(iid)
+    return out
+
+
 def run(engine, opps, best_use: dict) -> dict:
     """All checks for one engine run: row flags are set in place; returns the findings and the data monitor."""
     rows = check_rows(opps, engine.prices, engine.cut)
     crafted = check_crafted_worth(best_use, lambda i: engine.sell_value(i)[0], engine.name)
-    findings = sorted(rows + crafted, key=lambda f: ({'high': 0, 'warn': 1, 'info': 2}[f['severity']], -f['impact']))
-    return {'findings': findings, 'monitor': scan_prices(engine.prices), 'checked_at': int(time.time())}
+    held, values = check_values(engine, best_use)
+    findings = sorted(rows + crafted + held, key=lambda f: ({'high': 0, 'warn': 1, 'info': 2}[f['severity']], -f['impact']))
+    return {'findings': findings, 'monitor': scan_prices(engine.prices), 'values': values,
+            'checked_at': int(time.time())}
 
 
 def new_events(prev: dict | None, cur: dict, shown_keys: set[str]) -> list[dict]:
@@ -188,7 +249,39 @@ def audit_check(result: dict | None) -> dict:
               f"averages (ignored), {mon.get('walls', 0)} walls of listings far above sales (valued at sales), "
               f"{mon.get('lone_listings', 0)} lone listings far above the region with no sales.")
     return {'name': 'Price checks (second opinion)', 'status': status, 'detail': detail,
-            'examples': [f"{f['title']}: {f['text']}" for f in fs][:10]}
+            'examples': [f"{f['title']}: {f['text']}" for f in fs if f['check'] != 'value_rule'][:10]}
+
+
+def value_rule_check(result: dict | None) -> dict:
+    """The Data health entry for the buy-price rule."""
+    a = (result or {}).get('anomalies') or {}
+    v = a.get('values') or {}
+    held = [f for f in a.get('findings') or [] if f['check'] == 'value_rule']
+    found = (f"{len(held)} came out above it and were held at the buy price: some part of the app broke the rule, "
+             f"worth a look." if held else "none came out above it.")
+    n = v.get('no_crafted_worth', 0)
+    one = n == 1
+    crafts = (f"{n:,} craft{'' if one else 's'} that only pay{'s' if one else ''} at today's unusual prices "
+              f"give{'s' if one else ''}")
+    detail = (f"An item you hold or loot is worth at most what buying one costs on your realm's AH (a vendor's price "
+              f"aside): one you have only saves you buying one. Checked on every value the app works out "
+              f"({v.get('checked', 0):,} items, as My bags and the farm meter use them): {found} By design, "
+              f"{v.get('capped', 0)} crafted values are counted at the buy price (the craft's profit is on its Crafting "
+              f"row), and {crafts} {'its' if one else 'their'} ingredients no crafted worth (nor do {v.get('crafts_losing', 0):,} that "
+              f"lose money even at today's prices).")
+    return {'name': 'Values never above the buy price', 'status': 'fail' if held else 'pass', 'detail': detail,
+            'examples': ([f"{f['title']}: {f['text']}" for f in held] + v.get('no_crafted_worth_examples', []))[:10]}
+
+
+def swing_check(found: dict) -> dict:
+    """The Data health entry for values that swing: found = item -> {'text', 'ts'} from the last 24 hours."""
+    rows = sorted(found.values(), key=lambda f: -f['ts'])
+    detail = ("At every price update, each value is compared with the one before. A value that moved by half or more "
+              "(and 10s or more) beyond its own price's move rests on other items' prices, such as a thin margin "
+              "between two big prices, so it can be far off an hour later: treat it with care. "
+              + (f"{len(rows)} in the last 24 hours." if rows else "None in the last 24 hours."))
+    return {'name': 'Values that swing', 'status': 'warn' if rows else 'pass', 'detail': detail,
+            'examples': [f['text'] for f in rows][:10]}
 
 
 if __name__ == '__main__':

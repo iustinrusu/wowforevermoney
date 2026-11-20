@@ -21,6 +21,12 @@ Crafted worth holds only for as many units a day as the recipe can use (the user
 cooldown and what the product's market takes at your share. Every unit beyond that is worth the next best channel
 (usually its sale price). Thorium Bar: 21g 65s through Transmute: Arcanite, for 1 every 2 days; the rest at 17s.
 So a quantity is valued with `worth_for` (a bag of 20, an hour's loot), never as one unit's worth x the count.
+
+No value is above what buying one costs (the user's decision, 2026-11-20): one you hold or loot only saves buying one.
+Crafted worth is capped where it is worked out (Engine.best_uses); this module also holds every other way (opening
+it, a channel added later) at the buy price as a safety net, and records each time it had to in `Valuer.breaches`:
+Data health shows them as an error, since some part of the app broke the rule. A vendor's price is the exception:
+a vendor pays it whatever the AH lists.
 """
 from __future__ import annotations
 
@@ -104,6 +110,7 @@ class Valuer:
         self.best_use = best_use or {}
         self.contents = contents or {}
         self._cache: dict[tuple, Value] = {}
+        self.breaches: dict[int, dict] = {}      # item -> the value above the buy price that was held (Data health)
 
     def value(self, iid: int, _depth: int = 0) -> Value:
         key = (iid, _depth)
@@ -202,5 +209,15 @@ class Valuer:
                     f'{fmt_money(beyond)} each)')
         if best != 'craft':
             crafted, cap, beyond, cap_by = 0, None, 0, ''
-        return Value(channels[best], best, how, tuple(flags), channels, contents[:12], source, if_skilled,
+        value = channels[best]
+        buy = e.buy_now(iid) if hasattr(e, 'buy_now') else None
+        if buy is not None and best != 'vendor' and value > buy:
+            # the safety net: never above what buying one costs (a vendor's price aside, that is paid whatever)
+            held = max(buy, channels.get('vendor', 0))
+            self.breaches[iid] = {'item_id': iid, 'name': e.name(iid), 'channel': best, 'value': value, 'buy': buy,
+                                  'held': held, 'how': how}
+            value, crafted = held, min(crafted, held)
+            flags.append('held_at_buy_price')
+            how += f' (held at what buying one costs, {fmt_money(buy)})'
+        return Value(value, best, how, tuple(flags), channels, contents[:12], source, if_skilled,
                      crafted, cap, beyond, cap_by, de)

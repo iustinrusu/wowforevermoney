@@ -95,6 +95,14 @@ MAX_UNITS_PER_DAY = 200          # sanity cap when demand is effectively unlimit
 COPPER_PER_GOLD = 10000
 
 
+class _CraftCheck:
+    """A recipe seen as a craft row, for anomalies.second_opinion (Engine.best_uses)."""
+    kind = 'craft'
+
+    def __init__(self, item_id: int, detail: dict):
+        self.item_id, self.detail = item_id, detail
+
+
 @dataclass
 class Opportunity:
     kind: str                 # craft | vendor_flip | ah_to_vendor | realm_dip | gather | farm_zone | fishing_spot
@@ -289,6 +297,13 @@ class Engine:
         if q:
             options.append(q)
         return min(options, key=lambda o: o.value) if options else None
+
+    def item_values(self, valuer: valuation.Valuer) -> dict[int, int]:
+        """What the app values every priced item at (copper a unit, as My bags shows it): the farm meter's prices
+        (ForeverMoneyBridge Prices.lua) and the value checks (anomalies.check_values). Items with a TSM price or a
+        vendor price."""
+        ids = set(self.prices) | {i for i, it in self.gd.items.items() if it.sell_price}
+        return {i: valuer.value(i).value for i in ids if i in self.gd.items}
 
     def buy_now(self, iid: int) -> int | None:
         """What buying one more costs on your realm's AH right now, or None when none are listed. With only a few
@@ -1017,9 +1032,15 @@ class Engine:
         is on the craft's own row. Before, the ingredient got the craft's whole margin: a Rugged Hide (7s 77c, 486
         listed) was "worth" 2g 66s at 13:22 and 90s 77c an hour later (2 Cured Rugged Hides minus a 66g salt), and
         every ingredient of a recipe got the same margin. 'margin' keeps the uncapped figure, 'capped' says it was
-        cut. Only items nobody lists keep the full crafted worth (with its daily limit, valuation.capped_total)."""
+        cut. Only items nobody lists keep the full crafted worth (with its daily limit, valuation.capped_total).
+
+        The same second opinion as the rows (anomalies.second_opinion, the user's yes of 2026-11-20): a craft that only
+        pays at today's unusual prices adds nothing to its ingredients' worth, as its row is kept out of Top picks.
+        Cured Rugged Hide lost 10g 70s at typical prices while it gave the hide 2g 66s. Those recipes are listed in
+        `self.no_crafted_worth` (Data health)."""
         best: dict[int, dict] = {}
         buy_now: dict[int, int | None] = {}
+        self.no_crafted_worth = []
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         for r in self.gd.recipes:
             if r.profession not in PROFESSIONS or not (r.spell_id in self.su.thresholds or getattr(r, 'use_item', 0)):
@@ -1027,13 +1048,13 @@ class Engine:
                 # belongs to the tool's own row, not to every Deeprock Salt you hold or farm. Items used up count:
                 # a Greater Eternal Essence is worth what 3 Lesser ones sell for if that is more
                 continue
-            unit_val, channel, _ = self.sell_value(r.product_id)
+            unit_val, channel, sell_q = self.sell_value(r.product_id)
             if channel == 'AH' and {'hard_to_sell', 'no_sales_data'} & set(liquidity(self.price(r.product_id), min_spd)['flags']):
                 # a product that (barely) never sells adds nothing to its ingredients: Delicate Arcanite Converter
                 # (0 sold a day in the region) made Ironweb Spider Silk "worth 18g 11s if crafted" instead of ~30s
                 continue
             revenue = unit_val * r.product_count
-            costs = {}
+            costs, mats = {}, []
             ok = True
             for mid, cnt in r.reagents:
                 q = self.cheapest(mid)
@@ -1041,7 +1062,17 @@ class Engine:
                     ok = False
                     break
                 costs[mid] = q.value * cnt
+                mats.append({'item_id': mid, 'name': self.name(mid), 'unit': q.value, 'count': cnt, 'source': q.source})
             if not ok:
+                continue
+            so = anomalies.second_opinion(
+                _CraftCheck(r.product_id, {'product_count': r.product_count, 'sell_channel': channel, 'revenue': revenue,
+                                           'sell_price': sell_q.value if sell_q else 0, 'mats': mats}),
+                self.prices, self.cut)
+            if so is not None and so['profit'] <= 0:
+                self.no_crafted_worth.append({'recipe': r.name, 'profession': r.profession, 'product_id': r.product_id,
+                                              'mats': [m['item_id'] for m in mats], 'today': int(revenue - sum(costs.values())),
+                                              'typical': so['profit']})
                 continue
             req, _ = self.required_skill(r)
             have = self.profs.get(r.profession)
@@ -1863,7 +1894,9 @@ class Engine:
                 o.detail['effort'] = ef
                 if o.daily > 0 and o.daily <= ef['cost'] and 'not_worth_time' not in o.flags:
                     o.flags.append('not_worth_time')
-        # price checks: a second opinion at typical prices flags rows that rest on unusual prices (anomalies.py)
+        # every priced item's value (the farm meter's prices), then the price checks: a second opinion at typical
+        # prices flags rows that rest on unusual prices, and no value may be above what buying one costs (anomalies.py)
+        values = self.item_values(self.valuer(best_use))
         checks = anomalies.run(self, all_opps, best_use)
         for o in all_opps:
             o.detail['confidence'] = confidence(o.flags)
@@ -1881,7 +1914,7 @@ class Engine:
                 'plan': plan.build(all_opps, top, self.my_holdings(self.valuer(best_use)), self.time_value,
                                    self.share, self.cut, int(self.gold), self.s.get('done_today') or {}),
                 'time_value': self.time_value, 'time_value_source': self.time_value_source, 'anomalies': checks,
-                'undervalued': self.undervaluation_watch()}
+                'item_values': values, 'undervalued': self.undervaluation_watch()}
 
     def character(self) -> str:
         """The character the app plans for: the one picked in the header (setting 'character'), else the last played."""

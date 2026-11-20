@@ -70,6 +70,8 @@ class App:
         self._settings_dirty = threading.Event()
         self._force = threading.Event()
         self.tips = self._load_tips()
+        self.swings: dict[int, dict] = {}       # values that swing, the last 24 hours (anomalies.swings)
+        self._values_prev: dict | None = None   # the last price update's values, to compare with
 
     # ---------- compute ----------
     def _load_tips(self) -> dict:
@@ -109,7 +111,9 @@ class App:
                 {a.get('key') for a in ((result.get('plan') or {}).get('actions') or [])}
             events += anomalies.new_events((self.result or {}).get('anomalies'), result.get('anomalies') or {}, shown)
             self.result, self.generated_at = result, int(time.time())
-            self.audit = audit.run(self.world, Engine(self.world, settings)) + [anomalies.audit_check(result)]
+            self._track_swings(result, settings)
+            self.audit = audit.run(self.world, Engine(self.world, settings)) + [
+                anomalies.audit_check(result), anomalies.value_rule_check(result), anomalies.swing_check(self.swings)]
             self._write_item_checks(result)
             self._write_prices(result, settings)
             self.tips = self._load_tips()
@@ -161,16 +165,54 @@ class App:
                 log('Watcher error:\n' + traceback.format_exc())
             self._settings_dirty.wait(POLL_SECONDS)
 
+    def _scan_time(self) -> int:
+        """When your realm's newest TSM scan was taken (0 if none): values are compared between scans."""
+        pd = self.world.price_data
+        realm = self.settings.snapshot().get('realm')
+        return max((d.download_time for d in (pd.datasets if pd else []) if d.scope == realm), default=0)
+
+    def _track_swings(self, result, settings):
+        """Values that swing (anomalies.swings): compare this run's values with the last scan's, with the same
+        settings (a skill-up or a new setting changes values on purpose), and list them for 24 hours."""
+        try:
+            values = result.get('item_values') or {}
+            prices = self.world.prices or {}
+            key = json.dumps({k: v for k, v in settings.items() if k != 'done_today'}, sort_keys=True, default=str)
+            cur = {'scan': self._scan_time(), 'key': key,
+                   'values': {i: (v, anomalies.own_price(prices.get(i))) for i, v in values.items() if v > 0}}
+            prev = getattr(self, '_values_prev', None)
+            found = getattr(self, 'swings', None)
+            if found is None:
+                found = self.swings = {}
+            now = int(time.time())
+            if prev and prev['key'] == key and cur['scan'] and prev['scan'] and cur['scan'] != prev['scan']:
+                moved = anomalies.swings(prev['values'], cur['values'])
+                valuer = Engine(self.world, settings).valuer(result.get('best_use') or {}) if moved else None
+                for iid in moved:
+                    (before, own_b), (after, own_a) = prev['values'][iid], cur['values'][iid]
+                    found[iid] = {'ts': now, 'item_id': iid,
+                                  'text': f"{self.name(iid)}: {fmt_money(before)} -> {fmt_money(after)} at "
+                                          f"{time.strftime('%H:%M', time.localtime(cur['scan']))}, while its own price "
+                                          f"went {fmt_money(own_b)} -> {fmt_money(own_a)}. Valued by: "
+                                          f"{valuer.value(iid).how}"}
+            for iid in [i for i, f in found.items() if now - f['ts'] > anomalies.SWING_KEEP]:
+                del found[iid]
+            if cur['scan']:
+                self._values_prev = cur
+        except Exception as e:      # a monitor: never let it break a recompute
+            log(f'Value swing check failed: {e}')
+
     def _write_prices(self, result, settings):
         """The farm meter's prices (ForeverMoneyBridge Prices.lua): the app's value of every item that has a price,
-        so the meter in game and the app never disagree."""
+        so the meter in game and the app never disagree (Engine.item_values, worked out in the run)."""
         try:
             gd = self.world.gamedata
             if not gd or not self.world.paths:
                 return
-            valuer = Engine(self.world, settings).valuer(result.get('best_use') or {})
-            ids = set(self.world.prices) | {i for i, it in gd.items.items() if it.sell_price}
-            values = {i: valuer.value(i).value for i in ids if i in gd.items}
+            values = result.get('item_values')
+            if values is None:
+                eng = Engine(self.world, settings)
+                values = eng.item_values(eng.valuer(result.get('best_use') or {}))
             containers = {i for i, it in gd.items.items() if it.openable}       # count as 0 until opened
             if profile_mod.write_prices(self.world.paths.addons, values, int(time.time()), containers):
                 log(f'Farm meter prices updated ({sum(1 for v in values.values() if v > 0):,} items)')
