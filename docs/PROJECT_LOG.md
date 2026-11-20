@@ -836,6 +836,12 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (seventeenth part) Went through what's left (the user: "what's left to do?"). Checked the addon's
+  saved file: the farm meter counted XP and loot in a Maraudon session (ended 2026-11-19 23:45: 47,609 XP, 8g 10s 12c
+  in all), so that part of checklist B8 is confirmed; the fold has never been used. Still no fishing logged (B5).
+  Stale notes fixed: to-do C1 (top 100 and skinning items done; next reading list), C3 and checklist B2 (strategy
+  item 3 was done on 2026-11-15; left 4-9).
+
 - **2026-11-20** (sixteenth part) The user signed off on the Night watch look ("Signed off", after pictures of every tab
   wide and at 375 px). To-do B2 ticked; next is part C (`docs/plans/TODO.md`).
 

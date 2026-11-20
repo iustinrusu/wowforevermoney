@@ -89,8 +89,9 @@ B2. [x] (done 2026-11-20: the Night watch look, signed off by the user; docs/pla
 
 ## C. Then the rest
 
-C1. [ ] (in progress: 102 item pages read by 2026-11-15; 2 minutes apart, at most 20 a session: 3356 and 5500 left
-       of the top 100, then the 4 skinning items, pools, Javnir Nashak; see the plan's Progress section)
+C1. [ ] (in progress: the top 100 and the 4 skinning items done 2026-11-20; 2 minutes apart, at most 20 a session.
+       Next: the Philosopher's Stone page (checklist B10), more vendors (A0), Fizzlefuse again, Javnir Nashak (A7),
+       then the 26 pools (A3); see the plan's Progress section)
        **Forever source data for every material** (fixes "some skins not counted", pool loot, mob drops, node
        yields; the user's top priority for data accuracy, 2026-11-14): `docs/plans/material-coverage.md`. Work in the
        order at the top of that file: other Forever data sources, the item-page data format, 5 top pages a session
@@ -99,8 +100,9 @@ C2. [ ] (first version done 2026-11-14: Gathering -> Mob farming, one row per mo
        mobs' own pages for complete loot, coins) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with
        drop rates from Wowhead Forever ("Dropped by", material-coverage step 4) and the kills-per-hour setting, never
        your own logged time.
-C3. [ ] (2026-11-15: items 2 (levelling planner), 1 (profession advisor, Professions tab) and 10 (Niches tab) done;
-       next 3 (vertical integration), then 4-9) **Strategy features**, items 1-10: `docs/plans/strategy-features.md`
+C3. [ ] (2026-11-15: items 1 (profession advisor), 2 (levelling planner), 3 (vertical integration, "With your own
+       materials") and 10 (Niches tab) done; next 4-9. Item 6, the recipe finder, is partly there since 2026-11-19:
+       every recipe's sources in the levelling path) **Strategy features**, items 1-10: `docs/plans/strategy-features.md`
 C4. [ ] **Dungeons view** (the user's idea; 2026-11-15: build it, at a lower priority): a "run <dungeon>" row = trash +
        bosses from their own Wowhead Forever pages, your share of a group's loot, runs per hour from Settings, the
        instance limit; dungeon mob rows already exist (flag `dungeon`). Raids later, if at all (shared raid loot).

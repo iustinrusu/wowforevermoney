@@ -34,13 +34,16 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 ## B. Work left that needs no Wowhead
 
 - [x] B1. (done 2026-11-15) Review of the 2026-11-13/14 work (to-do item 6, `docs/plans/forever-data-next.md` section 6).
-- [ ] B2. Strategy features (to-do item 7, `docs/plans/strategy-features.md`): profession advisor, levelling
+- [ ] B2. (2026-11-20: 1, 2, 3 and 10 done on 2026-11-15; left 4-9: phase tracker, peak-and-fade items, recipe
+      finder (partly there: every recipe's sources), alt planner, raid-week rhythm, demand trends; to-do C3)
+      Strategy features (to-do item 7, `docs/plans/strategy-features.md`): profession advisor, levelling
       planner, niches first.
 - [ ] B3. Not counted in profits yet: AH deposits and listings that don't sell; buying several of an ingredient
       (each costed at the lowest listing); recipe learning costs (shown, not subtracted).
 - [ ] B4. Not valued yet: coins inside containers, quest-item
       rewards, lockboxes beyond their contents.
-- [ ] B5. Pool catches: the addon records which pool a catch came from by itself (no fishing logged yet on
+- [ ] B5. (2026-11-20: checked the saved file again: still no fishing logged, so nothing to check yet.) Pool
+      catches: the addon records which pool a catch came from by itself (no fishing logged yet on
       2026-11-15). After the user next fishes, check the saved file has `pools` entries (moved from D3).
 - [x] B6. (all three done 2026-11-15) The user's decisions of 2026-11-15, briefed in `docs/plans/decided-2026-11-15.md`: remove the character
       names from GitHub's history (C5: done 2026-11-15, history rewritten and force-pushed), crafted
@@ -49,7 +52,10 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 - [x] B7. (done 2026-11-20, to-do B1: report in docs/plans/comprehensive-review.md) Comprehensive review of the whole app (UI, UX, logic, accuracy, no discrepancies between views): planned
       for a new chat after the usage reset, `docs/plans/comprehensive-review.md` (the user, 2026-11-15).
 
-- [ ] B8. (2026-11-19) Farm meter 1.6.x in game: XP line, prices (the app's while under 12 h old, else TSM), a
+- [ ] B8. (2026-11-20: the saved file shows XP and loot counted: a meter session in Maraudon that ended 2026-11-19
+      23:45 saved 47,609 XP, 1g 48s 69c in coins and its loot (8g 10s 12c in all). Left: the fold, never used yet (no
+      folded state saved), a screenshot folded and open; a container as "not opened yet" without the app.)
+      (2026-11-19) Farm meter 1.6.x in game: XP line, prices (the app's while under 12 h old, else TSM), a
       container from a mob or fishing shown as "not opened yet" without the app. Claude can't run WoW: a screenshot.
       Same login: addon 1.6.2 saves TSM's vendor prices about 30 s after login (then /reload); Data health shows them.
       Done 2026-11-19: TSM's vendor prices saved (22,265 sell, 87 buy); the XP line and "Prices: the app's, from 2.0 h
