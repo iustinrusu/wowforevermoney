@@ -1277,6 +1277,9 @@ class Engine:
         """Mob farming, one row per mob: Wowhead Forever "Dropped by" counts from item pages read by hand (only those
         items: a floor until the mob's own page is read), plus a skin if you can skin it. Kills per hour: Settings."""
         mobs = wowhead_items.mob_drops(getattr(self.w, 'forever_pages', None) or {})
+        # a mob's own page read: every drop it has (greys and gear too) and its Quick Facts: the coins a kill gives
+        # ("Worth"), health and level (2026-11-20 reading session, docs/plans/mob-farming-review.md)
+        npc_pages = (getattr(self.w, 'forever_pages', None) or {}).get('npcs') or {}
         # Everloot fills gaps where Wowhead Forever has no rate (30+ loot windows only, labelled, never Top picks)
         everloot_mod.fill_mob_gaps(mobs, getattr(self.w, 'everloot', None) or {})
         if not mobs:
@@ -1308,7 +1311,9 @@ class Engine:
                            key=lambda d: -d['per_kill'] * d['value'])
             drop_value = sum(d['per_kill'] * d['value'] for d in drops)
             skin_value = sum(share * value_of(i) for i, share in skin_items.items())
-            value = drop_value + (skin_value if can_skin else 0)
+            facts = (npc_pages.get(str(npc)) or {}).get('facts') or {}
+            coins = int(facts.get('worth') or 0)          # 0 when the page shows none (elementals, most beasts)
+            value = drop_value + (skin_value if can_skin else 0) + coins
             if value <= 0:
                 continue
             lo = m['min_level'] or qn.get('minLevel') or (sk or {}).get('min_level')
@@ -1342,6 +1347,7 @@ class Engine:
                 detail={'npc': npc, 'zone': zname, 'zone_id': zone, 'levels': f'{lo or "?"}-{hi or "?"}',
                         'classification': cls, 'looted': m['looted'], 'drops': drops[:12],
                         'drop_value': int(drop_value), 'skin_value': int(skin_value), 'can_skin': can_skin,
+                        'coins': coins, 'own_page': bool(m['complete']), 'health': facts.get('health'),
                         'skin_needed': skin_need, 'kills_per_hour': round(per_hour, 1),
                         'pace_source': 'your kills-per-hour setting', 'read': m['read'],
                         'source': 'Wowhead Forever "Dropped by" counts' + (' and "Skinned from" counts' if sk else '')}))

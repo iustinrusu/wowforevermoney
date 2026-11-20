@@ -43,6 +43,27 @@ The recipe drops are lotteries (a rare drop worth a lot, selling less than once 
 elementals (Gusting Vortex, Living Storm) look strongest, but the realm only takes about 10 Breaths of Wind a day at
 your share, so an hour of them would flood it (point 4).
 
+## Progress
+- **2026-11-20 Reading session done (step 1, 20 pages, no block).** The user: "Reading session first", then "maybe
+  start with reading high interest, high level items and mobs first" (the order was changed to that). What Forever
+  says, with each mob's own page now counting every drop and its coins:
+
+  | Mob | Gold an hour (60 kills) | From | Sample |
+  |---|---|---|---|
+  | Arkkoran Oracle, Azshara 54-55 | 221g | Pattern: Stormshroud Armor 3 of 29 loots (34g) | tiny |
+  | Dark Caster, Eastern Plaguelands 56-57 | 140g | Pattern: Wizardweave Turban 2 of 37 (42g) | tiny |
+  | Scarlet Spellbinder, Western Plaguelands 57-58 | 101g | Crusader formula 5 of 955 (0.52%, 293g); Runecloth | solid |
+  | Deadwind Warlock, Deadwind Pass 57-58 | 83g | Superior Strength formula 2 of 160 (77g), EZ-Thro Shell schematic | fair |
+  | Gusting Vortex, Tanaris 43-45 | 53g | Breath of Wind 33 of 41 (80%), Elemental Air | small |
+  | Toxic Horror, Felwood 53-54 | 36g | Essence of Water 85 of 617 (13.8%) and the rest of its loot | solid |
+
+  The recipe drops sell less than once a day in the whole region (Crusader 0.3, Stormshroud 0.4): without a market
+  limit (step 2) these rows promise gold nobody would pay. Coins from the pages' Quick Facts ("Worth"): about 5s a
+  kill for the level 55-60 humanoids (Classic table: about 1s 30c), none for elementals. Scourge Warder drops no
+  Essence of Undeath in Forever (Classic: 85% a kill); in Forever it comes mostly from Stratholme and Scholomance.
+  Elemental Air's lowest listing jumped to 1g 20s (16:23) and 70s (17:23) while it sells for about 22s, which lifts
+  the Desolace and Thousand Needles air elementals for now: step 2 should value an hour's loot at what it sells for.
+
 ## Proposed next steps (the user decides)
 1. **Wowhead reading session, 20 pages** (pace in CLAUDE.md): item pages Breath of Wind (7081), Essence of Undeath
    (12808), Elemental Air (7069), Globe of Water (7079), Formula: Enchant Weapon - Crusader (16252), Pattern:

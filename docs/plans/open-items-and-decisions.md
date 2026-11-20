@@ -29,7 +29,8 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 - [ ] A5. Mobs' own pages, so mob farming counts every drop (coins, gray items, gear), not only materials.
       (2026-11-20 review, `docs/plans/mob-farming-review.md`: Toxic Horror is 17th of 554 open-world mobs by Classic
       value a kill; a 20-page reading list for the candidates: Tanaris air elementals for Breath of Wind, Silithus
-      Essence of Air, Eastern Plaguelands Essence of Undeath, recipe drops such as Crusader.)
+      Essence of Air, Eastern Plaguelands Essence of Undeath, recipe drops such as Crusader. Read the same evening:
+      20 pages, 10 mobs' own pages with their coins and health; results in the review's Progress.)
 - [ ] A8. (2026-11-20, decision for the user) Market limit on farmed loot: count at the AH price only your share of
       the realm's daily sales for an hour's loot, the rest at the vendor price (Breath of Wind: about 50 an hour, your
       share 9.9 a day). And kill speed from each mob's health and level instead of one pace for all.

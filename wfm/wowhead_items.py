@@ -191,6 +191,30 @@ def clean_page(page: dict) -> dict:
             raise ValueError('sells must be a list')
         out['sells'] = [clean_sell(r) for r in page['sells'][:500]]
         out['sells_classic'] = _int(page.get('sells_classic') or 0)
+    if page.get('facts') is not None:
+        out['facts'] = clean_facts(page['facts'])
+    return out
+
+
+def clean_facts(f) -> dict:
+    """An npc page's Quick Facts (2026-11-20, for kill speed): health and level as [low, high] numbers, the
+    classification, and the box's text as read (short), so the numbers can be checked against it."""
+    if not isinstance(f, dict):
+        raise ValueError('facts must be an object')
+    out = {}
+    for k, top in (('health', 10**9), ('level', 100)):
+        v = f.get(k)
+        if v is None:
+            continue
+        if not isinstance(v, list) or not 1 <= len(v) <= 2:
+            raise ValueError(f'{k} must be [low] or [low, high]')
+        out[k] = [_int(x, 0, top) for x in v]
+    if f.get('worth') is not None:
+        out['worth'] = _int(f['worth'], 0, 10**8)        # Quick Facts "Worth": the coins a kill gives, in copper
+    if f.get('classification') is not None:
+        out['classification'] = _text(f['classification'], 40)
+    if f.get('text') is not None:
+        out['text'] = _text(f['text'], 600)
     return out
 
 

@@ -326,5 +326,26 @@ class VendorPageTests(unittest.TestCase):
         self.assertIsNone(e.vendor_price(self.SCHEMATIC))
 
 
+class NpcFactsTests(unittest.TestCase):
+    """An npc page's Quick Facts are kept for kill speed (2026-11-20): health and level as numbers, checked."""
+
+    def page(self, facts):
+        return {'npc=7132': {'name': 'Toxic Horror', 'url': 'https://www.wowhead.com/forever/npc=7132', 'read': '2026-11-20',
+                             'tabs': {}, 'facts': facts}}
+
+    def test_kept(self):
+        data, saved, problems = wi.merge({}, self.page({'health': [3188, 3292], 'level': [53, 54],
+                                                         'classification': 'Normal', 'text': 'Level: 53 - 54'}))
+        self.assertEqual((saved, problems), (['npc=7132'], []))
+        self.assertEqual(data['npcs']['7132']['facts'], {'health': [3188, 3292], 'level': [53, 54],
+                                                         'classification': 'Normal', 'text': 'Level: 53 - 54'})
+
+    def test_bad_numbers_skip_the_page(self):
+        for bad in ({'health': '3188'}, {'health': [1, 2, 3]}, {'level': [500]}, 'Health: 3188'):
+            data, saved, problems = wi.merge({}, self.page(bad))
+            self.assertEqual(saved, [])
+            self.assertEqual(len(problems), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

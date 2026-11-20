@@ -38,6 +38,14 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   6471 3864 249391 249427 12184 4232 6037 13464 1529 4387 3182 (102 item pages in all). Left of the top 100: 3356
   Kingsblood, 5500 Iridescent Pearl; then the skinning items 7286 8165 15412 15423, the pools (step 3 list), Javnir
   Nashak (checklist A7). A saved batch is checked against a SHA-256 of the tab's store before importing.
+- Session 5 (2026-11-20, evening, the mob farming review): 20 pages, 2 minutes apart, no block. Items 7081 16252
+  14505 13499 12808 16246 15753 7069 7079 13496, npcs 8667 4494 8526 8550 14455 8525 7372 6138 7132 9397 (order: the
+  user asked for high-level, high-interest pages first). The reader now keeps an npc page's Quick Facts (`facts`:
+  health, level, the coins a kill gives as "Worth", read from the coin icons from the next session on; this batch's
+  Worth was taken from the text, two numbers = silver and copper). Batch checked with SHA-256 (13,200 characters;
+  a non-breaking space in "React: A H" had to be restored), saved in the tab as `wfm_pages_saved_005`. No Forever
+  drops recorded yet (re-read later): Shadowmage, Whirling Invader, Living Storm, Recipe: Greater Shadow Protection
+  Potion, Recipe: Greater Nature Protection Potion. Next: a reading queue ranked by gold at stake and mob level.
 - Session 4 (2026-11-20, just after midnight): 20 pages at 2 minutes apart, no block: spell 1289305 (B10), items
   274964 13545 18335 8396 (B9), vendors 3364 15419 4453 260565 16015 248200 2664 265346 2832 (checklist A0), 3356
   5500 (the top 100 is done), 7286 8165 15412 15423 (the skinning items are done). The tab's storage had lost the

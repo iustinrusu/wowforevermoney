@@ -863,6 +863,15 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (twenty-second part) Wowhead reading session for the mob farming review (to-do C1/C2, checklist A5):
+  20 pages, 2 minutes apart, no block, high-level and high-interest first (the user's suggestion). npc pages now keep
+  their Quick Facts (`wowhead_items.clean_facts`: health, level, "Worth" = coins a kill, the text as read), and a
+  mob whose own page was read gets its coins in its value a kill (`Engine.mob_spots`, shown in the row details).
+  Results: `docs/plans/mob-farming-review.md`, Progress (Arkkoran Oracle 221g an hour on 3 drops in 29 loots, Scarlet
+  Spellbinder 101g on the Crusader formula, Gusting Vortex 53g, Toxic Horror 36g with its full loot). Facts verified:
+  Wowhead Forever npc pages show health and the coins a kill gives; Scourge Warder drops no Essence of Undeath in
+  Forever. Tests: 2 new (npc facts). Next, as the user asked: the market limit on farmed loot, then kill speed.
+
 - **2026-11-20** (twenty-first part) (1) Every item name links to its Wowhead Forever page (the user: "every item
   name in the whole app should be clickable"): most tables already did (`itemLink`); now also the row details' title,
   the levelling planner's unlocks, the Professions lists and big sales, and the Changes tab (`linkName`; the server
