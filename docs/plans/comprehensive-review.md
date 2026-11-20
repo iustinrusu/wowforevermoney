@@ -44,6 +44,15 @@ fix the clear bugs, ask the user only about real decisions. Never skip a check o
    logic that could drift apart (one function per rule), slow spots.
 7. **Report.** A short summary for the user: what was found, what was fixed, what needs their decision.
 
+## Progress (started 2026-11-20, to-do B1)
+- Part 1 done 2026-11-20: `tools/consistency_check.py` now builds the app as it runs (nothing written to AddOns) and
+  compares what each tab's own function returns, 16 pairs, each with how many were compared: plan vs rows, Top picks
+  vs tabs, Niches, Professions vs Crafting, Professions vs Gathering and the levelling panel, item drawer vs tables,
+  the AH cut taken once, profit a day = profit each x a day, Market tab vs TSM and drawer, Investments vs TSM and
+  drawer, Biggest markets vs TSM and rows, Sniper vs TSM, levelling vs Crafting, purse vs My bags, plan cash-in vs My
+  bags, Data health counts vs tabs. 0 problems on real data. Found: the plan cash-in check had compared nothing since
+  it was written (it looked for a field `each`; the item lines say `unit`). Units and labels: in part 4 (UI).
+
 ## Known items to look at (from 2026-11-15)
 - Levelling planner values products with no recorded sales at vendor price where Crafting shows the listing
   ("no sales data"): deliberate; check it's explained in both places.
