@@ -361,6 +361,14 @@ class EngineTests(unittest.TestCase):
         self.assertAlmostEqual(o.units_day, round(24 / 47, 2))
         self.assertIn('cooldown', o.flags)
         self.assertEqual(o.detail['cooldown_hours'], 47.0)
+        # the cooldown sets the pace: the page shows a craft's profit, every 47 hours (the user, 2026-11-20)
+        self.assertTrue(o.detail['cooldown_limits'])
+        self.assertEqual(o.profit_unit, int(1000 * 0.95) - 80)
+        self.assertEqual(o.daily, int(o.profit_unit * 24 / 47))          # 870 a craft, about 444 a day on average
+        thin = {**prices, PRODUCT: dict(prices[PRODUCT], regionSoldPerDay=1)}     # the market takes 0.2 a day: it sets the pace
+        o2 = Engine(make_world(thin, [arcanite]), dict(SETTINGS, gold=100)).crafts()[0]
+        self.assertAlmostEqual(o2.units_day, 0.2)
+        self.assertFalse(o2.detail['cooldown_limits'])
         arcanite.cooldown_ms = 1500                                   # a global cooldown is not a limit
         o = Engine(make_world(prices, [arcanite]), dict(SETTINGS, gold=100)).crafts()[0]
         self.assertNotIn('cooldown', o.flags)

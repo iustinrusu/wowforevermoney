@@ -16,6 +16,10 @@ function money(c) {
 const num = (v, d = 1) => (v === null || v === undefined) ? '–' : Number(v).toLocaleString(undefined, {maximumFractionDigits: d});
 const chg = (v, d = 0, color = true) => (v === null || v === undefined) ? '<span class="pill">–</span>' : `<span class="${color ? (v > 0.005 ? 'up' : (v < -0.005 ? 'down' : '')) : ''}">${v > 0 && color ? '+' : ''}${(v * 100).toFixed(d)}%</span>`;
 const daysText = (d) => `${num(d, d < 10 ? 1 : 0)} ${Math.abs(d - 1) < 0.05 ? 'day' : 'days'}`;
+// a craft whose cooldown sets the pace: its profit comes once a cooldown, on the day you craft it (the user, 2026-11-20)
+const cdHours = (o) => { const d = (o && o.detail) || {}; return d.cooldown_limits && d.cooldown_hours ? d.cooldown_hours : 0; };
+const cdEvery = (h) => h >= 24 ? daysText(h / 24) : `${num(h, h < 10 ? 1 : 0)} ${Math.abs(h - 1) < 0.05 ? 'hour' : 'hours'}`;
+const cdTip = (o) => `Its cooldown allows one craft every ${cdEvery(cdHours(o))}, so it earns ${moneyText(o.profit_unit)} on the day you craft it and nothing in between. Averaged over those days that is ${moneyText(o.daily)} a day, the figure used to rank it against things you can do every day.`;
 const ago = (ts) => { if (!ts) return 'never'; const s = Date.now() / 1000 - ts; if (s < 90) return `${Math.round(s)}s ago`; if (s < 5400) return `${Math.round(s / 60)} min ago`; if (s < 172800) return `${(s / 3600).toFixed(1)} h ago`; return `${(s / 86400).toFixed(1)} days ago`; };
 const KIND = {mob_spot: 'Mob farming', farm_zone: 'Farming spot', craft: 'Craft', vendor_flip: 'Vendor → AH', ah_to_vendor: 'AH → vendor', realm_dip: 'Cheap relist', gather: 'Farm', fishing_zone: 'Fishing spot', fishing_spot: 'Fishing spot'};
 const FLAGS = {
@@ -257,7 +261,7 @@ function oppTable(rows, opts = {}) {
   if (st) rows = [...rows].sort((a, b) => ((sortVal(a) ?? -1e18) < (sortVal(b) ?? -1e18) ? -1 : 1) * (st.dir));
   const numeric = new Set(['good_day', 'own', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells', 'cooldown', 'profit_avg', 'every', 'effort']);
   const HT = {units_day: 'How many you can expect to sell (or make) a day: what the whole region buys a day x your share (Settings, 20%), capped by your gold, vendor stock and ingredients. Under 1 means less than one a day.',
-    daily: 'Profit each x sales a day: what this earns on an average day if you keep doing it. "up to": the same at the current lowest listing.',
+    daily: 'Profit each x sales a day: what this earns on an average day if you keep doing it. "up to": the same at the current lowest listing. For a craft with a cooldown: what one craft makes and how often you can make it (it earns on the day you craft it), with the average a day under it.',
     profit_unit: STATE.settings.sale_price_basis === 'min_buyout' ? 'Profit on one, after the AH cut, at the current lowest listing.'
       : STATE.settings.sale_price_basis === 'actual_sales' ? 'Profit on one, after the AH cut, at what it actually sells for (never above the realm listing average or the region average sale price).'
       : STATE.settings.sale_price_basis === 'lower' ? 'Profit on one, after the AH cut, at the lower of the current lowest listing and its usual sale price across the region: what you can count on. "up to" below it: if it sells at the current lowest listing instead.'
@@ -291,6 +295,7 @@ function oppTable(rows, opts = {}) {
       if (c === 'units_day') return `<td class="num">${o.units_day >= 1 || !o.units_day ? num(o.units_day) : `1 every ${daysText(1 / o.units_day)}`}</td>`;
       if (c === 'effort') { const ef = (o.detail || {}).effort; return ef ? `<td class="num" title="About ${ef.minutes} minutes of play a day for its profit a day (posting, reposting, buying, crafting, a vendor trip). No hourly figure: the market only takes so many, so more time would not earn more.">~${num(ef.minutes, ef.minutes < 10 ? 1 : 0)} min</td>` : '<td class="num pill">–</td>'; }
       if (c === 'every') return `<td class="num">${o.units_day > 0 ? (o.units_day >= 1 ? `${num(o.units_day, 1)} a day` : daysText(1 / o.units_day)) : '–'}</td>`;
+      if (c === 'daily' && cdHours(o)) return `<td class="num" title="${esc(cdTip(o))}">${money(o.profit_unit)}<div class="pill">a craft, every ${esc(cdEvery(cdHours(o)))}</div><div class="pill">about ${esc(moneyText(o.daily))} a day on average</div></td>`;
       if ((c === 'profit_unit' || c === 'daily') && (o.detail || {}).at_usual) {
         const u = o.detail.at_usual;
         return `<td class="num">${money(o[c])}<div class="pill" title="${esc(`At your realm's lowest listing (${moneyText(u.price_used)}) as shown; across the region it usually sells for ${moneyText(u.price)}, which would give this. Region sales are the only sales data TSM has.`)}">at usual ${esc(moneyText(c === 'daily' ? u.daily : u.profit_unit))}</div></td>`;
@@ -772,21 +777,27 @@ const VIEWS = {
       if (r.kind === 'gathering') {
         const g = which === 'now' ? r.gather.now : (r.gather.full || r.gather.classic_full);
         if (!g) return '<span class="pill">–</span>';
-        return `${money(g.gph)}<span class="pill"> an hour</span><div class="hint">${esc(g.title)}${g.classic ? ' <span class="flag" title="Some of what a node gives comes from WoW Classic loot tables: not confirmed for Forever">Classic yields</span>' : ''}</div>`;
+        return `<span class="amt">${money(g.gph)}<span class="pill"> an hour</span></span><div class="hint">${esc(g.title)}${g.classic ? ' <span class="flag" title="Some of what a node gives comes from WoW Classic loot tables: not confirmed for Forever">Classic yields</span>' : ''}</div>`;
       }
       const c = which === 'now' ? r.craft.now : r.craft.full, total = which === 'now' ? r.craft.now_daily : r.craft.full_daily;
       if (!c.length) return '<span class="pill">–</span>';
-      return `${money(total)}<span class="pill"> a day</span><div class="hint">${c.map((x) => esc(x.title.replace(/^Craft /, ''))).join(', ')}</div>`;
+      const every = (x) => x.every_hours ? ` <span class="pill" title="Its cooldown allows one craft every ${esc(cdEvery(x.every_hours))}: it earns on the day you craft it. Counted here at its average a day">every ${esc(cdEvery(x.every_hours))}</span>` : '';
+      return `<span class="amt">${money(total)}<span class="pill"> a day</span></span><div class="hint">${c.map((x) => esc(x.title.replace(/^Craft /, '')) + every(x)).join(', ')}</div>`;
     };
+    // at full skill the same as now (you are at or near 300): say so instead of repeating the numbers
+    const sameAsNow = (r) => r.have && (r.kind === 'gathering'
+      ? (r.gather.now && r.gather.full && r.gather.now.gph >= r.gather.full.gph)
+      : (r.craft.now.length && r.craft.now_daily >= r.craft.full_daily));
+    const full = (r) => sameAsNow(r) ? '<span class="pill" title="Your skill already reaches its best: more skill adds nothing">same as now</span>' : val(r, 'full');
     const cost = (r) => r.kind === 'gathering' ? '<span class="pill" title="A gathering profession rises as you gather: no gold">levels as you gather</span>'
       : r.levelling ? `${money(r.levelling.total)}<div class="hint">about ${num(r.levelling.crafts, 0)} crafts${r.levelling.stuck_at ? `; stops at ${r.levelling.stuck_at}` : ''}${(r.levelling.to_find || []).length ? `; plus ${r.levelling.to_find.length} recipes to find (they only drop or come from quests)` : ''}</div>` : '<span class="pill" title="Enchantments make no item, so they are not in the recipe tables">not planned</span>';
     const good = (r) => r.kind !== 'crafting' ? '<span class="pill">–</span>' : `${money(r.craft.good_day)}<span class="pill"> a day</span>`;
     const big = (r) => r.kind === 'crafting' && r.craft.big_sales.length ? `<div class="hint" title="Worth a lot each but selling less than once a day at your share, so the average day hides them">Big sales: ${r.craft.big_sales.map((b) => `${esc(b.title.replace(/^Craft /, ''))} ${esc(moneyText(b.profit_unit))}${b.days_per_sale ? ` (1 every ${b.days_per_sale} days)` : ''}`).join(', ')}</div>` : '';
     const rows = d.rows.map((r, i) => `<tr><td>${esc(r.profession)}${r.have ? ` <span class="pill good" title="You have this profession">yours: ${r.skill}</span>` : ''}</td>
-      <td class="num">${r.have ? val(r, 'now') : '<span class="pill">–</span>'}</td><td class="num">${val(r, 'full')}</td><td class="num">${good(r)}</td><td class="num">${cost(r)}</td><td>${esc(r.verdict)}${big(r)}</td></tr>`).join('');
+      <td class="num">${r.have ? val(r, 'now') : '<span class="pill">–</span>'}</td><td class="num">${full(r)}</td><td class="num">${good(r)}</td><td class="num">${cost(r)}</td><td>${esc(r.verdict)}${big(r)}</td></tr>`).join('');
     return `<div class="panel"><h2>Professions <small>what each primary profession earns you now and at full skill, and what getting there costs</small></h2>
       <div class="hint">${esc(d.note)} Yours: ${d.yours.length ? esc(d.yours.join(' and ')) : 'none detected'}.</div>
-      <div class="tablewrap"><table><thead><tr><th title="Every profession, yours first">Profession</th><th class="num" title="With your skill today (only for professions you have)">Now</th><th class="num" title="Gathering: the best spot that only needs more skill. Crafting: the three best crafts at 300 that sell, with the gold for their ingredients">At full skill</th><th class="num" title="Optimistic: one sale today of each of its three best crafts at your realm's price, including ones that usually sell less than once a day">On a good day</th><th class="num" title="Crafting: the levelling planner's cost from your skill (or from 1) to 300; a minus means you would earn that much on the way">To get there</th><th title="A one-line verdict from the numbers on this row">In short</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="tablewrap"><table class="profs"><colgroup><col class="c-prof"><col class="c-now"><col class="c-full"><col class="c-good"><col class="c-cost"><col class="c-short"></colgroup><thead><tr><th title="Every profession, yours first">Profession</th><th class="num" title="With your skill today (only for professions you have)">Now</th><th class="num" title="Gathering: the best spot that only needs more skill. Crafting: the three best crafts at 300 that sell, with the gold for their ingredients">At full skill</th><th class="num" title="Optimistic: one sale today of each of its three best crafts at your realm's price, including ones that usually sell less than once a day">On a good day</th><th class="num" title="Crafting: the levelling planner's cost from your skill (or from 1) to 300; a minus means you would earn that much on the way">To get there</th><th title="A one-line verdict from the numbers on this row">In short</th></tr></thead><tbody>${rows}</tbody></table></div>
       <details class="how"><summary>How this is worked out</summary><div>Gathering professions: the best gathering spot by gold an hour, from the Gathering tab (Forever data first; a spot partly resting on WoW Classic loot tables is marked "Classic yields"). Node spots do not check your level: a high zone (Winterspring, Eastern Plaguelands, Felwood) needs a high level to farm safely. Crafting professions: the profit a day of the three best crafts that sell, from the Crafting tab, and the levelling planner below for the cost from your skill (or from skill 1 for one you don't have) to 300. One hour of farming a day is about its gold an hour a day, so the two kinds can be compared. Switching a profession means dropping one of yours and its skill: compare its "Now" with the new one's numbers and cost.</div></details></div>
       ${await levellingPanel()}`;
   },
@@ -1097,7 +1108,7 @@ function oppDetail(o) {
   const notes = (o.flags || []).filter((f) => FLAGS[f]);
   let html = `<h3>${esc(o.title)} <small>${esc(KIND[o.kind] || o.kind)}</small></h3>${notes.length ? `<ul class="notes">${notes.map((f) => `<li><span class="flag ${FLAGS[f][0]}">${esc(FLAGS[f][1])}</span> ${esc(FLAGS[f][2])}</li>`).join('')}</ul>` : ''}
     <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot', 'mob_spot'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
-    <div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
+    ${cdHours(o) ? `<div>How often</div><div>One craft every ${esc(cdEvery(cdHours(o)))} (its cooldown) → ${money(o.profit_unit)} on the day you craft it<div class="pill" title="${esc(cdTip(o))}">about ${esc(moneyText(o.daily))} a day on average</div></div>` : `<div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
     ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>${d.price_check ? `<div class="hint">⚠ Second opinion: ${esc(d.price_check.text)}</div>` : ''}`;
   const ef = d.effort;
   if (ef) html += `<h3>Your time</h3><div class="kv"><div>About</div><div>${num(ef.minutes, 1)} minutes a day (${num(ef.posts, 0)} auction posts incl. reposts, ingredients, crafting, a vendor trip: estimates)</div><div>For</div><div>${money(o.daily)} a day (its profit a day: more time would not sell more)</div><div>Your time is worth</div><div>${money(ef.time_value)} an hour <span class="pill">half your best measured farming; change it in Settings</span></div></div>`;

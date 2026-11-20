@@ -53,7 +53,9 @@ def crafting(prof: str, opps: list) -> dict:
     now = one_per_cooldown(sorted((o for o in rows if o.doable and 'cant_afford' not in o.flags),
                                   key=lambda o: -o.daily))[:TOP_CRAFTS]
     full = one_per_cooldown(sorted(rows, key=lambda o: -(o.detail.get('daily_if_affordable', o.daily) or 0)))[:TOP_CRAFTS]
-    pick = lambda os_, f: [{'title': o.title, 'key': o.key, 'daily': int(f(o) or 0)} for o in os_]
+    pick = lambda os_, f: [{'title': o.title, 'key': o.key, 'daily': int(f(o) or 0),
+                            'every_hours': o.detail.get('cooldown_hours') if o.detail.get('cooldown_limits') else None}
+                           for o in os_]
     # a good day (optimistic): one sale of each of its best crafts today, slow ones too; big sales: worth a lot each
     # but selling less than once a day (Devilsaur Leggings), so the average day hides them
     sellable = [o for o in opps if o.kind == 'craft' and o.profession == prof
@@ -78,6 +80,8 @@ def verdict(r: dict) -> str:
             return 'No spot with enough data yet.'
         tail = ' (by WoW Classic yields: not confirmed for Forever)' if not full else ''
         if r['have']:
+            if now and full and now['gph'] >= full['gph']:
+                return f"You have it: {fmt_money(now['gph'])} an hour from its best spot; more skill adds nothing."
             return (f"You have it: {fmt_money(now['gph'])} an hour now" if now else 'You have it, but no spot you can do '
                     'today has enough Forever data') + f"; up to {fmt_money(best['gph'])} an hour with more skill{tail}."
         return f"Up to {fmt_money(best['gph'])} an hour once learned and levelled (it levels as you gather){tail}."
@@ -88,6 +92,10 @@ def verdict(r: dict) -> str:
     if lev.get('stuck_at'):
         path += f" (the path stops at {lev['stuck_at']}: no recipe you can buy past it)"
     if r['have']:
+        if c['now_daily'] >= c['full_daily']:
+            return (f"You have it: {fmt_money(c['now_daily'])} a day from its best crafts, as much as at 300; {path}."
+                    if (r.get('skill') or 0) < 300 else
+                    f"You have it at full skill: {fmt_money(c['now_daily'])} a day from its best crafts.")
         return (f"You have it: {fmt_money(c['now_daily'])} a day now from its best crafts; {fmt_money(c['full_daily'])} a day "
                 f"at 300; {path}.")
     return f"{fmt_money(c['full_daily'])} a day at 300 from its best crafts; {path} from skill 1."

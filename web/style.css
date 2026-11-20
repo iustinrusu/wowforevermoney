@@ -365,3 +365,16 @@ html[data-motion="off"] .sky .px, html[data-motion="off"] .sky .rune-wrap { tran
 @media (prefers-reduced-motion: reduce) {
   html:not([data-motion]) *, html:not([data-motion]) *::before, html:not([data-motion]) *::after { animation: none !important; transition: none !important; }
 }
+
+/* Professions table (2026-11-20, the user: "Now and At full skill columns take too much width, while In short takes too
+   little"): the gold amount stays on one line, the crafts or spot under it wrap, and on a wide screen each column gets
+   a fixed share with the verdict the widest */
+table.profs td.num { white-space: normal; }
+table.profs td.num .hint { text-align: left; margin: 2px 0 0; }
+table.profs .amt { white-space: nowrap; }
+@media (min-width: 701px) {
+  table.profs { table-layout: fixed; width: 100%; }
+  table.profs col.c-prof { width: 14%; } table.profs col.c-now, table.profs col.c-full { width: 20%; }
+  table.profs col.c-good { width: 10%; } table.profs col.c-cost { width: 12%; } table.profs col.c-short { width: 24%; }
+  table.profs th { white-space: normal; }
+}

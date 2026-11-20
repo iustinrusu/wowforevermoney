@@ -78,5 +78,30 @@ class AdvisorTests(unittest.TestCase):
         self.assertEqual(set(self.order[:2]), {'Skinning', 'Leatherworking'})
 
 
+class SameAsNowTests(unittest.TestCase):
+    """At or near full skill, the verdict doesn't repeat a figure that more skill wouldn't change (the user, 2026-11-20:
+    the Professions table "doesn't look that nice and easy to read")."""
+
+    def test_full_skill_crafting_and_gathering(self):
+        opps = [row('craft', 'Craft A', daily=3000, prof='Leatherworking'),
+                row('skin_spot', 'Skin in Barrens', gph=20000, prof='Skinning')]
+        rows = {r['profession']: r for r in advisor.build(FakeEngine(), opps, {'Skinning': 300, 'Leatherworking': 300})['rows']}
+        self.assertEqual(rows['Leatherworking']['verdict'], 'You have it at full skill: 30s 0c a day from its best crafts.')
+        self.assertEqual(rows['Skinning']['verdict'],
+                         'You have it: 2g 0s 0c an hour from its best spot; more skill adds nothing.')
+
+    def test_near_full_skill(self):
+        opps = [row('craft', 'Craft A', daily=3000, prof='Leatherworking')]
+        rows = {r['profession']: r for r in advisor.build(FakeEngine(), opps, {'Leatherworking': 281})['rows']}
+        self.assertIn('30s 0c a day from its best crafts, as much as at 300; levelling to 300 earns about',
+                      rows['Leatherworking']['verdict'])
+
+    def test_a_cooldown_craft_says_how_often(self):
+        cd = row('craft', 'Salt Shaker: make Refined Deeprock Salt', daily=2000, prof='Leatherworking')
+        cd.detail.update(cooldown_hours=71.0, cooldown_limits=True)
+        lw = {r['profession']: r for r in advisor.build(FakeEngine(), [cd], {'Leatherworking': 281})['rows']}['Leatherworking']
+        self.assertEqual(lw['craft']['now'][0]['every_hours'], 71.0)
+
+
 if __name__ == '__main__':
     unittest.main()

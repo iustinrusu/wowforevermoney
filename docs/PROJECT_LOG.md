@@ -863,6 +863,17 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (twentieth part) Two page fixes the user asked for. (1) "profit a day doesnt make sense on items that
+  have cds, profit is only on craft day": a craft whose cooldown sets the pace (`detail.cooldown_limits`, new in
+  `Engine.crafts`) shows in "Profit a day" what one craft makes, "a craft, every 3 days", and "about X a day on
+  average" in small print (the average still ranks it); the row details say "One craft every 3 days (its cooldown)".
+  The Professions lists mark such crafts "every 3 days". (2) Professions table ("Now and At full skill columns take
+  too much width, while In short takes too little"): number cells never wrapped, so the craft lists under the
+  amounts made those two columns 500 px each (the table 1,411 px in a 1,024 px window). Now the amounts stay on one
+  line, the lists wrap, wide screens get fixed column shares (In short the widest), and "At full skill" says "same as
+  now" when more skill adds nothing (the verdict no longer repeats the same figure either). Checked: 943 px wide, no
+  sideways scroll at 1,024 or 375 px, every tab without script errors. Tests: 4 new.
+
 - **2026-11-20** (nineteenth part) The three value guards (decision above). `wfm/engine.py` (`best_uses` second
   opinion, `no_crafted_worth`, `item_values` worked out once in the run, `_CraftCheck`), `wfm/valuation.py` (safety
   net, `breaches`), `wfm/anomalies.py` (`check_values`, `own_price`, `swings`, `value_rule_check`, `swing_check`),

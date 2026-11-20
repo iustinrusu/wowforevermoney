@@ -920,6 +920,10 @@ class Engine:
                     'sold_per_day': sold_per_day(self.price(r.product_id)),
                     'daily_if_affordable': int(profit * crafts_uncapped), 'limited_by_mat': mat_limit,
                     'cooldown_hours': round(r.cooldown_ms / 3_600_000, 2) if per_cooldown is not None else None,
+                    # the cooldown sets the pace (not the market or your gold): the profit comes once a cooldown, on
+                    # the day you craft it, so the page shows a craft's profit and how often (the user, 2026-11-20:
+                    # "profit a day doesnt make sense on items that have cds, profit is only on craft day")
+                    'cooldown_limits': per_cooldown is not None and crafts_day >= per_cooldown * 0.999,
                     'cooldown_group': getattr(r, 'cooldown_group', '') or None,
                     'cooldown_shared_with': sum(1 for x in self.gd.recipes if x is not r and getattr(r, 'cooldown_group', '')
                                                 and getattr(x, 'cooldown_group', '') == r.cooldown_group)}))
