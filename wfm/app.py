@@ -439,8 +439,22 @@ class App:
     def professions(self) -> dict:
         """Profession advisor: every primary profession now and at full skill, and the cost of getting there."""
         s = self.effective_settings()[0]
-        return advisor_mod.build(Engine(self.world, s), (self.result or {}).get('opportunities', []),
-                                 s.get('professions') or {}, self._known_crafts())
+        out = advisor_mod.build(Engine(self.world, s), (self.result or {}).get('opportunities', []),
+                                s.get('professions') or {}, self._known_crafts())
+        # each listed craft's item, so the page can link its name to Wowhead (the user, 2026-11-20)
+        by = (self.result or {}).get('by_key') or {}
+        for r in out.get('rows') or []:
+            c = r.get('craft') or {}
+            for x in (c.get('now') or []) + (c.get('full') or []) + (c.get('big_sales') or []):
+                o = by.get(x.get('key'))
+                if o:
+                    x.update(self._item_ref(o.item_id))
+        return out
+
+    def _item_ref(self, iid: int) -> dict:
+        """An item's id, name and quality, for a link to its Wowhead page on the page."""
+        it = self.world.gamedata.items.get(iid) if self.world.gamedata and iid else None
+        return {'item_id': iid, 'name': it.name, 'quality': it.quality} if it else {}
 
     def levelling(self, qs) -> dict:
         """The cheapest way from one skill to another (300 by default) in a crafting profession, for the character
@@ -707,7 +721,9 @@ def make_handler(app: App):
                 if url.path == '/api/inventory':
                     return self._json(app.inventory())
                 if url.path == '/api/events':
-                    return self._json(app.events.recent(200))
+                    return self._json([{**e, 'item_name': app._item_ref(e.get('item_id')).get('name', ''),
+                                        'quality': app._item_ref(e.get('item_id')).get('quality', 1)}
+                                       if e.get('item_id') else e for e in app.events.recent(200)])
                 if url.path == '/api/audit':
                     return self._json(app.audit)
                 if url.path == '/api/scans':

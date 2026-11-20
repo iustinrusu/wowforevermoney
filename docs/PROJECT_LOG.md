@@ -863,6 +863,18 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (twenty-first part) (1) Every item name links to its Wowhead Forever page (the user: "every item
+  name in the whole app should be clickable"): most tables already did (`itemLink`); now also the row details' title,
+  the levelling planner's unlocks, the Professions lists and big sales, and the Changes tab (`linkName`; the server
+  adds the item's name and quality: `App._item_ref`, Engine levelling unlocks). (2) Professions of yours at their best
+  (more skill adds nothing) get the Biggest markets glowing gold border (`tr.yours`), with a legend and hover help.
+  (3) Mob farming review (the user: "double check that the current mob farming ranking is accurate and profits are
+  precise, then look for any missing data"): `docs/plans/mob-farming-review.md`. Math and ranking verified by hand;
+  every mob row is a floor (no mob's own page read), coins and greys are small (Classic: median 1s 30c and about 4s a
+  kill for level 50-60 humanoids), kill speed is one pace for all, and farmed loot has no market limit. Toxic Horror is
+  17th of 554 open-world mobs level 45+ by Classic value a kill. Decisions for the user: a 20-page reading list,
+  a market limit on farmed loot, kill speed by health (checklist A5, A8).
+
 - **2026-11-20** (twentieth part) Two page fixes the user asked for. (1) "profit a day doesnt make sense on items that
   have cds, profit is only on craft day": a craft whose cooldown sets the pace (`detail.cooldown_limits`, new in
   `Engine.crafts`) shows in "Profit a day" what one craft makes, "a craft, every 3 days", and "about X a day on

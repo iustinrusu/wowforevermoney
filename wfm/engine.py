@@ -761,7 +761,9 @@ class Engine:
             if o.kind == 'craft' and o.profession == profession and skill < req <= target \
                     and not (set(o.flags) & {'hard_to_sell', 'no_sales_data', 'price_check_fails', 'unverified_recipe'}):
                 at = next((st['cumulative'] for st in out['steps'] if st['to'] >= req), None)
+                it = self.gd.items.get(o.item_id)
                 unlocks.append({'skill': req, 'title': o.title, 'item_id': o.item_id, 'key': o.key,
+                                'name': it.name if it else '', 'quality': it.quality if it else 1,
                                 'daily': int(o.detail.get('daily_if_affordable', o.daily) or 0),
                                 'profit_unit': o.profit_unit, 'cost_to_reach': at})
         unlocks.sort(key=lambda u: -u['daily'])
