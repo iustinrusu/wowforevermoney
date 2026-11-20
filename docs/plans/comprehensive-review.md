@@ -78,6 +78,24 @@ fix the clear bugs, ask the user only about real decisions. Never skip a check o
   header scrolls away and the tabs are one swipeable row (they covered half the screen). Tables turn into cards when a
   view renders, not only on the next paint. Not changed: wording of the notes (read through, no contradictions found
   in the tabs checked); the Settings save and the item drawer were exercised by earlier sessions' browser checks.
+- Part 5 done 2026-11-20: start.bat and update.bat read through (Python found or offered via winget, a ZIP folder told
+  how to update); a friend's setup was run in part 3 (no data key, no GatherLite, no Everloot, no SavedVariables);
+  switching characters: every view run for each of the 4 characters, each with its own level, faction, professions,
+  picks, plan, purse and levelling view, no errors. Not done: a real fresh clone started with start.bat (it would
+  write into the AddOns folder this PC plays with); a friend's first start is the true test.
+- Part 6 done 2026-11-20: 305 tests pass; the consistency check and the scratch rebuild (part 2) run on real data.
+  Removed a dead line in `Engine.top_picks` (a "speculative" list built and never used). Kept, unused by the app:
+  `Engine.realm_dips` and `ah_to_vendor` (only their tests call them; the Sniper uses its own history-based list): a
+  candidate for removal if the Sniper never needs them.
+
+## Report (2026-11-20)
+Found and fixed: 27 "Farm" rows for crafted-only items (Farm Arcanite Bar 341g a day); node spots ignoring your level
+and GatherLite's node counts; a consistency check that had never compared anything; Data health notes that didn't say
+how to fix a missing source or that the Wowhead pages were locked; 30 column headers with no hover help; the app not
+fitting a phone (tables, Settings, the header covering half the screen). Checked and fine: 16 pairs of views agree;
+crafts, flips and every farming kind rebuild from raw data; no Classic data in Top picks or the plan; every source can
+be missing; character switching. For the user to decide: nothing new (the skinning skill rule in Top picks is
+Classic but changes nothing at Skinning 300).
 
 ## Known items to look at (from 2026-11-15)
 - Levelling planner values products with no recorded sales at vendor price where Crafting shows the listing

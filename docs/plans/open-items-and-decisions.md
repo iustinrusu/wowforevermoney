@@ -46,7 +46,7 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       names from GitHub's history (C5: done 2026-11-15, history rewritten and force-pushed), crafted
       worth capped by what can be made a day (C7: done 2026-11-15), Everloot cross-check (C2: done 2026-11-15).
 
-- [ ] B7. Comprehensive review of the whole app (UI, UX, logic, accuracy, no discrepancies between views): planned
+- [x] B7. (done 2026-11-20, to-do B1: report in docs/plans/comprehensive-review.md) Comprehensive review of the whole app (UI, UX, logic, accuracy, no discrepancies between views): planned
       for a new chat after the usage reset, `docs/plans/comprehensive-review.md` (the user, 2026-11-15).
 
 - [ ] B8. (2026-11-19) Farm meter 1.6.x in game: XP line, prices (the app's while under 12 h old, else TSM), a

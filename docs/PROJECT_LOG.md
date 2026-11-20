@@ -823,6 +823,14 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (thirteenth part) Comprehensive review (to-do B1), parts 3-7. Part 3: every data source missing in turn
+  (TSM, QuestieDB, SkillUpForever, ForeverRecipes, both, no SavedVariables, a friend without the data key): the app
+  always loads and runs; Data health notes for TSM, QuestieDB and the locked Wowhead pack now say how to fix them.
+  Part 4: hover help on every column header (30 had none); on a 375 px phone nothing scrolls sideways (card cells
+  wrap, Professions table in a scroll box, Settings and summaries fit, header scrolls away, tabs one swipeable row);
+  phone cards built on render, not only on the next paint. Part 5: start/update scripts read; all 4 characters run
+  through every view. Part 6: a dead line removed from `Engine.top_picks`; `realm_dips` and `ah_to_vendor` kept
+  (unused by the app). Part 7: report in the plan file. 305 tests pass; consistency check 0 problems.
 - **2026-11-20** (twelfth part) Comprehensive review (to-do B1), parts 1-2 (`docs/plans/comprehensive-review.md`,
   Progress). Part 1: `tools/consistency_check.py` builds the app as it runs and compares 16 pairs of views (0
   problems); the plan cash-in pair had compared nothing since it was written. Part 2: an independent rebuild from raw

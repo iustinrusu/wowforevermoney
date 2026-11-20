@@ -73,7 +73,8 @@ A5. [x] (done 2026-11-20: 20 pages, 2 minutes apart, no block: B10's spell, B9's
 
 ## B. Then: the comprehensive app review
 
-B1. [ ] **Comprehensive review** (UI, UX, logic, accuracy, how all systems work together; the user's request,
+B1. [x] (done 2026-11-20: report and every part in docs/plans/comprehensive-review.md; project log, change log)
+       **Comprehensive review** (UI, UX, logic, accuracy, how all systems work together; the user's request,
        2026-11-15): `docs/plans/comprehensive-review.md`. Include what 2026-11-19 added: the levelling planner (new
        algorithm, every recipe, where to learn, slow sellers) on every profession, item-use crafts, Biggest markets,
        disenchant labels, TSM vendor prices.
