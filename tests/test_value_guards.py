@@ -116,5 +116,40 @@ class SwingTests(unittest.TestCase):
         self.assertEqual(a.swings, {})
 
 
+class MarketLimitTests(unittest.TestCase):
+    """An hour's farmed loot sells on the AH only as far as your share of the region's daily sales; the rest goes to
+    the next best way, usually a vendor (the user, 2026-11-20, after the mob farming review)."""
+
+    def engine(self, meat):
+        w = make_world({MAT_AH: meat})
+        w.gamedata.items[MAT_AH].sell_price = 10                     # a vendor pays 10
+        return Engine(w, dict(SETTINGS))
+
+    def test_breath_of_wind_case(self):
+        # 49.4 sold a day in the region x 20% = 9.88 a day at 94s; an hour of Gusting Vortex gives 48 (0.8 x 60)
+        e = self.engine({'numAuctions': 78, 'minBuyout': 9900, 'marketValue': 9900, 'regionSale': 9000,
+                         'regionSoldPerDay': 49.4})
+        v = e.valuer({})
+        self.assertEqual(v.lanes(MAT_AH)[0][1], 49.4 * 0.2)
+        ah = int(9900 * 0.95)
+        each = v.unit_worth(MAT_AH, 48)
+        self.assertAlmostEqual(each, (9.88 * ah + (48 - 9.88) * 10) / 48)
+        self.assertAlmostEqual(v.unit_worth(MAT_AH, 5), ah)            # under the market: all at the AH price
+        self.assertAlmostEqual(v.unit_worth(MAT_AH, 0), ah)
+        self.assertEqual(e.loot_worth(MAT_AH, {}, 0.8, 60), int(each))
+
+    def test_no_sales_at_all_go_to_the_vendor(self):
+        e = self.engine({'numAuctions': 5, 'minBuyout': 500, 'marketValue': 500})
+        self.assertAlmostEqual(e.valuer({}).unit_worth(MAT_AH, 3), 10)
+
+    def test_a_listing_far_above_sales_counts_at_the_sale_price(self):
+        # Elemental Air on 2026-11-20 17:23: lowest listing 69s 77c, sells for about 21s 66c across the region
+        e = self.engine({'numAuctions': 302, 'minBuyout': 6977, 'marketValue': 3058, 'regionSale': 2166,
+                         'regionSoldPerDay': 122.6})
+        v = e.valuer({}).value(MAT_AH)
+        self.assertIn('ah_price_doubtful', v.flags)
+        self.assertEqual(v.value, int(2166 * 0.95))
+
+
 if __name__ == '__main__':
     unittest.main()

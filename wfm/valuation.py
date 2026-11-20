@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 
 from .pricing import fmt_money, usual_sale
 
+INF = float('inf')
 OPEN_DEPTH = 2              # a container inside a container is valued; deeper than that isn't
 WORTH_OPENING = 1.2         # flag "open it" when opening beats selling by 20%+
 CRAFT_DEMAND = 50           # flag a crafting value when its product's market absorbs fewer units/day than this
@@ -129,21 +130,49 @@ class Valuer:
             return int(v.value * qty)
         return int(capped_total(v.crafted, v.craft_cap, v.beyond, qty))
 
-    def unit_worth(self, iid: int, qty: float) -> float:
-        """Average worth of one unit when you get qty of them a day (an hour's loot: qty = per loot x loots an hour)."""
+    def lanes(self, iid: int) -> list[tuple[float, float, str]]:
+        """The ways to turn an item into gold, best first, each with how many a day it takes: (worth each, units a
+        day, channel). Crafting: as many as the recipe can use; the AH: your share of the region's daily sales; a
+        vendor or opening it: any number. Never above the item's value (the buy-price rule)."""
         v = self.value(iid)
-        if v.channel != 'craft':
-            return float(v.value)
+        top = float(v.value) if 'held_at_buy_price' in v.flags else INF      # the safety net held it there
+        out = []
+        if v.channel == 'craft' and v.crafted:
+            out.append((float(min(v.crafted, top)), INF if v.craft_cap is None else float(v.craft_cap), 'craft'))
+        for ch, worth in v.channels.items():
+            if ch == 'craft' or worth <= 0:
+                continue
+            cap = float(self.e.demand_per_day(iid, 'AH')) if ch == 'AH' and hasattr(self.e, 'demand_per_day') else INF
+            out.append((float(min(worth, top)), cap, ch))
+        return sorted(out, key=lambda x: -x[0])
+
+    def unit_worth(self, iid: int, qty: float) -> float:
+        """Average worth of one unit when you farm qty of them a day (an hour's loot: qty = per loot x loots an hour).
+
+        The market limit (the user, 2026-11-20, mob farming review): the units go to the best way first, each only
+        as far as it takes them in a day (`lanes`), the rest to the next: an hour of Tanaris air elementals gives
+        about 48 Breaths of Wind while your share of the region's sales is about 10 a day, so the other 38 count at
+        what a vendor pays. Before, all counted at the AH price; crafted worth was already limited (2026-11-15)."""
+        lanes = self.lanes(iid)
+        if not lanes:
+            return 0.0
         if qty <= 1e-9:
-            return float(v.crafted if (v.craft_cap or 0) > 0 else v.beyond)
-        return capped_total(v.crafted, v.craft_cap, v.beyond, qty) / qty
+            return next((w for w, cap, _ in lanes if cap > 0), 0.0)
+        left, total = float(qty), 0.0
+        for worth, cap, _ in lanes:
+            take = min(left, cap)
+            total += take * worth
+            left -= take
+            if left <= 1e-9:
+                break
+        return total / qty
 
     def _value(self, iid: int, depth: int) -> Value:
         e = self.e
         item = e.gd.items.get(iid)
         channels, flags = {}, []
         sell, channel, q = e.sell_value(iid)
-        if channel == 'AH' and q and {'no_sales_data', 'above_region'} & set(q.flags):
+        if channel == 'AH' and q and {'no_sales_data', 'above_region', 'listed_far_above_sales'} & set(q.flags):
             # a lone listing far above the region (or no recorded sale at all) isn't a price you'd get: value
             # contents and catches at the actual sale price, or not on the AH at all if it never sold
             flags.append('ah_price_doubtful')

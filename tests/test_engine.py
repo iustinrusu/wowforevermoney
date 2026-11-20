@@ -295,10 +295,11 @@ class EngineTests(unittest.TestCase):
         self.assertIn('forever_only', zone.flags)
         # 200 casts/hour (setting); no zone skill known, so nothing gets away: your log's 10 of 100 is not used.
         # An hour gives 200 x 40/90 = 88.9 fish, but the cooked fish's market takes 50 x 20% = 10 a day: 10 count at
-        # 190 (cooked), the other 78.9 at 76 (sold raw): 88c a fish on average (the user's rule, 2026-11-15)
+        # 190 (cooked; the user's rule, 2026-11-15). The raw fish's own market also takes 10 a day at 76 (the market
+        # limit, 2026-11-20); the other 68.9 go to a vendor at 4: 33c a fish on average
         fish = 200 * 40 / 90
-        each = int((10 * 190 + (fish - 10) * 76) / fish)
-        self.assertEqual(each, 88)
+        each = int((10 * 190 + 10 * 76 + (fish - 20) * 4) / fish)
+        self.assertEqual(each, 33)
         self.assertEqual(zone.profit_unit, int(each * 40 / 90))    # value per catch
         self.assertEqual(zone.gph, round(each * 40 / 90 * 200))
 

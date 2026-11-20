@@ -24,6 +24,15 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-20 Farmed loot has a market limit (the user, after the mob farming review: do the market limit and kill
+  speed after the reading session).** An hour of farming a day: each item counts at the AH price only for your share
+  of the region's daily sales, crafted worth only for what its recipe uses (as since 2026-11-15), the rest at the next
+  best price (usually a vendor's). Why: farm rows promised gold the market can't pay (an hour of Arkkoran Oracles,
+  221g, rested on 6 Stormshroud patterns that sell 0.4 a day in the whole region). Also: a lowest listing 3x or more
+  above the region's sale price counts at the sale price for item values (it already did for no sales and lone
+  listings): Breath of Wind listed at 98s 99c sells for 9s 50c. With both, Toxic Horror (about 35g an hour) is the best
+  open-world mob farm backed by Forever data.
+
 - **2026-11-20 Three value guards, so a value like the 2g 66s Rugged Hide can't come back unnoticed (the user: "how can
   we prevent those issues in the future?", then "Yes, build them").** Why it got through: tests check the math does
   what it was designed to do, the consistency check compares views that all used the same wrong value, the
@@ -862,6 +871,12 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-20** (twenty-third part) Market limit on farmed loot (decision above): `valuation.Valuer.lanes` and
+  `unit_worth` (farming rows only; bags and the meter use `worth_for`, unchanged), `ah_price_doubtful` includes
+  `listed_far_above_sales`; Gathering explanations and README. 202 of 1,437 farming rows changed (numbers in
+  `docs/plans/mob-farming-review.md`). Tests: 3 new (`MarketLimitTests`), the fishing-zone test updated (the raw fish's
+  market takes 10 a day: 33c a fish, not 88c). 336 pass; consistency check 0 problems.
 
 - **2026-11-20** (twenty-second part) Wowhead reading session for the mob farming review (to-do C1/C2, checklist A5):
   20 pages, 2 minutes apart, no block, high-level and high-interest first (the user's suggestion). npc pages now keep

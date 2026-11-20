@@ -64,6 +64,17 @@ your share, so an hour of them would flood it (point 4).
   Elemental Air's lowest listing jumped to 1g 20s (16:23) and 70s (17:23) while it sells for about 22s, which lifts
   the Desolace and Thousand Needles air elementals for now: step 2 should value an hour's loot at what it sells for.
 
+- **2026-11-20 Market limit built (step 2; the user: "let's not forget about the other two gaps").** An hour's loot
+  goes to the best way first, each only as far as it takes them in a day (`valuation.Valuer.lanes`, `unit_worth`):
+  crafting as many as the recipe uses, the AH your share of the region's daily sales, the rest at a vendor's price.
+  And a lowest listing 3x or more above what the item sells for counts at the sale price (`ah_price_doubtful` now
+  includes `listed_far_above_sales`): Breath of Wind was listed at 98s 99c but sells for 9s 50c (realm average
+  14s 48c). Result: 202 of 1,437 farming rows changed. Arkkoran Oracle 221g -> 11g an hour, Scarlet Spellbinder 101g
+  -> 25g, Deadwind Warlock 83g -> 13g, the Desolace and Thousand Needles air elementals about 27g -> 6g, Gusting
+  Vortex 12g -> 6g. Toxic Horror stays at about 35g an hour and is the best open-world mob farm the app has Forever
+  data for; the hourly Top picks are Toxic Horror, Entropic Horror, Entropic Beast, Diseased Black Bear, Angerclaw
+  Grizzly. Bags and the farm meter are unchanged (they value what you hold, not an hour a day).
+
 ## Proposed next steps (the user decides)
 1. **Wowhead reading session, 20 pages** (pace in CLAUDE.md): item pages Breath of Wind (7081), Essence of Undeath
    (12808), Elemental Air (7069), Globe of Water (7079), Formula: Enchant Weapon - Crusader (16252), Pattern:
