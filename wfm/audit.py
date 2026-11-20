@@ -13,6 +13,17 @@ def _check(name, status, detail, examples=None):
     return {'name': name, 'status': status, 'detail': detail, 'examples': (examples or [])[:10]}
 
 
+def material_coverage(world) -> dict:
+    """coverage.audit for the world: which traded looted items have Forever source data, and the item reading queue."""
+    gd, q, prices = world.gamedata, world.questie, world.prices or {}
+    read = getattr(world, 'forever_pages', None) or {}
+    return coverage.audit(gd.items, prices, q.items if q else {}, gd.recipes,
+                          getattr(world, 'forever_skinning', None), getattr(world, 'forever_fishing', None),
+                          pages=wowhead_items.page_kinds(read), node_items=wowhead_items.covered_by_objects(read),
+                          unlooted=wowhead_items.no_sources(read),
+                          fish_hint=coverage.fish_items(getattr(world, 'classic_fishing', None)))
+
+
 def run(world, engine) -> list[dict]:
     out = []
     gd, su, q, prices = world.gamedata, world.skillup, world.questie, world.prices
@@ -224,12 +235,7 @@ def run(world, engine) -> list[dict]:
 
     # Forever source data for every material and item (the user's top priority, 2026-11-14)
     try:
-        read = getattr(world, 'forever_pages', None) or {}
-        cov = coverage.audit(gd.items, prices, q.items if q else {}, gd.recipes,
-                             getattr(world, 'forever_skinning', None), getattr(world, 'forever_fishing', None),
-                             pages=wowhead_items.page_kinds(read), node_items=wowhead_items.covered_by_objects(read),
-                             unlooted=wowhead_items.no_sources(read),
-                             fish_hint=coverage.fish_items(getattr(world, 'classic_fishing', None)))
+        cov = material_coverage(world)
         kinds = ', '.join(f'{coverage.KIND_TEXT[k]} {c[0]} of {c[1]}' for k, c in sorted(cov['by_kind'].items()))
         out.append(_check('Forever source data for every material', 'warn' if cov['queue'] else 'pass',
                           f"{cov['materials_covered']} of {cov['materials']} traded materials (and {cov['covered']} of "
@@ -237,11 +243,10 @@ def run(world, engine) -> list[dict]:
                           f"obtained. By way: {kinds}. Without it, values per mob, node or pool are missing or come "
                           f"from WoW Classic. {len(cov['read_no_data'])} items have their Wowhead Forever page read, "
                           f"but Wowhead has not recorded Forever data yet for some ways of getting them (re-read "
-                          f"later; listed after the queue). Next to read on Wowhead Forever (one item page covers "
-                          f"every source; materials first, most traded value first):",
-                          [coverage.describe(r) for r in cov['queue']]
-                          + [coverage.describe(r) + ' (page read: no Forever data on Wowhead yet)'
-                             for r in cov['read_no_data']]))
+                          f"later; listed below). What to read next, items and mobs together: the check "
+                          f"'Wowhead reading queue'.",
+                          [coverage.describe(r) + ' (page read: no Forever data on Wowhead yet)'
+                           for r in cov['read_no_data']]))
     except Exception as e:          # never let a check break the audit
         out.append(_check('Forever source data for every material', 'warn', f'Could not work it out: {e}'))
 

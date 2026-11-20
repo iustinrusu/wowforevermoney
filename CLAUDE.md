@@ -30,6 +30,8 @@ memory of the project, not the chat.
   linking to Wowhead, the public tooltip API (slow, cached), and reading a short list of pages in the
   browser pane when asked. The user's decision (2026-11-14): if no bulk Forever source exists, read the top 100 of
   the coverage queue at one page a minute, stopping at the first block (`docs/plans/material-coverage.md`).
+  Reading order since 2026-11-20 (the user: "high interest, high level items and mobs first"): the Data health check
+  "Wowhead reading queue", items and mobs together by the gold a day the app can't see yet (`coverage.reading_queue`).
   Pace from 2026-11-15 (the user left it to Claude, after one 403 at page 77 that lifted within 30 minutes):
   one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session.
 - **Downloads:** approved by the user (2026-11-15: "I approve downloads too"): no need to ask first; say afterwards
@@ -111,7 +113,8 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/tooltips.py` | slow cached Wowhead tooltip fetch for items missing from the game tables |
 | `wfm/audit.py` | cross-source accuracy checks (shown on the Data health tab) |
 | `wfm/anomalies.py` | price checks every run: second opinion at typical prices, crafted worth, TSM data monitor; `python -m wfm.anomalies` |
-| `wfm/coverage.py` | which traded materials/items lack Forever source data; Wowhead reading queue |
+| `wfm/coverage.py` | which traded materials/items lack Forever source data; the Wowhead reading queue (items and mobs by gold you can't see yet, high levels first) |
+| `wfm/classicmobs.py` | WoW Classic mob loot from the cMaNGOS dump, cached: only picks the reading queue's order, never a value |
 | `wfm/app.py` | HTTP server, JSON API, SSE live updates, watcher loop |
 | `tools/screenshots.py` | pictures of every tab, wide and 375 px, plus sideways-scroll and console checks (`python tools/screenshots.py before`) |
 | `web/` | the page (index.html, app.js, style.css) |

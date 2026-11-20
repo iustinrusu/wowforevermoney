@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import anomalies, audit
+from . import anomalies, audit, classicmobs, coverage
 from . import advisor as advisor_mod
 from . import done as done_mod
 from . import niches as niches_mod
@@ -112,8 +112,10 @@ class App:
             events += anomalies.new_events((self.result or {}).get('anomalies'), result.get('anomalies') or {}, shown)
             self.result, self.generated_at = result, int(time.time())
             self._track_swings(result, settings)
+            self.reading_queue = self._reading_queue(result, settings)
             self.audit = audit.run(self.world, Engine(self.world, settings)) + [
-                anomalies.audit_check(result), anomalies.value_rule_check(result), anomalies.swing_check(self.swings)]
+                anomalies.audit_check(result), anomalies.value_rule_check(result), anomalies.swing_check(self.swings),
+                coverage.queue_check(self.reading_queue, float(settings.get('kills_per_hour', 60) or 60))]
             self._write_item_checks(result)
             self._write_prices(result, settings)
             self.tips = self._load_tips()
@@ -164,6 +166,22 @@ class App:
             except Exception:
                 log('Watcher error:\n' + traceback.format_exc())
             self._settings_dirty.wait(POLL_SECONDS)
+
+    def _reading_queue(self, result, settings) -> list[dict]:
+        """What to read next on Wowhead Forever, items and mobs, by gold a day the app can't see yet (coverage.py)."""
+        try:
+            if getattr(self, '_classic_mobs', None) is None:
+                self._classic_mobs = classicmobs.load_or_build(log)
+            eng = Engine(self.world, settings)
+            read = getattr(self.world, 'forever_pages', None) or {}
+            from . import wowhead_items
+            items = audit.material_coverage(self.world)['queue']
+            return coverage.reading_queue(eng, result.get('opportunities') or [], self._classic_mobs,
+                                          result.get('best_use') or {}, wowhead_items.page_ids(read, 'npcs'), items,
+                                          eng.share)
+        except Exception as e:      # a guide: never let it break a recompute
+            log(f'Reading queue not worked out: {e}')
+            return []
 
     def _scan_time(self) -> int:
         """When your realm's newest TSM scan was taken (0 if none): values are compared between scans."""

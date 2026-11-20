@@ -131,3 +131,108 @@ def fish_items(classic_fishing) -> set[int]:
     from .classicdb import expected_items
     tables = list(classic_fishing.loot.values()) + [p.get('loot') or [] for p in classic_fishing.pools.values()]
     return {int(i) for t in tables for i in expected_items(t, classic_fishing.refs)}
+
+
+# ---------- the reading queue: items and mobs, by gold a day the app can't see yet ----------
+QUEUE_LEN = 150
+MIN_SPAWNS = 5          # a mob with fewer spawn points in Forever (QuestieDB) is a rare or named one: not a farm
+
+
+def spawn_points(npc: dict | None) -> int:
+    sp = (npc or {}).get('spawns')
+    return sum(len(v or []) for v in sp.values()) if isinstance(sp, dict) else 0
+
+
+def dungeon_only(engine, iid: int) -> bool:
+    """Every mob QuestieDB (Forever) lists as dropping it lives in a dungeon or raid: for the Dungeons view (to-do C4)."""
+    from . import gamedata
+    q = engine.q
+    npcs = ((q.items.get(iid) if q else None) or {}).get('npcDrops') or []
+    if not npcs or ((q.items.get(iid) or {}).get('objectDrops')):
+        return False
+    spawns = [(q.npcs.get(n) or {}).get('spawns') for n in npcs]
+    zones = [int(z) for sp in spawns if isinstance(sp, dict) for z in sp]
+    return bool(zones) and all(gamedata.is_instance(engine.gd, z) for z in zones)
+
+
+def level_weight(level) -> float:
+    """High levels first (the user, 2026-11-20: "start with reading high interest, high level items and mobs first"):
+    level 60 counts in full, level 30 half, never under a fifth."""
+    return max(0.2, min(float(level or 0), 60.0) / 60.0)
+
+
+def mob_candidates(engine, opps, creatures: dict, best_use: dict, read_npcs: set[int]) -> list[dict]:
+    """Open-world normal mobs whose own Wowhead Forever page isn't read, with what the WoW Classic loot table suggests
+    an hour of them earns (today's prices, the market limit, their kill speed) beyond what Forever data shows now.
+    The Classic table only picks what to read; it never sets a value in a row."""
+    from . import gamedata
+    q, gd = engine.q, engine.gd
+    level = int(engine.s.get('level', 1) or 1)
+    per_hour = float(engine.s.get('kills_per_hour', 60) or 60)
+    shown = {o.detail.get('npc'): (o.gph or 0) for o in opps if o.kind == 'mob_spot'}
+    out = []
+    for sid, c in (creatures or {}).items():
+        npc = int(sid)
+        qn = (q.npcs.get(npc) if q else None) or {}
+        if npc in read_npcs or not qn or qn.get('friendlyToFaction') or spawn_points(qn) < MIN_SPAWNS:
+            continue                      # read, friendly, or a rare or named mob (one or two spawn points)
+        spawns = qn.get('spawns') if isinstance(qn.get('spawns'), dict) else {}
+        zones = [int(z) for z in spawns if not gamedata.is_instance(gd, int(z))]
+        if not zones:
+            continue                      # not in Forever's open world (dungeons: to-do C4)
+        hi = int(c['levels'][1] or 0)
+        pace, _ = engine.kill_pace(per_hour, max(level, hi - 3), hi)
+        parts = []
+        for i, n in c['items'].items():
+            if int(i) in gd.items:
+                parts.append((n * engine.loot_worth(int(i), best_use, n, pace), int(i)))
+        per_kill = (c.get('coins') or 0) + sum(v for v, _ in parts)
+        guess = per_kill * pace
+        missing = guess - shown.get(npc, 0)
+        if missing <= 0:
+            continue
+        top = [engine.name(i) for _, i in sorted(parts, reverse=True)[:2]]
+        out.append({'kind': 'npc', 'id': npc, 'name': qn.get('name') or c['name'], 'level': hi,
+                    'gold': int(missing), 'score': missing * level_weight(hi),
+                    'url': f'https://www.wowhead.com/forever/npc={npc}',
+                    'text': (f"{qn.get('name') or c['name']} (npc {npc}, level {c['levels'][0]}-{hi}, "
+                             f"{gd.zones.get(zones[0], 'zone ' + str(zones[0]))}): the WoW Classic table suggests about "
+                             f"{guess / 10000:,.1f}g an hour{' (mostly ' + ', '.join(top) + ')' if top else ''}; Forever data "
+                             f"shows {shown.get(npc, 0) / 10000:,.1f}g now")})
+    return out
+
+
+def reading_queue(engine, opps, creatures: dict, best_use: dict, read_npcs: set[int], item_queue: list[dict],
+                  share: float, n: int = QUEUE_LEN) -> list[dict]:
+    """What to read next on Wowhead Forever, items and mobs together, by gold a day the app can't see yet x a level
+    weight: a mob, the gold an hour its Classic table suggests beyond Forever data (an hour a day); an item without
+    Forever source data, your share of what the region trades of it a day."""
+    rows = mob_candidates(engine, opps, creatures, best_use, read_npcs)
+    gd = engine.gd
+    for r in item_queue or []:
+        if dungeon_only(engine, r['item_id']):
+            continue                      # dungeon gear and patterns: the Dungeons view (to-do C4)
+        it = gd.items.get(r['item_id'])
+        lv = getattr(it, 'item_level', 0) if it else 0
+        gold = r['market'] * share
+        rows.append({'kind': 'item', 'id': r['item_id'], 'name': r['name'], 'level': lv, 'gold': int(gold),
+                     'score': gold * level_weight(lv), 'url': r['url'], 'text': describe(r)})
+    rows.sort(key=lambda r: -r['score'])
+    return rows[:n]
+
+
+def queue_check(queue: list[dict], kills: float) -> dict:
+    """The Data health entry."""
+    mobs = sum(1 for r in queue if r['kind'] == 'npc')
+    return {'name': 'Wowhead reading queue', 'status': 'pass' if not queue else 'warn',
+            'detail': (f"What to read next on Wowhead Forever (one page every 2 minutes, at most 20 a session), items "
+                       f"and mobs together, by the gold a day the app can't see yet, high levels first (level 60 in full, "
+                       f"level 30 half). A mob: what an hour of it ({kills:g} kills for a typical mob of your level, "
+                       f"paced by its health) earns by the WoW Classic loot table at today's prices and market limits, "
+                       f"beyond what Forever data shows now; its own page gives every drop, its coins and health. The "
+                       f"Classic table only picks the order: it never sets a value. An item without Forever source data: "
+                       f"your share of what the region trades of it a day; its page gives every source at once. Left "
+                       f"out: rare and named mobs (under {MIN_SPAWNS} spawn points), items only dungeon mobs drop (the "
+                       f"Dungeons view, to-do C4). {len(queue)} listed ({mobs} mobs)."),
+            'examples': [f"{'Mob' if r['kind'] == 'npc' else 'Item'}: {r['text']} (score {r['score'] / 10000:,.1f}) "
+                         f"{r['url']}" for r in queue[:40]]}

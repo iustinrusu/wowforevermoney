@@ -879,6 +879,15 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (twenty-fifth part) The Wowhead reading queue (the user's idea: "start with reading high interest,
+  high level items and mobs first"; "Do it"): `coverage.reading_queue`, `mob_candidates`, `level_weight`,
+  `dungeon_only`, `queue_check`; `wfm/classicmobs.py` (2,654 normal Classic mobs, cached in
+  data/classicdb/creatures.json, 2.2 MB, built from the dump in about 4 s); `App._reading_queue` after each
+  recalculation (0.2 s); `audit.material_coverage`. The materials check now lists only pages read without Forever data
+  and points to the queue. Today's top: Blueprint: Fishing Hut, Gauntlets of Elements, Pattern: Black Dragonscale Helm,
+  Recipe: Transmute Undeath to Water; mobs from Cyclone Warrior (Silithus) down. CLAUDE.md's reading rule points to it.
+  Tests: 5 new. 345 pass; consistency check 0 problems; the queue shows on Data health without script errors.
+
 - **2026-11-20** (twenty-fourth part) Kill speed by mob health (decision above): `engine.MOB_HEALTH`,
   `typical_health`, `Engine.kill_pace`, mob rows' pace and its plain-words note; the kills/hour hover help, the
   Gathering explanation, the Settings hint and README. Also fixed: an hour's loot that fits the best outlet could

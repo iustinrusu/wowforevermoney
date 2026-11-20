@@ -38,6 +38,12 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   6471 3864 249391 249427 12184 4232 6037 13464 1529 4387 3182 (102 item pages in all). Left of the top 100: 3356
   Kingsblood, 5500 Iridescent Pearl; then the skinning items 7286 8165 15412 15423, the pools (step 3 list), Javnir
   Nashak (checklist A7). A saved batch is checked against a SHA-256 of the tab's store before importing.
+- **Reading order from 2026-11-20:** the Data health check "Wowhead reading queue" (`coverage.reading_queue`): items
+  and mobs together, by the gold a day the app can't see yet x a level weight (level 60 in full, 30 half, at least a
+  fifth). A mob: an hour of it by the WoW Classic loot table (`wfm/classicmobs.py`, a guide only) at today's prices,
+  the market limit and its kill speed, minus what Forever data shows; rare and named mobs (under 5 spawn points in
+  QuestieDB) left out. An item without Forever source data: your share of the region's trade in it a day; items only
+  dungeon mobs drop are left for the Dungeons view (C4). Read it from the top, skip pages read in the last month.
 - Session 5 (2026-11-20, evening, the mob farming review): 20 pages, 2 minutes apart, no block. Items 7081 16252
   14505 13499 12808 16246 15753 7069 7079 13496, npcs 8667 4494 8526 8550 14455 8525 7372 6138 7132 9397 (order: the
   user asked for high-level, high-interest pages first). The reader now keeps an npc page's Quick Facts (`facts`:

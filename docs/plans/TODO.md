@@ -99,8 +99,8 @@ C1. [ ] (in progress: the top 100 and the 4 skinning items done 2026-11-20; 2 mi
 C2. [ ] (first version done 2026-11-14: Gathering -> Mob farming, one row per mob, drops read so far = a floor; left:
        mobs' own pages for complete loot, coins. 2026-11-20 review: math and ranking right; gaps and a 20-page reading
        list, a market limit on farmed loot and kill speed by mob health proposed: `docs/plans/mob-farming-review.md`;
-       all three done the same day. Next: a Wowhead reading queue ranked by gold at stake and mob level, the user's
-       idea of 2026-11-20, so the most valuable pages are read first) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with
+       all three done the same day, and the reading queue the user suggested: Data health "Wowhead reading
+       queue", items and mobs by gold a day the app can't see yet, high levels first) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with
        drop rates from Wowhead Forever ("Dropped by", material-coverage step 4) and the kills-per-hour setting, never
        your own logged time.
 C3. [ ] (2026-11-15: items 1 (profession advisor), 2 (levelling planner), 3 (vertical integration, "With your own
