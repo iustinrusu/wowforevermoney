@@ -75,6 +75,16 @@ your share, so an hour of them would flood it (point 4).
   data for; the hourly Top picks are Toxic Horror, Entropic Horror, Entropic Beast, Diseased Black Bear, Angerclaw
   Grizzly. Bags and the farm meter are unchanged (they value what you hold, not an hour a day).
 
+- **2026-11-20 Kill speed built (step 3).** The kills-per-hour setting is for a typical normal mob of your level;
+  each mob's pace = setting x typical health at your level / its health, between 0.5x and 1.5x (`Engine.kill_pace`).
+  Its health: its Wowhead Forever page (Quick Facts) where read, else the typical health at its level (`MOB_HEALTH`,
+  the median normal mob of the WoW Classic database, labelled a Classic rule; it matches Forever where a page shows
+  health). A mob above your reach is paced at the level it needs (its "needs level" note). Final ranking, open world:
+  Toxic Horror 32g an hour (54 kills: 3,293 health), Scarlet Spellbinder about 28g once you are 55+, Rock Stalker and
+  Desert Rumbler (Silithus, small samples) 22-23g, Entropic Horror 15g. **Answer to the user's question: with Forever
+  data, realistic prices and the market limit, Toxic Horror is the best open-world mob farm the app knows of.** Still
+  open: mobs whose own page isn't read (most rows are a floor), and a reading queue ranked by gold at stake and level.
+
 ## Proposed next steps (the user decides)
 1. **Wowhead reading session, 20 pages** (pace in CLAUDE.md): item pages Breath of Wind (7081), Essence of Undeath
    (12808), Elemental Air (7069), Globe of Water (7079), Formula: Enchant Weapon - Crusader (16252), Pattern:

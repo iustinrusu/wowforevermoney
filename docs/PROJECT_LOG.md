@@ -24,6 +24,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-20 Kill speed by mob health.** Kills per hour (Settings, 60) now means a typical normal mob of your level;
+  each mob is paced by its health against that (0.5x to 1.5x): Forever health from its Wowhead page where read, else
+  the typical health at its level from the WoW Classic database's median (labelled a Classic rule, like the skinning
+  skill rule; it matches Forever's pages). Why: one pace for every mob made a 3,300-health elemental as fast as a
+  2,200-health one. Not modelled: hit chance and damage taken against higher levels (only health); a mob above your
+  reach is paced at the level it needs.
+
 - **2026-11-20 Farmed loot has a market limit (the user, after the mob farming review: do the market limit and kill
   speed after the reading session).** An hour of farming a day: each item counts at the AH price only for your share
   of the region's daily sales, crafted worth only for what its recipe uses (as since 2026-11-15), the rest at the next
@@ -871,6 +878,13 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-20** (twenty-fourth part) Kill speed by mob health (decision above): `engine.MOB_HEALTH`,
+  `typical_health`, `Engine.kill_pace`, mob rows' pace and its plain-words note; the kills/hour hover help, the
+  Gathering explanation, the Settings hint and README. Also fixed: an hour's loot that fits the best outlet could
+  come out 1c low (399.9999 rounded down), from the market limit commit. Final open-world ranking: Toxic Horror 32g an
+  hour first (`docs/plans/mob-farming-review.md`). Tests: 4 new (`KillPaceTests`), 1 updated. 340 pass; consistency
+  check 0 problems; every tab without script errors.
 
 - **2026-11-20** (twenty-third part) Market limit on farmed loot (decision above): `valuation.Valuer.lanes` and
   `unit_worth` (farming rows only; bags and the meter use `worth_for`, unchanged), `ah_price_doubtful` includes

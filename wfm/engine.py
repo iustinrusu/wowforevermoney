@@ -63,6 +63,21 @@ def confidence(flags) -> float:
 # Ranking (Engine.rank). Score = expected profit x how sure we are x risk x can-do-now x problems x preference.
 HOURLY_KINDS = ('fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot', 'mob_spot')
 ELITE = {1, 2, 3}          # Wowhead classification (Questie rank): elite, rare elite, boss; 4 = rare
+# Kill speed (the user, 2026-11-20: "kill speed from mob health and level"): the typical health of a normal mob at each
+# level 1-63, the median of the WoW Classic database (cMaNGOS 1.12; smoothed at 58, 60 and 61, where special creatures
+# pull the median down). A WoW Classic rule, labelled: it matches Forever where its pages show health (Toxic Horror
+# 3,293 at level 54: 3,292 here; Gusting Vortex 2,218 at 45: 2,217). Wowhead shows a mob's health at its highest level.
+MOB_HEALTH = [42, 55, 71, 86, 102, 120, 137, 156, 176, 198, 222, 247, 273, 300, 328, 356, 386, 417, 449, 484, 531, 573,
+              617, 664, 712, 787, 840, 895, 950, 1002, 1106, 1162, 1221, 1279, 1342, 1468, 1536, 1604, 1677, 1752, 1902,
+              1981, 2059, 2138, 2217, 2398, 2487, 2577, 2672, 2768, 2979, 3082, 3188, 3292, 3398, 3643, 3758, 3804, 3849,
+              3960, 4165, 4370, 4496]
+PACE_MIN, PACE_MAX = 0.5, 1.5    # a mob is killed at most twice as slowly or 1.5 times as fast as a typical one
+
+
+def typical_health(level) -> int | None:
+    """The health of a normal mob at this level (MOB_HEALTH), None outside 1-63."""
+    lv = int(level or 0)
+    return MOB_HEALTH[lv - 1] if 1 <= lv <= len(MOB_HEALTH) else None
 ONE_OFF_KINDS = ('realm_dip', 'ah_to_vendor')
 PROBLEM_FLAGS = {'not_worth_time', 'hard_to_sell', 'slow_seller', 'no_sales_data', 'unverified_recipe', 'above_region', 'black_market',
                  'event_vendor', 'classic_unconfirmed'}
@@ -1302,7 +1317,12 @@ class Engine:
                 for i, share in sk['items'].items():
                     per_kill[i] = per_kill.get(i, 0) + share
             skin_items = (sk or {}).get('items') or {}
-            value_of = lambda i: self.loot_worth(i, best_use, per_kill.get(i) or skin_items.get(i, 0), per_hour)
+            facts = (npc_pages.get(str(npc)) or {}).get('facts') or {}
+            hi = m['max_level'] or qn.get('maxLevel') or (sk or {}).get('max_level')
+            # a mob above your reach: the pace once you can farm it (at the level its "needs level" note asks for)
+            pace, pace_note = self.kill_pace(per_hour, max(level, (hi or 0) - skinning.LEVEL_REACH), hi,
+                                             facts.get('health'), level)
+            value_of = lambda i: self.loot_worth(i, best_use, per_kill.get(i) or skin_items.get(i, 0), pace)
             from_everloot = m.get('everloot_items') or set()
             drops = sorted(({'item_id': i, 'name': self.name(i), 'per_kill': round(c, 4), 'value': value_of(i),
                              'count': m['counts'][i][0], 'looted': m['counts'][i][1],
@@ -1311,13 +1331,11 @@ class Engine:
                            key=lambda d: -d['per_kill'] * d['value'])
             drop_value = sum(d['per_kill'] * d['value'] for d in drops)
             skin_value = sum(share * value_of(i) for i, share in skin_items.items())
-            facts = (npc_pages.get(str(npc)) or {}).get('facts') or {}
             coins = int(facts.get('worth') or 0)          # 0 when the page shows none (elementals, most beasts)
             value = drop_value + (skin_value if can_skin else 0) + coins
             if value <= 0:
                 continue
             lo = m['min_level'] or qn.get('minLevel') or (sk or {}).get('min_level')
-            hi = m['max_level'] or qn.get('maxLevel') or (sk or {}).get('max_level')
             zone = next((z for z in m['zones'] if z and z > 0), None) or qn.get('zoneID')
             cls = m['classification'] if m['classification'] is not None else qn.get('rank')
             name = qn.get('name') or m['name'] or f'mob {npc}'
@@ -1342,16 +1360,31 @@ class Engine:
                 kind='mob_spot', key=f'mob:{npc}', item_id=drops[0]['item_id'] if drops else 0,
                 title=f'Kill {name} in {zname}', profit_unit=int(value), cost_unit=0, units_day=0, daily=0,
                 # elites, bosses and dungeon mobs can't be killed at the kills-per-hour pace: value per kill only
-                gph=None if {'elite', 'dungeon'} & set(flags) else int(value * per_hour),
+                gph=None if {'elite', 'dungeon'} & set(flags) else int(value * pace),
                 doable=can_kill, needs=needs, profession=None, preferred=False, flags=flags,
                 detail={'npc': npc, 'zone': zname, 'zone_id': zone, 'levels': f'{lo or "?"}-{hi or "?"}',
                         'classification': cls, 'looted': m['looted'], 'drops': drops[:12],
                         'drop_value': int(drop_value), 'skin_value': int(skin_value), 'can_skin': can_skin,
                         'coins': coins, 'own_page': bool(m['complete']), 'health': facts.get('health'),
-                        'skin_needed': skin_need, 'kills_per_hour': round(per_hour, 1),
-                        'pace_source': 'your kills-per-hour setting', 'read': m['read'],
+                        'skin_needed': skin_need, 'kills_per_hour': round(pace, 1),
+                        'pace_source': pace_note, 'read': m['read'],
                         'source': 'Wowhead Forever "Dropped by" counts' + (' and "Skinned from" counts' if sk else '')}))
         return out
+
+    def kill_pace(self, per_hour: float, level: int, mob_level, health=None, yours: int | None = None) -> tuple[float, str]:
+        """Kills an hour of one mob: the kills-per-hour setting is for a typical normal mob of your level; a mob with
+        more health takes longer, one with less dies faster (between PACE_MIN and PACE_MAX times the setting). Its
+        health: its Wowhead Forever page (Quick Facts) when read, else the typical health at its level (MOB_HEALTH,
+        a WoW Classic rule). level: yours, or the level a mob above your reach needs (yours: your own, for the
+        note). Returns (kills an hour, how it was worked out, in plain words)."""
+        ref = typical_health(level)
+        hp, src = (max(health), 'its Wowhead Forever page') if health else (typical_health(mob_level), f'typical at level {int(mob_level)}, WoW Classic rule') if mob_level else (None, '')
+        if not ref or not hp:
+            return per_hour, 'your kills-per-hour setting (its level is unknown)'
+        factor = min(PACE_MAX, max(PACE_MIN, ref / hp))
+        whose = 'your level' if not yours or yours >= level else f'level {level}, the level you need for it'
+        return per_hour * factor, (f'your setting ({per_hour:g} an hour for a typical mob of {whose}, {ref:,} health) x '
+                                   f'{factor:.2f}: it has {hp:,} health ({src})')
 
     def zone_level(self, zone_id: int) -> float | None:
         """How high a zone's mobs are: the 25th percentile of its hostile mobs' levels in QuestieDB's Forever data
@@ -1535,7 +1568,7 @@ class Engine:
         """An item's average worth in an hour's loot: it comes per_loot times per loot (catch, kill, skin, node) at
         per_hour loots an hour. Crafted worth counts only for as many as its recipe can use a day (an hour of
         farming a day); the rest at the sale price (the user's decision, 2026-11-15: valuation.capped_total)."""
-        return int(self.valuer(best_use).unit_worth(iid, per_loot * per_hour))
+        return int(round(self.valuer(best_use).unit_worth(iid, per_loot * per_hour), 6))     # 399.9999 is 400
 
     def fishing_spots(self, best_use: dict[int, dict]) -> list[Opportunity]:
         """Fishing, zone by zone, Forever data first.

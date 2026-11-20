@@ -178,7 +178,10 @@ class MobFarmingTests(unittest.TestCase):
         a = rows[MOB_A]
         # 30 of 100 kills, 1.25 a drop -> 0.375 cloth a kill; skinned: 50 of 100 skins gave a hide -> 0.5 a skin
         self.assertEqual(a.profit_unit, int(0.375 * cloth + 0.5 * hide))
-        self.assertEqual(a.gph, int((0.375 * cloth + 0.5 * hide) * 60))
+        # kill speed: 60 an hour for a typical level 40 mob (1,752 health); this one is level 41 (1,902): 55.3 an hour
+        self.assertEqual(a.gph, int((0.375 * cloth + 0.5 * hide) * 60 * 1752 / 1902))
+        self.assertAlmostEqual(a.detail['kills_per_hour'], round(60 * 1752 / 1902, 1))
+        self.assertIn('typical at level 41', a.detail['pace_source'])
         self.assertEqual(a.title, 'Kill Jungle Stalker in ' + e.gd.zones.get(33, 'zone 33'))
         self.assertTrue(a.doable)
         self.assertIn('drops_partial', a.flags)

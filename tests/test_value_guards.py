@@ -151,5 +151,33 @@ class MarketLimitTests(unittest.TestCase):
         self.assertEqual(v.value, int(2166 * 0.95))
 
 
+class KillPaceTests(unittest.TestCase):
+    """Kill speed by health (the user, 2026-11-20): the kills-per-hour setting is for a typical mob of your level."""
+
+    def engine(self):
+        return Engine(make_world({}), dict(SETTINGS))
+
+    def test_forever_health_from_the_page(self):
+        # Toxic Horror for a level 51: 2,979 typical health at 51, its Forever page says 3,293
+        pace, note = self.engine().kill_pace(60, 51, 54, [3293])
+        self.assertAlmostEqual(pace, 60 * 2979 / 3293)
+        self.assertIn('3,293 health (its Wowhead Forever page)', note)
+
+    def test_typical_health_at_its_level_otherwise(self):
+        pace, note = self.engine().kill_pace(60, 51, 45)              # Gusting Vortex, not read: 2,217 at level 45
+        self.assertAlmostEqual(pace, 60 * 2979 / 2217)
+        self.assertIn('typical at level 45, WoW Classic rule', note)
+
+    def test_limits_and_unknown_levels(self):
+        e = self.engine()
+        self.assertEqual(e.kill_pace(60, 60, 10)[0], 90)             # a level 10 mob for a 60: at most 1.5x
+        self.assertEqual(e.kill_pace(60, 20, 60)[0], 30)             # a level 60 mob for a 20: at least half
+        self.assertEqual(e.kill_pace(60, 51, None)[0], 60)           # level unknown: the setting as it is
+        # Scarlet Spellbinder (57-58, 2,714 health) for a level 51: worked out at level 55, the level it needs
+        pace, note = e.kill_pace(60, 55, 58, [2714], 51)
+        self.assertAlmostEqual(pace, 60 * 3398 / 2714)
+        self.assertIn('level 55, the level you need for it', note)
+
+
 if __name__ == '__main__':
     unittest.main()

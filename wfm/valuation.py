@@ -158,6 +158,8 @@ class Valuer:
             return 0.0
         if qty <= 1e-9:
             return next((w for w, cap, _ in lanes if cap > 0), 0.0)
+        if qty <= lanes[0][1]:
+            return lanes[0][0]                  # all of it fits the best way (exactly, no rounding on the way)
         left, total = float(qty), 0.0
         for worth, cap, _ in lanes:
             take = min(left, cap)
