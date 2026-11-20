@@ -58,7 +58,7 @@ prices aren't recorded.
 | **Item search** | Look up any of the ~32,000 items: prices, price history, who sells or drops it, recipes, where to fish it. |
 | **Changes** | A history of new top picks, snipes, watched price moves and newly spotted undervalued items. |
 | **Data health** | How old each data source is, and accuracy checks. Includes Classic fishing vs Forever, vendor prices three ways (TSM, your own client's checks, the game files), and "possibly undervalued items". The dot on the tab turns yellow or red when something needs attention. |
-| **Settings** | Your detected characters, the manual fallback values (gold, level, professions), and the assumptions: AH cut, your share of daily sales, how many days of AH sales the levelling planner counts (2: a product that sells once every few days can't make a path look cheap), casts per hour, alerts, and when data counts as stale. |
+| **Settings** | **Motion**: the page's animations (the night sky moving as you scroll, panels and rows rising in, the sliding tab line, gold counting up, a sparkle when you tick a step). "Follow Windows" (the default) turns them off when Windows asks apps for less motion (Settings > Accessibility > Visual effects > Animation effects); On or Off decide outright, saved at once. Off changes nothing but the movement. Then your detected characters, the manual fallback values (gold, level, professions), and the assumptions: AH cut, your share of daily sales, how many days of AH sales the levelling planner counts (2: a product that sells once every few days can't make a path look cheap), casts per hour, alerts, and when data counts as stale. |
 
 **In an item's details** (click any item):
 - **Open on Wowhead** for comments and tips.

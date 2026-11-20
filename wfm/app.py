@@ -44,6 +44,12 @@ def log(msg: str):
         pass
 
 
+# Settings only the page reads: saving one doesn't recalculate. 'motion' (Settings "Motion", the Night watch look):
+# 'system' follows the system's reduce-motion setting (Windows: "Animation effects"), 'on' or 'off' decide outright.
+PAGE_ONLY_SETTINGS = {'motion'}
+MOTION_CHOICES = ('system', 'on', 'off')
+
+
 class App:
     def __init__(self):
         self.settings = Settings()
@@ -576,8 +582,10 @@ class App:
         allowed = {'auto_detect', 'character', 'gold_scope', 'realm', 'faction', 'gold', 'level', 'professions', 'preferred', 'switch_bonus', 'ah_cut',
                    'market_share', 'min_sold_per_day', 'levelling_ah_days', 'show_other_professions', 'include_unverified_recipes',
                    'farm_rates', 'watchlist', 'alerts', 'stale_hours', 'casts_per_hour', 'fishing_skill_bonus', 'kills_per_hour', 'time_value_gold', 'herb_nodes_per_hour', 'ore_nodes_per_hour',
-                   'own_logs_for_rates', 'fishing_pools', 'sale_price_basis', 'data_key', 'auto_update'}
+                   'own_logs_for_rates', 'fishing_pools', 'sale_price_basis', 'data_key', 'auto_update', 'motion'}
         clean = {k: v for k, v in changes.items() if k in allowed}
+        if clean.get('motion', 'system') not in MOTION_CHOICES:
+            clean.pop('motion')
         new = self.settings.update(clean)
         if 'data_key' in clean:             # a new key: unlock the shared Wowhead data now
             with self.world.lock:
@@ -586,7 +594,8 @@ class App:
             with self.world.lock:
                 self.world._load_tsm()
                 self.world.refresh_freshness()
-        self._settings_dirty.set()
+        if set(clean) - PAGE_ONLY_SETTINGS:     # the page's own settings change nothing the engine works out
+            self._settings_dirty.set()
         return new
 
 
@@ -612,7 +621,7 @@ def make_handler(app: App):
                 self.send_error(404)
                 return
             ctype = {'.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
-                     '.svg': 'image/svg+xml', '.png': 'image/png'}.get(path.suffix, 'application/octet-stream')
+                     '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.txt': 'text/plain'}.get(path.suffix, 'application/octet-stream')
             body = path.read_bytes()
             self.send_response(200)
             self.send_header('Content-Type', ctype + ('; charset=utf-8' if ctype.startswith('text') else ''))

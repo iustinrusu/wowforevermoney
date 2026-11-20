@@ -24,6 +24,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-20 The look is "Night watch" (the user: "Build A, Night watch"), out of three mock-ups.** Night sky header
+  with parallax, stone panels with gold corner pieces, Cinzel headings (a free font shipped with the app), rare and
+  epic names a touch lighter for contrast. Claude's choices, with the reason: Settings "Motion" has three choices,
+  follow Windows (the default), on, off, because Windows "Animation effects" is off on the user's PC, so browsers
+  there ask for reduced motion and a strict reading of the brief would have shown none of the motion asked for (the
+  user didn't answer the default question; following the system is the usual default, and the Settings text says
+  to pick On). Entrances play on a tab switch only, never on live updates, so hourly data doesn't make the page jump.
 - **2026-11-20 UI overhaul is the next high-priority to-do (the user: "I would also like a UI overhaul regarding
   design: more wow themes, more animations and effects, parallax, whatever is needed for a more modern and flashy app.
   But let's do this as the next high prio todo, in a new chat").** To-do B2, brief in `docs/plans/ui-overhaul.md`.
@@ -828,6 +835,13 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-20** (fifteenth part) UI overhaul built: the Night watch look (details in `docs/plans/ui-overhaul.md`,
+  Progress). `web/style.css` (theme section at the end), `web/index.html` (sky, tab line, loading shimmer, motion set
+  before the first paint), `web/app.js` (motion, sky, parallax, `placeInk`, `countUp`, `runCounts`, `sparkle`,
+  `markEntrance`, Settings "Motion"), `wfm/settings.py` (`motion`), `wfm/app.py` (page-only settings don't
+  recalculate; fonts served). Downloaded: `cinzel-latin.woff2` (25,904 bytes, jsDelivr, Fontsource's copy of Cinzel)
+  and its licence `OFL.txt` (4,383 bytes, Google Fonts' GitHub). Mock-up page removed. Tests: 313 pass (8 new).
 
 - **2026-11-20** (fourteenth part) UI overhaul (to-do B2), steps 1-2 of `docs/plans/ui-overhaul.md`. New
   `tools/screenshots.py`: pictures of every tab at 1440 and 375 px through Edge's DevTools port (standard library

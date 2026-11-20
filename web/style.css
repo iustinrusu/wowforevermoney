@@ -112,18 +112,15 @@ ul.notes { margin: 6px 0 10px; }
 body { background: radial-gradient(1400px 700px at 50% -15%, #212838 0%, #10131a 55%, #0b0d12 100%) fixed; }
 h2, h3, .brand b { font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; letter-spacing: .2px; }
 h2 { color: var(--gold-2); }
-h2::before { content: "◆"; color: var(--gold); font-size: 11px; margin-right: 8px; vertical-align: 2px; opacity: .8; }
 .top { background: linear-gradient(180deg, #1a1f2a 0%, #12151c 100%); border-bottom: 1px solid var(--trim);
        box-shadow: 0 2px 18px rgba(0,0,0,.45), 0 1px 0 rgba(232,192,96,.12); }
 .brand { display: flex; align-items: center; gap: 10px; }
-.brand .coin { font-size: 26px; filter: drop-shadow(0 0 6px rgba(232,192,96,.45)); }
 .brand b { display: block; font-size: 19px; background: linear-gradient(180deg, #fff1c4, #e8c060 55%, #b8862b);
            -webkit-background-clip: text; background-clip: text; color: transparent; }
 .brand small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; margin-top: -2px; }
 nav button { display: inline-flex; align-items: center; gap: 6px; }
 nav button .ti { font-size: 14px; }
-nav button.active { background: linear-gradient(180deg, #262c38, #1d222c); border-color: var(--trim); color: var(--gold-2);
-                    box-shadow: inset 0 -2px 0 var(--gold); }
+nav button.active { background: rgba(232,192,96,.08); color: var(--gold-2); text-shadow: 0 0 12px rgba(232,192,96,.45); }
 .panel { background: linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,0)) , var(--panel);
          border: 1px solid var(--line); border-top-color: #3a3424; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
 th { background: #141820; border-bottom: 1px solid var(--trim); color: #b9c0cc; }
@@ -211,7 +208,6 @@ tr.yours { outline: 2px solid rgba(232, 192, 96, .8); outline-offset: -2px; anim
 tr.yours > td { background: rgba(232, 192, 96, .05); }
 .yours-tag { color: var(--gold); font-weight: 600; }
 .yours-sample { padding: 0 6px; border-radius: 4px; outline: 2px solid var(--gold); outline-offset: -1px; animation: yours-glow 2.4s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { tr.yours, .yours-sample { animation: none; } }
 /* levelling planner (2026-11-19): summary values and two-line steps */
 .stat .v { font-size: 17px; margin: 2px 0; }
 .stat .v b { display: inline; font-size: inherit; margin: 0; }
@@ -220,3 +216,152 @@ table.level tr.sub td { border-bottom: 1px solid var(--line); padding-top: 0; }
 table.level tr:not(.sub) td { border-bottom: none; }
 /* a profession rank to train before the path goes on (Journeyman, Expert, Artisan) */
 table.level tr.train td { background: color-mix(in srgb, var(--gold, #d4a017) 10%, transparent); border-bottom: 1px solid var(--line); }
+
+/* ---------- Night watch look (the user's pick, 2026-11-20). Drawn here in CSS and SVG: no game art, fonts or textures.
+   Readability first: the effects frame the data and never sit on numbers. Motion only moves transform and opacity, and
+   all of it stops with Settings "Motion" off (html[data-motion="off"], set by the page; see the end of this file). ---- */
+@font-face { font-family: "Cinzel"; src: url("/static/fonts/cinzel-latin.woff2") format("woff2"); font-weight: 400 900;
+  font-style: normal; font-display: swap; }   /* Cinzel: SIL Open Font License, web/fonts/OFL.txt */
+:root {
+  --serif: "Cinzel", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  /* rare and epic a touch lighter than the game's #0070dd and #a335ee, which are about 3.6:1 on these panels (small
+     text needs 4.5:1); these are about 6:1 and still read as blue and purple */
+  --q3: #3b9cff; --q4: #b870ff;
+  --stone: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .07 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* one gold corner piece, turned four ways */
+  --corner-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cg fill='none' stroke='%23e8c060'%3E%3Cpath d='M1.5 29V9.5Q1.5 1.5 9.5 1.5H29' stroke-width='1.4'/%3E%3Cpath d='M5.5 29V11Q5.5 5.5 11 5.5H29' stroke-width='.8' opacity='.45'/%3E%3C/g%3E%3Cpath d='M9 4.2 13.8 9 9 13.8 4.2 9Z' fill='%23e8c060'/%3E%3Cpath d='M9 6.6 11.4 9 9 11.4 6.6 9Z' fill='%23fff1c4'/%3E%3C/svg%3E");
+  --corner-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cg transform='translate%2830 0%29 scale%28-1 1%29'%3E%3Cg fill='none' stroke='%23e8c060'%3E%3Cpath d='M1.5 29V9.5Q1.5 1.5 9.5 1.5H29' stroke-width='1.4'/%3E%3Cpath d='M5.5 29V11Q5.5 5.5 11 5.5H29' stroke-width='.8' opacity='.45'/%3E%3C/g%3E%3Cpath d='M9 4.2 13.8 9 9 13.8 4.2 9Z' fill='%23e8c060'/%3E%3Cpath d='M9 6.6 11.4 9 9 11.4 6.6 9Z' fill='%23fff1c4'/%3E%3C/g%3E%3C/svg%3E");
+  --corner-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cg transform='translate%280 30%29 scale%281 -1%29'%3E%3Cg fill='none' stroke='%23e8c060'%3E%3Cpath d='M1.5 29V9.5Q1.5 1.5 9.5 1.5H29' stroke-width='1.4'/%3E%3Cpath d='M5.5 29V11Q5.5 5.5 11 5.5H29' stroke-width='.8' opacity='.45'/%3E%3C/g%3E%3Cpath d='M9 4.2 13.8 9 9 13.8 4.2 9Z' fill='%23e8c060'/%3E%3Cpath d='M9 6.6 11.4 9 9 11.4 6.6 9Z' fill='%23fff1c4'/%3E%3C/g%3E%3C/svg%3E");
+  --corner-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cg transform='translate%2830 30%29 scale%28-1 -1%29'%3E%3Cg fill='none' stroke='%23e8c060'%3E%3Cpath d='M1.5 29V9.5Q1.5 1.5 9.5 1.5H29' stroke-width='1.4'/%3E%3Cpath d='M5.5 29V11Q5.5 5.5 11 5.5H29' stroke-width='.8' opacity='.45'/%3E%3C/g%3E%3Cpath d='M9 4.2 13.8 9 9 13.8 4.2 9Z' fill='%23e8c060'/%3E%3Cpath d='M9 6.6 11.4 9 9 11.4 6.6 9Z' fill='%23fff1c4'/%3E%3C/g%3E%3C/svg%3E");
+}
+h2, h3, .brand b { font-family: var(--serif); }
+h2 { font-size: 18px; letter-spacing: .4px; padding-bottom: 6px; margin-bottom: 8px;
+     background: linear-gradient(90deg, rgba(232,192,96,.6), rgba(232,192,96,.14) 45%, transparent 80%) left bottom / 100% 1px no-repeat; }
+h3 { color: #ead9ae; letter-spacing: .3px; }
+h2 small, h3 small { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: 0; }
+/* rare, epic and legendary names glow faintly in their colour (a still glow: nothing moves) */
+a.q3 { text-shadow: 0 0 10px rgba(0,112,221,.45); } a.q4 { text-shadow: 0 0 10px rgba(163,53,238,.5); } a.q5 { text-shadow: 0 0 10px rgba(255,128,0,.4); }
+.num, .money, .chip, .purse-gold, .stat b, .stat .v { font-variant-numeric: tabular-nums; }
+
+/* header: a night sky over two mountain ranges, a rune circle behind the name, embers, a gold trim */
+.top { overflow: hidden; background: #0b1020; border-bottom: 0; padding: 12px 16px 14px; box-shadow: 0 6px 22px rgba(0,0,0,.5); }
+.top > :not(.sky):not(.trim) { position: relative; z-index: 1; }
+.sky { --sy: 0; position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+  background: radial-gradient(520px 170px at 82% 8%, rgba(190,205,255,.10), transparent 70%),
+              linear-gradient(180deg, #0a0f1f 0%, #121a2e 60%, #1b1b26 100%); }
+.sky > * { position: absolute; }
+.sky .px { transform: translate3d(0, calc(var(--sy) * var(--k) * 1px), 0); will-change: transform; }
+.sky .stars { left: 0; top: 0; width: 1px; height: 1px; border-radius: 50%; }
+.sky .stars.near { animation: twinkle 4s ease-in-out infinite alternate; }
+.sky .mtn { left: 0; bottom: -2px; width: 100%; }
+.sky .mtn.far { height: 58px; } .sky .mtn.near { height: 40px; }
+.sky .mtn.far path { fill: #1d2742; stroke: rgba(190,205,255,.24); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.sky .mtn.near path { fill: #0d1019; }
+.sky .rune-wrap { left: -36px; top: -55px; width: 170px; height: 170px; transform: translate3d(0, calc(var(--sy) * .05px), 0) rotate(calc(var(--sy) * .12deg)); }
+.sky .rune { width: 100%; height: 100%; color: rgba(232,192,96,.26); animation: spin 140s linear infinite; }
+.sky .embers { left: 0; right: 0; bottom: 0; height: 100%; }
+.sky .embers i { position: absolute; bottom: 0; left: var(--x); width: 3px; height: 3px; border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle, #ffe2a0, #e8a040 60%, transparent 70%); animation: ember var(--d, 7s) linear infinite; animation-delay: var(--w, 0s); }
+.trim { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; z-index: 2; overflow: hidden;
+  background: linear-gradient(90deg, transparent, #7a5c18 8%, #e8c060 50%, #7a5c18 92%, transparent); }
+.trim::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 44%, rgba(255,248,220,.95) 50%, transparent 56%);
+  transform: translateX(-100%); animation: trim-shine 9s ease-in-out infinite; }
+.brand .coin { width: 30px; height: 30px; border-radius: 50%; flex: 0 0 auto; position: relative; overflow: hidden;
+  background: radial-gradient(circle at 34% 30%, #fff6c2, #e8c060 42%, #a87b12 75%, #6b4a08);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 0 14px rgba(232,192,96,.35), inset 0 -2px 3px rgba(0,0,0,.35); }
+.brand .coin::before { content: ""; position: absolute; inset: 5px; border-radius: 50%; border: 1px solid rgba(110,74,8,.55); }
+.brand .coin::after, .medal::after { content: ""; position: absolute; inset: -40%; transform: translateX(-130%);
+  background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.8) 50%, transparent 58%); animation: coin-shine 6s ease-in-out infinite; }
+.brand b { font-size: 20px; letter-spacing: .5px; }
+nav button { color: #aab2c0; }
+nav button:hover { background: rgba(255,255,255,.06); }
+nav button .ti { display: inline-block; transition: transform .25s, filter .25s; }
+nav button:hover .ti { transform: translateY(-1px) scale(1.12); filter: drop-shadow(0 0 5px rgba(232,192,96,.7)); }
+/* the gold line under the open tab slides to the tab you click (placed by the page: placeInk) */
+nav { position: relative; }
+nav .ink { position: absolute; left: 0; top: 0; width: 100px; height: 2px; z-index: 0; pointer-events: none; transform-origin: 0 0; opacity: 0;
+  background: linear-gradient(90deg, transparent, #e8c060 20%, #fff1c4 50%, #e8c060 80%, transparent); box-shadow: 0 0 10px rgba(232,192,96,.8); }
+nav .ink.ready { opacity: 1; transition: transform .4s cubic-bezier(.3,.8,.2,1); }
+.purse { background: linear-gradient(180deg, rgba(34,29,16,.94), rgba(23,20,12,.94)); box-shadow: 0 0 14px rgba(232,192,96,.10); }
+.purse.bump { animation: bump .6s ease-out; }
+.top select, .top .btn { background: rgba(29,34,44,.9); }
+.status { color: #a9b1bf; }
+
+/* panels: dark stone, a thin gold frame and corner pieces */
+.panel { position: relative; border: 1px solid #3b3423; border-radius: 4px; padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,.025), transparent 120px), var(--stone), var(--panel);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.7), inset 0 0 0 1px rgba(232,192,96,.07), 0 10px 30px rgba(0,0,0,.35); }
+.panel::before { content: ""; position: absolute; inset: -3px; pointer-events: none;
+  background: var(--corner-tl) left top / 30px no-repeat, var(--corner-tr) right top / 30px no-repeat,
+              var(--corner-bl) left bottom / 30px no-repeat, var(--corner-br) right bottom / 30px no-repeat; }
+.panel.plan { border-color: #5a4a26; box-shadow: 0 0 0 1px rgba(0,0,0,.7), inset 0 0 0 1px rgba(232,192,96,.14), 0 10px 30px rgba(0,0,0,.35); }
+.panel .panel, .drawer .panel { box-shadow: inset 0 0 0 1px rgba(232,192,96,.05); }
+.panel .panel::before, .drawer .panel::before { content: none; }
+
+/* tables: banner headings, a warm row highlight */
+th { background: linear-gradient(180deg, #221d12, #161a22); color: #d9c48f; border-bottom: 1px solid #6b5626; box-shadow: inset 0 1px 0 rgba(232,192,96,.12); }
+tr.row:hover td { background: rgba(232,192,96,.07); }
+.medal { position: relative; overflow: hidden; }
+.medal.m2::after { animation-delay: .3s; } .medal.m3::after { animation-delay: .6s; }
+
+/* plan cards lift a little under the mouse */
+.plan-card { background: linear-gradient(180deg, #1e232d, #1a1e27); border-color: #2c3242; transition: transform .2s, border-color .2s, box-shadow .2s; }
+.plan-card:hover { transform: translateY(-2px); border-color: rgba(232,192,96,.6); box-shadow: 0 8px 20px rgba(0,0,0,.35), 0 0 16px rgba(232,192,96,.10); }
+
+/* toasts, the drawer and the done-for-today dialog slide and fade in */
+.toast { position: relative; background: linear-gradient(180deg, #1f2430, #181c25); border: 1px solid #3b3423; border-left: 3px solid var(--gold);
+  border-radius: 6px; padding: 10px 12px 10px 38px; box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 18px rgba(232,192,96,.12); animation: toast-in .45s cubic-bezier(.2,.8,.2,1) both; }
+.toast::before { content: "✦"; position: absolute; left: 13px; top: 9px; color: var(--gold); font-size: 15px; text-shadow: 0 0 8px rgba(232,192,96,.8); }
+.toast.out { animation: toast-out .35s ease-in forwards; }
+.drawer:not(.hidden) { animation: fade-in .2s ease-out both; }
+.drawer:not(.hidden) .drawer-inner { animation: drawer-in .32s cubic-bezier(.2,.8,.2,1) both; }
+.drawer-inner { background: var(--stone), var(--panel); border-left: 1px solid #5a4a26; box-shadow: -14px 0 40px rgba(0,0,0,.5); }
+.modal { animation: fade-in .18s ease-out both; }
+.modal-box { border-color: #5a4a26; box-shadow: 0 16px 40px rgba(0,0,0,.6), inset 0 0 0 1px rgba(232,192,96,.08); animation: pop-in .22s cubic-bezier(.2,.8,.2,1) both; }
+/* a short sparkle where you ticked a step done (the page adds it: sparkle) */
+.sparkle { position: fixed; z-index: 1100; width: 0; height: 0; pointer-events: none; }
+.sparkle i { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%;
+  background: radial-gradient(circle, #fff6c2, #e8c060 60%, transparent 70%); animation: spark .7s ease-out forwards; }
+
+/* the first time a tab shows, its panels, plan cards and first rows rise in one after another (the page sets --i) */
+#view.enter > *, #view.enter .grid2 > *, #view.enter .plan-card { animation: rise .5s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+#view.enter tbody tr[style*="--i"] { animation: row-in .4s ease-out both; animation-delay: calc(120ms + var(--i, 0) * 35ms); }
+
+/* loading: a shimmer where the page will be; empty: a small purse drawn in gold */
+.skel { height: 14px; margin: 10px 0; border-radius: 6px; background: rgba(255,255,255,.05); position: relative; overflow: hidden; }
+.skel.h { height: 20px; width: 40%; margin-top: 2px; } .skel.short { width: 60%; }
+.skel::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(232,192,96,.12), transparent); animation: shimmer 1.4s ease-in-out infinite; }
+div.empty::before { content: ""; display: block; width: 38px; height: 38px; margin: 0 auto 6px; opacity: .55;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' fill='none' stroke='%23e8c060' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 12c-2-3 0-6 2-6 1 0 2 2 4 2s3-2 4-2c2 0 4 3 2 6'/%3E%3Cpath d='M13 13h14'/%3E%3Cpath d='M14 13c-6 4-8 9-6 14 2 5 7 7 12 7s10-2 12-7c2-5 0-10-6-14'/%3E%3Ccircle cx='20' cy='24' r='4' opacity='.7'/%3E%3C/svg%3E") center / contain no-repeat; }
+
+@keyframes twinkle { from { opacity: .55; } to { opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes ember { 0% { opacity: 0; transform: translate(0, 0); } 15% { opacity: .9; } 100% { opacity: 0; transform: translate(var(--drift, 20px), -110px); } }
+@keyframes trim-shine { 0%, 15% { transform: translateX(-100%); } 55%, 100% { transform: translateX(100%); } }
+@keyframes coin-shine { 0%, 70% { transform: translateX(-130%); } 85%, 100% { transform: translateX(130%); } }
+@keyframes bump { 30% { transform: scale(1.06); } 100% { transform: scale(1); } }
+@keyframes toast-in { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateX(40px); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes drawer-in { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: none; } }
+@keyframes pop-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes spark { from { opacity: 1; transform: translate(0, 0) scale(1); } to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.3); } }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+@media (max-width: 700px) {
+  .top { padding: 10px 12px 12px; }
+  .sky .rune-wrap { left: -48px; top: -62px; }
+  h2 { font-size: 16.5px; }
+  table.cardable > tbody > tr { border-color: #2c3242; border-top-color: rgba(232,192,96,.28); }
+}
+
+/* Motion off: Settings "Motion" set to off, or "follow Windows" while the system asks for less motion. The page sets
+   html[data-motion]; before it runs (or without it), the system's setting decides. Nothing moves; colours stay. */
+html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after { animation: none !important; transition: none !important; }
+html[data-motion="off"] .sky .px, html[data-motion="off"] .sky .rune-wrap { transform: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion]) *, html:not([data-motion]) *::before, html:not([data-motion]) *::after { animation: none !important; transition: none !important; }
+}

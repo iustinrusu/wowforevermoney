@@ -50,6 +50,9 @@ DEFAULTS = {
     # Pools (Floating Wreckage/Debris, schools) have to be found first, so gold/hour counts open water only;
     # pool loot (trunks, Stranglekelp, Rumsey Rum) is shown as a bonus unless you turn this on.
     'fishing_pools': False,
+    # The page's animations (Night watch look, 2026-11-20): 'system' = off when the system asks for less motion
+    # (Windows: Settings > Accessibility > Visual effects > Animation effects), 'on', or 'off'.
+    'motion': 'system',
 }
 
 

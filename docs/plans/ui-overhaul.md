@@ -87,3 +87,25 @@ and the Settings switch turn the motion off; tests pass.
   - Other proposal shown in the mock-ups: rare blue and epic purple item names a touch lighter (today #0070dd and
     #a335ee are about 3.6:1 on the dark panels, below the 4.5:1 usual for small text); headings in Cinzel, a free
     font (SIL Open Font License) the app would ship (the mock-up loads it from Google Fonts).
+- **2026-11-20 The user picked A, Night watch ("Build A, Night watch"). Built in one piece:**
+  - Theme: Cinzel headings (bundled: `web/fonts/cinzel-latin.woff2`, SIL Open Font License in `web/fonts/OFL.txt`; served
+    as font/woff2), rare blue `#3b9cff` and epic purple `#b870ff` (about 6:1, the game's colours are about 3.6:1), a still
+    glow on rare, epic and legendary names, tabular figures for numbers.
+  - Header: night sky, two mountain ranges, a rune circle, embers, a gold trim with a running light, a drawn coin;
+    parallax from one scroll handler (at most once a frame) setting `--sy` on the sky only; the sliding gold tab line
+    (`placeInk`, transform only).
+  - Panels: stone texture (SVG noise), thin gold frame, four corner pieces in one pseudo-element (none on nested
+    panels or in the drawer), gold rule under titles; banner table headings, warm row highlight; plan cards lift.
+  - Motion: panels, plan cards and the first 12 rows of each table rise in on a tab switch only (never on live
+    updates), medal shine, purse and plan total count to a new value, a sparkle where you tick a step done, toasts,
+    drawer and the done dialog slide and fade in. Loading shimmer (first load, and a view that takes over 150 ms);
+    empty states get a small purse drawn in gold.
+  - Settings "Motion": follow Windows (default), on, off; saved at once without recalculating (`PAGE_ONLY_SETTINGS`
+    in `wfm/app.py`), kept in the browser too so the first paint is right. CSS: everything stops under
+    `html[data-motion="off"]`; the media query only decides before the page script runs.
+  - Checked: every tab wide and 375 px (`tools/screenshots.py after`: no sideways scroll, no console errors), the
+    three motion modes, parallax, the tab line and the count-up in headless Edge (rAF does not run in the browser pane
+    while it is off screen, so those were checked there). Tests: `tests/test_motion.py` (setting saved, checked, no
+    recalculation; the off rule; new keyframes move only transform and opacity). The mock-up page is removed.
+  - Left as it was: the Biggest markets glow (`yours-glow`, the user's request of 2026-11-19) animates outline and
+    shadow, not transform/opacity; it stops with Motion off.

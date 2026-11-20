@@ -102,7 +102,95 @@ const rankCell = (r) => `<td class="rk">${r <= 3 ? `<span class="medal m${r}" ti
 const RANK_TIP = 'Ranked by expected profit (per day; per hour for activities; per purchase for snipes) x how sure we are (data quality and how well it sells) x risk (what you would lose if it does not sell, vs the profit) x whether you can do it now. Problems such as barely selling sink a row. Click a row to see its numbers.';
 const flagHtml = (flags) => (flags || []).map((f) => { const d = FLAGS[f] || ['', f, f]; return `<span class="flag ${d[0]}" title="${esc(d[2])}">${esc(d[1])}</span>`; }).join('');
 const itemLink = (id, name, q) => `<a class="q${q ?? 1}" href="https://www.wowhead.com/forever/item=${id}" target="_blank" rel="noopener" data-wowhead="item=${id}&domain=forever">${esc(name)}</a>`;
-function toast(text) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; $('#toasts').appendChild(t); setTimeout(() => t.remove(), 9000); }
+// ---------- motion (the Night watch look, 2026-11-20) ----------
+// Settings "Motion": 'system' follows the system's reduce-motion setting (Windows: Settings > Accessibility > Visual
+// effects > Animation effects), 'on' or 'off' decide outright. style.css stops every animation under html[data-motion="off"].
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)');
+let MOTION = (() => { try { return localStorage.getItem('motion') || 'system'; } catch (e) { return 'system'; } })();
+let skyQueued = false, skyLast = -1;
+const motionOn = () => MOTION === 'on' || (MOTION === 'system' && !REDUCE.matches);
+function applyMotion() {
+  document.documentElement.dataset.motion = motionOn() ? 'on' : 'off';
+  if (!motionOn()) { $('.sky').style.setProperty('--sy', 0); skyLast = -1; }
+}
+function setMotion(m) { MOTION = m; try { localStorage.setItem('motion', m); } catch (e) { /* no storage */ } applyMotion(); }
+REDUCE.addEventListener('change', applyMotion);
+applyMotion();
+
+// the header's night sky: stars (one element each layer, drawn as shadows), the rune circle, embers
+(function buildSky() {
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const stars = (n, size, alpha, warm) => Array.from({length: n}, () => {
+    const a = (alpha * (.45 + rnd() * .55)).toFixed(2), c = warm && rnd() < .3 ? `rgba(255,230,180,${a})` : `rgba(220,230,255,${a})`;
+    return `${Math.round(rnd() * 2600)}px ${Math.round(rnd() * 260)}px 0 ${size}px ${c}`;
+  }).join(',');
+  $('.sky .stars.far').style.boxShadow = stars(260, .5, .7);
+  $('.sky .stars.near').style.boxShadow = stars(60, 1, .9, true);
+  const marks = ['M0 -54v5', 'M-2 -54l2 5 2-5', 'M-2 -52h4M0 -54v5', 'M-2 -54l4 5M2 -54l-4 5', 'M0 -54v5M0 -52l2 -2', 'M-2 -49v-5h4v5'];
+  $('.sky .rune').innerHTML = '<g fill="none" stroke="currentColor"><circle r="56" stroke-width=".8"/><circle r="50" stroke-width=".5" stroke-dasharray="2 3"/>'
+    + '<circle r="34" stroke-width=".8"/><polygon points="0,-34 29.4,17 -29.4,17" stroke-width=".7"/><polygon points="0,34 29.4,-17 -29.4,-17" stroke-width=".7"/>'
+    + '<circle r="12" stroke-width=".6"/>' + marks.concat(marks, marks, marks).map((d, i) => `<path d="${d}" stroke-width=".7" transform="rotate(${i * 15})"/>`).join('') + '</g>';
+  $('.sky .embers').innerHTML = Array.from({length: 9}, (_, i) => `<i style="--x:${6 + i * 11}%;--d:${6 + (i % 4)}s;--w:${((i * 1.3) % 7).toFixed(1)}s;--drift:${i % 2 ? 24 : -18}px"></i>`).join('');
+})();
+// parallax: as you scroll, the sky's layers move at their own speeds (style.css: --sy times each layer's --k);
+// one handler, at most once a frame, and only the header's own variable changes
+addEventListener('scroll', () => {
+  if (skyQueued || !motionOn()) return;
+  skyQueued = true;
+  requestAnimationFrame(() => {
+    skyQueued = false;
+    const v = Math.min(Math.round(scrollY), 500);
+    if (v !== skyLast) { skyLast = v; $('.sky').style.setProperty('--sy', v); }
+  });
+}, {passive: true});
+
+// the gold line under the open tab: moved (and stretched) to the tab, so it slides when you switch
+function placeInk() {
+  const nav = $('#tabs'), on = nav.querySelector('button.active'), ink = nav.querySelector('.ink');
+  if (!on || !ink) return;
+  ink.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop + on.offsetHeight - 2}px) scaleX(${on.offsetWidth / 100})`;
+  if (!ink.classList.contains('ready')) requestAnimationFrame(() => ink.classList.add('ready'));
+}
+new ResizeObserver(() => placeInk()).observe($('#tabs'));
+if (document.fonts) document.fonts.ready.then(placeInk);
+
+// a gold amount that changed counts to its new value (the purse, the plan's total), then its box gives a small bump
+function countUp(el, from, to, bumpEl) {
+  if (!el || !motionOn()) return;
+  const t0 = performance.now(), dur = 900;
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    el.innerHTML = money(Math.round(from + (to - from) * e));
+    if (k < 1) requestAnimationFrame(step);
+  };
+  el.innerHTML = money(from);
+  requestAnimationFrame(step);
+  if (bumpEl) { bumpEl.classList.remove('bump'); void bumpEl.offsetWidth; bumpEl.classList.add('bump'); }
+}
+const COUNTS = {};
+function runCounts() {
+  document.querySelectorAll('#view [data-count]').forEach((el) => {
+    const k = el.dataset.count, v = +el.dataset.c, old = COUNTS[k];
+    COUNTS[k] = v;
+    if (old !== undefined && old !== v) countUp(el, old, v);
+  });
+}
+// a short sparkle where you ticked something done for today
+function sparkle(x, y) {
+  if (!motionOn()) return;
+  const s = document.createElement('div');
+  s.className = 'sparkle'; s.style.left = `${x}px`; s.style.top = `${y}px`;
+  s.innerHTML = Array.from({length: 10}, (_, i) => { const a = i / 10 * Math.PI * 2, d = 22 + (i % 3) * 8; return `<i style="--dx:${(Math.cos(a) * d).toFixed(1)}px;--dy:${(Math.sin(a) * d).toFixed(1)}px"></i>`; }).join('');
+  document.body.appendChild(s);
+  setTimeout(() => s.remove(), 800);
+}
+const SKELETON = '<div class="panel loading" aria-busy="true"><div class="skel h"></div><div class="skel"></div><div class="skel"></div><div class="skel short"></div><div class="hint">Loading…</div></div>';
+
+function toast(text) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; $('#toasts').appendChild(t);
+  setTimeout(() => { if (!motionOn()) { t.remove(); return; } t.classList.add('out'); setTimeout(() => t.remove(), 360); }, 9000);
+}
 function refreshTooltips() { try { window.$WowheadPower && window.$WowheadPower.refreshLinks(); } catch (e) { /* optional */ } }
 
 // ---------- state ----------
@@ -112,6 +200,7 @@ const sortState = {};
 
 async function loadState() {
   STATE = await api('/api/state');
+  if (STATE.settings.motion && STATE.settings.motion !== MOTION) setMotion(STATE.settings.motion);
   const worst = (STATE.freshness || []).map((f) => f.status);
   const audit = STATE.audit_summary || {};
   const dot = $('#health-dot');
@@ -143,12 +232,14 @@ async function loadPurse() {
     const p = await api('/api/purse');
     const m = p.me;
     if (!m) { el.innerHTML = '<span class="pill">gold: needs Syndicator or the addon</span>'; return; }
-    const extra = m.bags_bank + m.mail + m.auctions;
+    const extra = m.bags_bank + m.mail + m.auctions, before = el.dataset.c === undefined ? null : +el.dataset.c;
+    el.dataset.c = m.money;
     el.innerHTML = `<div class="purse-gold">${money(m.money)}</div><div class="purse-sub">+ ${esc(moneyText(extra))} in items · ≈ ${esc(moneyText(m.total))} total</div>`;
     el.title = `${p.character}: ${moneyText(m.money)} gold\nBags + bank: ≈ ${moneyText(m.bags_bank)}\nMail: ≈ ${moneyText(m.mail)}\nOn the AH: ≈ ${moneyText(m.auctions)} (${m.auction_count} listings${m.expired_auctions ? `, ${m.expired_auctions} expired` : ''})\nAll ${p.all.characters} characters: ${moneyText(p.all.money)} gold, ≈ ${moneyText(p.all.total)} with items\n\n${p.note}\nClick for your bags.`;
+    if (before !== null && before !== m.money) countUp($('.purse-gold', el), before, m.money, el);
   } catch (e) { el.innerHTML = ''; }
 }
-$('#purse').onclick = () => { TAB = 'bags'; localStorage.setItem('tab', TAB); render(); };
+$('#purse').onclick = () => { TAB = 'bags'; localStorage.setItem('tab', TAB); render({enter: true}); };
 
 // ---------- tables ----------
 function oppTable(rows, opts = {}) {
@@ -449,7 +540,7 @@ function planPanel(p) {
   if (!p) return '';
   const acts = p.actions || [];
   const tv = STATE.time_value_source;
-  const sum = acts.length ? `About <b>${money(p.total_gain)}</b> expected for about <b>${minsText(p.total_minutes)}</b> of play, in ${acts.length} steps.` : 'Nothing is worth your time right now: check back after the next price update.';
+  const sum = acts.length ? `About <b data-count="plan-total" data-c="${Math.round(p.total_gain || 0)}">${money(p.total_gain)}</b> expected for about <b>${minsText(p.total_minutes)}</b> of play, in ${acts.length} steps.` : 'Nothing is worth your time right now: check back after the next price update.';
   const gold = p.gold_needed ? ` The steps need ${money(p.gold_needed)} up front${p.short_of_gold ? `, more than the ${money(p.gold_now)} you have: do them in order and reinvest as things sell` : ` (you have ${money(p.gold_now)})`}.` : '';
   const timeNote = ` Your time is counted at ${money(p.time_value)} an hour${tv ? ` (${esc(tv)})` : ''}.`;
   const bags = p.holdings_found ? '' : '<div class="hint">⚠ Your bags are not read (needs the Syndicator addon), so the "cash in what you have" steps are missing.</div>';
@@ -463,7 +554,7 @@ function wirePlan() {
   document.querySelectorAll('#view .plan-card').forEach((el) => el.onclick = (e) => {
     if (e.target.closest('a, details')) return;
     const k = el.dataset.key;
-    if (el.dataset.type.startsWith('cash_')) { TAB = 'bags'; localStorage.setItem('tab', TAB); render(); return; }
+    if (el.dataset.type.startsWith('cash_')) { TAB = 'bags'; localStorage.setItem('tab', TAB); render({enter: true}); return; }
     const row = k && Object.values(STATE.top || {}).flat().find((o) => o.key === k);
     if (row) openOpp(row); else if (+el.dataset.item) openItem(+el.dataset.item);
   });
@@ -597,7 +688,7 @@ const TICK_KINDS = new Set(['craft', 'vendor_flip', 'routine', 'cooldown', 'big_
 const tickButton = (key, kind, plan) => key && TICK_KINDS.has(kind)
   ? `<button class="tick" data-tick="${esc(key)}" ${plan ? `data-plan="${esc(JSON.stringify({title: plan.title, count: plan.count || plan.quantity || null, kind}))}"` : ''} title="Done for today: it leaves the plan and Top picks, and the next best takes its place">✓</button>` : '';
 const doneNote = (o) => { const t = (o.detail || {}).done_today; return t && t.done < t.of ? `<div class="pill">done today: ${num(t.done, 0)} of ${num(t.of, 0)}; ${num(o.units_day, 1)} left</div>` : ''; };
-function tickDialog(key, plan) {
+function tickDialog(key, plan, at) {
   const o = ROWS[key];
   const title = (plan && plan.title) || (o && o.title) || key;
   const sells = o && ['craft', 'vendor_flip'].includes(o.kind);
@@ -614,6 +705,7 @@ function tickDialog(key, plan) {
   const send = async (done) => {
     close();
     await api('/api/done', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({key, done, of: rec, title})});
+    if (at) sparkle(at.left + at.width / 2, at.top + at.height / 2);
     toast(done >= rec ? `Done for today: ${title}. The next best takes its place.` : `Noted ${done} of ${rec}: ${rec - done} left for today.`);
   };
   box.querySelector('[data-all]').onclick = () => send(rec);
@@ -624,7 +716,7 @@ function tickDialog(key, plan) {
 }
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-tick]');
-  if (b) { e.preventDefault(); e.stopPropagation(); tickDialog(b.dataset.tick, b.dataset.plan ? JSON.parse(b.dataset.plan) : null); return; }
+  if (b) { e.preventDefault(); e.stopPropagation(); tickDialog(b.dataset.tick, b.dataset.plan ? JSON.parse(b.dataset.plan) : null, b.getBoundingClientRect()); return; }
   const u = e.target.closest('[data-untick]');
   if (u) { e.preventDefault(); api('/api/done', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({key: u.dataset.untick, undo: true})}).then(() => toast('Back on the list.')); }
 }, true);
@@ -846,7 +938,13 @@ const VIEWS = {
     const profs = ['First Aid', 'Cooking', 'Fishing', 'Skinning', 'Leatherworking', 'Herbalism', 'Mining', 'Tailoring', 'Alchemy', 'Blacksmithing', 'Engineering', 'Enchanting'];
     const auto = (k) => det[k] !== undefined ? `<span class="flag good" title="Detected from your saved addon data; your manual value is the fallback">auto: ${esc(k === 'gold' ? num(det[k], 2) + 'g' : (k === 'faction' ? (det[k] === 'H' ? 'Horde' : 'Alliance') : det[k]))}</span>` : '';
     const detProfs = det.professions || {};
-    return `<div class="panel"><h2>Detected from your game <small>read from ForeverMoneyBridge and TSM when you log out or /reload</small></h2>
+    const motionNow = REDUCE.matches ? 'off' : 'on';
+    return `<div class="panel"><h2>Motion <small>the page's animations</small></h2>
+      <div class="controls"><label class="chk">Motion <select id="s-motion"><option value="system" ${MOTION === 'system' ? 'selected' : ''}>Follow Windows (now ${motionNow})</option>
+        <option value="on" ${MOTION === 'on' ? 'selected' : ''}>On</option><option value="off" ${MOTION === 'off' ? 'selected' : ''}>Off</option></select></label></div>
+      <div class="hint">What moves: the night sky in the header as you scroll (with its turning rune circle, rising embers and a light along the gold trim), panels and rows rising in when you open a tab, the gold line sliding to the tab you click, a shine on the medals, your gold counting up when it changes, and a sparkle when you tick a step done. Off keeps every colour, number and label the same, only still.
+        "Follow Windows" turns it off when Windows asks apps for less motion (Windows Settings &gt; Accessibility &gt; Visual effects &gt; Animation effects)${REDUCE.matches ? ': that is off on this PC now, so pick On to see the animations' : ''}. Saved as soon as you pick.</div></div>
+      <div class="panel"><h2>Detected from your game <small>read from ForeverMoneyBridge and TSM when you log out or /reload</small></h2>
       <div class="controls"><label class="chk"><input type="checkbox" id="s-auto" ${s.auto_detect !== false ? 'checked' : ''}> fill in my settings automatically</label>
       <label class="chk">character <select id="s-char"><option value="">last played (${esc(STATE.active_character || 'unknown')})</option>${Object.keys(chars).map((n) => `<option ${n === s.character ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
       <label class="chk">gold counts <select id="s-gscope"><option value="faction" ${s.gold_scope !== 'character' ? 'selected' : ''}>all my characters on this faction</option><option value="character" ${s.gold_scope === 'character' ? 'selected' : ''}>only this character</option></select></label></div>
@@ -886,14 +984,33 @@ const VIEWS = {
   },
 };
 
-async function render() {
+async function render(opts = {}) {
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === TAB));
+  placeInk();
   const view = $('#view');
-  try { view.innerHTML = await VIEWS[TAB](); } catch (e) { view.innerHTML = `<div class="panel">Could not load: ${esc(e.message)}</div>`; }
+  // switching tabs: a shimmer if the view takes a moment, then its panels and rows rise in (live updates redraw quietly)
+  const slow = opts.enter ? setTimeout(() => { view.classList.remove('enter'); view.innerHTML = SKELETON; }, 150) : null;
+  let html;
+  try { html = await VIEWS[TAB](); } catch (e) { html = `<div class="panel">Could not load: ${esc(e.message)}</div>`; }
+  clearTimeout(slow);
+  view.classList.toggle('enter', !!opts.enter && motionOn());
+  view.innerHTML = html;
+  if (view.classList.contains('enter')) markEntrance(view);
+  runCounts();
   wireView();
   wirePlan();
   refreshTooltips();
   labelTables();          // phone cards at once, not only on the next paint (a hidden window never paints)
+}
+
+// the order things rise in: panels, the cards of a plan, the first 12 rows of each table (style.css #view.enter)
+function markEntrance(view) {
+  [...view.children].slice(0, 8).forEach((el, i) => el.style.setProperty('--i', i));
+  view.querySelectorAll('.grid2').forEach((g) => [...g.children].forEach((el, i) => el.style.setProperty('--i', i + 1)));
+  view.querySelectorAll('.plan-list').forEach((l) => [...l.children].slice(0, 10).forEach((el, i) => el.style.setProperty('--i', i + 1)));
+  view.querySelectorAll('table').forEach((t) => [...t.querySelectorAll(':scope > tbody > tr')].slice(0, 12).forEach((tr, i) => tr.style.setProperty('--i', i)));
+  clearTimeout(markEntrance.timer);
+  markEntrance.timer = setTimeout(() => view.classList.remove('enter'), 1600);
 }
 
 // Narrow windows: tables become stacked cards (style.css), each value labelled with its column's name
@@ -946,6 +1063,11 @@ function wireView() {
   });
   if (TAB === 'health') $('#refresh').onclick = async () => { await api('/api/refresh', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}); toast('Checking for updates…'); };
   if (TAB === 'settings') {
+    $('#s-motion').onchange = async (e) => {
+      setMotion(e.target.value); STATE.settings.motion = e.target.value;
+      try { await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({motion: e.target.value})}); toast(`Motion: ${e.target.selectedOptions[0].textContent}. Saved.`); }
+      catch (err) { toast('Could not save the motion setting: ' + err.message); }
+    };
     $('#notif').onclick = () => Notification.requestPermission().then((p) => toast('Notifications: ' + p));
     $('#save').onclick = async () => {
       const professions = {};
@@ -1125,7 +1247,7 @@ async function openItem(id, opp) {
   if (it.made_by.length) html += `<h3>Made by</h3><table><tbody>${it.made_by.map((r) => `<tr><td>${esc(r.profession)}</td><td>${esc(r.name)}${r.count !== 1 ? ' ×' + r.count : ''}</td><td>${r.mats.map((m) => `${m.count}× ${itemLink(m.item_id, m.name)}`).join(', ')}</td><td class="pill">${r.thresholds ? r.thresholds.join('/') : ''}</td></tr>`).join('')}</tbody></table>`;
   if (it.used_in.length) html += `<h3>Used in <small>${it.used_in.length} recipes</small></h3><table><tbody>${it.used_in.slice(0, 30).map((r) => `<tr class="row" data-item="${r.product_id}"><td>${esc(r.profession)}</td><td>${r.count}× → ${itemLink(r.product_id, r.product)}</td></tr>`).join('')}</tbody></table>`;
   openDrawer(html);
-  $('#to-market').onclick = () => { sessionStorage.setItem('marketItem', id); TAB = 'market'; localStorage.setItem('tab', TAB); $('#drawer').classList.add('hidden'); render(); };
+  $('#to-market').onclick = () => { sessionStorage.setItem('marketItem', id); TAB = 'market'; localStorage.setItem('tab', TAB); $('#drawer').classList.add('hidden'); render({enter: true}); };
   $('#watch').onclick = async () => {
     const wl = new Set(STATE.settings.watchlist || []); watching ? wl.delete(id) : wl.add(id);
     await api('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({watchlist: [...wl]})});
@@ -1180,5 +1302,5 @@ $('#refresh-now').onclick = async () => {
   try { await api('/api/refresh', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}); } catch (e) { toast('Refresh failed: ' + e.message); }
   setTimeout(() => { b.disabled = false; b.textContent = 'Refresh now'; }, 4000);
 };
-document.querySelectorAll('#tabs button').forEach((b) => b.onclick = () => { TAB = b.dataset.tab; localStorage.setItem('tab', TAB); render(); });
-(async () => { await loadState(); await render(); connect(); })();
+document.querySelectorAll('#tabs button').forEach((b) => b.onclick = () => { TAB = b.dataset.tab; localStorage.setItem('tab', TAB); render({enter: true}); });
+(async () => { await loadState(); await render({enter: true}); connect(); })();

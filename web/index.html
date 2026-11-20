@@ -5,14 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gold Ever After</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%AA%99%3C/text%3E%3C/svg%3E">
+<link rel="preload" href="/static/fonts/cinzel-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/style.css">
+<script>/* motion before the first paint: Settings "Motion" (kept here too), else the system's reduce-motion setting */
+try { const m = localStorage.getItem('motion') || 'system';
+  document.documentElement.dataset.motion = m === 'off' || (m === 'system' && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'off' : 'on'; } catch (e) { /* no storage */ }</script>
 <script>const whTooltips = {colorLinks: false, iconizeLinks: true, iconSize: 'small', renameLinks: false};</script>
 <script src="https://wow.zamimg.com/js/tooltips.js" async></script>
 </head>
 <body>
 <header class="top">
-  <div class="brand"><span class="coin">🪙</span><span><b>Gold Ever After</b><small>a WoW: Forever money guide</small></span></div>
-  <nav id="tabs">
+  <div class="sky" aria-hidden="true">
+    <div class="stars far px" style="--k:.03"></div>
+    <div class="stars near px" style="--k:.06"></div>
+    <div class="rune-wrap"><svg class="rune" viewBox="-60 -60 120 120"></svg></div>
+    <svg class="mtn far px" style="--k:.07" viewBox="0 0 1200 100" preserveAspectRatio="none"><path d="M0 100V62L55 48 110 60 175 34 240 55 300 44 365 58 430 30 500 52 560 41 630 57 700 33 770 50 835 42 900 58 965 36 1035 54 1100 44 1160 56 1200 47V100Z"/></svg>
+    <svg class="mtn near px" style="--k:.13" viewBox="0 0 1200 100" preserveAspectRatio="none"><path d="M0 100V78L70 64 130 74 200 52 270 70 340 60 420 76 490 56 560 72 640 62 720 79 800 58 880 71 950 63 1030 77 1110 60 1200 70V100Z"/></svg>
+    <div class="embers"></div>
+  </div>
+  <div class="trim" aria-hidden="true"></div>
+  <div class="brand"><span class="coin" aria-hidden="true"></span><span><b>Gold Ever After</b><small>a WoW: Forever money guide</small></span></div>
+  <nav id="tabs"><span class="ink" aria-hidden="true"></span>
     <button data-tab="top" class="active"><span class="ti">🏆</span>Top picks</button>
     <button data-tab="craft"><span class="ti">⚒️</span>Crafting</button>
     <button data-tab="profs"><span class="ti">🧭</span>Professions</button>
@@ -32,7 +45,7 @@
   <div id="purse" class="purse" title="Your gold"></div>
   <button class="btn" id="refresh-now" title="Re-read TSM prices, your addons and game data now, then recalculate. Your bags, gold and professions only change after a /reload (or logout) in game, which makes the addons save them.">Refresh now</button>
 </header>
-<main id="view"></main>
+<main id="view"><div class="panel loading" aria-busy="true"><div class="skel h"></div><div class="skel"></div><div class="skel"></div><div class="skel short"></div><div class="hint">Loading…</div></div></main>
 <div id="drawer" class="drawer hidden"><div class="drawer-inner"><button class="close" id="drawer-close" aria-label="Close">×</button><div id="drawer-body"></div></div></div>
 <div id="toasts"></div>
 <script src="/static/app.js"></script>
