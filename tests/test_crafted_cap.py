@@ -1,16 +1,17 @@
 """Crafted worth counts only for as many units a day as the recipe can use (the user's decision, 2026-11-15).
 
 Hand-worked numbers. The ingredient is the raw fish (sells for 76 after the AH cut); the recipe turns one fish into a
-product that sells for 950 after the cut.
+product that sells for 950 after the cut. None are listed on the AH right now (realm market value 80), so nothing
+caps the crafted worth at a buy price (BuyPriceCapTests: that cap, the user's decision of 2026-11-20).
 """
 import unittest
 
-from tests.test_engine import COOKED, FISH, PRODUCT, SETTINGS, make_world
+from tests.test_engine import COOKED, FISH, MAT_AH, PRODUCT, SETTINGS, make_world
 from wfm.engine import Engine
 from wfm.gamedata import Recipe
 from wfm.valuation import capped_total, per_day_text
 
-RAW = {'numAuctions': 5, 'minBuyout': 80, 'marketValue': 90, 'regionSoldPerDay': 500}
+RAW = {'numAuctions': 0, 'marketValue': 80, 'regionSoldPerDay': 500}
 
 
 def recipe(count=1, cooldown_hours=0):
@@ -94,6 +95,72 @@ class ValuerCapTests(unittest.TestCase):
         self.assertEqual(row.units_day, 100.0)                         # the raw fish's own market at your share
         self.assertEqual(row.daily, int(0.5 * 950 + 99.5 * 76))
         self.assertIn('1 every 2 days', row.detail['best_use'])
+
+
+class BuyPriceCapTests(unittest.TestCase):
+    """An ingredient listed on your realm's AH is worth at most what buying one costs (the user's decision,
+    2026-11-20, after the farm meter valued one Rugged Hide at 2g 66s 43c). The craft's profit stays on its own row."""
+
+    # The 13:22 snapshot of 2026-11-20. Cured Rugged Hide makes 2 in Forever (game files and ForeverRecipes):
+    # 1 Rugged Hide + 1 Refined Deeprock Salt. Here the hide is FISH, the salt MAT_AH, Cured Rugged Hide COOKED.
+    HIDE = {'numAuctions': 399, 'minBuyout': 888, 'marketValue': 1827, 'regionSale': 529, 'regionSoldPerDay': 87.672}
+    SALT = {'numAuctions': 34, 'minBuyout': 655599, 'marketValue': 514633, 'regionSale': 537500,
+            'regionSoldPerDay': 16.244}
+    CURED = {'numAuctions': 24, 'minBuyout': 359075, 'marketValue': 289868, 'regionSale': 294495,
+             'regionSoldPerDay': 11.22}
+
+    def engine(self, hide=None, salt=None, cured=None):
+        r = Recipe(spell_id=500, name='Cured Rugged Hide', profession='Cooking', skill_line=185, product_id=COOKED,
+                   product_count=2, reagents=[(FISH, 1), (MAT_AH, 1)], trivial_low=140, trivial_high=180, min_rank=1)
+        prices = {FISH: hide or self.HIDE, MAT_AH: salt or self.SALT, COOKED: cured or self.CURED}
+        return Engine(make_world(prices, [r]), dict(SETTINGS, gold=100))
+
+    def test_the_rugged_hide_case(self):
+        e = self.engine()
+        best = e.best_uses()
+        hide = best[FISH]
+        # 2 x 359,075 x 0.95 = 682,242 for two Cured Rugged Hides, minus the salt at 655,599: 26,643 (2g 66s 43c),
+        # what the meter showed; capped at the hide's lowest listing, 888 (8s 88c, 399 listed)
+        self.assertEqual(hide['margin'], 2 * int(359075 * 0.95) - 655599)
+        self.assertEqual(hide['margin'], 26643)
+        self.assertEqual((hide['doable_value'], hide['value'], hide['buy_now']), (888, 888, 888))
+        self.assertTrue(hide['capped'] and hide['doable_capped'])
+        v = e.valuer(best).value(FISH)
+        self.assertEqual((v.value, v.channel), (888, 'craft'))      # beats selling it: 888 x 0.95 = 843
+        self.assertIn('crafted_at_buy_price', v.flags)
+        self.assertIn('what buying one costs on the AH, 8s 88c', v.how)
+        # the salt: 682,242 - 888 = 681,354 crafted, but buying one costs 655,599
+        self.assertEqual((best[MAT_AH]['margin'], best[MAT_AH]['doable_value']), (681354, 655599))
+
+    def test_an_hour_later_the_same_value(self):
+        # 14:22: Cured Rugged Hide 355,075 and the salt 665,565 moved the margin to 9,077 (90s 77c);
+        # the hide's worth only follows its own price (7s 77c, 486 listed)
+        e = self.engine(hide=dict(self.HIDE, minBuyout=777, numAuctions=486),
+                        salt=dict(self.SALT, minBuyout=665565, numAuctions=49),
+                        cured=dict(self.CURED, minBuyout=355075))
+        hide = e.best_uses()[FISH]
+        self.assertEqual(hide['margin'], 2 * int(355075 * 0.95) - 665565)
+        self.assertEqual(hide['margin'], 9077)
+        self.assertEqual(hide['doable_value'], 777)
+
+    def test_a_margin_below_the_buy_price_is_kept(self):
+        e = self.engine(hide=dict(self.HIDE, minBuyout=50000, numAuctions=10))      # hides at 5g each
+        hide = e.best_uses()[FISH]
+        self.assertEqual((hide['doable_value'], hide['doable_capped']), (26643, False))
+        self.assertNotIn('crafted_at_buy_price', e.valuer(e.best_uses()).value(FISH).flags)
+
+    def test_none_listed_keeps_the_crafted_worth(self):
+        hide = {'numAuctions': 0, 'marketValue': 1827, 'regionSoldPerDay': 87.672}
+        best = self.engine(hide=hide).best_uses()[FISH]
+        self.assertEqual((best['doable_value'], best['buy_now'], best['capped']), (26643, None, False))
+
+    def test_a_thin_supply_counts_at_the_market_value(self):
+        # 2 listed at 300 won't last: buying the next one costs about the realm's market value, 1,827
+        e = self.engine(hide=dict(self.HIDE, minBuyout=300, numAuctions=2))
+        self.assertEqual(e.buy_now(FISH), 1827)
+        self.assertEqual(e.best_uses()[FISH]['doable_value'], 1827)
+        e = self.engine(hide=dict(self.HIDE, minBuyout=300, numAuctions=4))
+        self.assertEqual(e.buy_now(FISH), 300)
 
 
 if __name__ == '__main__':

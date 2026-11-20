@@ -24,6 +24,19 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-20 An ingredient is never worth more than buying one costs (the user: "Yes, cap it").** The farm meter
+  showed one Rugged Hide at 2g 66s 43c (the user: "rugged hide price seems werid"); it sells for 5-8s, 486 listed at
+  7s 77c. Cause: `Engine.best_uses` gave each ingredient the craft's whole margin. Cured Rugged Hide makes 2 in Forever
+  (game files and ForeverRecipes agree): 2 x 35g 91s after the cut minus the salt at 65g 56s = 2g 66s at the 13:22
+  scan, 90s 77c at 14:22, a loss at the region's usual sale prices. A looted hide only saves buying one, the margin
+  is there whether you looted it or bought it, and every ingredient of a recipe got the same margin (counted more
+  than once). Now: an ingredient listed on your realm's AH is worth at most `Engine.buy_now` (the lowest listing;
+  with 3 or fewer listed, the higher of it and the realm's market value), flag `crafted_at_buy_price`; the uncapped
+  figure is kept as `margin`. Items nobody lists keep the crafted worth with its daily limit (2026-11-15). On real
+  data: 108 items were valued above their buy price (Living Essence 7g 20s, buy 41s; Jade 5g 35s, buy 8s 77c); 466
+  farming rows changed (Tar Creeper in Un'Goro 10g 15s -> 81s an hour, Farm Living Essence 16g 68s -> 7g 35s); your
+  bags 31g 70s -> 27g 89s; the consistency check still 0 problems.
+
 - **2026-11-20 The look is "Night watch" (the user: "Build A, Night watch"), out of three mock-ups.** Night sky header
   with parallax, stone panels with gold corner pieces, Cinzel headings (a free font shipped with the app), rare and
   epic names a touch lighter for contrast. Claude's choices, with the reason: Settings "Motion" has three choices,
@@ -835,6 +848,14 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-20** (eighteenth part) Crafted worth capped at the buy price (decision above). `wfm/engine.py`
+  (`buy_now`, `best_uses`: `margin`, `capped`, `buy_now`, `doable_margin`, `doable_capped`; gathering text),
+  `wfm/valuation.py` (flag `crafted_at_buy_price` and its text), `web/app.js` (flag label; item details say when the
+  value is the buy price and what the craft would make). Tests: 5 new (`BuyPriceCapTests`, with the real 13:22 and
+  14:22 numbers), 7 updated to an unlisted ingredient (the daily-limit tests) or the capped value (Greater Eternal
+  Essence: worth its buy price, 26g 99s 90c; the split's 2g 70s stays on its own row). 318 pass. The user's app was
+  restarted with the new code (start.bat): Prices.lua now has Rugged Hide at 7s 73c; the meter uses it after /reload.
 
 - **2026-11-20** (seventeenth part) Went through what's left (the user: "what's left to do?"). Checked the addon's
   saved file: the farm meter counted XP and loot in a Maraudon session (ended 2026-11-19 23:45: 47,609 XP, 8g 10s 12c

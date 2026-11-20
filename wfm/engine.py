@@ -290,6 +290,18 @@ class Engine:
             options.append(q)
         return min(options, key=lambda o: o.value) if options else None
 
+    def buy_now(self, iid: int) -> int | None:
+        """What buying one more costs on your realm's AH right now, or None when none are listed. With only a few
+        listed (pricing.ODD_LISTINGS), the higher of the lowest listing and the realm's market value: a thin supply
+        won't last, so the cheapest one is not what the next one costs."""
+        p = self.price(iid)
+        if not pricing.listed(p):
+            return None
+        value = int(p['minBuyout'])
+        if p.get('numAuctions', 0) <= pricing.ODD_LISTINGS:
+            value = max(value, int(p.get('marketValue') or 0))
+        return value
+
     def sell_value(self, iid: int) -> tuple[int, str, Quote | None]:
         """Best of AH (after cut) and vendor, per unit. Returns (copper, channel, ah quote)."""
         item = self.gd.items.get(iid)
@@ -998,8 +1010,16 @@ class Engine:
 
         'value'/'recipe' is the best recipe overall; 'doable_value'/'doable_recipe' the best one you can make
         now. What something is worth to you today uses the doable one (a recipe needing more skill would
-        overstate it); the other shows what levelling would add."""
+        overstate it); the other shows what levelling would add.
+
+        Never more than buying one costs (the user's decision, 2026-11-20): an ingredient listed on your realm's AH
+        is worth at most its price there (`buy_now`), since a looted one only saves buying one; the craft's profit
+        is on the craft's own row. Before, the ingredient got the craft's whole margin: a Rugged Hide (7s 77c, 486
+        listed) was "worth" 2g 66s at 13:22 and 90s 77c an hour later (2 Cured Rugged Hides minus a 66g salt), and
+        every ingredient of a recipe got the same margin. 'margin' keeps the uncapped figure, 'capped' says it was
+        cut. Only items nobody lists keep the full crafted worth (with its daily limit, valuation.capped_total)."""
         best: dict[int, dict] = {}
+        buy_now: dict[int, int | None] = {}
         min_spd = float(self.s.get('min_sold_per_day', 0.5))
         for r in self.gd.recipes:
             if r.profession not in PROFESSIONS or not (r.spell_id in self.su.thresholds or getattr(r, 'use_item', 0)):
@@ -1037,17 +1057,26 @@ class Engine:
             for mid, cnt in r.reagents:
                 if self.vendor_price(mid):
                     continue   # vendor mats aren't "your" materials
-                val = (revenue - (sum(costs.values()) - costs[mid])) / cnt
-                entry = {'value': int(val), 'recipe': r.name, 'product': self.name(r.product_id),
+                margin = (revenue - (sum(costs.values()) - costs[mid])) / cnt
+                if mid not in buy_now:
+                    buy_now[mid] = self.buy_now(mid)
+                cap = buy_now[mid]
+                val = min(margin, cap) if cap is not None else margin
+                capped = cap is not None and margin > cap
+                entry = {'value': int(val), 'margin': int(margin), 'capped': capped, 'buy_now': cap,
+                         'recipe': r.name, 'product': self.name(r.product_id),
                          'profession': r.profession, 'doable': can, 'skill': req,
                          'units_per_day': round(crafts * cnt, 2), 'cap_by': cap_by}
+                # several recipes can all be capped at the same price: the bigger margin decides between them
                 cur = best.get(mid)
                 if cur is None:
-                    cur = best[mid] = dict(entry, doable_value=None, doable_recipe=None, doable_profession=None)
-                elif val > cur['value']:
+                    cur = best[mid] = dict(entry, doable_value=None, doable_recipe=None, doable_profession=None,
+                                           doable_margin=None, doable_capped=False)
+                elif (val, margin) > (cur['value'], cur['margin']):
                     cur.update(entry)
-                if can and (cur['doable_value'] is None or val > cur['doable_value']):
+                if can and (cur['doable_value'] is None or (val, margin) > (cur['doable_value'], cur['doable_margin'])):
                     cur['doable_value'], cur['doable_recipe'], cur['doable_profession'] = int(val), r.name, r.profession
+                    cur['doable_margin'], cur['doable_capped'] = int(margin), capped
                     # what the product's market absorbs at your share (or the cooldown allows), in units of this
                     # ingredient: crafted worth holds only for that many a day (valuation.capped_total)
                     cur['doable_units_per_day'] = round(crafts * cnt, 2)
@@ -1093,6 +1122,8 @@ class Engine:
             value, how, cap = sell, f'Sell ({channel})', None
             if use and (use.get('doable_value') or 0) > value:
                 value, how = use['doable_value'], f"{use['doable_profession']}: {use['doable_recipe']}"
+                if use.get('doable_capped'):
+                    how += " (at what buying one costs: the craft's own profit is on its Crafting row)"
                 cap = use.get('doable_units_per_day')
                 if cap is not None and cap < valuation.CRAFT_DEMAND:
                     how += f' (crafted worth for up to {valuation.per_day_text(cap)}; the rest sold)'

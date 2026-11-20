@@ -57,6 +57,7 @@ const FLAGS = {
   stock_unknown: ['warn', 'stock unknown', 'Nothing says how many this vendor has: some vendors sell only a few at a time and restock slowly. Open the vendor once in game (the addon records its stock) and the app caps the amount if it is limited'],
   done_today: ['', 'done today', 'You ticked this as done for today: it leaves the plan and Top picks until tomorrow, and the next best takes its place. Untick it in the Done today list on Top picks'],
   craft_limited_demand: ['warn', 'limited demand', 'Valued by crafting it into something whose market only takes a limited number a day (or whose recipe has a cooldown). The crafted worth counts only for that many a day; every one beyond that counts at its sale price, in this row and everywhere else'],
+  crafted_at_buy_price: ['', 'at buy price', "Counted at what buying one on your realm's AH costs. A craft makes more from it, but one you have only saves you buying one, so that profit belongs to the craft's own row (Crafting tab), not to every one you hold or loot"],
   more_with_skill: ['', 'more with skill', "A recipe you can't make yet would make it worth more (see details); valued at what you can do now"],
   event_vendor: ['bad', 'event vendor', 'Every vendor selling it is event-only (Darkmoon Faire, holidays) or has no known location: check it is there now. Kept out of Top picks'],
   black_market: ['bad', 'black market vendor', 'Black Market agents charge more than the game-file price (e.g. Frilled Lichen: 4g 50s, not 1s 20c). Visit once to record the real price'],
@@ -1235,7 +1236,7 @@ async function openItem(id, opp) {
       <div>Region sold/day · sale rate</div><div>${num(p.regionSoldPerDay)} · ${p.regionSalePercent !== undefined ? (p.regionSalePercent * 100).toFixed(1) + '%' : '–'}</div>
       <div>Vendor pays</div><div>${money(it.vendor_sell)}</div>
       ${it.vendor_price ? `<div>Vendor sells for</div><div>${money(it.vendor_price)}</div>` : ''}
-      ${it.best_use ? `<div>Best crafting use</div><div>${money(it.best_use.value)} each via ${esc(it.best_use.profession)}: ${esc(it.best_use.recipe)}${it.best_use.doable ? '' : ' <span class="pill">(you can\'t yet)</span>'}</div>` : ''}
+      ${it.best_use ? `<div>Best crafting use</div><div>${money(it.best_use.value)} each via ${esc(it.best_use.profession)}: ${esc(it.best_use.recipe)}${it.best_use.doable ? '' : ' <span class="pill">(you can\'t yet)</span>'}${it.best_use.capped ? `<div class="hint" style="margin:2px 0 0">That is what buying one costs on your realm's AH. The craft would make ${money(it.best_use.margin)} from each, but one you have only saves you buying one, so that profit is on the craft's own row (Crafting tab).</div>` : ''}</div>` : ''}
       <div>Required level · item level</div><div>${it.req_level ?? '–'} · ${it.item_level ?? '–'}</div>
       ${it.disenchant ? `<div>Disenchant it <span class="pill" title="${esc(it.disenchant.source)}">Classic table</span></div><div>about ${money(it.disenchant.value)} each: ${deMats(it.disenchant)}${deWho(it.disenchant)}</div>` : ''}
     </div>${spark(it.history)}`;

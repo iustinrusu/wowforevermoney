@@ -284,8 +284,11 @@ class MoreInteractionTests(unittest.TestCase):
         self.assertTrue(o.doable)
         self.assertEqual(o.profit_unit, 3 * int(104230 * 0.95) - 269990)    # 297,054 - 269,990 = 27,064 (2g 70s)
         self.assertEqual(o.detail['learn']['how'], 'item use')
-        # and a Greater Eternal Essence is worth what its three Lesser ones sell for
-        self.assertEqual(e.best_uses()[GREATER_ETERNAL]['doable_value'], 3 * int(104230 * 0.95))
+        # a Greater Eternal Essence would make what its three Lesser ones sell for, but one you hold is worth what
+        # buying one costs (269,990): the 2g 70s is the split's own row (the user's decision, 2026-11-20)
+        use = e.best_uses()[GREATER_ETERNAL]
+        self.assertEqual(use['doable_margin'], 3 * int(104230 * 0.95))
+        self.assertEqual((use['doable_value'], use['doable_capped']), (269990, True))
 
     def test_a_recipe_tool_you_lack(self):
         _, rows = self.world(bags={})

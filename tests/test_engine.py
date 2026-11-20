@@ -283,7 +283,7 @@ class EngineTests(unittest.TestCase):
     def test_best_use_and_fishing_zone(self):
         recipe = Recipe(spell_id=500, name='Spotted Yellowtail', profession='Cooking', skill_line=185, product_id=COOKED,
                         product_count=1, reagents=[(FISH, 1)], trivial_low=140, trivial_high=180, min_rank=1)
-        prices = {FISH: {'numAuctions': 5, 'minBuyout': 80, 'marketValue': 90, 'regionSoldPerDay': 50},
+        prices = {FISH: {'numAuctions': 0, 'marketValue': 80, 'regionSoldPerDay': 50},   # none listed: no buy-price cap
                   COOKED: {'numAuctions': 5, 'minBuyout': 200, 'marketValue': 210, 'regionSoldPerDay': 50}}
         angler = {'zones': {'Tanaris': {'c': 100, 'k': 90, 'e': 10, 'fish': {FISH: 40}}}}
         w = make_world(prices, [recipe], angler)
@@ -320,7 +320,7 @@ class EngineTests(unittest.TestCase):
                       product_count=1, reagents=[(FISH, 1)], trivial_low=140, trivial_high=180, min_rank=1)
         hard = Recipe(spell_id=501, name='Tasty Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
                       product_count=1, reagents=[(FISH, 1)], trivial_low=320, trivial_high=360, min_rank=1)
-        prices = {FISH: {'numAuctions': 5, 'minBuyout': 80, 'marketValue': 90, 'regionSoldPerDay': 50},
+        prices = {FISH: {'numAuctions': 0, 'marketValue': 80, 'regionSoldPerDay': 50},   # none listed: no buy-price cap
                   COOKED: {'numAuctions': 5, 'minBuyout': 200, 'marketValue': 210, 'regionSoldPerDay': 50},
                   PRODUCT: {'numAuctions': 5, 'minBuyout': 1000, 'marketValue': 1000, 'regionSoldPerDay': 50}}
         w = make_world(prices, [easy, hard])

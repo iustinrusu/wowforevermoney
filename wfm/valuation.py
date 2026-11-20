@@ -191,6 +191,11 @@ class Valuer:
             flags.append('craft_limited_demand')    # beyond that many a day, it's worth its sale price
         how = {'AH': 'sell on the AH', 'vendor': 'sell to a vendor', 'open': 'open it',
                'craft': f"{use['doable_profession']}: {use['doable_recipe']}" if use else 'craft'}[best]
+        if best == 'craft' and use and use.get('doable_capped'):
+            # Engine.best_uses: never more than buying one costs; the craft's profit is on the craft's own row
+            flags.append('crafted_at_buy_price')
+            how += (f" (counted at what buying one costs on the AH, {fmt_money(use.get('buy_now') or crafted)}: one "
+                    "you have only saves buying one; the craft's own profit is on its Crafting row)")
         if best == 'craft' and cap is not None and cap < CRAFT_DEMAND:
             why = "the recipe's cooldown" if cap_by == 'cooldown' else 'what its market takes at your share'
             how += (f' (worth {fmt_money(crafted)} crafted, for up to {per_day_text(cap)}: {why}; the rest at '
