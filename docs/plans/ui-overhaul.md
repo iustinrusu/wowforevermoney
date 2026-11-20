@@ -25,7 +25,7 @@ needed for a more modern and flashy app."
 ## Rules for the overhaul
 - Readability first (CLAUDE.md: "UI: readability and usability first, then the WoW theme"): numbers, gold amounts,
   warnings and hover help must stay as easy to read as now or easier. Effects frame the data, never cover or blur it.
-  If the user wants the balance moved further toward flash, ask; don't assume.
+  Confirmed by the user, 2026-11-20: "readability first sounds good, you can start".
 - WoW-inspired, made here: own CSS (gradients, borders, shadows, textures drawn in CSS or SVG made for this app). Never
   copy Blizzard's art, fonts (Friz Quadrata, Morpheus are licensed), UI textures or logos; item icons stay as they are.
 - `prefers-reduced-motion`: every animation and parallax off (or a fade at most). A "less motion" switch in Settings
