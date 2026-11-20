@@ -24,6 +24,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-20 UI overhaul is the next high-priority to-do (the user: "I would also like a UI overhaul regarding
+  design: more wow themes, more animations and effects, parallax, whatever is needed for a more modern and flashy app.
+  But let's do this as the next high prio todo, in a new chat").** To-do B2, brief in `docs/plans/ui-overhaul.md`.
+  Claude's framing, for the new chat to confirm with the user: readability stays first (CLAUDE.md's UI rule), the
+  look is WoW-inspired but made here (no Blizzard art, fonts or textures), motion respects `prefers-reduced-motion`
+  and gets a Settings switch, and the user picks a direction from mock-ups before the build.
 - **2026-11-20 A vendor's Wowhead Forever page decides what it sells (checklist A0; the user, 2026-11-15: "Wowhead
   always has more accurate data").** Once a vendor's page is read, its Sells list replaces QuestieDB's for that vendor:
   an item not on it isn't sold there (QuestieDB had Borya selling Pattern: Invoker's Cord, a Season of Discovery item,

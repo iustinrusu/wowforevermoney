@@ -8,6 +8,8 @@ Each item points to a plan file or carries the full brief. Follow CLAUDE.md's st
 step, commit and push each finished piece, tick it off here and note it in docs/PROJECT_LOG.md. If usage gets
 tight: finish the current piece, commit, update this list, and set a reminder that runs nothing.
 
+**Next (the user, 2026-11-20): B2, the UI overhaul, in a new chat; then part C.** Parts A and B1 are done.
+
 **Order (the user, 2026-11-19, end of day): first the topics of the 2026-11-19 session (part A), then the
 comprehensive app review (part B), then the rest (part C).** What that session did, all pushed: Salt Shaker and
 every item interaction, ForeverRecipes as a second recipe source, disenchanting from a labelled Classic table, Biggest
@@ -78,6 +80,11 @@ B1. [x] (done 2026-11-20: report and every part in docs/plans/comprehensive-revi
        2026-11-15): `docs/plans/comprehensive-review.md`. Include what 2026-11-19 added: the levelling planner (new
        algorithm, every recipe, where to learn, slow sellers) on every profession, item-use crafts, Biggest markets,
        disenchant labels, TSM vendor prices.
+B2. [ ] **UI overhaul: a more modern, flashy WoW look** (the user, 2026-11-20: "more wow themes, more animations and
+       effects, parallax, whatever is needed for a more modern and flashy app"; the next high-priority to-do, in a new
+       chat): `docs/plans/ui-overhaul.md`. Readability first, own WoW-inspired CSS (no Blizzard art or fonts),
+       reduced motion respected plus a "less motion" setting, phones keep working; the user picks a direction from
+       mock-ups first.
 
 ## C. Then the rest
 
