@@ -70,6 +70,14 @@ fix the clear bugs, ask the user only about real decisions. Never skip a check o
   read, and for a friend without the data key it now says the pages are locked and the key unlocks them. The pack:
   key, wrong key and newer local pages are tested (`tests/test_datapack.py`). Classic labels: every row kind that uses
   Classic data carries its flag (fishing tables, node yields, gathers per node, disenchanting, Everloot, skill rule).
+- Part 4 done 2026-11-20 (in the browser pane, every tab, full width and a 375 px phone; console clean): every column
+  header now has hover help (30 had none: Cost each, Gold / hour, Sells (region), Cooldown, all of Investments, My
+  bags, Niches, the levelling tables, Settings' characters, Biggest markets). Phone fixes: the Professions comparison
+  table now scrolls inside its box; card cells wrap (rows of warning labels made Top picks, Crafting, Flips and
+  Gathering 360-690 px too wide); Settings fits (it was 507 px); long "How this is worked out" summaries wrap; the
+  header scrolls away and the tabs are one swipeable row (they covered half the screen). Tables turn into cards when a
+  view renders, not only on the next paint. Not changed: wording of the notes (read through, no contradictions found
+  in the tabs checked); the Settings save and the item drawer were exercised by earlier sessions' browser checks.
 
 ## Known items to look at (from 2026-11-15)
 - Levelling planner values products with no recorded sales at vendor price where Crafting shows the listing
