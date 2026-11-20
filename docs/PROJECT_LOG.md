@@ -829,6 +829,15 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-20** (fourteenth part) UI overhaul (to-do B2), steps 1-2 of `docs/plans/ui-overhaul.md`. New
+  `tools/screenshots.py`: pictures of every tab at 1440 and 375 px through Edge's DevTools port (standard library
+  only, a throw-away profile), and per view a check for sideways scrolling and console errors (Wowhead's tooltip site
+  counted apart). "Before" pictures taken (26, kept in `data/screenshots/before/`, never committed: they show
+  characters and gold); no tab scrolls sideways at 375 px. Mock-ups of three looks in `web/mockups/directions.html`
+  (Night watch, Leather and ledger, Arcane glass), sent to the user with the before pictures. Found: Windows
+  "Animation effects" is off on the user's PC, so browsers there report reduced motion; proposed a three-way
+  Settings "Motion" switch (follow Windows, on, off). Waiting for the user's pick. Tests: 305 pass.
+
 - **2026-11-20** (thirteenth part) Comprehensive review (to-do B1), parts 3-7. Part 3: every data source missing in turn
   (TSM, QuestieDB, SkillUpForever, ForeverRecipes, both, no SavedVariables, a friend without the data key): the app
   always loads and runs; Data health notes for TSM, QuestieDB and the locked Wowhead pack now say how to fix them.

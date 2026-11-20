@@ -113,6 +113,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/anomalies.py` | price checks every run: second opinion at typical prices, crafted worth, TSM data monitor; `python -m wfm.anomalies` |
 | `wfm/coverage.py` | which traded materials/items lack Forever source data; Wowhead reading queue |
 | `wfm/app.py` | HTTP server, JSON API, SSE live updates, watcher loop |
+| `tools/screenshots.py` | pictures of every tab, wide and 375 px, plus sideways-scroll and console checks (`python tools/screenshots.py before`) |
 | `web/` | the page (index.html, app.js, style.css) |
 | `addon/ForeverMoneyBridge/` | our WoW addon; copied into AddOns when the app starts |
 | `data/` | caches and user state (not versioned, except the hand-curated `data/tips.json` and `data/investments.json`) |

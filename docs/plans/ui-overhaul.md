@@ -63,3 +63,27 @@ needed for a more modern and flashy app."
 ## Done when
 The user signs off on the after screenshots; no tab scrolls sideways at 375 px; the console is clean; reduced motion
 and the Settings switch turn the motion off; tests pass.
+
+## Progress
+- **2026-11-20 Steps 1 and 2 done; waiting for the user to pick a look.**
+  - "Before" pictures: every tab at 1440 px and at 375 px (26, in `data/screenshots/before/`, not committed: they show
+    characters and gold), taken with the new `tools/screenshots.py` (Edge without a window, through its DevTools port,
+    standard library only; a throw-away profile). It also checks each view: no tab scrolls sideways at 375 px, no
+    console errors from the app (Wowhead's tooltip site sometimes fails in the throw-away profile: counted apart).
+    Run it again for the "after" pictures: `python tools/screenshots.py after` (the app must be running).
+  - Mock-ups: `web/mockups/directions.html` (open http://127.0.0.1:8765/static/mockups/directions.html while the app
+    runs): three looks, each a small scrollable copy of the app with made-up numbers (header with parallax, the plan
+    panel, a table, an alert), wide or 375 px. A "Night watch" (night sky, mountains, turning rune circle, embers, gold
+    trim with a running light, stone panels with gold corner pieces), B "Leather and ledger" (tooled leather band,
+    stitching, rivets, map and compass, ledger tables, parchment alerts with a wax seal), C "Arcane glass" (aurora,
+    three star layers, glass-like cards, rows as strips, a light running round the number-one pick, coin icons
+    instead of g/s/c). Common to all: tab underline that slides, rows and cards rise in, medal shine, sparkle when
+    a step is ticked, the purse counts up. Pictures in `data/screenshots/mockups/`. Delete the mock-up page once
+    the look is built.
+  - Found: Windows "Animation effects" is off on the user's PC, so every browser there reports
+    `prefers-reduced-motion: reduce`. Followed strictly, the user would see none of the motion they asked for.
+    Proposed: Settings "Motion" with three choices (follow Windows, on, off), the page keyed on one attribute the
+    script sets, not on the media query directly. Waiting for the user's choice.
+  - Other proposal shown in the mock-ups: rare blue and epic purple item names a touch lighter (today #0070dd and
+    #a335ee are about 3.6:1 on the dark panels, below the 4.5:1 usual for small text); headings in Cinzel, a free
+    font (SIL Open Font License) the app would ship (the mock-up loads it from Google Fonts).
