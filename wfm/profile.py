@@ -76,7 +76,12 @@ def build_profile(bridge: dict, tsm_chars: dict, char_mtimes: dict[str, float]) 
         first = bridge_name.split(' ')[0]
         return next((n for n in chars if n.split(' ')[0] == first), bridge_name)
 
-    for key, c in (bridge.get('characters') or {}).items():
+    # Oldest first, so the newest snapshot of a character wins. The addon keys characters by "name - realm", and
+    # the realm it reads changed (2026-11: the game began returning an empty realm name where it gave the server's
+    # internal name), so one character can sit in the file twice: a level-60 entry from today and a level-52 one
+    # from a week ago. Read in file order, the stale one could overwrite the new one.
+    entries = sorted((bridge.get('characters') or {}).items(), key=lambda kc: float(kc[1].get('updated') or 0))
+    for key, c in entries:
         name = match(c.get('name') or key.split(' - ')[0])
         merged = chars.get(name, {})
         merged.update({k: v for k, v in c.items() if v is not None})

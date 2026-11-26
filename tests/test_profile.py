@@ -50,6 +50,23 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(eff['professions'], {'Fishing': 230, 'Cooking': 226}, 'complete list replaces manual')
         self.assertEqual(eff['gold'], 1.2345)
 
+    def test_newest_snapshot_of_a_character_wins(self):
+        """The same character saved twice by the addon (the realm name it read changed): the newest entry wins,
+        whatever order the file lists them in. Found 2026-11-26: the app showed level 52 for a level-60 character."""
+        chars = profile.read_tsm_characters(self.tsm_file(self.TSM))
+        old = {'name': 'Testchar', 'realm': 'CAMWOW EU5 Realm 4 PvP', 'faction': 'Horde', 'level': 52, 'money': 100,
+               'updated': 1795199111}
+        new = {'name': 'Testchar', 'realm': '', 'faction': 'Horde', 'level': 60, 'money': 900, 'updated': 1795685643}
+        for order in (('Testchar - ', new), ('Testchar - CAMWOW EU5 Realm 4 PvP', old)), \
+                     (('Testchar - CAMWOW EU5 Realm 4 PvP', old), ('Testchar - ', new)):
+            bridge = {'lastCharacter': 'Testchar - ', 'characters': dict(order)}
+            prof = profile.build_profile(bridge, chars, {})
+            self.assertEqual(prof['active'], 'Testchar Alpha')
+            self.assertEqual(len([n for n in prof['characters'] if n.startswith('Testchar')]), 1, 'one character, not two')
+            eff, det = profile.apply({'auto_detect': True, 'gold_scope': 'character'}, prof)
+            self.assertEqual(det['level'], 60)
+            self.assertEqual(eff['gold'], 0.09)
+
     def test_auto_detect_off(self):
         prof = profile.build_profile({}, profile.read_tsm_characters(self.tsm_file(self.TSM)), {})
         eff, det = profile.apply({'auto_detect': False, 'level': 42, 'professions': {}}, prof)

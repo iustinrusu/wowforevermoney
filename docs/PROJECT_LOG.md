@@ -688,6 +688,9 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-26: in the Forever client `GetRealmName()` now returns an empty string to ForeverMoneyBridge (its entries
+  since about 2026-11-21 have realm ""; before, "CAMWOW EU5 Realm 4 PvP"). TSM's character names are "First Last"
+  where the addon's `UnitName` gives the first word; the app matches them by that first word.
 - 2026-11-20, Wowhead Forever pages (session 4, 20 pages):
   - Spell 1289305 "Transmute: Red Power Crystal to Blue Power Crystal": 2 s cast, tool Philosopher's Stone, reagent 1
     Red Power Crystal, creates 1 Blue Power Crystal (11184); no skill line, no "taught by" tab; added in 1.60.1.
@@ -878,6 +881,15 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-26** Fixed: the app showed level 52 for a level-60 character (the user: "app detects me as level 52, but I
+  am 60. why?"). ForeverMoneyBridge keys characters by "name - realm", and the realm the game gives it changed: older
+  entries hold the server's internal name ("CAMWOW EU5 Realm 4 PvP"), entries since about 2026-11-21 an empty realm
+  name. So one character sat in the file twice (level 60 updated today, level 52 from 2026-11-20), and
+  `profile.build_profile` merged both into the same character in file order, the stale one last. Now the entries are
+  merged oldest first, so the newest snapshot wins. Test `test_newest_snapshot_of_a_character_wins` (fails without
+  the fix); on the user's real files the detected level is now 60; all 346 tests pass. The addon itself is unchanged
+  (its empty realm is harmless to the app: `_same_realm` treats an empty realm as any).
 
 - **2026-11-20** (twenty-seventh part) (1) Reading session from the new queue (the user: "Do it now"): 20 pages, no
   block (`docs/plans/material-coverage.md`, session 6); 140 item and 21 npc pages now. Mob farming after it: Toxic
