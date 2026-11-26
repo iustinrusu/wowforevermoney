@@ -42,6 +42,15 @@ def mobs(snapshot: dict) -> dict[int, dict]:
                                           'max_level': r['max_level'], 'zones': r['zones'], 'skinned': 0, 'items': {}})
             m['skinned'] = max(m['skinned'], r['outof'])
             m['items'][int(iid)] = r['count'] / r['outof'] if r['outof'] else 0.0
+    # a mob's own Wowhead Forever page (wowhead_items.mob_skins): every item its skins gave, so it replaces the rows
+    # the leather pages had for it (those list only the mobs skinned most); levels and zones they knew stay as a fallback
+    for npc, own in ((snapshot or {}).get('mob_pages') or {}).items():
+        old = out.get(int(npc)) or {}
+        out[int(npc)] = {'npc': int(npc), 'name': own.get('name') or old.get('name', ''),
+                         'min_level': own.get('min_level') or old.get('min_level') or 0,
+                         'max_level': own.get('max_level') or old.get('max_level') or 0,
+                         'zones': own.get('zones') or old.get('zones') or [],
+                         'skinned': own.get('skinned') or 0, 'items': dict(own.get('items') or {}), 'own_page': True}
     return out
 
 

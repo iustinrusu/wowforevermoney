@@ -132,6 +132,29 @@ class TableTests(unittest.TestCase):
         self.assertEqual(set(npcs), {MOB_A, MOB_B, 99})                 # nothing lost
         self.assertEqual((npcs[MOB_A]['count'], npcs[MOB_A]['outof']), (25, 500))   # the newer read wins
 
+    def test_a_mob_page_skinning_tab_replaces_the_leather_lists(self):
+        """A mob's own page lists every item its skins gave; a leather page only its 30-40 most skinned mobs (2026-11-26:
+        Ridge Stalker was on none, so the app counted no skin for it)."""
+        from wfm import skinning
+        pristine = 249428
+        data, _, _ = wi.merge(self.data, {f'npc={MOB_A}': {**page('Mob A', {'skinning': {'kind': 'item', 'rows': [
+            row(HIDE, 60, 120), row(pristine, 12, 120, stack={'2': 50, '3': 50})]}}), 'facts': {'level': [40, 41]}},
+            f'npc={MOB_B}': page('Mob B', {'drops': {'kind': 'item', 'rows': [row(CLOTH, 4, 40)]}})})
+        snap = {'items': {str(HIDE): {'name': 'Heavy Hide', 'checked': '2026-11-13', 'npcs': [
+            {'npc': MOB_A, 'name': 'Mob A', 'count': 20, 'outof': 400, 'min_level': 30, 'max_level': 31, 'zones': [400]},
+            {'npc': MOB_B, 'name': 'Mob B', 'count': 9, 'outof': 300, 'min_level': 30, 'max_level': 31, 'zones': [400]}]}}}
+        out = wi.merge_skinning(snap, data)
+        self.assertEqual(set(out['mob_pages']), {MOB_A}, 'only a page with a Skinning tab')
+        self.assertEqual(out['items'], snap['items'], "the leather lists stay as their pages show (coverage reads them)")
+        mobs = skinning.mobs(out)
+        a = mobs[MOB_A]
+        self.assertTrue(a['own_page'])
+        self.assertAlmostEqual(a['items'][HIDE], 0.5)                   # 60 of 120 skins
+        self.assertAlmostEqual(a['items'][pristine], 0.25)              # 12 of 120, 2 or 3 at a time: 0.1 x 2.5
+        self.assertEqual((a['skinned'], a['min_level'], a['max_level'], a['zones']), (120, 40, 41, [33]))
+        self.assertAlmostEqual(mobs[MOB_B]['items'][HIDE], 0.03)        # no Skinning tab read: the leather list stays
+        self.assertNotIn('mob_pages', wi.merge_skinning(snap, self.data))
+
 
 class NodeCombineTests(unittest.TestCase):
     def test_forever_replaces_classic_item_by_item(self):
@@ -188,6 +211,25 @@ class MobFarmingTests(unittest.TestCase):
         _, rows = self.rows(professions={})
         self.assertEqual(rows[MOB_A].profit_unit, int(0.375 * cloth))               # no Skinning: drops only
         self.assertIn('skin_extra', rows[MOB_A].flags)
+
+    def test_a_skin_from_the_mobs_own_page_counts(self):
+        """Mob B is on no leather page; its own page's Skinning tab gives the skin (level 51: needs 255)."""
+        from tests.test_engine import SETTINGS
+        from wfm.engine import Engine
+        w = self.world()
+        w.forever_pages, _, _ = wi.merge(w.forever_pages, {f'npc={MOB_B}': {**page('Mob B', {'skinning': {
+            'kind': 'item', 'rows': [row(HIDE, 90, 100)]}}), 'facts': {'level': [50, 51]}}})
+        w.forever_skinning = wi.merge_skinning({}, w.forever_pages)
+        e = Engine(w, dict(SETTINGS, level=40, kills_per_hour=60, professions={'Skinning': 300}))
+        b = next(o for o in e.mob_spots({}) if o.detail['npc'] == MOB_B)
+        hide = e.fish_value(HIDE, {})
+        self.assertTrue(b.detail['can_skin'])
+        self.assertEqual(b.detail['skin_needed'], 255)
+        self.assertEqual(b.detail['skin_value'], int(0.9 * hide))
+        e2 = Engine(w, dict(SETTINGS, level=40, kills_per_hour=60, professions={'Skinning': 250}))
+        b2 = next(o for o in e2.mob_spots({}) if o.detail['npc'] == MOB_B)
+        self.assertFalse(b2.detail['can_skin'])                                     # 250 < 255
+        self.assertIn('skin_extra', b2.flags)
 
     def test_elites_and_mobs_far_above_you_stay_out_of_top_picks(self):
         from wfm.engine import Engine

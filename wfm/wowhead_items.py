@@ -336,14 +336,45 @@ def as_skinning(data: dict) -> dict:
     return {'items': items}
 
 
+def mob_skins(data: dict) -> dict[int, dict]:
+    """npc id -> what skinning it gives, from the mob's own page (its Skinning tab: complete, every item a skin gave),
+    in skinning.mobs' shape. A leather's page lists only the 30-40 mobs skinned most, so a mob outside those lists
+    had no skin in the app (2026-11-26: Ridge Stalker, skinned 1,221 times in Forever). Levels from the page's Quick
+    Facts, else the item pages' rows; zones from the item pages' rows. Items per skin count their stack (Pristine Hide:
+    2 or 3)."""
+    out, drops = {}, None
+    for nid, page in ((data or {}).get('npcs') or {}).items():
+        tab = (page.get('tabs') or {}).get('skinning')
+        rows = [r for r in ((tab or {}).get('rows') or []) if r['outof'] > 0]
+        if not tab or tab.get('kind') != 'item' or not rows:
+            continue
+        if drops is None:
+            drops = mob_drops(data)
+        info = drops.get(int(nid)) or {}
+        level = (page.get('facts') or {}).get('level') or []
+        out[int(nid)] = {'npc': int(nid), 'name': page.get('name') or info.get('name', ''),
+                         'min_level': (level[0] if level else 0) or info.get('min_level') or 0,
+                         'max_level': (level[-1] if level else 0) or info.get('max_level') or 0,
+                         'zones': info.get('zones') or [], 'skinned': max(r['outof'] for r in rows),
+                         'items': {r['id']: r['count'] / r['outof'] * avg_stack(r) for r in rows},
+                         'read': page.get('read', ''), 'own_page': True}
+    return out
+
+
 def merge_skinning(snapshot: dict, pages: dict) -> dict:
     """The skinning snapshot with every item page's "Skinned from" rows added, mob by mob: the two keep different
     rows (the snapshot the 40 most skinned for the item, a page the 30 mobs skinned most), and for a mob in both
-    the newer read wins."""
+    the newer read wins. Mobs whose own page was read go under 'mob_pages' (mob_skins): skinning.mobs lets them
+    replace what the item lists say, and the item lists stay what the leather pages show (coverage counts those)."""
     extra = as_skinning(pages).get('items') or {}
-    if not extra:
+    own = mob_skins(pages)
+    if not extra and not own:
         return snapshot or {}
     out = dict(snapshot or {})
+    if own:
+        out['mob_pages'] = own
+    if not extra:
+        return out
     items = dict((snapshot or {}).get('items') or {})
     for iid, page_item in extra.items():
         old = items.get(iid)

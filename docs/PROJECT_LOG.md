@@ -882,6 +882,18 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-26** (second part) Skins from a mob's own page (the user: "does open world farming account for skinning?
+  it should if players has skinning", then "Yes, read them"). Mob farming already added a skin when you can skin the
+  mob (84 rows in the running app, all at Skinning 300), but only for mobs on a leather page's "Skinned from" list (its
+  30-40 most skinned). Checked the doable mob farms against the WoW Classic dump's SkinningLootId (a guide only): the
+  top farms are elementals, humanoids, spiders and insects, none skinnable; 4 small beast farms were. Read their
+  Wowhead Forever pages (session 7, `docs/plans/material-coverage.md`): all four are skinned in Forever. New
+  `wowhead_items.mob_skins`: a mob page's Skinning tab (complete, stacks counted: Pristine Hide 2-3) goes under the
+  skinning data's `mob_pages` and replaces that mob's leather-list rows in `skinning.mobs`; the leather lists stay as
+  read, so coverage is unchanged. On the real data: Ridge Stalker 12.98g an hour (5s skin + 10s drops a kill),
+  Patriarch 15.88g, Huntress 13.13g, Kurzen War Tiger 12.09g (they showed under 4g: skins missing, drops partial, and
+  the level 52 bug). Tests: 2 new, 348 pass.
+
 - **2026-11-26** Fixed: the app showed level 52 for a level-60 character (the user: "app detects me as level 52, but I
   am 60. why?"). ForeverMoneyBridge keys characters by "name - realm", and the realm the game gives it changed: older
   entries hold the server's internal name ("CAMWOW EU5 Realm 4 PvP"), entries since about 2026-11-21 an empty realm

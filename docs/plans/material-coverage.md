@@ -44,6 +44,14 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   the market limit and its kill speed, minus what Forever data shows; rare and named mobs (under 5 spawn points in
   QuestieDB) left out. An item without Forever source data: your share of the region's trade in it a day; items only
   dungeon mobs drop are left for the Dungeons view (C4). Read it from the top, skip pages read in the last month.
+- Session 7 (2026-11-26; the user: "Yes, read them", after asking whether mob farming counts skinning): 4 mob pages,
+  2 minutes apart, no block: npcs 2731 Ridge Stalker, 2734 Ridge Stalker Patriarch, 2732 Ridge Huntress, 976 Kurzen
+  War Tiger: beasts the WoW Classic dump calls skinnable that no leather page lists. All four have a Forever Skinning
+  tab (skinned 1,221 / 778 / 1,516 / 159 times). The tab's storage had lost the reader again: set up again (`wfm_fn`
+  keeps every listview with item, npc, object or zone rows, so a mob's Skinning tab too; `pctstack` gives the stack
+  spread; `wfm_go3` as before). Batch checked with SHA-256 (10,102 characters; the copy written with three special
+  characters as themselves matched once re-encoded with \u escapes), kept in the tab as `wfm_pages_saved_007`.
+  Pages: 140 items, 25 npcs. Mob pages' Skinning tabs now feed skinning (`wowhead_items.mob_skins`).
 - Session 6 (2026-11-20, late evening, the first from the reading queue; the user: "Do it now"): 20 pages, 2 minutes
   apart, no block, the queue's top 20: items 13486 16713 287020 4500 16723 12692 12809 16710 12820 13047 18362 16673
   273127 13443 287033 13466 18333 13444, npcs 11745 8546. The coins ("Worth") now come from the coin icons (Dark
