@@ -84,11 +84,15 @@ function UnitCreatureType(t) local u = U(t); if not u then return nil end
   return (u.type or 7) == 7 and "Humanoid" or "Beast", u.type or 7 end
 function UnitReaction(t) return U(t) and U(t).reaction end
 C_Spell = {
-  GetSpellName = function(id) return ({ [921] = "Pick Pocket", [6770] = "Sap" })[id] end,
+  GetSpellName = function(id) return ({ [921] = "Pick Pocket", [6770] = "Sap", [1752] = "Sinister Strike" })[id] end,
   IsSpellInRange = function(name, t) local u = U(t); if not u then return nil end
-    if name == "Pick Pocket" then return u.reach <= 1 end
+    if name == "Pick Pocket" then if u.player then return nil end return u.reach <= 1 end   -- NPCs only: no answer
+    if name == "Sinister Strike" then return u.reach <= 1 end                               -- melee range
     if name == "Sap" then return u.reach <= 2 end end,
 }
+PROFILE_MS = 0                                  -- debugprofilestop: a look takes PROFILE_STEP ms
+PROFILE_STEP = 0.4
+function debugprofilestop() PROFILE_MS = PROFILE_MS + PROFILE_STEP return PROFILE_MS end
 function CheckInteractDistance(t, i) local u = U(t); if not u then return false end
   return u.reach <= ({ [3] = 3, [2] = 4, [4] = 5 })[i] end
 C_UnitAuras = { GetDebuffDataByIndex = function(t, i) local u = U(t)

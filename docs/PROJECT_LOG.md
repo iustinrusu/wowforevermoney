@@ -947,6 +947,19 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (twenty-third part) TargetKit 1.5.0. The user asked how TargetKit decides who is closer: range bands
+  only, and for players the first band (Pick Pocket, NPCs only) gave no answer, so two players in Sap range looked the
+  same. They said yes to a melee band, and asked "wouldnt this be slow to compute or drain performance?" and
+  "wouldnt /targetenemy work? it should target nearest enemy?" (answered: it's the game's Tab pick, and the Arathi
+  Basin log showed it taking an out-of-range player every press).
+  - Band 1 is now Pick Pocket's range or, when the game gives no answer for it (a player), melee range asked with
+    Sinister Strike (1752). `IsSpellInRange` giving nil now counts as no answer (before: no). Each band's question is
+    asked only when the closer ones said no. The band's name in the log: "melee range".
+  - Every look out of combat is timed (debugprofilestop); every 5 minutes a `perf:` log line gives the number of
+    looks, the average and the longest in ms. Looks a new nameplate asks for: at most one per 0.1 s.
+  - Tests: 61 (new: a player in melee range before one at the edge of Sap range; the perf line and the nameplate
+    look limit). Not yet tried in game.
+
 - **2026-11-27** (twenty-second part) TargetKit 1.4.9 (the user: "still not working great. i feel it shouldnt be that
   hard, just clear target before casting sap and the new target should be another closer one, right? /target I
   think targets closest by default"). The 1.4.8 macro did clear first; the game's own `/targetenemyplayer` then took

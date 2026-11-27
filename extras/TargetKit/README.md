@@ -138,7 +138,15 @@ Revised:
 
 ## Limits (the game's, not choices)
 
-- No exact distances: range bands only (see above).
+- No exact distances: range bands only. The game answers addons only "would this spell reach?": Pick Pocket's range
+  (NPCs) or melee range by Sinister Strike (players, 1.5.0), about 5 yd; Sap's; then duel (10 yd), trade (11 yd),
+  follow (28 yd), further. Within a band the order is steady but not by distance (Forever won't let addons measure
+  nameplates on screen). Ranges are Classic's, not checked on Forever.
+- The game's own `/targetenemy` and `/targetenemyplayer` (Tab) take what the game rates best in front of you, not
+  the physically closest (the user's Arathi Basin log: the same out-of-range player on about 30 presses), so TK Sap
+  only falls back to them when it can't measure anyone in Sap range.
+- Cost: a look out of combat five times a second (and when a nameplate appears, at most every 0.1 s); every 5
+  minutes the log says how many looks there were and how long they took (`perf:` lines).
 - Keys: one key with Shift, Ctrl, Alt, or a mouse button or the wheel; two ordinary keys together can't be bound.
   Keys can't change in combat.
 - An addon's own slash command can't target or cast, and a macro can't change in combat: in combat the macros hold

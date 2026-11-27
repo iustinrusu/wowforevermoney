@@ -38,8 +38,9 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.4.9"
+local VERSION = "1.5.0"
 local PICK_POCKET, SAP = 921, 6770
+local MELEE = 1752                                        -- Sinister Strike: melee range, and it takes players
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
 local CYCLE = 8                       -- seconds: TK Find going round the list's names keeps going within this
@@ -169,7 +170,7 @@ local function inRange(id, unit)
   local check = (C_Spell and C_Spell.IsSpellInRange) or IsSpellInRange
   if not (name and check) then return false end
   local ok, r = pcall(check, name, unit)
-  if not ok or (r ~= nil and isSecret(r)) then return nil end            -- unknown
+  if not ok or r == nil or isSecret(r) then return nil end               -- unknown, or no answer (Pick Pocket on a player)
   return r == true or r == 1
 end
 
@@ -180,16 +181,21 @@ local function interact(unit, index)
   return r and true or false
 end
 
--- 1 Pick Pocket's range, 2 Sap's, 3 duel (10 yd), 4 trade (11 yd), 5 follow (28 yd), 6 further; nil: the game said
--- nothing (all hidden or refused)
+-- 1 Pick Pocket's or melee range (about 5 yd), 2 Sap's, 3 duel (10 yd), 4 trade (11 yd), 5 follow (28 yd), 6 further;
+-- nil: the game said nothing (all hidden or refused). Pick Pocket only takes NPCs, so for a player the game gives no
+-- answer to it, and melee range is asked with Sinister Strike instead (1.5.0, the user: yes to "a player within about
+-- 5 yards would come before one at the edge of Sap range"). Each question is asked only if the closer ones said no.
 local function reach(unit)
   local a = inRange(PICK_POCKET, unit)
+  if a == nil then a = inRange(MELEE, unit) end
   if a then return 1 end
   local b = inRange(SAP, unit)
   if b then return 2 end
-  local c, d, e = interact(unit, 3), interact(unit, 2), interact(unit, 4)
+  local c = interact(unit, 3)
   if c then return 3 end
+  local d = interact(unit, 2)
   if d then return 4 end
+  local e = interact(unit, 4)
   if e then return 5 end
   if a == nil and b == nil and c == nil and d == nil and e == nil then return nil end
   return 6
@@ -295,7 +301,7 @@ local function rank(list)
   return list
 end
 
-local BAND = { "Pick Pocket range", "Sap range", "10 yd", "11 yd", "28 yd", "further" }
+local BAND = { "melee range", "Sap range", "10 yd", "11 yd", "28 yd", "further" }
 local function describe(c) return (nameOf(c.unit) or "?") .. " (" .. c.unit .. ", " .. BAND[c.reach] .. ")" end
 
 local function passed(c, why) return (nameOf(c.unit) or "?") .. " (" .. c.unit .. "): " .. why end
@@ -726,6 +732,32 @@ local function prepare(force)                            -- look once, write all
     -- written at once, without the 0.4 s wait (1.4.6, 1.4.7)
     local urgent = (b.name == "TKSap" or b.name == "TKPick") and kept ~= (b.live and b.live.text)
     write(b, force, urgent)
+  end
+end
+
+-- How long the looks take (1.5.0, the user: "wouldnt this be slow to compute or drain performance?"). Each look out of
+-- combat is timed (debugprofilestop, in milliseconds) and every 5 minutes the log says how many there were, the
+-- average and the longest. A look a new nameplate asks for waits if the last one was under 0.1 s ago.
+local perf = { n = 0, total = 0, max = 0, since = nil, lastEvent = -10 }
+local function look(force, fromEvent)
+  if not db or InCombatLockdown() then return end
+  local now = GetTime()
+  if fromEvent then                                      -- many nameplates at once: one look per 0.1 s
+    if now - perf.lastEvent < 0.1 then return end
+    perf.lastEvent = now
+  end
+  local clock = debugprofilestop
+  local t0 = clock and clock()
+  prepare(force)
+  if not t0 then return end
+  local ms = clock() - t0
+  perf.n, perf.total = perf.n + 1, perf.total + ms
+  if ms > perf.max then perf.max = ms end
+  perf.since = perf.since or now
+  if now - perf.since >= 300 then
+    log("perf", string.format("%d looks in the last %.0f min, %.2f ms each on average, the longest %.2f ms", perf.n,
+      (now - perf.since) / 60, perf.total / perf.n, perf.max))
+    perf.n, perf.total, perf.max, perf.since = 0, 0, 0, now
   end
 end
 
@@ -1247,7 +1279,7 @@ ev:SetScript("OnUpdate", function(_, dt)
   acc = acc + (dt or 0)
   if acc < 0.2 then return end
   acc = 0
-  if db and not InCombatLockdown() then try("TargetKit choosing", prepare, false) end
+  if db and not InCombatLockdown() then try("TargetKit choosing", look, false) end
 end)
 
 local function onEvent(_, event, a1, a2, a3)
@@ -1292,7 +1324,7 @@ local function onEvent(_, event, a1, a2, a3)
     rememberName("mouseover")
   elseif event == "NAME_PLATE_UNIT_ADDED" or event == "PLAYER_SOFT_ENEMY_CHANGED" then
     if a1 and event == "NAME_PLATE_UNIT_ADDED" then rememberName(a1) end
-    if db and not InCombatLockdown() then prepare(false) end         -- someone new in sight: look now
+    try("TargetKit choosing", look, false, true)                       -- someone new in sight: look now
   elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
     if a1 == "TargetKit" then
       log("ERROR", "the game blocked TargetKit from " .. tostring(a2) .. " (" .. event .. ")")

@@ -251,6 +251,27 @@ class TargetKitTests(unittest.TestCase):
         self.tick(wait=0.05)                                               # well within 0.4 s
         self.assertIn('/targetexact Defias Miner', self.body('TKPick'))
 
+    def test_sap_takes_a_player_in_melee_range_before_one_at_the_edge_of_sap_range(self):
+        """1.5.0: Pick Pocket takes NPCs only, so for players melee range is asked with Sinister Strike."""
+        self.unit('nameplate1', 'Nightstep', player=True, reach=2)             # first in the steady order
+        self.unit('nameplate2', 'Shadowfang', player=True, reach=1)            # right next to you
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/targetexact Shadowfang\n/cast Sap')
+        self.assertTrue(self.in_log('enemy player in Sap range: Shadowfang (nameplate2, melee range)'))
+
+    def test_looks_are_timed_and_logged_every_5_minutes(self):
+        """1.5.0, the user: "wouldnt this be slow to compute or drain performance?"."""
+        self.unit('nameplate1', 'Defias Thug', reach=2)
+        for _ in range(3):
+            self.tick()
+        self.g.NOW += 300
+        self.tick()
+        line = [l for l in self.logged() if 'perf:' in l][-1]
+        self.assertRegex(line, r'perf: \d+ looks in the last 5 min, 0\.40 ms each on average, the longest 0\.40 ms')
+        n = sum(1 for l in self.logged() if 'perf:' in l)
+        self.fire('NAME_PLATE_UNIT_ADDED', 'nameplate1')
+        self.fire('NAME_PLATE_UNIT_ADDED', 'nameplate1')                   # within 0.1 s: no second look
+        self.assertEqual(sum(1 for l in self.logged() if 'perf:' in l), n)
+
     def test_sap_is_rewritten_at_once_when_a_player_comes_into_sap_range(self):
         """1.4.6: a rogue popping up next to you is in TK Sap's macro without the 0.4 s wait."""
         self.unit('nameplate1', 'Defias Thug', reach=2)
@@ -558,7 +579,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.4.9 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.5.0 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
