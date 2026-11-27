@@ -891,6 +891,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 - (same log) Within one macro run, a line's [conditions] see the target from before the press: with a target,
   "/cleartarget" then "/target [noexists] Zhevra Runner" ran ClearTarget() only (the second line's condition still
   saw the old target), with none it ran both. So "clear, then [noexists]" toggles target, none, target.
+- (2026-11-27, TargetKit 1.4.2's log, Zhevra Runners) Forever refuses a nameplate's unit token in a macro's /target:
+  "/target nameplate1" ran TargetUnit(nameplate1) on every one of ~30 presses and the target stayed none. So an
+  addon's macro can target a unit by name (the closest of that name: `/targetexact`, `/target`), with the game's Tab
+  (`/targetenemy`, `/targetfriend`, `/targetenemyplayer`), or by a group, target or focus token; not by nameplate.
 
 ## What to do next
 
@@ -927,6 +931,22 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (sixteenth part) TargetKit 1.4.3 (the user: "now it doesnt work at all"). The 1.4.2 log: TK Find
+  chose the Zhevra Runner on nameplate1 every press and wrote "/target nameplate1"; the game ran it and the target
+  stayed none (now under Verified facts). Before 1.4.2 the by-name line after it had hidden that; the 1.4.2 rule
+  "the choice alone" exposed it. TK Sap and TK Pickpocket wrote nameplate lines too.
+  - Every choice is written by name (`/targetexact Name`, players with -Realm); only target, focus, party and raid
+    keep their token. The game takes the closest unit of that name.
+  - TK Find: the first press takes the closest match by name. When your target is on the list, the macro is the
+    game's Tab to the next unit (`/targetenemy`, or `/targetfriend` for a friendly target); when Tab landed on one not
+    on the list and TK Find was pressed in the last 8 s, it Tabs on. After a pause, or with no target, it starts
+    from the closest by name again. The visited list is gone (Tab does the going round).
+  - The check after a press compares names (the game may take another unit of the same name). TK Pickpocket's
+    "last unit" (for the half-done rule) is the one targeted after the press, not the one chosen.
+  - Harness: TargetUnit refuses nameplate tokens and takes the closest unit of a name; Tab follows a set order
+    (TAB, FTAB). Tests: 50 (new: closest by name, then Tab round past one not on the list and back to the closest after
+    a pause; no macro holds a nameplate token).
 
 - **2026-11-27** (fifteenth part) TargetKit 1.4.2 (the user: "for enemy mobs (zhevra runner): first press targets the
   closest, second press unselects the first selection and then third press reselects the first one, so no cycling",

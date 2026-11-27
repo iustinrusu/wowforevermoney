@@ -13,17 +13,34 @@ KEYDOWN = true
 function GetCVarBool(name) if name == "ActionButtonUseKeyDown" then return KEYDOWN end end
 function IsInRaid() return false end
 -- what a secure macro calls (tests/test_targetkit_lua.py runs macro lines through these); hooksecurefunc as in WoW
-function TargetUnit(what, exact)                -- a token, or a name (part of one; exact: the whole name)
+-- A token, or a name (part of one; exact: the whole name): the closest unit of that name. As on Forever (TargetKit
+-- 1.4.3's log), a nameplate's token is refused.
+function TargetUnit(what, exact)
+  if tostring(what):match("^nameplate%d+$") then return end
   if UNITS[what] then UNITS.target = UNITS[what] return end
   local w = tostring(what):lower()
+  local best
   for tok, u in pairs(UNITS) do
     local n = u.name and u.name:lower()
-    if tok ~= "target" and n and ((exact and n == w) or (not exact and n:find(w, 1, true))) then UNITS.target = u return end
+    if tok ~= "target" and n and ((exact and n == w) or (not exact and n:find(w, 1, true))) then
+      local r, br = u.reach or 9, best and (best.reach or 9)
+      if not best or r < br or (r == br and tostring(u.guid) < tostring(best.guid)) then best = u end
+    end
   end
+  if best then UNITS.target = best end
 end
 function ClearTarget() UNITS.target = nil end
 NEAREST_ENEMY, NEAREST_PLAYER = nil, nil          -- what the game's own Tab targeting would find (nil: nobody)
-function TargetNearestEnemy() if NEAREST_ENEMY then UNITS.target = NEAREST_ENEMY end end
+TAB, FTAB = {}, {}                                -- or the game's Tab order, enemies and friendly units: the next one
+local function tabNext(order)
+  if #order == 0 then return end
+  for i, u in ipairs(order) do
+    if u == UNITS.target then UNITS.target = order[i % #order + 1] return end
+  end
+  UNITS.target = order[1]
+end
+function TargetNearestEnemy() if NEAREST_ENEMY then UNITS.target = NEAREST_ENEMY return end tabNext(TAB) end
+function TargetNearestFriend() tabNext(FTAB) end
 function TargetNearestEnemyPlayer() if NEAREST_PLAYER then UNITS.target = NEAREST_PLAYER end end
 function TargetLastTarget() end
 function CastSpellByName() end

@@ -2,7 +2,8 @@
 -- Not part of the WoW Forever Money app: it lives in the repo's extras/ folder and the app never copies it.
 -- The request it follows (revised): extras/TargetKit/README.md.
 --
---   TK Find        your find list (/tkit add <name>): the closest match first, each press within 8 s the next one.
+--   TK Find        your find list (/tkit add <name>): the closest match first (by name); with one of them targeted,
+--                  each press is the game's Tab to the next unit, and on past ones not on the list (1.4.3).
 --                  Dead mobs are skipped; dead players count, and dead friendly NPCs (a dead neutral or hostile unit
 --                  could be a mob, so it is skipped).
 --   TK Pickpocket  the closest humanoid you can rob (attackable, not a player, alive, not in combat, not pickpocketed
@@ -29,15 +30,18 @@
 -- (GetCenter) is an error, and that error made every look fail. And within one press, a macro's [conditions] still see
 -- the target you had before it: after "/cleartarget", "/target [noexists] X" doesn't act. So the macros no longer chain
 -- "/cleartarget" with [noexists] lines; each line's conditions are written about the target you had before the press.
+-- 1.4.3 (the user: "now it doesnt work at all"): Forever refuses "/target nameplate1" in a macro (the game ran it on
+-- every press, the target stayed none; before, the by-name line behind it had hidden that). So a unit is targeted by
+-- name (the game takes the closest of that name) or by the game's own Tab, never by its nameplate.
 -- Distance: the game gives addons no distance to other units, only "in range" checks, so "closest" is the nearest of
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.4.2"
+local VERSION = "1.4.3"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
-local CYCLE = 8                       -- seconds: TK Find pressed again within this goes to the next match
+local CYCLE = 8                       -- seconds: TK Find going round with Tab keeps going if pressed within this
 local AGAIN = 10                      -- seconds: TK Pickpocket pressed again on its last unit finishes the job
 local KEEP_PICKED = 2 * 3600          -- a robbed unit is skipped for 2 hours (a respawn is a new unit anyway)
 local MAX_BODY = 255                  -- a macro's text: the game takes up to 255 characters
@@ -98,7 +102,7 @@ local function noteRan(fname, ...)
 end
 if hooksecurefunc then
   for _, fname in ipairs({ "TargetUnit", "ClearTarget", "TargetNearestEnemy", "TargetNearestEnemyPlayer",
-                           "TargetLastTarget", "CastSpellByName", "CastSpellByID" }) do
+                           "TargetNearestFriend", "TargetLastTarget", "CastSpellByName", "CastSpellByID" }) do
     if type(_G[fname]) == "function" then
       hooksecurefunc(fname, function(...) noteRan(fname, ...) end)
     end
@@ -251,11 +255,11 @@ local function describe(c) return (UnitName(c.unit) or "?") .. " (" .. c.unit ..
 
 local function passed(c, why) return (UnitName(c.unit) or "?") .. " (" .. c.unit .. "): " .. why end
 
--- The line that targets a unit the addon chose. A nameplate, your target or focus, or someone in your group keeps its
--- token until the press. The mouseover and the soft targets don't: they follow the mouse and camera (clicking the macro
--- on your bar moves the mouse off the unit), so those are targeted by name, exactly (1.4.0).
+-- The line that targets a unit the addon chose. Your target or focus, or someone in your group, by token. Anything else
+-- by name, exactly: the mouseover and the soft targets follow the mouse and camera (1.4.0), and Forever refuses a
+-- nameplate's token in a macro (1.4.3). The game takes the closest unit of that name.
 local function steady(u)
-  return u == "target" or u == "focus" or u:match("^nameplate%d+$") or u:match("^party%d$") or u:match("^raid%d+$")
+  return u == "target" or u == "focus" or u:match("^party%d$") or u:match("^raid%d+$")
 end
 local function fullName(u)
   local n, realm = UnitName(u)
@@ -324,7 +328,7 @@ local function sapBuild(units)
   if p and p.reach <= 2 then
     head[#head + 1] = targetLine(p)
     head[#head + 1] = "/cast " .. sap
-    return table.concat(head, "\n"), "enemy player in Sap range: " .. describe(p), p.guid, saw
+    return table.concat(head, "\n"), "enemy player in Sap range: " .. describe(p), UnitName(p.unit), saw
   end
   local n = npcs[1]
   if n and n.reach > 2 then n = nil end
@@ -337,7 +341,7 @@ local function sapBuild(units)
 end
 
 -- ---------- TK Pickpocket ----------
-local last = { find = { t = 0, visited = {} }, pick = { guid = nil, t = 0 } }
+local last = { find = { t = 0 }, pick = { guid = nil, t = 0 } }
 
 local function picked(guid)
   local t = db.picked[guid]
@@ -365,9 +369,9 @@ local function pickBuild(units)
       and not UnitAffectingCombat("target") then
     local sapped, robbed = hasSap("target"), picked(t)
     if sapped and not robbed then
-      return "/cast " .. PP(), "Pick Pocket the one just sapped: " .. (UnitName("target") or "?"), t, {}
+      return "/cast " .. PP(), "Pick Pocket the one just sapped: " .. (UnitName("target") or "?"), UnitName("target"), {}
     elseif robbed and not sapped then
-      return "/cast " .. SAPN(), "Sap the one just robbed: " .. (UnitName("target") or "?"), t, {}
+      return "/cast " .. SAPN(), "Sap the one just robbed: " .. (UnitName("target") or "?"), UnitName("target"), {}
     end
   end
   local list, rejected = {}, {}
@@ -382,7 +386,7 @@ local function pickBuild(units)
   local lines = { targetLine(c) }
   if not hasSap(c.unit) then lines[#lines + 1] = "/cast " .. SAPN() end
   lines[#lines + 1] = "/cast " .. PP()
-  return table.concat(lines, "\n"), "closest to rob: " .. describe(c), c.guid, saw
+  return table.concat(lines, "\n"), "closest to rob: " .. describe(c), UnitName(c.unit), saw
 end
 
 -- ---------- TK Find ----------
@@ -466,18 +470,26 @@ local function findBuild(units)
   end
   rank(list)
   local saw = seen({ list }, rejected, others)
+  -- Forever refuses "/target nameplateN" in a macro (1.4.3), so a unit can only be targeted by name, which gives the
+  -- closest of that name, or by the game's own Tab, which goes round. So: your target on the list: Tab to the next
+  -- unit; Tab landed on one not on the list a moment ago: Tab on; else the closest match, by name.
+  if UnitExists("target") and not findWhyNot("target") then
+    local harm = UnitCanAttack("player", "target") and true or false
+    return harm and "/targetenemy" or "/targetfriend", "your target " .. (UnitName("target") or "?") .. " is on the"
+      .. " list, so the game's Tab to the next " .. (harm and "enemy" or "friendly unit") .. " (" .. #list
+      .. " on the list in sight)", nil, saw, { mode = "tab", friend = not harm }
+  end
+  if UnitExists("target") and last.find.mode == "tab" and GetTime() - last.find.t <= CYCLE then
+    local friend = last.find.friend
+    return friend and "/targetfriend" or "/targetenemy", "going round with Tab: " .. (UnitName("target") or "?")
+      .. " isn't on the list", nil, saw, { mode = "tab", friend = friend }
+  end
   if #list == 0 then
     return nil, "none in sight, so by name (with the full names seen that contain a list entry)", nil, saw
   end
-  local visited = (GetTime() - last.find.t > CYCLE) and {} or last.find.visited    -- a pause: from the closest again
-  local pick, again
-  for _, c in ipairs(list) do
-    if not visited[c.guid] then pick = c break end
-  end
-  if not pick then pick, again = list[1], true end                       -- all seen: round again, closest first
-  local i = 0
-  for k, c in ipairs(list) do if c == pick then i = k end end
-  return targetLine(pick), describe(pick) .. ", " .. i .. " of " .. #list, pick.guid, saw, again
+  local pick = list[1]
+  return targetLine(pick), "the closest on the list: " .. describe(pick) .. " (" .. #list .. " in sight)",
+    UnitName(pick.unit), saw
 end
 
 -- ---------- the macros ----------
@@ -564,12 +576,13 @@ local function prepare(force)                            -- look once, write all
   local units = visibleUnits()
   for _, b in ipairs(BUTTONS) do
     local n = room(b)
-    local text, why, chosen, saw, again
-    local ok = try(b.macro .. " choosing", function() text, why, chosen, saw, again = b.build(units, n) end)
-    if not ok then text, why, chosen, saw = nil, "an error (logged), so the fixed macro", nil, {} end
+    local text, why, expect, saw, extra
+    local ok = try(b.macro .. " choosing", function() text, why, expect, saw, extra = b.build(units, n) end)
+    if not ok then text, why, expect, saw, extra = nil, "an error (logged), so the fixed macro", nil, {}, nil end
     if not text then why = why or "nothing found, so the fixed macro" end
     local body, kept = compose(b, text or b.fixed(n))
-    b.state = { text = kept, why = why, chosen = chosen, saw = saw or {}, again = again }
+    b.state = { text = kept, why = why, expect = expect, saw = saw or {}, mode = extra and extra.mode,
+                friend = extra and extra.friend }
     b.body = body
     write(b, force)
   end
@@ -590,9 +603,9 @@ local function afterPress(p)                             -- 0.3 s after a press:
   local after = UnitName("target") or "none"
   log("result", b.macro .. ": the game ran " .. (#p.ran > 0 and table.concat(p.ran, ", ") or "nothing we watch")
     .. "; target " .. p.before .. " -> " .. after)
-  if st.chosen and UnitGUID("target") ~= st.chosen then
+  if st.expect and UnitName("target") ~= st.expect then
     log("WARN", b.macro .. ": it chose " .. (st.why or "?") .. ", but your target is " .. after
-      .. " (the game didn't take the macro's first target line)")
+      .. " (the game didn't take the macro's target line)")
     if not saidMissed[b.name] then
       saidMissed[b.name] = true
       note("|cffff6060" .. b.macro .. " chose a target, but the game didn't target it|r (your target: " .. after
@@ -605,6 +618,9 @@ local function afterPress(p)                             -- 0.3 s after a press:
       .. " The game's own target-by-name found nobody either."
     log("result", msg)
     note(msg)
+  end
+  if b.name == "TKPick" and st.expect and UnitName("target") == st.expect then   -- its last unit, for the half-done rule
+    last.pick.guid, last.pick.t = UnitGUID("target"), p.at
   end
 end
 
@@ -625,15 +641,9 @@ local function onPress(b)                                -- the macro's last lin
       log("press", msg)
       note(msg)
     end
-    if st.chosen then                                    -- the next press goes to the next one
-      if now - last.find.t > CYCLE or st.again then last.find.visited = {} end
-      last.find.visited[st.chosen] = true
-      last.find.t = now
-    end
-  elseif b.name == "TKPick" and st.chosen then
-    last.pick.guid, last.pick.t = st.chosen, now
+    last.find.t, last.find.mode, last.find.friend = now, st.mode, st.friend
   end
-  local p = { b = b, st = st, ran = ran, before = targetBefore }
+  local p = { b = b, st = st, ran = ran, before = targetBefore, at = now }
   if C_Timer then
     C_Timer.After(0, function() try("TargetKit choosing", prepare, true) end)    -- the next press: written fresh
     C_Timer.After(0.3, function() try(b.macro .. " result", afterPress, p) end)

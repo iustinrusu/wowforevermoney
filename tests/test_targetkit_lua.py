@@ -114,6 +114,8 @@ class TargetKitTests(unittest.TestCase):
                 g.TargetNearestEnemyPlayer()
             elif cmd == '/targetenemy':
                 g.TargetNearestEnemy()
+            elif cmd == '/targetfriend':
+                g.TargetNearestFriend()
             elif cmd == '/cast':
                 g.CastSpellByName(rest)
 
@@ -144,7 +146,7 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate2', 'Shadowfang', player=True, reach=2, y=300)
         self.unit('nameplate3', 'Nightstep', player=True, reach=2, y=200)     # lower on screen: nearer
         self.unit('nameplate4', 'Farstrider', player=True, reach=5)
-        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/target nameplate3\n/cast Sap')
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/targetexact Nightstep\n/cast Sap')
 
     def test_sap_skips_who_it_cannot_sap(self):
         self.unit('nameplate1', 'In Combat', player=True, reach=1, combat=True)
@@ -154,7 +156,7 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate5', 'Friend', player=True, reach=1, enemy=False)
         self.unit('nameplate6', 'Defias Pathstalker', reach=2)                  # the NPC in Sap range
         text = self.press('TKSap')
-        self.assertEqual(text, MOUSEOVER + '\n/target [noexists][dead][noharm][noplayer] nameplate6'
+        self.assertEqual(text, MOUSEOVER + '\n/targetexact [noexists][dead][noharm][noplayer] Defias Pathstalker'
                                '\n/targetenemyplayer [noexists][dead][noharm][noplayer]\n/cast Sap')
 
     def test_sap_with_no_player_in_sight_lets_the_game_find_a_revealed_stealther(self):
@@ -168,31 +170,31 @@ class TargetKitTests(unittest.TestCase):
     def test_in_combat_the_fixed_macro_runs(self):
         self.unit('nameplate1', 'Nightstep', player=True, reach=1)
         self.tick()
-        self.assertIn('/target nameplate1', self.body('TKSap'))
+        self.assertIn('/targetexact Nightstep', self.body('TKSap'))
         self.fire('PLAYER_REGEN_DISABLED')                     # just before combat locks the buttons
         self.g.COMBAT = True
         text = self.press('TKSap')                             # nothing may change it now
         self.assertIn('/targetenemyplayer [noexists]', text)
-        self.assertNotIn('nameplate1', text)
+        self.assertNotIn('Nightstep', text)
         self.assertTrue(self.in_log('press: TK Sap: the fixed macro (in combat, or just before)'))
 
     def test_the_choice_is_written_into_the_macro_before_the_press(self):
         self.unit('nameplate1', 'Nightstep', player=True, reach=2)
         self.tick()
-        self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + MOUSEOVER + '\n/target nameplate1\n/cast Sap'
+        self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + MOUSEOVER + '\n/targetexact Nightstep\n/cast Sap'
                                              '\n/click TKSapMark')
 
     def test_a_macro_is_rewritten_at_most_every_0_4_s_until_a_press(self):
         self.unit('nameplate1', 'Nightstep', player=True, reach=2)
         self.tick()
-        self.assertIn('/target nameplate1', self.body('TKSap'))
+        self.assertIn('/targetexact Nightstep', self.body('TKSap'))
         edits = self.g.EDITS
         self.unit('nameplate2', 'Shadowfang', player=True, reach=1)             # nearer
         self.tick(wait=0.2)
         self.assertEqual(self.g.EDITS, edits)                              # too soon after the last
-        self.assertIn('/target nameplate1', self.body('TKSap'))
+        self.assertIn('/targetexact Nightstep', self.body('TKSap'))
         self.tick(wait=0.3)
-        self.assertIn('/target nameplate2', self.body('TKSap'))
+        self.assertIn('/targetexact Shadowfang', self.body('TKSap'))
         edits = self.g.EDITS
         self.tick()
         self.assertEqual(self.g.EDITS, edits)                              # nothing changed: nothing written
@@ -201,14 +203,14 @@ class TargetKitTests(unittest.TestCase):
         self.g.MacroFrame = self.lua.eval('{ IsShown = function() return true end }')
         self.unit('nameplate1', 'Nightstep', player=True, reach=2)
         self.tick()
-        self.assertNotIn('nameplate1', self.body('TKSap'))
+        self.assertNotIn('Nightstep', self.body('TKSap'))
         self.g.MacroFrame = None
         self.tick()
-        self.assertIn('nameplate1', self.body('TKSap'))
+        self.assertIn('Nightstep', self.body('TKSap'))
         i = self.g.GetMacroIndexByName('TK Sap')
         self.g.MACROS[i].body = '/say hi'                                  # edited by hand
         self.tick()
-        self.assertIn('nameplate1', self.body('TKSap'))
+        self.assertIn('Nightstep', self.body('TKSap'))
 
     def test_a_deleted_macro_is_said_once_in_the_log(self):
         self.lua.eval('table.remove')(self.g.MACROS, self.g.GetMacroIndexByName('TK Sap'))
@@ -218,7 +220,7 @@ class TargetKitTests(unittest.TestCase):
         warns = [l for l in self.logged() if 'WARN: TK Sap: not in your macros (deleted?)' in l]
         self.assertEqual(len(warns), 1)
         self.slash('macros')
-        self.assertIn('nameplate1', self.body('TKSap'))
+        self.assertIn('Nightstep', self.body('TKSap'))
 
     # --- TK Pickpocket ---
     def test_pickpocket_saps_then_robs_the_closest_humanoid_npc(self):
@@ -227,19 +229,19 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate3', 'Defias Guard', reach=1, combat=True)
         self.unit('nameplate4', 'Defias Thug', reach=2)
         self.unit('nameplate5', 'Defias Miner', reach=3)
-        self.assertEqual(self.press('TKPick'), '/target nameplate4\n/cast Sap\n/cast Pick Pocket')
+        self.assertEqual(self.press('TKPick'), '/targetexact Defias Thug\n/cast Sap\n/cast Pick Pocket')
 
     def test_pickpocket_moves_on_and_finishes_a_half_done_one(self):
         thug = self.unit('nameplate1', 'Defias Thug', reach=1)
         self.unit('nameplate2', 'Defias Miner', reach=2)
-        self.assertIn('/target nameplate1', self.press('TKPick'))
+        self.assertIn('/targetexact Defias Thug', self.press('TKPick'))
         self.g.UNITS.target = thug
         thug.sapped = True                              # Sap landed, Pick Pocket was still on cooldown
         self.g.NOW += 1.5
         self.assertEqual(self.press('TKPick'), '/cast Pick Pocket')
         self.fire('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-1', 921)
         self.g.NOW += 1.5
-        self.assertEqual(self.press('TKPick'), '/target nameplate2\n/cast Sap\n/cast Pick Pocket')
+        self.assertEqual(self.press('TKPick'), '/targetexact Defias Miner\n/cast Sap\n/cast Pick Pocket')
 
     def test_robbed_but_not_sapped_gets_sapped(self):
         thug = self.unit('nameplate1', 'Defias Thug', reach=1)
@@ -250,7 +252,7 @@ class TargetKitTests(unittest.TestCase):
 
     def test_one_already_sapped_is_only_robbed(self):
         self.unit('nameplate1', 'Defias Thug', reach=1, sapped=True)
-        self.assertEqual(self.press('TKPick'), '/target nameplate1\n/cast Pick Pocket')
+        self.assertEqual(self.press('TKPick'), '/targetexact Defias Thug\n/cast Pick Pocket')
 
     def test_no_pockets_to_pick_means_skip_it(self):
         thug = self.unit('nameplate1', 'Defias Thug', reach=1)
@@ -259,20 +261,26 @@ class TargetKitTests(unittest.TestCase):
         self.assertEqual(self.press('TKPick'), '/targetenemy [noharm][dead]\n/cast Sap\n/cast Pick Pocket')
 
     # --- TK Find ---
-    def test_find_goes_closest_first_then_the_next_on_each_press(self):
+    def test_find_takes_the_closest_then_tabs_round(self):
+        """1.4.3: Forever refuses "/target nameplateN" in a macro, so the first press is by name (the game takes the
+        closest of that name) and the next ones are the game's Tab, on past units not on the list."""
         self.slash('add thug')
-        self.unit('nameplate1', 'Defias Thug', reach=5)
-        self.unit('nameplate2', 'Defias Thug', reach=2)
-        self.unit('nameplate3', 'Riverpaw Thug', reach=4)                      # part of a name is enough
-        self.unit('nameplate4', 'Defias Miner', reach=1)                       # not on the list
-        presses = [self.press('TKFind') for _ in range(4)]
-        self.assertEqual([p.split('\n')[0] for p in presses],
-                         ['/target nameplate2', '/target nameplate3', '/target nameplate1',
-                          '/target nameplate2'])                               # round again, closest first
-        self.assertEqual(presses[0], '/target nameplate2')                    # the choice alone (1.4.2)
-        self.g.NOW += 9                                                        # a pause: start from the closest
-        self.press('TKFind')
-        self.assertEqual(self.press('TKFind').split('\n')[0], '/target nameplate3')
+        far = self.unit('nameplate1', 'Defias Thug', reach=5)
+        near = self.unit('nameplate2', 'Defias Thug', reach=2)
+        river = self.unit('nameplate3', 'Riverpaw Thug', reach=4)                # part of a name is enough
+        miner = self.unit('nameplate4', 'Defias Miner', reach=1)                 # not on the list
+        self.g.TAB = self.lua.table_from([near, river, miner, far])             # the game's Tab order
+        self.assertEqual(self.press('TKFind'), '/targetexact Defias Thug')
+        self.assertEqual(self.g.UNITS.target.guid, near.guid)                   # the closest of that name
+        got = []
+        for _ in range(4):
+            self.assertEqual(self.press('TKFind'), '/targetenemy')
+            got.append(self.g.UNITS.target.name)
+        self.assertEqual(got, ['Riverpaw Thug', 'Defias Miner', 'Defias Thug', 'Defias Thug'])
+        self.assertTrue(self.in_log("going round with Tab: Defias Miner isn't on the list"))
+        self.g.UNITS.target = miner
+        self.g.NOW += 9                                                         # a pause, on one not on the list
+        self.assertEqual(self.press('TKFind'), '/targetexact Defias Thug')      # from the closest again
 
     def test_find_skips_dead_mobs_but_not_dead_players_or_friendly_npcs(self):
         self.slash('add Baron')
@@ -280,8 +288,12 @@ class TargetKitTests(unittest.TestCase):
         self.unit('focus', 'Baron Beast', plate=False, dead=True, reaction=4, reach=1)      # neutral: could be one
         self.unit('mouseover', 'Baron Guard', plate=False, dead=True, reaction=5, reach=3, enemy=False)
         self.unit('party1', 'Baronfriend', plate=False, dead=True, player=True, reach=4, enemy=False)
-        presses = {self.press('TKFind').split('\n')[0] for _ in range(3)}
-        self.assertEqual(presses, {'/targetexact Baron Guard', '/target party1'})     # the mouseover: by name
+        self.assertEqual(self.press('TKFind'), '/targetexact Baron Guard')     # the closest that counts
+        saw = [l for l in self.logged() if 'saw:' in l][-1]
+        self.assertIn('Baron Mob (target): dead, and neutral or hostile, so it could be a mob', saw)
+        self.assertIn('Baron Beast (focus): dead, and neutral or hostile', saw)
+        self.assertEqual(self.g.UNITS.target.name, 'Baron Guard')
+        self.assertEqual(self.press('TKFind'), '/targetfriend')                # a friendly one: the friendly Tab
 
     def test_find_by_name_when_none_is_in_sight(self):
         self.slash('add Thug')
@@ -455,7 +467,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.4.2 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.4.3 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
@@ -467,7 +479,7 @@ class TargetKitTests(unittest.TestCase):
         self.press('TKSap')
         self.assertTrue(self.in_log('press: TK Sap: enemy player in Sap range: Nightstep (nameplate2, Sap range) -> '
                                     '/cast [@mouseover,harm,nodead] Sap / /stopmacro [@mouseover,harm,nodead] / '
-                                    '/target nameplate2 / /cast Sap'))
+                                    '/targetexact Nightstep / /cast Sap'))
         saw = [l for l in self.logged() if 'saw:' in l][-1]
         self.assertIn('Nightstep (nameplate2, Sap range)', saw)
         self.assertIn('Wolf (nameplate1): not humanoid (Sap takes humanoids)', saw)
@@ -531,7 +543,7 @@ class TargetKitTests(unittest.TestCase):
     def test_a_press_logs_what_the_game_ran_and_where_the_target_went(self):
         self.unit('nameplate1', 'Nightstep', player=True, reach=2)
         self.press('TKSap')
-        self.assertTrue(self.in_log('result: TK Sap: the game ran TargetUnit(nameplate1), CastSpellByName(Sap);'
+        self.assertTrue(self.in_log('result: TK Sap: the game ran TargetUnit(Nightstep, true), CastSpellByName(Sap);'
                                     ' target none -> Nightstep'))
 
     def test_a_choice_the_game_did_not_take_is_flagged(self):
@@ -542,7 +554,7 @@ class TargetKitTests(unittest.TestCase):
         self.press('TKSap')
         warns = [l for l in self.logged() if 'WARN: TK Sap: it chose enemy player in Sap range: Nightstep' in l]
         self.assertEqual(len(warns), 2)
-        self.assertIn("but your target is none (the game didn't take the macro's first target line)", warns[0])
+        self.assertIn("but your target is none (the game didn't take the macro's target line)", warns[0])
         self.assertFalse(self.said("chose a target, but the game didn't target it"))   # the log only (1.4.1)
         self.g.TargetUnit = takes
         self.press('TKSap')                                                  # one the game takes: no warning
@@ -568,7 +580,7 @@ class TargetKitTests(unittest.TestCase):
         self.assertLessEqual(len(self.body('TKFind')), 255)
         self.assertTrue(self.body('TKFind').endswith('\n/target Somebody With A Long Name 0\n/click TKFindMark'))
         self.unit('nameplate1', 'Somebody With A Long Name 7', reach=2, enemy=False, reaction=5)
-        self.assertEqual(self.press('TKFind'), '/target nameplate1')
+        self.assertEqual(self.press('TKFind'), '/targetexact Somebody With A Long Name 7')
 
     def test_find_says_when_nobody_on_the_list_is_near(self):
         self.slash('add Game')
@@ -620,11 +632,12 @@ class TargetKitTests(unittest.TestCase):
     # --- 1.4.2: what Forever's log showed (Zhevra Runners, and CorpseGlow's corpse nameplate) ---
     def test_nameplates_that_cannot_be_measured_still_go_round(self):
         """On Forever asking a nameplate where it is on screen is an error ("Can't measure restricted regions"); it
-        made every look fail, so TK Find ran its fixed macro."""
+        made every look fail, so TK Find ran its fixed macro (1.4.2)."""
         self.g.C_NamePlate.GetNamePlateForUnit = self.lua.eval(
             'function() return { GetCenter = function() error("Can\'t measure restricted regions") end } end')
         self.slash('add Zhevra Runner')
         runners = [self.unit(f'nameplate{i}', 'Zhevra Runner', reach=5, enemy=True, reaction=4) for i in (1, 2, 3)]
+        self.g.TAB = self.lua.table_from(runners)
         got = []
         for _ in range(4):
             self.press('TKFind')
@@ -633,7 +646,18 @@ class TargetKitTests(unittest.TestCase):
         self.assertEqual(got[3], got[0])                                     # then round again
         self.assertEqual(len([l for l in self.logged() if "doesn't let addons measure nameplates" in l]), 1)
         self.assertFalse(self.in_log('ERROR'))
-        self.assertEqual({r.guid for r in runners}, set(got))
+
+    def test_no_macro_targets_a_nameplate_token(self):
+        """Forever refuses "/target nameplateN" in a macro (1.4.3: the game ran it on every press, the target stayed
+        none)."""
+        self.slash('add Thug')
+        self.unit('nameplate1', 'Defias Thug', reach=1)
+        self.unit('nameplate2', 'Nightstep', player=True, reach=2)
+        for button in MACRO:
+            self.tick()
+            self.assertNotIn('nameplate', self.body(button))
+        self.g.TargetUnit('nameplate1')                                      # the harness refuses it too
+        self.assertIsNone(self.g.UNITS.target)
 
     def test_by_name_doesnt_drop_a_target_you_already_have(self):
         """The fixed macro was "/cleartarget" then "/target [noexists] name": the condition saw the old target, so a

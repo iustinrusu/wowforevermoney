@@ -31,6 +31,9 @@ Revised:
 >    have been visited, then starts over. Dead mobs are skipped. Dead players count, and dead NPCs count when the game
 >    shows them as friendly; a dead neutral or hostile unit could be a mob, so it is skipped. Units too far for a
 >    nameplate, or dead ones without one, are found by name as a fallback.
+>    (1.4.3, what Forever allows: an addon can't target a unit by its nameplate, only by name, which gives the
+>    closest of that name, or with the game's Tab. So the first press takes the closest match by name; with one
+>    targeted, each press is Tab to the next unit, pressing on past ones not on the list.)
 > 2. **TK Pickpocket**: targets the closest humanoid I can rob (attackable, not a player, alive, not in combat, not
 >    pickpocketed yet), then Sap and Pick Pocket in one press (Sap doesn't break stealth on Forever). If one of the
 >    two was still on cooldown, the next press on that unit does the missing one; after that it moves on to the next
@@ -62,7 +65,7 @@ Revised:
   (part of one is enough) and press Enter, or **Add my target**; **Remove** takes one off; the wheel scrolls a long
   list. Drag the minimap button to move it; `/tkit minimap` hides it or brings it back.
 - **How a press works (1.4.0):** out of combat TargetKit looks around five times a second and writes its choice
-  into the three macros themselves ("/target nameplate7", "/targetexact Name" and the spell), at most every 0.4 s
+  into the three macros themselves ("/targetexact Name" and the spell), at most every 0.4 s
   while nothing is pressed, at once after a press so the next one gets the next unit, and not while the game's Macros
   window is open. A press runs what's written, with no addon code in between. Just before combat each macro gets its
   fixed text (the game's own targeting), since macros can't change in combat. Units seen only as your mouseover or a
@@ -103,7 +106,10 @@ Revised:
   clears whom you robbed; `/tkit debug` prints, on every press, what it chose and the macro it ran (off after every
   `/reload`); `/tkit chat` (above); `/tkit help`.
 - Nameplates matter: the addon sees units through them (enemy nameplates for mobs and players, friendly ones for
-  NPCs), plus your target, mouseover, soft targets, focus and group.
+  NPCs), plus your target, mouseover, soft targets, focus and group. It can't target through them: Forever refuses
+  "/target nameplateN" in a macro (1.4.3), so every choice is written by name, and TK Find goes round with Tab
+  (`/targetenemy`, or `/targetfriend` when your target is friendly). Tab goes through every enemy in front of you,
+  so with other mobs around some presses land on ones not on your list; press again (within 8 s it keeps tabbing).
 
 ## Limits (the game's, not choices)
 
