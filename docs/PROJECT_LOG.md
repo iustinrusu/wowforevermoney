@@ -910,6 +910,26 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (eleventh part) TargetKit 1.3.0 (the user: "tried with a friendly player again, did not work"; they
+  spammed the button). The log settled it: the game never ran the macro.
+  - On 1.2.0 TargetKit found the friendly player itself, as soft target and as mouseover, and wrote
+    `/target softfriend` and `/target mouseover`, yet the target never changed.
+  - On 1.2.2 every press logged "the game did not run its macro": none of the watched targeting functions was called,
+    though the click came down=true with act-on-key-down 1.
+  Two likely causes, both removed:
+  - The macro was written in PreClick: addon code running inside the press, which may taint the secure click when it
+    comes from a /click in a macro.
+  - The secure button was hidden.
+  Now the addon looks out of combat five times a second and writes all three buttons' macros ahead of time, setting the
+  attribute only when the text changes. A press runs no addon code. The buttons are shown, 1 px, alpha 0, no mouse.
+  Logging moved to markers:
+  - Each button's macro starts with `/click TK<X>Mark`, a plain button whose Click is watched by hooksecurefunc. That
+    logs the press, its reason and what it saw, then 0.3 s later what the game ran and where the target went.
+  - Find's cycling and Pickpocket's "finish the half-done one" advance from that hook.
+  - The TK macros start with `/click TK<X>Press`. If that fires but the button's marker doesn't, the log and chat say
+    the game didn't run the button's macro.
+  40 TargetKit tests (the test press now runs the macro as written by the last look). Not checked in game yet.
+
 - **2026-11-27** (tenth part) TargetKit 1.2.2 (the user: the unit was "Game something" and only "Game" was on the list).
   The addon's own matching takes part of a name, but it only sees units with a nameplate. The user's friendly
   nameplates are off (GetCVar("nameplateShowFriends") gave nil), so a friendly unit is left to the game's

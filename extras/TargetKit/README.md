@@ -61,6 +61,9 @@ Revised:
   works while TargetKit is loaded and your own binding for it comes back when you clear it. Find list: type a name
   (part of one is enough) and press Enter, or **Add my target**; **Remove** takes one off; the wheel scrolls a long
   list. Drag the minimap button to move it; `/tkit minimap` hides it or brings it back.
+- **How a press works (1.3.0):** out of combat TargetKit looks around five times a second and writes each button's
+  macro ahead of time, so a press runs what's already written, with no addon code in between (1.2.x wrote it during
+  the press, and the game didn't run it). Each macro's first line clicks a marker button so the log can see the press.
 - **On your bars:** the three macros are under Escape > Macros, General tab: drag **TK Find**, **TK Pickpocket** and
   **TK Sap** to your bars. In a macro of your own, the line is `/click TKFind`, `/click TKPick` or `/click TKSap`, plus
   ` LeftButton 1` while the game acts on key down (the default; the window shows the exact line). The addon writes

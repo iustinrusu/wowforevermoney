@@ -14,16 +14,21 @@
 --                  else the game's nearest enemy.
 --
 -- How, within WoW's rules: an addon may never pick a target by itself; only a key press on a secure button can, and
--- the button's macro can only be changed out of combat. So each macro is "/click TKFind" (TKPick, TKSap). Just
--- before the click
--- runs (PreClick), out of combat, the addon looks at every unit it can see (nameplates, target, mouseover, soft
--- targets, focus, your group), ranks them and writes the button's macro: "/target nameplate7" and the spell. In combat,
--- or when it finds nothing, the button runs a fixed macro made only of the game's own targeting.
+-- the button's macro can only be changed out of combat. So each macro is "/click TKFind" (TKPick, TKSap). Out of
+-- combat, five times a second, the addon looks at every unit it can see (nameplates, target, mouseover, soft targets,
+-- focus, your group), ranks them and writes each button's macro ahead of time: "/target nameplate7" and the spell. A
+-- press runs whatever is written then, with no addon code in between. In combat, or when it finds nothing, the button
+-- runs a fixed macro made only of the game's own targeting.
+-- 1.3.0 (the user: "tried with a friendly player again, did not work"; the 1.2.x log showed the game never ran the
+-- macro, though TargetKit had found the player and written "/target mouseover"): until then the macro was written in
+-- PreClick, addon code running inside the press, and the button was hidden. Either can stop the game running a
+-- secure macro, so neither is done any more: the macros are written ahead of time and the buttons are shown (1 pixel,
+-- see-through, no mouse).
 -- Distance: the game gives addons no distance to other units, only "in range" checks, so "closest" is the nearest of
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.2.2"
+local VERSION = "1.3.0"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
@@ -71,9 +76,9 @@ end
 -- What the game ran for a press (1.2.1, the user: "added a target in the find list but macro does not work when
 -- pressing"; the log showed each press and its macro, but not whether the game ran it). The game's own targeting and
 -- casting functions are watched with hooksecurefunc, which only looks after the fact and can't get in the macro's way.
--- Between a press's PreClick and PostClick every call to them is noted; PostClick logs them and where the target went,
--- warns when a macro that should have targeted ran nothing, and TK Find says in chat when it found nobody.
-local clickState                                 -- { b, ran = { "TargetUnit(Game)", ... }, before, text }
+-- From a press's first line (the marker, see onPress) for 0.3 s every call to them is noted; then they are logged with
+-- where the target went, and TK Find says in chat when it found nobody.
+local clickState                                 -- { b, ran = { "TargetUnit(Game)", ... }, before }
 local function noteRan(fname, ...)
   if not clickState then return end
   local args = {}
@@ -202,12 +207,14 @@ end
 -- nearest band first; within a band, the nameplate lower on the screen first
 local function rank(list)
   for _, c in ipairs(list) do
-    c.reach = reach(c.unit)
-    c.y = math.huge
-    local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(c.unit)
-    if plate and plate.GetCenter then
-      local _, y = plate:GetCenter()
-      if y then c.y = y end
+    if not c.reach then
+      c.reach = reach(c.unit)
+      c.y = math.huge
+      local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(c.unit)
+      if plate and plate.GetCenter then
+        local _, y = plate:GetCenter()
+        if y then c.y = y end
+      end
     end
   end
   table.sort(list, function(a, b)
@@ -221,15 +228,14 @@ end
 local BAND = { "Pick Pocket range", "Sap range", "10 yd", "11 yd", "28 yd", "further" }
 local function describe(c) return (UnitName(c.unit) or "?") .. " (" .. c.unit .. ", " .. BAND[c.reach] .. ")" end
 
-local seenNow = {}                               -- what the last press saw, for the log
 local function passed(c, why) return (UnitName(c.unit) or "?") .. " (" .. c.unit .. "): " .. why end
-local function seen(lists, rejected, others)
+local function seen(lists, rejected, others)    -- what a look saw, for the log of the press that uses it
   local out = {}
   for _, list in ipairs(lists) do for _, c in ipairs(list) do out[#out + 1] = describe(c) end end
   for _, r in ipairs(rejected) do out[#out + 1] = r end
   while #out > 12 do table.remove(out) end
   if others and others > 0 then out[#out + 1] = others .. " others not on the find list" end
-  seenNow = out
+  return out
 end
 
 -- ---------- TK Sap ----------
@@ -252,10 +258,10 @@ local function sapWhyNot(u)
   if hasSap(u) then return "sapped already" end
 end
 
-local function sapBuild()
+local function sapBuild(units)
   local sap = SAPN()
   local players, npcs, rejected = {}, {}, {}
-  for _, c in ipairs(visibleUnits()) do
+  for _, c in ipairs(units or visibleUnits()) do
     local u = c.unit
     local why = sapWhyNot(u)
     if why then
@@ -268,13 +274,13 @@ local function sapBuild()
   end
   rank(players)
   rank(npcs)
-  seen({ players, npcs }, rejected)
+  local saw = seen({ players, npcs }, rejected)
   local head = { "/cast [@mouseover,harm,nodead] " .. sap, "/stopmacro [@mouseover,harm,nodead]" }
   local p = players[1]
   if p and p.reach <= 2 then
     head[#head + 1] = "/target " .. p.unit
     head[#head + 1] = "/cast " .. sap
-    return table.concat(head, "\n"), "enemy player in Sap range: " .. describe(p)
+    return table.concat(head, "\n"), "enemy player in Sap range: " .. describe(p), p.guid, saw
   end
   local n = npcs[1]
   if n and n.reach > 2 then n = nil end
@@ -284,7 +290,7 @@ local function sapBuild()
   head[#head + 1] = "/targetenemy [noexists]"
   head[#head + 1] = "/cast " .. sap
   return table.concat(head, "\n"), "no enemy player in Sap range in sight: the game's nearest enemy player"
-    .. (n and (", else " .. describe(n)) or "")
+    .. (n and (", else " .. describe(n)) or ""), n and n.guid, saw
 end
 
 -- ---------- TK Pickpocket ----------
@@ -309,35 +315,31 @@ local function pickWhyNot(c)
   if picked(c.guid) then return "robbed already" end
 end
 
-local function pickBuild()
-  seenNow = {}
+local function pickBuild(units)
   -- its last unit, half done (Sap or Pick Pocket still on cooldown then): the missing half
   local t = UnitGUID("target")
   if t and t == last.pick.guid and GetTime() - last.pick.t <= AGAIN and not dead("target")
       and not UnitAffectingCombat("target") then
     local sapped, robbed = hasSap("target"), picked(t)
     if sapped and not robbed then
-      last.pick.t = GetTime()
-      return "/cast " .. PP(), "Pick Pocket the one just sapped: " .. (UnitName("target") or "?")
+      return "/cast " .. PP(), "Pick Pocket the one just sapped: " .. (UnitName("target") or "?"), t, {}
     elseif robbed and not sapped then
-      last.pick.t = GetTime()
-      return "/cast " .. SAPN(), "Sap the one just robbed: " .. (UnitName("target") or "?")
+      return "/cast " .. SAPN(), "Sap the one just robbed: " .. (UnitName("target") or "?"), t, {}
     end
   end
   local list, rejected = {}, {}
-  for _, c in ipairs(visibleUnits()) do
+  for _, c in ipairs(units or visibleUnits()) do
     local why = pickWhyNot(c)
     if why then rejected[#rejected + 1] = passed(c, why) else list[#list + 1] = c end
   end
   rank(list)
-  seen({ list }, rejected)
+  local saw = seen({ list }, rejected)
   local c = list[1]
-  if not c then return nil, "no humanoid to rob in sight" end
+  if not c then return nil, "no humanoid to rob in sight", nil, saw end
   local lines = { "/target " .. c.unit }
   if not hasSap(c.unit) then lines[#lines + 1] = "/cast " .. SAPN() end
   lines[#lines + 1] = "/cast " .. PP()
-  last.pick.guid, last.pick.t = c.guid, GetTime()
-  return table.concat(lines, "\n"), "closest to rob: " .. describe(c)
+  return table.concat(lines, "\n"), "closest to rob: " .. describe(c), c.guid, saw
 end
 
 -- ---------- TK Find ----------
@@ -399,14 +401,10 @@ local function findFixed()                               -- by name: reaches uni
   return table.concat(lines, "\n")
 end
 
-local function findBuild()
-  seenNow = {}
-  if #db.find == 0 then
-    tell("your find list is empty. /tkit add <name> adds one (part of a name is enough), or target something and type /tkit add.")
-    return "", "empty list"
-  end
+local function findBuild(units)
+  if #db.find == 0 then return "", "empty list", nil, {} end
   local list, rejected, others = {}, {}, 0
-  for _, c in ipairs(visibleUnits()) do
+  for _, c in ipairs(units or visibleUnits()) do
     local why = findWhyNot(c.unit)
     if not why then
       list[#list + 1] = c
@@ -417,20 +415,19 @@ local function findBuild()
     end
   end
   rank(list)
-  seen({ list }, rejected, others)
-  if #list == 0 then return nil, "none in sight, so by name (with the full names seen that contain a list entry)" end
-  local now = GetTime()
-  if now - last.find.t > CYCLE then last.find.visited = {} end
-  local pick
-  for _, c in ipairs(list) do
-    if not last.find.visited[c.guid] then pick = c break end
+  local saw = seen({ list }, rejected, others)
+  if #list == 0 then
+    return nil, "none in sight, so by name (with the full names seen that contain a list entry)", nil, saw
   end
-  if not pick then last.find.visited = {}; pick = list[1] end             -- all seen: round again, closest first
-  last.find.visited[pick.guid] = true
-  last.find.t = now
+  local visited = (GetTime() - last.find.t > CYCLE) and {} or last.find.visited    -- a pause: from the closest again
+  local pick, again
+  for _, c in ipairs(list) do
+    if not visited[c.guid] then pick = c break end
+  end
+  if not pick then pick, again = list[1], true end                       -- all seen: round again, closest first
   local i = 0
   for k, c in ipairs(list) do if c == pick then i = k end end
-  return "/target " .. pick.unit, describe(pick) .. ", " .. i .. " of " .. #list
+  return "/target " .. pick.unit, describe(pick) .. ", " .. i .. " of " .. #list, pick.guid, saw, again
 end
 
 -- ---------- the buttons and their macros ----------
@@ -442,67 +439,114 @@ local BUTTONS = {
 }
 
 local watching                                           -- the last press, for 2 s: what came of it goes to the log
-local warnedNotRun, saidNobody = {}, 0
-local function afterClick(b, down)               -- PostClick: what the game ran, and where the target went
-  local st = clickState
-  clickState = nil
-  if not st or st.b ~= b then return end
-  local after = UnitName("target") or "none"
-  if #st.ran > 0 then
-    log("result", b.macro .. ": the game ran " .. table.concat(st.ran, ", ") .. "; target " .. st.before .. " -> " .. after)
-    if b.name == "TKFind" and after == "none" and #db.find > 0 and GetTime() - saidNobody > 3 then
-      saidNobody = GetTime()
-      tell("TK Find: nobody on your find list (" .. table.concat(db.find, ", ") .. ") is near enough to target."
-        .. " The game's own target-by-name found nobody either.")
-    end
-  elseif st.text:find("/target") or st.text:find("/cleartarget") then
-    log("WARN", b.macro .. ": the game did not run its macro (the click came with down=" .. tostring(down)
-      .. "; act on key down " .. cvar("ActionButtonUseKeyDown") .. ")")
-    if not warnedNotRun[b.name] then
-      warnedNotRun[b.name] = true
-      tell("|cffff6060the game did not run " .. b.macro .. "'s macro.|r /reload and tell Claude: the log has the details.")
-    end
+local saidNobody, warnedNotRun, keyAt, markAt = 0, {}, {}, {}
+
+-- Each button's macro, written ahead of time (out of combat only). Its first line clicks the button's marker (a plain
+-- button: clicking it runs no addon code, but its Click is watched by hooksecurefunc), so a press shows in the log.
+local function setText(b, text, why, chosen, saw, again)
+  b.state = { text = text, why = why, chosen = chosen, saw = saw or {}, again = again }
+  local full = "/click " .. b.name .. "Mark" .. (text ~= "" and ("\n" .. text) or "")
+  if b.frame:GetAttribute("macrotext") ~= full then b.frame:SetAttribute("macrotext", full) end
+end
+
+local function prepare()                                 -- look once, write all three (out of combat)
+  if not db or InCombatLockdown() or not BUTTONS[1].frame then return end
+  local units = visibleUnits()
+  for _, b in ipairs(BUTTONS) do
+    local text, why, chosen, saw, again
+    local ok = try(b.macro .. " choosing", function() text, why, chosen, saw, again = b.build(units) end)
+    if not ok then text, why, chosen, saw = nil, "an error (logged), so the fixed macro", nil, {} end
+    if not text then why = why or "nothing found, so the fixed macro" end
+    setText(b, text or b.fixed(), why, chosen, saw, again)
   end
 end
 
 local function resetButtons()                            -- back to the fixed macros (out of combat only)
-  if InCombatLockdown() then return end
-  for _, b in ipairs(BUTTONS) do
-    if b.frame then b.frame:SetAttribute("macrotext", b.fixed()) end
+  if InCombatLockdown() or not BUTTONS[1].frame then return end
+  for _, b in ipairs(BUTTONS) do setText(b, b.fixed(), "the fixed macro (in combat, or just before)") end
+end
+
+local function afterPress(b)                             -- 0.3 s after a press: what the game ran, where the target went
+  local st = clickState
+  if not st or st.b ~= b then return end
+  clickState = nil
+  local after = UnitName("target") or "none"
+  log("result", b.macro .. ": the game ran " .. (#st.ran > 0 and table.concat(st.ran, ", ") or "nothing we watch")
+    .. "; target " .. st.before .. " -> " .. after)
+  if b.name == "TKFind" and after == "none" and #db.find > 0 and GetTime() - saidNobody > 3 then
+    saidNobody = GetTime()
+    tell("TK Find: nobody on your find list (" .. table.concat(db.find, ", ") .. ") is near enough to target."
+      .. " The game's own target-by-name found nobody either.")
   end
+end
+
+local function onPress(b)                                -- the macro's first line ran: the press is real
+  local st = b.state or { text = "", why = "?", saw = {} }
+  local now = GetTime()
+  markAt[b.name] = now
+  watching = { macro = b.macro, untilT = now + 2 }
+  clickState = { b = b, ran = {}, before = UnitName("target") or "none" }
+  log("press", b.macro .. ": " .. (st.why or "?") .. " -> " .. st.text)
+  if #st.saw > 0 then log("press", "  saw: " .. table.concat(st.saw, "; ")) end
+  if debug then tell(b.macro .. ": " .. (st.why or "?") .. "\n" .. st.text) end
+  if b.name == "TKFind" then
+    if #db.find == 0 then
+      tell("your find list is empty. /tkit add <name> adds one (part of a name is enough), or target something and"
+        .. " type /tkit add.")
+    end
+    if st.chosen then                                    -- the next press goes to the next one
+      if now - last.find.t > CYCLE or st.again then last.find.visited = {} end
+      last.find.visited[st.chosen] = true
+      last.find.t = now
+    end
+  elseif b.name == "TKPick" and st.chosen then
+    last.pick.guid, last.pick.t = st.chosen, now
+  end
+  if C_Timer then
+    C_Timer.After(0, function() try("TargetKit choosing", prepare) end)       -- the next press: written fresh
+    C_Timer.After(0.3, function() try(b.macro .. " result", afterPress, b) end)
+  end
+end
+
+local function onKey(b)                                  -- TK macro pressed: its button's marker should follow at once
+  local now = GetTime()
+  keyAt[b.name] = now
+  if not C_Timer then return end
+  C_Timer.After(0.3, function()
+    if (markAt[b.name] or -1) >= now then return end
+    log("WARN", b.macro .. ": its macro was pressed, but the game didn't run " .. b.name .. "'s macro (act on key down "
+      .. cvar("ActionButtonUseKeyDown") .. ")")
+    if not warnedNotRun[b.name] then
+      warnedNotRun[b.name] = true
+      tell("|cffff6060the game did not run " .. b.macro .. "'s macro.|r /reload and tell Claude: the log has the details.")
+    end
+  end)
+end
+
+local function invisible(f)                              -- shown (a hidden button may not run), but not seen
+  f:SetSize(1, 1)
+  f:SetAlpha(0)
+  f:EnableMouse(false)
+  f:ClearAllPoints()
+  f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
 end
 
 local function makeButtons()
   for _, b in ipairs(BUTTONS) do
     local f = CreateFrame("Button", b.name, UIParent, "SecureActionButtonTemplate")
     f:SetAttribute("type", "macro")
-    f:SetAttribute("macrotext", b.fixed())
     f:RegisterForClicks("AnyUp", "AnyDown")
-    f:Hide()                                             -- clicked by its macro, never seen
-    f:SetScript("PreClick", function(self)
-      watching = { macro = b.macro, untilT = GetTime() + 2 }
-      clickState = { b = b, ran = {}, before = UnitName("target") or "none", text = "" }
-      if InCombatLockdown() then
-        clickState.text = tostring(self:GetAttribute("macrotext") or "")
-        log("press", b.macro .. " in combat, so its fixed macro: " .. clickState.text)
-        if debug then tell(b.macro .. ": in combat, so the fixed macro") end
-        return
-      end
-      local text, why
-      local ok = try(b.macro .. " press", function() text, why = b.build() end)
-      if not ok then text, why = nil, "an error (logged), so the fixed macro" end
-      text = text or b.fixed()
-      try(b.macro .. " set its macro", self.SetAttribute, self, "macrotext", text)
-      clickState.text = text
-      log("press", b.macro .. ": " .. (why or "nothing found, so the fixed macro") .. " -> " .. text)
-      if #seenNow > 0 then log("press", "  saw: " .. table.concat(seenNow, "; ")) end
-      if debug then tell(b.macro .. ": " .. (why or "the fixed macro") .. "\n" .. text) end
-    end)
-    f:SetScript("PostClick", function(self, _, down)
-      try(b.macro .. " result", afterClick, b, down)
-      if not InCombatLockdown() then try(b.macro .. " reset", self.SetAttribute, self, "macrotext", b.fixed()) end
-    end)
+    invisible(f)
     b.frame = f
+    local mark = CreateFrame("Button", b.name .. "Mark", UIParent)            -- the macro's first line
+    invisible(mark)
+    local key = CreateFrame("Button", b.name .. "Press", UIParent)            -- the TK macro's first line
+    invisible(key)
+    if hooksecurefunc then
+      hooksecurefunc(mark, "Click", function() try(b.macro .. " press", onPress, b) end)
+      hooksecurefunc(key, "Click", function() try(b.macro .. " key", onKey, b) end)
+    end
+    setText(b, b.fixed(), "the fixed macro")
   end
 end
 
@@ -516,9 +560,9 @@ local function clickLine(name)
   return "/click " .. name .. (down and " LeftButton 1" or "")
 end
 
-local function macroBody(b)
+local function macroBody(b)                              -- the marker first: a press the button doesn't run shows
   local show = b.show and spellName(b.show)
-  return (show and ("#showtooltip " .. show .. "\n") or "") .. clickLine(b.name)
+  return (show and ("#showtooltip " .. show .. "\n") or "") .. "/click " .. b.name .. "Press\n" .. clickLine(b.name)
 end
 
 local function ensureMacros(create)
@@ -563,7 +607,7 @@ local function addName(name)
     if strlower(w) == strlower(name) then return false, w .. " is already on the find list." end
   end
   db.find[#db.find + 1] = name
-  resetButtons()
+  prepare()
   return true, "added " .. name .. " to the find list (" .. #db.find .. " on it). TK Find targets it, closest first."
 end
 
@@ -571,7 +615,7 @@ local function removeName(name)
   for i, w in ipairs(db.find) do
     if strlower(w) == strlower(name or "") then
       table.remove(db.find, i)
-      resetButtons()
+      prepare()
       return true, "removed " .. w .. " from the find list."
     end
   end
@@ -951,6 +995,14 @@ local function outcome(...)                              -- something that came 
   if watching and GetTime() <= watching.untilT then log("result", watching.macro .. ": " .. table.concat({ ... }, " ")) end
 end
 local pendingMacros = false
+local acc = 0
+ev:SetScript("OnUpdate", function(_, dt)
+  acc = acc + (dt or 0)
+  if acc < 0.2 then return end
+  acc = 0
+  if db and not InCombatLockdown() then try("TargetKit choosing", prepare) end
+end)
+
 local function onEvent(_, event, a1, a2, a3)
   if event == "PLAYER_LOGIN" then
     TargetKitDB = TargetKitDB or {}
@@ -968,13 +1020,14 @@ local function onEvent(_, event, a1, a2, a3)
     db.minimap = db.minimap or {}
     for g, t in pairs(db.picked) do if time() - t >= KEEP_PICKED then db.picked[g] = nil end end
     makeButtons()
+    prepare()
     if InCombatLockdown() then pendingMacros = true else ensureMacros(not db.macrosMade); db.macrosMade = true end
     applyKeys()
     pcall(makeMinimapButton)
   elseif event == "PLAYER_REGEN_DISABLED" then
     resetButtons()
   elseif event == "PLAYER_REGEN_ENABLED" then
-    resetButtons()                                       -- a find list changed in combat
+    prepare()                                            -- out of combat again: look and write
     if pendingMacros then pendingMacros = false; ensureMacros(not db.macrosMade); db.macrosMade = true end
     if pendingKeys then pendingKeys = false; applyKeys() end
   elseif event == "CVAR_UPDATE" then
@@ -1038,7 +1091,7 @@ local function slash(msg)
       or ("find list: " .. table.concat(db.find, ", ")))
   elseif cmd == "clear" then
     db.find = {}
-    resetButtons()
+    prepare()
     report(true, "the find list is empty now.")
   elseif cmd == "macros" then
     if InCombatLockdown() then tell("not in combat: try again after it.") return end

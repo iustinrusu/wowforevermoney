@@ -24,9 +24,19 @@ function TargetNearestEnemy() end
 function TargetNearestEnemyPlayer() end
 function TargetLastTarget() end
 function CastSpellByName() end
-function hooksecurefunc(name, fn)
-  local orig = _G[name]
-  _G[name] = function(...) local r = orig(...); fn(...); return r end
+function hooksecurefunc(a, b, c)                -- (name, hook) on a global, or (table, name, hook)
+  local t, name, fn = _G, a, b
+  if type(a) == "table" then t, name, fn = a, b, c end
+  local orig = t[name]
+  t[name] = function(...) local r = orig(...); fn(...); return r end
+end
+TIMERS = {}                                     -- C_Timer.After; RUN_TIMERS() runs those due by NOW, in order
+C_Timer = { After = function(delay, f) TIMERS[#TIMERS + 1] = { at = NOW + delay, f = f } end }
+function RUN_TIMERS()
+  local due = {}
+  for i = #TIMERS, 1, -1 do if TIMERS[i].at <= NOW then table.insert(due, table.remove(TIMERS, i)) end end
+  table.sort(due, function(x, y) return x.at < y.at end)
+  for _, t in ipairs(due) do t.f() end
 end
 CVARS = { ActionButtonUseKeyDown = "1", nameplateShowEnemies = "1", nameplateShowFriends = "0", SoftTargetEnemy = "1",
           nameplateMaxDistance = "41" }
@@ -137,6 +147,7 @@ local frameMethods = {
   GetFrameLevel = function() return 1 end,
   SetPoint = function(self, ...) self.point = { ... } end,
   GetCenter = function(self) return rawget(self, "cx"), rawget(self, "cy") end,
+  Click = function(self, ...) if self.scripts.OnClick then self.scripts.OnClick(self, ...) end end,
 }
 frames = {}
 function CreateFrame(kind, name)
