@@ -38,7 +38,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.5.3"
+local VERSION = "1.5.4"
 local PICK_POCKET, SAP = 921, 6770
 local MELEE = 1752                                        -- Sinister Strike: melee range, and it takes players
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
@@ -62,8 +62,8 @@ local function note(...) if db and db.chat then tell(...) end end
 -- /tkit debug. Every press: which macro, what it saw and why it chose what it did, and the macro it ran. Then what came
 -- of it in the next 2 s: the game's error line, the cast, the new target. Also the game's settings at login, macros
 -- and keys made (and checked), anything the game blocked, and every error with where. Kept in TargetKitDB.log (the
--- last 400 lines); WoW writes it on /reload or logout, where Claude can read it. /tkit log shows the last lines.
-local LOG_MAX = 400
+-- last 2000 lines; 400 until 1.5.4, when a battleground's Sap presses pushed the user's Pick Pocket test out); WoW writes it on /reload or logout, where Claude can read it. /tkit log shows the last lines.
+local LOG_MAX = 2000
 local early = {}
 local function clean(v)
   return (tostring(v):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1"):gsub("\n", " / "))

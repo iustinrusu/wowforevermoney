@@ -75,7 +75,7 @@ python -m wfm.profile                          # copy the addon into WoW now (th
 **Addon logs, read them first when the user reports an addon problem** (ask for a `/reload` so WoW writes them):
 `ForeverMoneyBridgeDB.log` in `SavedVariables/ForeverMoneyBridge.lua` (Gold Ever After: the meter's every count and
 skip, the box watcher, the loot log, errors; last 600 lines) and `TargetKitDB.log` in `SavedVariables/TargetKit.lua`
-(every press, what it saw and chose, what came of it, settings at login, keys, errors; last 400 lines). Always on.
+(every press, what it saw and chose, what came of it, settings at login, keys, errors; last 2000 lines). Always on.
 In game: `/gea log`, `/tkit log`.
 
 After every change to `addon/`, run `python -m wfm.profile` straight away. The app copies the addon only when it starts,

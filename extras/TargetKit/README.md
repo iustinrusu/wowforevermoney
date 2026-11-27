@@ -140,7 +140,7 @@ Revised:
   to the log only. `/tkit chat` shows it in chat too (kept through relogs; `/tkit chat` again turns it off). Answers
   to what you type (`/tkit list`, `/tkit add`, `/tkit log`, `/tkit help`) still show in chat, and what you do in the
   window shows on its bottom line.
-  `/tkit log` shows the last 15 lines (`/tkit log 40`, `/tkit log clear`); the last 400 are kept
+  `/tkit log` shows the last 15 lines (`/tkit log 40`, `/tkit log clear`); the last 2000 are kept
   in the saved file, written on `/reload` or logout. When something doesn't work, `/reload` and say so.
 - `/tkit macros` makes the three macros again if you deleted them; `/tkit forget`
   clears whom you robbed; `/tkit debug` prints, on every press, what it chose and the macro it ran (off after every

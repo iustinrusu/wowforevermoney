@@ -966,6 +966,12 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (twenty-seventh part) TargetKit 1.5.4 (the user: "sap working correctly, but now pickpocket does not
+  work; also question, does sap macro work on mobs too?"). The log's 15 TK Pickpocket presses were all in a
+  battleground (Arathi Basin: only players, who can't be pickpocketed, and no humanoid mobs), so "no humanoid to rob"
+  and the game's nearest enemy, then both spells failed: expected there. Any test on mobs elsewhere had been pushed
+  out of the log by the Sap presses, so the log keeps 2000 lines now (was 400). Asked the user where they tried it.
+
 - **2026-11-27** (twenty-sixth part) TargetKit 1.5.3, TK Sap and fading rogues (the user: "two enemies in view, one
   fading rogue and one player in sight a little further away, that's what I really need. ideally fading rogues should
   be highest priority out of all rules of targeting, but I don't know that's possible to code"). The log before the
