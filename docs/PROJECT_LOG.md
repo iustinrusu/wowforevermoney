@@ -879,6 +879,11 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   1.2.x showed the same with the macro set in PreClick and PostClick seeing `down=true`. Not known which part the game
   refuses (the secure button from a macro, or a macro run from inside a macro). EditMacro from an addon out of combat
   works (TargetKit and RXPGuides' targeting macro both rewrite macros that way on Forever).
+- (2026-11-27, TargetKit 1.4.1's log, the user: "it only targets closest currently") On Forever, `/targetexact Name`
+  in a macro lands on the closest unit with that name, even when you already target one of them: pressed again it
+  stays there. So targeting by name can't cycle through units that share a name; only a unit token can (a
+  nameplate). With friendly nameplates off, an addon sees friendly NPCs only as soft target, soft friend, mouseover
+  or target: at most two of a crowd of same-named guards at once.
 
 ## What to do next
 
@@ -915,6 +920,16 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (fourteenth part) TargetKit: same-named friendly NPCs don't cycle (the user: "target macro does not
+  cycle through friendly npcs with same name, is that intended?", then "it only targets closest currently"). Not
+  intended; the log explains it (under Verified facts): TargetKit saw at most two Orgrimmar Grunts at once (soft
+  interact and soft friend), wrote `/targetexact Orgrimmar Grunt`, and the game always took the closest one. The fix
+  offered (target the soft target's token when two share a name) was set aside by the user: "I think it's more
+  important to cycle through enemies and enemy mobs rather than have this for friendlies". Enemies have nameplates
+  (enemy nameplates on), so TK Find writes `/target nameplateN` for the exact unit and moves to the next on each
+  press within 8 s; not yet seen in game (B14). If the game refuses nameplate tokens in macros, the log says "chose
+  ... but your target is ..." on those presses. No code change.
 
 - **2026-11-27** (thirteenth part) TargetKit 1.4.1. The user: "find target macro works, but chat debug menus should
   be hidden, I don't want to see them". Verified in game first: the 1.4.0 log shows TK Find targeting a friendly

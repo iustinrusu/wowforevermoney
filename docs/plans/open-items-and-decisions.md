@@ -98,8 +98,11 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       as "not opened yet" without the app; addon 1.6.3's fold ("–" at the top right or /gea min: a screenshot folded
       and open, and that the window doesn't jump when folding).
 - [ ] B14. (2026-11-27, TargetKit 1.4.x, our extra addon) Done for TK Find (2026-11-27: a friendly player targeted
-      every press, the log shows it). Left: try TK Sap and TK Pickpocket once out of combat, then `/reload` and Claude
-      reads TargetKitDB.log (chat stays quiet since 1.4.1; `/tkit chat` shows TargetKit's notes in chat).
+      every press, the log shows it). Left: TK Find on enemy mobs that share a name (put one on the list, stand near
+      three or more, press TK Find a few times within 8 s: each press should take the next one); TK Sap and TK
+      Pickpocket once out of combat. Then `/reload` and Claude reads TargetKitDB.log (chat stays quiet since 1.4.1;
+      `/tkit chat` shows TargetKit's notes in chat). Same-named friendly NPCs only ever get the closest (no friendly
+      nameplates): the user's choice, enemies matter more.
 - [x] B11. (done 2026-11-19: every recipe with where to learn it, then rank training in to-do A3) Levelling paths
       stop where the next patterns only drop (Leatherworking at 270): use ForeverRecipes' pattern sellers and drop
       chances, and rank training fees (TODO 1d).
