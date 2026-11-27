@@ -918,6 +918,9 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   "Received 3 Silver, 77 Copper." and "You receive item: [Deathweed]x5" / "You receive item: [Blinding Powder]x2": no
   loot window and no "You loot" / "You receive loot" lines. Gold Ever After's log had its loot window "open" 20 s
   after the last Pick Pocket window, so a window's close isn't always seen (or a late LOOT_READY came after it).
+- (2026-11-27, Gold Ever After 1.6.10's log; the user: "looks ok now") Three Heavy Junkboxes opened from the bags
+  were each counted by the bag watcher, items and coins: Dust of Deterioration x2 and 5s 95c; Dust of Decay x8 and
+  3s 80c; Coarse Snuff x2, Blinding Powder x4 and 2s 60c ("coins from the box").
 - (2026-11-27, the user) Players on Forever have a first and a last name ("FirstName LastName"). The game gives
   addons the last name in `UnitName`'s second value (the realm field in other versions), so a player's whole name is
   "First Last" with a space.
