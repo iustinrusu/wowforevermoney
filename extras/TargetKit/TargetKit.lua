@@ -38,7 +38,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.4.7"
+local VERSION = "1.4.8"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
@@ -139,28 +139,53 @@ end
 local function PP() return spellName(PICK_POCKET) or "Pick Pocket" end
 local function SAPN() return spellName(SAP) or "Sap" end
 
+-- 1.4.8 (the user, in a battleground: "sap macro does not work, after targeting the first enemy, pressing the button
+-- again does not switch to closer targets"; the log: "attempted to index a table that cannot be indexed with secret
+-- keys", 300 times). There the game hides some values about units from addons ("secret" values). TargetKit treats a
+-- hidden value as unknown: it never compares one or uses it as a key, and a unit whose id is hidden isn't seen.
+local isSecret = issecretvalue or function() return false end
+local function known(v) return v ~= nil and not isSecret(v) end
+local function yes(fn, ...)                              -- a yes/no from the game: nil when hidden or refused
+  local ok, v = pcall(fn, ...)
+  if not ok or (v ~= nil and isSecret(v)) then return nil end
+  if v then return true end
+  return false
+end
+local hidden = false                                     -- a look met units the game hides (said once in the log)
+local function nameOf(u)                                 -- a unit's name, nil when hidden or refused
+  local ok, n = pcall(UnitName, u)
+  if ok and known(n) then return n end
+end
+
 -- ---------- what the addon can see about a unit ----------
 local function inRange(id, unit)
   local name = spellName(id)
   local check = (C_Spell and C_Spell.IsSpellInRange) or IsSpellInRange
   if not (name and check) then return false end
   local ok, r = pcall(check, name, unit)
-  return ok and (r == true or r == 1)
+  if not ok or (r ~= nil and isSecret(r)) then return nil end            -- unknown
+  return r == true or r == 1
 end
 
 local function interact(unit, index)
   if not CheckInteractDistance then return false end
   local ok, r = pcall(CheckInteractDistance, unit, index)
-  return ok and r and true or false
+  if not ok or (r ~= nil and isSecret(r)) then return nil end            -- unknown
+  return r and true or false
 end
 
--- 1 Pick Pocket's range, 2 Sap's, 3 duel (10 yd), 4 trade (11 yd), 5 follow (28 yd), 6 further
+-- 1 Pick Pocket's range, 2 Sap's, 3 duel (10 yd), 4 trade (11 yd), 5 follow (28 yd), 6 further; nil: the game said
+-- nothing (all hidden or refused)
 local function reach(unit)
-  if inRange(PICK_POCKET, unit) then return 1 end
-  if inRange(SAP, unit) then return 2 end
-  if interact(unit, 3) then return 3 end
-  if interact(unit, 2) then return 4 end
-  if interact(unit, 4) then return 5 end
+  local a = inRange(PICK_POCKET, unit)
+  if a then return 1 end
+  local b = inRange(SAP, unit)
+  if b then return 2 end
+  local c, d, e = interact(unit, 3), interact(unit, 2), interact(unit, 4)
+  if c then return 3 end
+  if d then return 4 end
+  if e then return 5 end
+  if a == nil and b == nil and c == nil and d == nil and e == nil then return nil end
   return 6
 end
 
@@ -190,7 +215,7 @@ local function hasSap(unit)
   return false
 end
 
-local function dead(unit) return (UnitIsDeadOrGhost or UnitIsDead)(unit) and true or false end
+local function dead(unit) return yes(UnitIsDeadOrGhost or UnitIsDead, unit) or false end
 
 -- every unit the addon can see, once each: nameplates first (their tokens are the steadiest for the click), then
 -- mouseover, soft targets, target, focus and your group
@@ -199,10 +224,17 @@ local rememberName                                       -- set below (TK Find)
 local function visibleUnits()
   local out, seen = {}, {}
   local function add(u)
-    local ok, exists = pcall(UnitExists, u)
-    if not (ok and exists) or UnitIsUnit(u, "player") then return end
-    local g = UnitGUID(u)
-    if g and not seen[g] then
+    if not yes(UnitExists, u) or yes(UnitIsUnit, u, "player") ~= false then return end
+    local ok, g = pcall(UnitGUID, u)
+    if not ok or not known(g) then                       -- hidden by the game (battlegrounds): not seen
+      if not hidden then
+        hidden = true
+        log("addon", "the game hides some units from addons here (" .. u .. "'s id is secret), so TargetKit doesn't"
+          .. " see them; TK Sap takes the game's nearest enemy player instead")
+      end
+      return
+    end
+    if not seen[g] then
       seen[g] = true
       out[#out + 1] = { unit = u, guid = g }
       if rememberName then rememberName(u) end
@@ -239,7 +271,7 @@ end
 local function rank(list)
   for _, c in ipairs(list) do
     if not c.reach then
-      c.reach = reach(c.unit)
+      c.reach = reach(c.unit) or 6
       c.y = plateY(c.unit) or math.huge
     end
   end
@@ -287,15 +319,16 @@ end
 -- The targeting lines' conditions are about the target you had before the press (that's what the game checks), and the
 -- last line that finds someone wins: no attackable target, the game's nearest enemy; then, unless you already have a
 -- living enemy player, the game's nearest enemy player (revealed stealthers too), which wins if there is one.
-local SAP_ANY = "/targetenemy [noexists][dead][noharm]"
 local SAP_PLAYER = "/targetenemyplayer [noexists][dead][noharm][noplayer]"
+-- The fixed macro (in combat, or when a look fails) starts from scratch every press (1.4.8): it can't know whether
+-- your target is near, and the user wants "the closest physically possible".
 local function sapFixed()
   local sap = SAPN()
   return table.concat({
     "/cast [@mouseover,harm,nodead] " .. sap,
     "/stopmacro [@mouseover,harm,nodead]",
-    SAP_ANY,
-    SAP_PLAYER,
+    "/cleartarget",
+    "/targetenemyplayer",
     "/cast " .. sap }, "\n")
 end
 
@@ -333,23 +366,26 @@ local function sapBuild(units)
   end
   local n = npcs[1]
   if n and n.reach > 2 then n = nil end
-  -- 1.4.6 (the user: "in case a stealthed rogue pops up next to me, it targets him even though I maybe have another
-  -- target enemy player targeted that is farther away"): an enemy player you target out of Sap range isn't kept. The
-  -- NPC in Sap range, or nothing, then the game's nearest enemy player, which wins if it finds one.
-  if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") and not dead("target")
-      and reach("target") > 2 then
-    head[#head + 1] = n and targetLine(n) or "/cleartarget"
-    head[#head + 1] = "/targetenemyplayer"
+  -- Your target is kept only when TargetKit knows it's in Sap range, attackable and alive (then a player the game finds
+  -- wins over an NPC). Else, further off or hidden by the game (enemy players in battlegrounds, 1.4.8; an enemy player
+  -- you target out of Sap range, 1.4.6: "in case a stealthed rogue pops up next to me, it targets him even though I
+  -- maybe have another target enemy player targeted that is farther away"), it's let go of: the NPC in Sap range, or
+  -- nothing, then the game's nearest enemy player, which wins if it finds one.
+  local tname = nameOf("target")
+  local r = yes(UnitExists, "target") and reach("target")
+  if r and r <= 2 and yes(UnitCanAttack, "player", "target") and yes(UnitIsDeadOrGhost, "target") == false then
+    head[#head + 1] = SAP_PLAYER
     head[#head + 1] = "/cast " .. sap
-    return table.concat(head, "\n"), "your target " .. (UnitName("target") or "?") .. " is out of Sap range, so the"
-      .. " game's nearest enemy player" .. (n and (", else " .. describe(n)) or ""), nil, saw
+    return table.concat(head, "\n"), "no enemy player in Sap range in sight; your target " .. (tname or "?")
+      .. " is in Sap range, so it stays (unless it's an NPC and the game finds an enemy player)", nil, saw
   end
-  -- the NPC in Sap range instead of the game's nearest enemy, unless you have a living enemy player; a player wins
-  head[#head + 1] = n and targetLine(n, "[noexists][dead][noharm][noplayer]") or SAP_ANY
-  head[#head + 1] = SAP_PLAYER
+  head[#head + 1] = n and targetLine(n) or "/cleartarget"
+  head[#head + 1] = "/targetenemyplayer"
   head[#head + 1] = "/cast " .. sap
-  return table.concat(head, "\n"), "no enemy player in Sap range in sight: the game's nearest enemy player"
-    .. (n and (", else " .. describe(n)) or ""), nil, saw        -- no sure choice: a player the game finds wins
+  local why = not yes(UnitExists, "target") and "no target" or (r == nil and ("your target " .. (tname or "?")
+    .. " can't be measured here") or ("your target " .. (tname or "?") .. " is out of Sap range"))
+  return table.concat(head, "\n"), "no enemy player in Sap range in sight; " .. why .. ", so the game's nearest enemy"
+    .. " player from scratch" .. (n and (", else " .. describe(n)) or ""), nil, saw
 end
 
 -- ---------- TK Pickpocket ----------
@@ -382,10 +418,11 @@ end
 local function pickBuild(units)
   -- its last unit, half done (Sap or Pick Pocket still on cooldown then): the missing half, while in range for it
   local t = UnitGUID("target")
+  if not known(t) then t = nil end                       -- hidden by the game: unknown
   if t and t == last.pick.guid and GetTime() - last.pick.t <= AGAIN and not dead("target")
       and not UnitAffectingCombat("target") then
     local sapped, robbed = hasSap("target"), picked(t)
-    local r = reach("target")
+    local r = reach("target") or 6
     if sapped and not robbed and r <= 1 then
       return "/cast " .. PP(), "Pick Pocket the one just sapped: " .. (UnitName("target") or "?"), UnitName("target"), {}
     elseif robbed and not sapped and r <= 2 then
@@ -411,12 +448,13 @@ local function pickBuild(units)
     local n = UnitName(c.unit)
     for _, o in ipairs(refused) do
       if UnitName(o.unit) == n then
-        o.reach = o.reach or reach(o.unit)
+        o.reach = o.reach or reach(o.unit) or 6
         if o.reach <= c.reach then return o end
       end
     end
   end
   local tg = UnitGUID("target")                          -- your target, robbable and in Sap range: that one
+  if not known(tg) then tg = nil end
   for _, o in ipairs(list) do
     if tg and o.guid == tg and o.reach <= 2 then
       local cast = {}
@@ -441,7 +479,8 @@ local function pickBuild(units)
     end
   end
   if not c then
-    if UnitExists("target") and UnitCanAttack("player", "target") and not dead("target") and reach("target") > 2 then
+    if yes(UnitExists, "target") and yes(UnitCanAttack, "player", "target") and not dead("target")
+        and (reach("target") or 6) > 2 then
       return "/cleartarget\n/targetenemy\n/cast " .. SAPN() .. "\n/cast " .. PP(), "no humanoid to rob in sight, and"
         .. " your target " .. (UnitName("target") or "?") .. " is out of Sap range: the game's nearest enemy instead",
         nil, saw
@@ -480,7 +519,7 @@ end
 local seenNames, seenCount = {}, 0                       -- lower-case name -> the name
 rememberName = function(unit)
   local ok, n = pcall(UnitName, unit)
-  if not ok or not n or n == "" or n == UNKNOWNOBJECT then return end
+  if not ok or not known(n) or n == "" or n == UNKNOWNOBJECT then return end
   local key = strlower(n)
   if seenNames[key] then return end
   if seenCount >= 500 then seenNames, seenCount = {}, 0 end
@@ -653,8 +692,13 @@ end
 
 local function prepare(force)                            -- look once, write all three (out of combat)
   if not db or InCombatLockdown() then return end
-  targetBefore = UnitName("target") or "none"
-  local units = visibleUnits()
+  local okName, tn = pcall(UnitName, "target")
+  targetBefore = (okName and known(tn)) and tn or "none"
+  local okLook, units = pcall(visibleUnits)
+  if not okLook then
+    try("TargetKit looking", error, units)               -- logged (and counted) like any error
+    units = {}
+  end
   for _, b in ipairs(BUTTONS) do
     local n = room(b)
     local text, why, expect, saw, extra
@@ -1223,7 +1267,7 @@ local function onEvent(_, event, a1, a2, a3)
     if a1 == "player" then outcome("cast", spellName(a3) or tostring(a3), "on", UnitName("target") or "no target") end
     if a1 == "player" and a3 == PICK_POCKET and db then        -- robbed: skip it from now on
       local g = UnitGUID("target")
-      if g then db.picked[g] = time() end
+      if known(g) then db.picked[g] = time() end
     end
   elseif event == "UNIT_SPELLCAST_FAILED" then
     if a1 == "player" then outcome(spellName(a3) or tostring(a3), "failed") end
@@ -1247,7 +1291,7 @@ local function onEvent(_, event, a1, a2, a3)
     for _, s in ipairs(none) do
       if s and msg == s and db then                               -- already robbed (by you before, or the game says so)
         local g = UnitGUID("target")
-        if g then db.picked[g] = time() end
+        if known(g) then db.picked[g] = time() end
       end
     end
   end

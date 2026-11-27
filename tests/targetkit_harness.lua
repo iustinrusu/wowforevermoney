@@ -12,6 +12,9 @@ function InCombatLockdown() return COMBAT end
 KEYDOWN = true
 function GetCVarBool(name) if name == "ActionButtonUseKeyDown" then return KEYDOWN end end
 function IsInRaid() return false end
+-- secret values, as in battlegrounds on Forever (TargetKit 1.4.8): a unit field set to SECRET reads as a hidden value
+SECRET = setmetatable({}, { __tostring = function() return "<secret>" end })
+function issecretvalue(v) return v == SECRET end
 -- what a secure macro calls (tests/test_targetkit_lua.py runs macro lines through these); hooksecurefunc as in WoW
 -- A token, or a name (part of one; exact: the whole name): the closest unit of that name. As on Forever (TargetKit
 -- 1.4.3's log), a nameplate's token is refused.

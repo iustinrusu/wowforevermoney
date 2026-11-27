@@ -103,7 +103,8 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       1.4.2 found the game refuses nameplate lines; 1.4.3/1.4.4 went round with the game's Tab, which landed on
       other mobs; 1.4.5, the user's call: no cycling of same-named mobs, the closest by name, the next list name
       in sight on each press); TK Sap (1.4.6: with a farther enemy player targeted, a rogue appearing next to you
-      should be taken; check in a battleground or duel area) and TK Pickpocket (1.4.7: walking past a group
+      should be taken; check in a battleground or duel area; 1.4.8: in battlegrounds every press is the game's
+      nearest enemy player from scratch, the game hides enemies from addons there) and TK Pickpocket (1.4.7: walking past a group
       stealthed, each press should take the one next to you, never the one behind; a camp of one name too) and TK
       Pickpocket once out of combat. Then `/reload` and Claude reads TargetKitDB.log (chat stays quiet since 1.4.1;
       `/tkit chat` shows TargetKit's notes in chat). Same-named friendly NPCs only ever get the closest (no friendly

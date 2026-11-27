@@ -899,6 +899,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   `Creature-0-<server>-<map>-<instance copy>-<npc id>-<spawn>`: the same NPC in map 229 (Blackrock Spire) shows up
   with a different instance-copy number and spawn part each time. So a mob in a new instance or battleground, or a
   respawn, is a new GUID: TargetKit's "robbed already" list (by GUID, 2 hours) doesn't skip it.
+- (2026-11-27, TargetKit 1.4.7's log, a battleground) In battlegrounds Forever hides some unit values from addons
+  ("secret" values, as in retail 12.0): `UnitGUID` of enemy units comes back secret, and using it as a table key is
+  an error ("attempted to index a table that cannot be indexed with secret keys"). `UnitName("target")` was still
+  readable there. Raid members (friendly) read normally.
 - (2026-11-27, the user in game with TargetKit 1.4.4) Targeting by name reaches a mob whose nameplate isn't showing;
   the game's Tab only goes through mobs whose nameplates are showing (on screen, within the nameplate range, 41 yd
   in the user's settings). So cycling same-named mobs covers only those on screen; no addon way around it.
@@ -938,6 +942,27 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (twenty-first part) TargetKit 1.4.8 (the user: "sap macro does not work, after targeting the first
+  enemy, pressing the button again does not switch to closer targets, target stays on the one selected initially").
+  The log (a battleground): every look failed in visibleUnits ("cannot be indexed with secret keys", 300+ times), so
+  no macro was rewritten, and TK Sap's macro stayed at its fallback, which kept a living enemy player you targeted:
+  "Out of range" on every press, the target never changed.
+  - Secret values (`issecretvalue`) are unknown everywhere: never compared or used as keys; a unit whose GUID is
+    hidden isn't seen (logged once: "the game hides some units from addons here"); range checks that come back
+    hidden give no band (reach nil: "can't be measured"); the look itself is in pcall so the macros are always
+    written.
+  - TK Sap keeps your target only when TargetKit knows it's in Sap range, attackable and alive (then
+    `/targetenemyplayer [noexists][dead][noharm][noplayer]`, so a player the game finds beats an NPC). Otherwise:
+    the NPC in Sap range or `/cleartarget`, then a plain `/targetenemyplayer`, Sap. The fixed macro (in combat or
+    when a look fails) is the same from-scratch text. This replaces 1.4.6's "far enemy player" rule and the old
+    "keep a living enemy player" fallback; the NPC Tab fallback (`/targetenemy [noexists]...`) is gone.
+  - TK Pickpocket's target id checks treat a hidden id as none.
+  - Harness: `issecretvalue` and a SECRET value for unit fields and the range checks. Tests: 59 (new: in a
+    battleground, hidden ids and range mean no error and the from-scratch macro, which takes the game's nearest enemy
+    player; a target is kept only while known to be in Sap range).
+  - Open: whether `/cleartarget` then `/targetenemyplayer` takes the nearest enemy player or the next after the old
+    target (target changes within one press may not show to the game yet); the next battleground log says.
 
 - **2026-11-27** (twentieth part) TargetKit 1.4.7, TK Pickpocket (the user: "pickpocket macro too, when stealthed and
   going past multiple enemies, if I press the button I instantly want to sap and pickpocket the one next to me, I

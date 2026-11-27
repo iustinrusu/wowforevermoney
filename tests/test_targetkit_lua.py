@@ -12,8 +12,7 @@ except ImportError:          # pip install lupa
 ROOT = Path(__file__).resolve().parent.parent
 KIT = ROOT / 'extras' / 'TargetKit'
 MOUSEOVER = '/cast [@mouseover,harm,nodead] Sap\n/stopmacro [@mouseover,harm,nodead]'
-SAP_FIXED = (MOUSEOVER + '\n/targetenemy [noexists][dead][noharm]\n/targetenemyplayer [noexists][dead][noharm][noplayer]'
-             '\n/cast Sap')
+SAP_FIXED = MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/cast Sap'      # from scratch (1.4.8)
 MACRO = {'TKFind': 'TK Find', 'TKPick': 'TK Pickpocket', 'TKSap': 'TK Sap'}
 
 
@@ -156,14 +155,14 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate5', 'Friend', player=True, reach=1, enemy=False)
         self.unit('nameplate6', 'Defias Pathstalker', reach=2)                  # the NPC in Sap range
         text = self.press('TKSap')
-        self.assertEqual(text, MOUSEOVER + '\n/targetexact [noexists][dead][noharm][noplayer] Defias Pathstalker'
-                               '\n/targetenemyplayer [noexists][dead][noharm][noplayer]\n/cast Sap')
+        self.assertEqual(text, MOUSEOVER + '\n/targetexact Defias Pathstalker'
+                               '\n/targetenemyplayer\n/cast Sap')           # a player the game finds still wins
 
     def test_sap_with_no_player_in_sight_lets_the_game_find_a_revealed_stealther(self):
         """A rogue the game has just revealed has no nameplate: only the game's own /targetenemyplayer reaches it."""
         self.unit('nameplate1', 'Farstrider', player=True, reach=4)            # a player, but out of Sap range
         text = self.press('TKSap')
-        self.assertIn('/targetenemyplayer [noexists]', text)
+        self.assertIn('/cleartarget\n/targetenemyplayer', text)
         self.assertNotIn('nameplate1', text)
         self.assertTrue(text.startswith(MOUSEOVER))
 
@@ -174,7 +173,7 @@ class TargetKitTests(unittest.TestCase):
         self.fire('PLAYER_REGEN_DISABLED')                     # just before combat locks the buttons
         self.g.COMBAT = True
         text = self.press('TKSap')                             # nothing may change it now
-        self.assertIn('/targetenemyplayer [noexists]', text)
+        self.assertIn('/cleartarget\n/targetenemyplayer', text)
         self.assertNotIn('Nightstep', text)
         self.assertTrue(self.in_log('press: TK Sap: the fixed macro (in combat, or just before)'))
 
@@ -559,7 +558,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.4.7 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.4.8 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
@@ -595,7 +594,7 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate1', 'Nightstep', player=True, reach=2)
         self.g.UnitCreatureType = self.lua.eval('function() error("boom") end')
         text = self.press('TKSap')
-        self.assertIn('/targetenemyplayer [noexists]', text)                # the fixed macro
+        self.assertIn('/cleartarget\n/targetenemyplayer', text)                # the fixed macro
         self.press('TKSap')
         errors = [l for l in self.logged() if 'ERROR: TK Sap choosing' in l]
         self.assertGreaterEqual(len(errors), 2)
@@ -761,21 +760,41 @@ class TargetKitTests(unittest.TestCase):
             self.assertEqual(self.g.UNITS.target.name, 'Zhevra Runner')
             self.tick()
 
-    def test_sap_keeps_an_npc_target_unless_the_game_finds_a_player(self):
-        thug = self.unit('target', 'Defias Thug', plate=False)
-        self.run_macro(self.body('TKSap'))
-        self.assertEqual(self.g.UNITS.target.name, 'Defias Thug')             # no enemy player near: the NPC stays
+    def test_sap_keeps_a_target_only_while_it_is_known_to_be_in_sap_range(self):
+        """1.4.8: kept only when TargetKit knows it's in Sap range; an NPC there gives way to a player the game finds."""
+        thug = self.unit('target', 'Defias Thug', plate=False, reach=2)
+        self.press('TKSap')
+        self.assertTrue(self.in_log(' is in Sap range, so it stays'))
+        self.assertEqual(self.g.UNITS.target.name, 'Defias Thug')             # no enemy player near: it stays
         self.g.NEAREST_PLAYER = self.lua.table_from({'name': 'Nightstep', 'guid': 'Player-1', 'enemy': True,
                                                      'player': True})
         self.run_macro(self.body('TKSap'))
         self.assertEqual(self.g.UNITS.target.name, 'Nightstep')                # a player wins
-        self.run_macro(self.body('TKSap'))
-        self.assertEqual(self.g.UNITS.target.name, 'Nightstep')                # and is kept
-        del self.g.UNITS.target
         self.g.NEAREST_PLAYER = None
-        self.g.NEAREST_ENEMY = thug
+        self.g.UNITS.target = thug
+        thug.reach = 4                                                      # you walked on
+        self.tick()
         self.run_macro(self.body('TKSap'))
-        self.assertEqual(self.g.UNITS.target.name, 'Defias Thug')             # nobody targeted: the nearest enemy
+        self.assertIsNone(self.g.UNITS.target)                              # let go of; nobody the game finds
+
+    def test_in_a_battleground_hidden_enemies_mean_the_nearest_enemy_player_every_press(self):
+        """The user's log in a battleground: "attempted to index a table that cannot be indexed with secret keys", every
+        look failed, and the macro kept a far enemy player: "Out of range" on every press."""
+        far = self.unit('target', 'Farstrider', plate=False, player=True, reach=5, guid=self.g.SECRET)
+        self.unit('nameplate1', 'Nightstep', player=True, reach=1, guid=self.g.SECRET)
+        self.g.C_Spell.IsSpellInRange = self.lua.eval('function() return SECRET end')   # range hidden too
+        self.g.CheckInteractDistance = self.lua.eval('function() return SECRET end')
+        self.tick()
+        self.assertFalse(self.in_log('ERROR'))
+        self.assertTrue(self.in_log("the game hides some units from addons here (nameplate1's id is secret)"))
+        self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + SAP_FIXED + '\n/click TKSapMark')
+        rogue = self.lua.table_from({'name': 'Shadowfang', 'guid': 'Player-2', 'enemy': True, 'player': True})
+        self.g.NEAREST_PLAYER = rogue
+        self.run_macro(self.body('TKSap'))
+        self.assertTrue(self.in_log("your target Farstrider can't be measured here, so the game's nearest enemy player"
+                                    " from scratch"))
+        self.assertEqual(self.g.UNITS.target.name, 'Shadowfang')
+        self.assertIsNot(self.g.UNITS.target, far)
 
     def test_the_addon_compiles_and_the_toc_loads_it(self):
         toc = (KIT / 'TargetKit.toc').read_text(encoding='utf-8')

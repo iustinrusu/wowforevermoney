@@ -93,6 +93,12 @@ Revised:
   enemy player to Sap changes, and TargetKit looks again as soon as a nameplate appears or your soft enemy target
   changes, instead of waiting up to 0.4 s. What no addon can do: Sap a stealthed player the game shows you no
   nameplate or soft target for; your mouse over him still works (the mouseover Sap line comes first).
+- **TK Sap in battlegrounds (1.4.8):** there the game hides enemy units' ids (and often their range) from addons
+  ("secret" values), so TargetKit can't see enemy players at all (before 1.4.8 that broke every look, and the macro
+  kept a far enemy player: "Out of range" on every press). Your target is now kept only when TargetKit knows it's in
+  Sap range; otherwise every press starts from scratch: `/cleartarget`, then the game's nearest enemy player, then
+  Sap. Your mouseover still comes first. Whether the game's nearest enemy player from no target is the one
+  physically closest is the game's own choice (it prefers what's in front of you).
 - **TK Pickpocket walking past a group (1.4.7):** a press goes to the one next to you, never the one you left behind.
   Your target, if it can be robbed and is in Sap range, is the one; else the closest one you can rob, by name. The
   "finish the missing half" rule (Sap or Pick Pocket was still on cooldown) only holds while that mob is still in
