@@ -348,7 +348,7 @@ local PAIR = 2                         -- seconds between a box leaving your bag
 local bagSnap                          -- item id -> count in your bags at the last BAG_UPDATE_DELAYED
 local boxKinds = {}                    -- item id -> true: seen in your bags as something you can open
 local gains, gone = {}, {}             -- {id, n, t}: items that came in, not from a loot window; {id, t}: boxes gone
-local windowOpen, windowShut = false, -99
+local windowOpen, windowAt = false, -99      -- a loot window open now, and since when
 local busy = {}                        -- vendor, bank, mail, trade, auction house: open now
 local BUSY = { MERCHANT_SHOW = "merchant", MERCHANT_CLOSED = "merchant", BANKFRAME_OPENED = "bank",
                BANKFRAME_CLOSED = "bank", MAIL_SHOW = "mail", MAIL_CLOSED = "mail", TRADE_SHOW = "trade",
@@ -428,7 +428,7 @@ local function boxDone(ev)                   -- PAIR seconds after a box left: w
   ns.log("box", "item " .. ev.id .. " opened into your bags: " .. (#got > 0 and ("gave " .. table.concat(got, ", "))
     or "nothing came in (empty, coins only, or destroyed)"))
   recordOpened(ev.id, items)
-  if ns.onBoxOpened then ns.try("farm meter: box opened", ns.onBoxOpened, ev.id, items) end
+  if ns.onBoxOpened then ns.try("farm meter: box opened", ns.onBoxOpened, ev.id, items, ev.t) end
 end
 
 local function onBags()
@@ -442,8 +442,14 @@ local function onBags()
   for id, n in pairs(before) do
     if (counts[id] or 0) < n and (boxKinds[id] or (ns.isContainer and ns.isContainer(id))) then left[#left + 1] = id end
   end
+  -- 1.6.10 (the user, 2026-11-27: "opened heavy junkbox and those in the screenshot did not add to the farm meter";
+  -- the log: "left your bags while a loot window was open or had just closed", 20 s after the last Pick Pocket window,
+  -- so the "open" had gone stale, and the box's items came as "You receive item:" lines with no window at all). A
+  -- loot window only holds the bag watcher back while it's really open and fresh (opened up to 5 s ago); a box with its
+  -- own loot window is left to that window anyway (ns.boxWindowAt). A window that just closed no longer does: opening a
+  -- box straight after looting a corpse is normal while farming.
   local skip = (next(busy) and ("a " .. next(busy) .. " window was open"))
-    or ((windowOpen or now - windowShut <= 1) and "a loot window was open or had just closed") or nil
+    or ((windowOpen and now - windowAt <= 5) and "a loot window was open") or nil
   if skip then                               -- loot windows count themselves; a vendor or bank is not opening a box
     for _, id in ipairs(left) do ns.log("box", "item " .. id .. " left your bags while " .. skip .. ": not counted as opened") end
     return
@@ -458,6 +464,7 @@ local function onBags()
     else
       ns.log("box", "item " .. id .. " left your bags: what comes in within " .. PAIR .. " s is what it held")
       local ev = { id = id, t = now }
+      ns.boxLeftAt = now
       gone[#gone + 1] = ev
       if C_Timer then C_Timer.After(PAIR, function() ns.try("box watcher", boxDone, ev) end) end
     end
@@ -590,13 +597,15 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
   elseif event == "CHAT_MSG_LOOT" then
     ns.try("loot lines", onLootLine, arg1 or "")
   elseif event == "LOOT_READY" then
+    if not windowOpen then windowAt = GetTime() end
     windowOpen = true
   elseif event == "LOOT_CLOSED" then
-    windowOpen, windowShut = false, GetTime()
+    windowOpen = false
   elseif BUSY[event] then
     busy[BUSY[event]] = (event:find("_SHOW$") or event:find("_OPENED$")) and true or nil
     if event == "MERCHANT_SHOW" then ns.try("vendor prices", recordMerchant) end
   elseif event == "LOOT_OPENED" then
+    if not windowOpen then windowAt = GetTime() end
     windowOpen = true
     ns.try("loot log", recordLoot)
   elseif event == "GET_ITEM_INFO_RECEIVED" then

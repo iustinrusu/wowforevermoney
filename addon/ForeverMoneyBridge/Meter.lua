@@ -29,7 +29,7 @@ local function note(...)                   -- a chat message that also goes to t
   print(...)
   log("meter", ...)
 end
-local VERSION = "1.6.9"             -- the same as the .toc's ## Version (tests/test_meter_lua.py checks)
+local VERSION = "1.6.10"             -- the same as the .toc's ## Version (tests/test_meter_lua.py checks)
 local CUT = 0.05
 local TSM_PRICE = "first(DBMinBuyout, DBMarket, DBRegionMarketAvg)"
 -- newer clients (WoW: Forever) moved these into C_Item / C_Spell; the old globals may not exist
@@ -603,6 +603,22 @@ local function coinLine(msg)
 end
 
 local windowKind, windowCounted, skipUntil = nil, false, 0
+-- Gold changes no coin line of yours accounted for (yet), the last 10 s: { d = copper, t = time, used = bool }. A box that
+-- opens straight into your bags gives its coins with "Received 3 Silver, 77 Copper." (the user's screenshot, 1.6.10),
+-- not a "You loot" line, so ns.onBoxOpened takes such a change made within 2 s of the box leaving your bags.
+local rises = {}
+local function noteRise(delta)
+  local now, keep = GetTime(), {}
+  for _, r in ipairs(rises) do if now - r.t <= 10 then keep[#keep + 1] = r end end
+  keep[#keep + 1] = { d = delta, t = now, used = false }
+  rises = keep
+end
+local function riseUsed(copper)                -- a coin line of yours, or a pairing, accounted for this change
+  local now = GetTime()
+  for _, r in ipairs(rises) do
+    if not r.used and (not copper or r.d == copper) and now - r.t <= 3 then r.used = true return end
+  end
+end
 local moneyChatAt, moneyDelta = 0, nil
 local chatCoins = false                -- a coin line was read: gold changes are no longer needed for loot
 local moneyTimer = 0                   -- which gold change the 2 s timer belongs to
@@ -685,8 +701,16 @@ end
 -- gave counts like loot, and the box under "Opened". Its contents come with no "You receive loot" line (the user's
 -- Heavy Junkbox: the meter counted none), so nothing here is counted twice. A box inside goes to "not opened yet".
 -- The reminder itself is lowered by reconcileBoxes when the box leaves your bags.
-function ns.onBoxOpened(box, items)
+function ns.onBoxOpened(box, items, at)
   if not session or session.paused then return end
+  at = at or GetTime()
+  for _, r in ipairs(rises) do                 -- its coins: a gold change no loot line accounts for, within 2 s
+    if not r.used and math.abs(r.t - at) <= 2 then
+      r.used = true
+      session.money = session.money + r.d
+      say("coins from the box (no loot line, the gold change with it):", money(r.d))
+    end
+  end
   local got = {}
   for id, n in pairs(items) do
     if isContainer(id) then
@@ -764,9 +788,10 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
     if copper then                                     -- your own line: its amount, whatever the timing
       chatCoins, moneyDelta = true, nil
       addMoney(copper)
+      riseUsed(copper)
     elseif copper == nil then                          -- a line the meter can't read: pair it with the gold change
       say("coins: a line the meter can't read, paired with the change in your gold:", msg)
-      if moneyDelta then addMoney(moneyDelta); moneyDelta = nil else moneyChatAt = GetTime() end
+      if moneyDelta then addMoney(moneyDelta); riseUsed(moneyDelta); moneyDelta = nil else moneyChatAt = GetTime() end
     else
       say("coins: someone else's, not counted:", msg)
     end
@@ -779,8 +804,9 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
     elseif delta > 0 and chatCoins then
       say("your gold went up " .. money(delta, true) .. ": counted only when a loot line of yours says so")
     end
+    if delta > 0 and GetTime() >= moneyQuietUntil then noteRise(delta) end
     if chatCoins or delta <= 0 or GetTime() < moneyQuietUntil then return end
-    if GetTime() - moneyChatAt <= 2 then addMoney(delta); moneyChatAt = 0 else
+    if GetTime() - moneyChatAt <= 2 then addMoney(delta); riseUsed(delta); moneyChatAt = 0 else
       moneyDelta, moneyTimer = delta, moneyTimer + 1   -- not loot (a sale, mail, a quest) unless a line follows
       local mine = moneyTimer                          -- within 2 s; an older timer leaves a newer change alone
       if C_Timer then C_Timer.After(2, function() if moneyTimer == mine then moneyDelta = nil end end) end

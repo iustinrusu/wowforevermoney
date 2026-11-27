@@ -914,6 +914,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   Pickpocket found no humanoid to rob and fell back to the game's nearest enemy. In Arathi Basin enemy players' names
   had read. With names hidden, nothing in a macro can name a unit: only the game's Tab or your mouseover reach it.
   Same log, cost: 1223 looks in 5 minutes, 0.60 ms on average, the longest 8.74 ms.
+- (2026-11-27, the user's screenshot, Alterac Valley) A Heavy Junkbox opened from the bags shows in chat as
+  "Received 3 Silver, 77 Copper." and "You receive item: [Deathweed]x5" / "You receive item: [Blinding Powder]x2": no
+  loot window and no "You loot" / "You receive loot" lines. Gold Ever After's log had its loot window "open" 20 s
+  after the last Pick Pocket window, so a window's close isn't always seen (or a late LOOT_READY came after it).
 - (2026-11-27, the user) Players on Forever have a first and a last name ("FirstName LastName"). The game gives
   addons the last name in `UnitName`'s second value (the realm field in other versions), so a player's whole name is
   "First Last" with a space.
@@ -970,6 +974,20 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (thirtieth part) Gold Ever After 1.6.10 (the user: "also, opened heavy junkbox and those in the
+  screenshot did not add to the farm meter (still not fixed)"). The log: "box: item 16885 left your bags while a loot
+  window was open or had just closed: not counted as opened" and "your gold went up 3s 77c: counted only when a loot
+  line of yours says so"; the screenshot: the coins and items came as "Received ..." and "You receive item: ..."
+  (Verified facts).
+  - The bag watcher no longer skips a box because of a loot window that just closed, nor one "open" for more than 5 s
+    (windowAt); only a fresh open window (and vendor, bank, mail, trade, auction house) holds it back. A box with its
+    own loot window is still left to that window (ns.boxWindowAt).
+  - Coins from a box: the meter keeps the gold changes no coin line of yours accounted for (the last 10 s); when a box
+    is settled (2 s after it left), a change within 2 s of it leaving counts as its coins ("coins from the box"). A
+    "You loot" line, or a pairing with an unreadable line, uses up its change, so corpse coins aren't counted again.
+  - Tests: 54 meter tests (new: a stale loot window, a box right after a window closes, the box's coins from the gold
+    change, corpse coins not given to a box). Installed with `python -m wfm.profile`. Not yet tried in game.
 
 - **2026-11-27** (twenty-ninth part) TargetKit 1.5.6 (the user: "Add my target does not work in alterac valley on
   Irondeep Troggs"). There the game hides the target's name from addons (as for nameplates, Verified facts), so the

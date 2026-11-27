@@ -740,6 +740,48 @@ class MeterTests(unittest.TestCase):
         self.assertEqual(self.g.ForeverMoneyBridgeDB.containers[16885].opened, 1)
         self.assertEqual(self.refresh().kv[2].text, '|cffc7c7cf5s|r |cffeda55f94c|r')    # 2 x 297, once
 
+    # --- 1.6.10, the user: "opened heavy junkbox and those in the screenshot did not add to the farm meter"; the log:
+    # "left your bags while a loot window was open or had just closed", 20 s after the last Pick Pocket window; the
+    # screenshot: "Received 3 Silver, 77 Copper.", "You receive item: [Deathweed]x5", "[Blinding Powder]x2" ---
+    def test_a_box_after_a_loot_window_that_never_said_it_closed_still_counts(self):
+        self.slash('start')
+        self.pick_junkbox_into_bags()
+        self.both('LOOT_READY')                              # a Pick Pocket window whose close the game never sent
+        self.g.NOW += 20
+        self.open_into_bags([(5173, 5), (5530, 2)])
+        log = self.g.ForeverMoneyBridgeDB.containers[16885]
+        self.assertEqual((log.opened, log['items'][5173], log['items'][5530]), (1, 5, 2))
+        self.assertIn('Opened 1', self.refresh().loots.text)
+
+    def test_a_box_opened_right_after_a_loot_window_closes_counts(self):
+        """Loot a corpse, open the box straight away: normal while farming (1.6.7 skipped it for 1 s)."""
+        self.slash('start')
+        self.pick_junkbox_into_bags()
+        self.both('LOOT_READY')
+        self.both('LOOT_CLOSED')
+        self.g.NOW += 0.3
+        self.open_into_bags([(5530, 2)])
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.containers[16885]['items'][5530], 2)
+
+    def test_the_boxs_coins_count_from_the_gold_change(self):
+        """"Received 3 Silver, 77 Copper." is no "You loot" line: the gold change within 2 s of the box is its coins."""
+        self.slash('debug')
+        self.slash('start')
+        self.coin_loot(184, 'You loot 1 Silver, 84 Copper', wait=3)          # coin lines are read from here on
+        self.pick_junkbox_into_bags()
+        self.g.MONEY += 377
+        self.fire('PLAYER_MONEY')                                          # the box's coins, no loot line
+        self.open_into_bags([(5530, 2)])
+        self.assertTrue(self.said('coins from the box (no loot line, the gold change with it): |cffc7c7cf3s|r'))
+        self.assertEqual(self.refresh().kv[3].text, '|cffc7c7cf5s|r |cffeda55f61c|r')   # 184 + 377
+
+    def test_coins_from_a_corpse_line_are_not_given_to_a_box_too(self):
+        self.slash('start')
+        self.pick_junkbox_into_bags()
+        self.coin_loot(200, 'You loot 2 Silver')                           # a corpse's coins, with their line
+        self.open_into_bags([(5530, 2)])                                   # and a box straight after, no coins
+        self.assertEqual(self.refresh().kv[3].text, '|cffc7c7cf2s|r')
+
 @unittest.skipUnless(lua51, 'lupa is not installed (pip install lupa)')
 class LootLogTests(unittest.TestCase):
     """The loot log (ForeverMoneyBridge.lua): what each container you open gives, never as mob or fishing loot."""
