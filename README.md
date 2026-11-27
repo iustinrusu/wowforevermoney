@@ -142,6 +142,14 @@ See docs/PROJECT_LOG.md, open items.
 - **Updates:** the app copies the latest version into your AddOns folder each time it starts. Do a `/reload` in game to load it.
 - **Privacy:** nothing leaves your PC. It only writes WoW's normal saved-variables file, which this app reads.
 
+## Extras (not part of the app)
+
+`extras/` holds our own addons that the app never installs, kept here for later changes:
+
+- **TargetKit** (`extras/TargetKit`): three one-key macros: TK Find (a find list, closest first, press again for the
+  next), TK Pickpocket (the closest humanoid not robbed yet: Sap, then Pick Pocket) and TK Sap (mouseover, else the
+  closest enemy player, including stealthed ones the game reveals). Its README has the details and how to install it.
+
 ## Command line
 
 ```bash

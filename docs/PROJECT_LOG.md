@@ -910,6 +910,22 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (sixth part) TargetKit 1.0.0, a new addon in `extras/` that the app never installs (the user: "create
+  a new addon that should not be included in the gea app, but should live in our repo ... revise the prompt"; the
+  request and its revised version are in `extras/TargetKit/README.md`). Three macros it makes itself, each a `/click`
+  on a hidden secure button whose macro text the addon writes in PreClick, out of combat (an addon may not pick a
+  target itself, nor change a secure button in combat); in combat a fixed macro of the game's own targeting runs.
+  TK Find: a find list (`/tkit add`), closest first, cycling; dead mobs skipped, dead players and dead friendly NPCs
+  count, dead neutral/hostile units skipped (could be mobs); by name when none is in sight. TK Pickpocket: the closest
+  humanoid not robbed yet, Sap then Pick Pocket; a second press finishes a half-done one. TK Sap: mouseover, closest
+  enemy player in Sap range, else the game's /targetenemyplayer (the only way to catch a stealthed player the game has
+  just revealed: no nameplate, invisible to addons; the user: "especially needed for sapping invisible targets"), else
+  the closest NPC in Sap range. "Closest" = range bands from the game's range checks, then the lower nameplate.
+  Correction from the user: on Forever, Sap does not break stealth. Claude had said it can, from 1.12's Improved Sap
+  talent, a Classic mechanic it hadn't checked on Forever; the first build ordered Pick Pocket first because of it,
+  now Sap first as asked. 16 tests (tests/test_targetkit_lua.py). Copied into AddOns; it needs a full game restart to
+  show up. Not checked in game yet.
+
 - **2026-11-27** (fourth part) To-do C1, reading session 8 (20 pages, 2 minutes apart, no block; details in
   `docs/plans/material-coverage.md`) and the limited-vendor fix (decisions above). Pages: the Philosopher's Stone
   (B10: Transmute: Red Power Crystal to Blue Power Crystal is among the 16 spells it is the tool for, with no
