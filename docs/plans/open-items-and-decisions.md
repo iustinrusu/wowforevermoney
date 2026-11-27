@@ -99,7 +99,8 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       and open, and that the window doesn't jump when folding).
 - [ ] B14. (2026-11-27, TargetKit 1.4.x, our extra addon) Done for TK Find (2026-11-27: a friendly player targeted
       every press, the log shows it). Left: TK Find on enemy mobs that share a name (put one on the list, stand near
-      three or more, press TK Find a few times within 8 s: each press should take the next one); TK Sap and TK
+      three or more, press TK Find a few times within 8 s: each press should take the next one; 1.4.1 failed here,
+      fixed in 1.4.2, also with CorpseGlow's glow showing); TK Sap and TK
       Pickpocket once out of combat. Then `/reload` and Claude reads TargetKitDB.log (chat stays quiet since 1.4.1;
       `/tkit chat` shows TargetKit's notes in chat). Same-named friendly NPCs only ever get the closest (no friendly
       nameplates): the user's choice, enemies matter more.

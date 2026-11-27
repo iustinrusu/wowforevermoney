@@ -24,11 +24,16 @@
 -- /click on a plain button) on every press, but never the secure button's macro after it, so the choice never ran.
 -- There is no secure button any more: the choice is in the macro, the way RXPGuides keeps its targeting macro on
 -- Forever. The mouseover and soft targets move with the mouse and camera, so they are written by name (/targetexact).
+-- 1.4.2 (the user: TK Find on Zhevra Runners went "closest, none, closest", and failed while CorpseGlow lit a corpse).
+-- The log showed two things about Forever. Nameplates are restricted regions: asking one where it is on screen
+-- (GetCenter) is an error, and that error made every look fail. And within one press, a macro's [conditions] still see
+-- the target you had before it: after "/cleartarget", "/target [noexists] X" doesn't act. So the macros no longer chain
+-- "/cleartarget" with [noexists] lines; each line's conditions are written about the target you had before the press.
 -- Distance: the game gives addons no distance to other units, only "in range" checks, so "closest" is the nearest of
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.4.1"
+local VERSION = "1.4.2"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
@@ -210,17 +215,27 @@ local function visibleUnits()
   return out
 end
 
--- nearest band first; within a band, the nameplate lower on the screen first
+-- Nearest band first; within a band, the nameplate lower on the screen first where the game lets an addon measure it.
+-- On Forever it doesn't (1.4.2: "Can't measure restricted regions"), so after the first refusal ties go by a steady
+-- order (the unit's id), which still lets TK Find go round them one by one.
+local measure = true
+local function plateY(unit)
+  if not measure then return nil end
+  local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(unit)
+  if not (plate and plate.GetCenter) then return nil end
+  local ok, _, y = pcall(plate.GetCenter, plate)
+  if ok then return y end
+  measure = false
+  log("addon", "the game doesn't let addons measure nameplates here (" .. clean(_):sub(1, 90) .. "), so units in the"
+    .. " same range band are taken in a steady order instead of lowest on screen first")
+  return nil
+end
+
 local function rank(list)
   for _, c in ipairs(list) do
     if not c.reach then
       c.reach = reach(c.unit)
-      c.y = math.huge
-      local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(c.unit)
-      if plate and plate.GetCenter then
-        local _, y = plate:GetCenter()
-        if y then c.y = y end
-      end
+      c.y = plateY(c.unit) or math.huge
     end
   end
   table.sort(list, function(a, b)
@@ -264,14 +279,18 @@ local function seen(lists, rejected, others)    -- what a look saw, for the log 
 end
 
 -- ---------- TK Sap ----------
+-- The targeting lines' conditions are about the target you had before the press (that's what the game checks), and the
+-- last line that finds someone wins: no attackable target, the game's nearest enemy; then, unless you already have a
+-- living enemy player, the game's nearest enemy player (revealed stealthers too), which wins if there is one.
+local SAP_ANY = "/targetenemy [noexists][dead][noharm]"
+local SAP_PLAYER = "/targetenemyplayer [noexists][dead][noharm][noplayer]"
 local function sapFixed()
   local sap = SAPN()
   return table.concat({
     "/cast [@mouseover,harm,nodead] " .. sap,
     "/stopmacro [@mouseover,harm,nodead]",
-    "/cleartarget [dead][noharm][noplayer]",          -- keep a living enemy player you already target
-    "/targetenemyplayer [noexists]",                  -- the game's nearest enemy player: revealed stealthers too
-    "/targetenemy [noexists]",
+    SAP_ANY,
+    SAP_PLAYER,
     "/cast " .. sap }, "\n")
 end
 
@@ -309,13 +328,12 @@ local function sapBuild(units)
   end
   local n = npcs[1]
   if n and n.reach > 2 then n = nil end
-  head[#head + 1] = "/cleartarget [dead][noharm][noplayer]"
-  head[#head + 1] = "/targetenemyplayer [noexists]"
-  if n then head[#head + 1] = targetLine(n, "[noexists]") end
-  head[#head + 1] = "/targetenemy [noexists]"
+  -- the NPC in Sap range instead of the game's nearest enemy, unless you have a living enemy player; a player wins
+  head[#head + 1] = n and targetLine(n, "[noexists][dead][noharm][noplayer]") or SAP_ANY
+  head[#head + 1] = SAP_PLAYER
   head[#head + 1] = "/cast " .. sap
   return table.concat(head, "\n"), "no enemy player in Sap range in sight: the game's nearest enemy player"
-    .. (n and (", else " .. describe(n)) or ""), nil, saw        -- no sure choice: the game may pick first
+    .. (n and (", else " .. describe(n)) or ""), nil, saw        -- no sure choice: a player the game finds wins
 end
 
 -- ---------- TK Pickpocket ----------
@@ -411,29 +429,29 @@ local function namesFor(w)                               -- full names seen that
   return out
 end
 
-local LET_GO = "/cleartarget [dead,noplayer]"            -- a dead mob found by name: let go of it
-
-local function byName(n, used)                           -- "/target [noexists] name" lines, as many as fit in n
-  local lines, size = {}, used or 0
+-- By name: reaches units with no nameplate (far, friendly with friendly nameplates off). "/cleartarget", then a plain
+-- "/target name" for each name: a name nobody near has changes nothing, the last one found wins, so the list goes in
+-- backwards (your first entry wins). The game takes the closest unit of a name, alive or a corpse; it can't skip
+-- corpses here (a condition would see the target you had before the press).
+local function findFixed(n)
+  n = n or MAX_BODY
+  local names = {}
   for _, w in ipairs(db.find) do
-    for _, name in ipairs(namesFor(w)) do
-      local line = "/target [noexists] " .. name
-      if size + 1 + #line > n then return lines end
-      lines[#lines + 1] = line
-      size = size + 1 + #line
-    end
+    for _, name in ipairs(namesFor(w)) do names[#names + 1] = name end
   end
-  return lines
-end
-
-local function findFixed(n)                              -- by name: reaches units with no nameplate (far, or dead)
-  local lines = { "/cleartarget" }
-  for _, l in ipairs(byName((n or MAX_BODY) - #LET_GO - 1, #lines[1])) do lines[#lines + 1] = l end
-  lines[#lines + 1] = LET_GO
+  local lines, size = { "/cleartarget" }, #"/cleartarget"
+  local kept = {}
+  for _, name in ipairs(names) do                        -- as many as fit, first entries first
+    local line = "/target " .. name
+    if size + 1 + #line > n then break end
+    kept[#kept + 1] = line
+    size = size + 1 + #line
+  end
+  for i = #kept, 1, -1 do lines[#lines + 1] = kept[i] end
   return table.concat(lines, "\n")
 end
 
-local function findBuild(units, n)
+local function findBuild(units)
   if #db.find == 0 then return "", "empty list", nil, {} end
   local list, rejected, others = {}, {}, 0
   for _, c in ipairs(units or visibleUnits()) do
@@ -459,12 +477,7 @@ local function findBuild(units, n)
   if not pick then pick, again = list[1], true end                       -- all seen: round again, closest first
   local i = 0
   for k, c in ipairs(list) do if c == pick then i = k end end
-  -- then the by-name lines, which only act if you have no target after the first line (it didn't take)
-  local lines = { targetLine(pick) }
-  local tail = not dead(pick.unit) and LET_GO or nil
-  for _, l in ipairs(byName((n or MAX_BODY) - (tail and (#tail + 1) or 0), #lines[1])) do lines[#lines + 1] = l end
-  if tail then lines[#lines + 1] = tail end
-  return table.concat(lines, "\n"), describe(pick) .. ", " .. i .. " of " .. #list, pick.guid, saw, again
+  return targetLine(pick), describe(pick) .. ", " .. i .. " of " .. #list, pick.guid, saw, again
 end
 
 -- ---------- the macros ----------

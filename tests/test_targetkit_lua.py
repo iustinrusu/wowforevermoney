@@ -12,7 +12,7 @@ except ImportError:          # pip install lupa
 ROOT = Path(__file__).resolve().parent.parent
 KIT = ROOT / 'extras' / 'TargetKit'
 MOUSEOVER = '/cast [@mouseover,harm,nodead] Sap\n/stopmacro [@mouseover,harm,nodead]'
-SAP_FIXED = (MOUSEOVER + '\n/cleartarget [dead][noharm][noplayer]\n/targetenemyplayer [noexists]\n/targetenemy [noexists]'
+SAP_FIXED = (MOUSEOVER + '\n/targetenemy [noexists][dead][noharm]\n/targetenemyplayer [noexists][dead][noharm][noplayer]'
              '\n/cast Sap')
 MACRO = {'TKFind': 'TK Find', 'TKPick': 'TK Pickpocket', 'TKSap': 'TK Sap'}
 
@@ -68,7 +68,8 @@ class TargetKitTests(unittest.TestCase):
 
     def holds(self, conds):
         """A macro line's [conditions], the ones TargetKit writes: [a,b][c] is (a and b) or c; @unit, exists, dead,
-        player, harm, each with no- for not."""
+        player, harm, each with no- for not. As on Forever (TargetKit 1.4.2's log), they see the target you had before
+        the press, not one a line before them set or cleared."""
         if not conds:
             return True
         for group in re.findall(r'\[([^\]]*)\]', conds):
@@ -78,7 +79,7 @@ class TargetKitTests(unittest.TestCase):
                     unit = c[1:]
                     continue
                 neg = c.startswith('no')
-                u = self.g.UNITS[unit]
+                u = self.before if unit == 'target' else self.g.UNITS[unit]
                 value = {'exists': u is not None, 'dead': bool(u and u.dead), 'player': bool(u and u.player),
                          'harm': bool(u and u.enemy)}[c[2:] if neg else c]
                 ok = ok and (value != neg)
@@ -88,6 +89,7 @@ class TargetKitTests(unittest.TestCase):
 
     def run_macro(self, text):
         g = self.g
+        self.before = g.UNITS.target
         for line in text.split('\n'):
             cmd, _, rest = line.partition(' ')
             m = re.match(r'^((?:\[[^\]]*\])+)\s*', rest)
@@ -152,8 +154,8 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate5', 'Friend', player=True, reach=1, enemy=False)
         self.unit('nameplate6', 'Defias Pathstalker', reach=2)                  # the NPC in Sap range
         text = self.press('TKSap')
-        self.assertEqual(text, MOUSEOVER + '\n/cleartarget [dead][noharm][noplayer]\n/targetenemyplayer [noexists]'
-                               '\n/target [noexists] nameplate6\n/targetenemy [noexists]\n/cast Sap')
+        self.assertEqual(text, MOUSEOVER + '\n/target [noexists][dead][noharm][noplayer] nameplate6'
+                               '\n/targetenemyplayer [noexists][dead][noharm][noplayer]\n/cast Sap')
 
     def test_sap_with_no_player_in_sight_lets_the_game_find_a_revealed_stealther(self):
         """A rogue the game has just revealed has no nameplate: only the game's own /targetenemyplayer reaches it."""
@@ -267,10 +269,7 @@ class TargetKitTests(unittest.TestCase):
         self.assertEqual([p.split('\n')[0] for p in presses],
                          ['/target nameplate2', '/target nameplate3', '/target nameplate1',
                           '/target nameplate2'])                               # round again, closest first
-        # then by name (the full names seen, then the list's), which only acts if the first line didn't take
-        self.assertEqual(presses[0], '/target nameplate2\n/target [noexists] Defias Thug\n'
-                                     '/target [noexists] Riverpaw Thug\n/target [noexists] thug\n'
-                                     '/cleartarget [dead,noplayer]')
+        self.assertEqual(presses[0], '/target nameplate2')                    # the choice alone (1.4.2)
         self.g.NOW += 9                                                        # a pause: start from the closest
         self.press('TKFind')
         self.assertEqual(self.press('TKFind').split('\n')[0], '/target nameplate3')
@@ -287,8 +286,7 @@ class TargetKitTests(unittest.TestCase):
     def test_find_by_name_when_none_is_in_sight(self):
         self.slash('add Thug')
         self.slash('add Baron Silverlaine')
-        self.assertEqual(self.press('TKFind'), '/cleartarget\n/target [noexists] Thug\n'
-                                                      '/target [noexists] Baron Silverlaine\n/cleartarget [dead,noplayer]')
+        self.assertEqual(self.press('TKFind'), '/cleartarget\n/target Baron Silverlaine\n/target Thug')   # first last
 
     def test_find_with_an_empty_list_says_how_to_fill_it(self):
         self.assertEqual(self.press('TKFind'), '')
@@ -457,7 +455,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.4.1 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.4.2 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
@@ -557,7 +555,7 @@ class TargetKitTests(unittest.TestCase):
         self.slash('add Brakka')
         friend = self.unit('softfriend', 'Brakka', plate=False, player=True, enemy=False, reaction=5, reach=4)
         self.tick()
-        self.assertTrue(self.body('TKFind').startswith('/targetexact Brakka\n'))
+        self.assertEqual(self.body('TKFind'), '/targetexact Brakka\n/click TKFindMark')
         del self.g.UNITS.softfriend                                          # the soft target moved on
         self.g.UNITS.world1 = friend                                         # still there, out of the addon's sight
         self.run_macro(self.body('TKFind'))
@@ -566,12 +564,11 @@ class TargetKitTests(unittest.TestCase):
     def test_a_long_find_list_stays_within_the_macro_limit(self):
         for i in range(40):
             self.slash(f'add Somebody With A Long Name {i}')
+        self.tick()
+        self.assertLessEqual(len(self.body('TKFind')), 255)
+        self.assertTrue(self.body('TKFind').endswith('\n/target Somebody With A Long Name 0\n/click TKFindMark'))
         self.unit('nameplate1', 'Somebody With A Long Name 7', reach=2, enemy=False, reaction=5)
-        for button in MACRO:
-            self.tick()
-            self.assertLessEqual(len(self.body(button)), 255)
-        self.assertTrue(self.body('TKFind').endswith('/cleartarget [dead,noplayer]\n/click TKFindMark'))
-        self.assertTrue(self.press('TKFind').startswith('/target nameplate1\n'))
+        self.assertEqual(self.press('TKFind'), '/target nameplate1')
 
     def test_find_says_when_nobody_on_the_list_is_near(self):
         self.slash('add Game')
@@ -594,9 +591,8 @@ class TargetKitTests(unittest.TestCase):
         self.fire('UPDATE_MOUSEOVER_UNIT')
         del self.g.UNITS.target
         del self.g.UNITS.mouseover                              # now neither is in sight
-        self.assertEqual(self.press('TKFind'), '/cleartarget\n/target [noexists] Game Warden Ollie\n'
-                                               '/target [noexists] Gamebird\n/target [noexists] Game\n'
-                                               '/cleartarget [dead,noplayer]')
+        self.assertEqual(self.press('TKFind'), '/cleartarget\n/target Game\n/target Gamebird\n'
+                                               '/target Game Warden Ollie')
 
     def test_chat_stays_quiet_unless_turned_on(self):
         """1.4.1, the user: "chat debug menus should be hidden, I don't want to see them"."""
@@ -620,6 +616,51 @@ class TargetKitTests(unittest.TestCase):
         self.assertTrue(self.said('TK Find: nobody on your find list'))
         self.slash('chat')
         self.assertFalse(self.g.TargetKitDB.chat)
+
+    # --- 1.4.2: what Forever's log showed (Zhevra Runners, and CorpseGlow's corpse nameplate) ---
+    def test_nameplates_that_cannot_be_measured_still_go_round(self):
+        """On Forever asking a nameplate where it is on screen is an error ("Can't measure restricted regions"); it
+        made every look fail, so TK Find ran its fixed macro."""
+        self.g.C_NamePlate.GetNamePlateForUnit = self.lua.eval(
+            'function() return { GetCenter = function() error("Can\'t measure restricted regions") end } end')
+        self.slash('add Zhevra Runner')
+        runners = [self.unit(f'nameplate{i}', 'Zhevra Runner', reach=5, enemy=True, reaction=4) for i in (1, 2, 3)]
+        got = []
+        for _ in range(4):
+            self.press('TKFind')
+            got.append(self.g.UNITS.target.guid)
+        self.assertEqual(len(set(got[:3])), 3)                               # each press the next one
+        self.assertEqual(got[3], got[0])                                     # then round again
+        self.assertEqual(len([l for l in self.logged() if "doesn't let addons measure nameplates" in l]), 1)
+        self.assertFalse(self.in_log('ERROR'))
+        self.assertEqual({r.guid for r in runners}, set(got))
+
+    def test_by_name_doesnt_drop_a_target_you_already_have(self):
+        """The fixed macro was "/cleartarget" then "/target [noexists] name": the condition saw the old target, so a
+        press with a target only cleared it (the user: "second press unselects the first selection")."""
+        self.slash('add Zhevra Runner')
+        self.g.UNITS.world1 = self.lua.table_from({'name': 'Zhevra Runner', 'guid': 'Creature-9', 'enemy': True})
+        self.unit('target', 'Sunscale Screecher', plate=False)                 # something else targeted
+        for _ in range(3):
+            self.run_macro(self.body('TKFind'))
+            self.assertEqual(self.g.UNITS.target.name, 'Zhevra Runner')
+            self.tick()
+
+    def test_sap_keeps_an_npc_target_unless_the_game_finds_a_player(self):
+        thug = self.unit('target', 'Defias Thug', plate=False)
+        self.run_macro(self.body('TKSap'))
+        self.assertEqual(self.g.UNITS.target.name, 'Defias Thug')             # no enemy player near: the NPC stays
+        self.g.NEAREST_PLAYER = self.lua.table_from({'name': 'Nightstep', 'guid': 'Player-1', 'enemy': True,
+                                                     'player': True})
+        self.run_macro(self.body('TKSap'))
+        self.assertEqual(self.g.UNITS.target.name, 'Nightstep')                # a player wins
+        self.run_macro(self.body('TKSap'))
+        self.assertEqual(self.g.UNITS.target.name, 'Nightstep')                # and is kept
+        del self.g.UNITS.target
+        self.g.NEAREST_PLAYER = None
+        self.g.NEAREST_ENEMY = thug
+        self.run_macro(self.body('TKSap'))
+        self.assertEqual(self.g.UNITS.target.name, 'Defias Thug')             # nobody targeted: the nearest enemy
 
     def test_the_addon_compiles_and_the_toc_loads_it(self):
         toc = (KIT / 'TargetKit.toc').read_text(encoding='utf-8')

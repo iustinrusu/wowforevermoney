@@ -22,8 +22,9 @@ function TargetUnit(what, exact)                -- a token, or a name (part of o
   end
 end
 function ClearTarget() UNITS.target = nil end
-function TargetNearestEnemy() end
-function TargetNearestEnemyPlayer() end
+NEAREST_ENEMY, NEAREST_PLAYER = nil, nil          -- what the game's own Tab targeting would find (nil: nobody)
+function TargetNearestEnemy() if NEAREST_ENEMY then UNITS.target = NEAREST_ENEMY end end
+function TargetNearestEnemyPlayer() if NEAREST_PLAYER then UNITS.target = NEAREST_PLAYER end end
 function TargetLastTarget() end
 function CastSpellByName() end
 function hooksecurefunc(a, b, c)                -- (name, hook) on a global, or (table, name, hook)

@@ -884,6 +884,13 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   stays there. So targeting by name can't cycle through units that share a name; only a unit token can (a
   nameplate). With friendly nameplates off, an addon sees friendly NPCs only as soft target, soft friend, mouseover
   or target: at most two of a crowd of same-named guards at once.
+- (2026-11-27, TargetKit 1.4.1's log, Zhevra Runners in the Barrens) On Forever, nameplates are restricted regions:
+  `NamePlateN:GetCenter()` from an addon is an error ("Action[FrameMeasurement] failed because[Can't measure
+  restricted regions]"). Reading the plates (`C_NamePlate.GetNamePlates`, the unit token), UnitGUID, UnitName and the
+  range checks on nameplate units work.
+- (same log) Within one macro run, a line's [conditions] see the target from before the press: with a target,
+  "/cleartarget" then "/target [noexists] Zhevra Runner" ran ClearTarget() only (the second line's condition still
+  saw the old target), with none it ran both. So "clear, then [noexists]" toggles target, none, target.
 
 ## What to do next
 
@@ -920,6 +927,30 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (fifteenth part) TargetKit 1.4.2 (the user: "for enemy mobs (zhevra runner): first press targets the
+  closest, second press unselects the first selection and then third press reselects the first one, so no cycling",
+  and "while the overlay for the looting+skinning addon shows up, targeting fails completely"). The log: every look
+  failed with "NamePlate3:GetCenter(): ... Can't measure restricted regions" (TargetKit used the plate's screen height
+  to order units within a range band), 50+ times, so TK Find always ran its fixed macro, and that macro toggled
+  (both facts under Verified facts). CorpseGlow turns on the soft-interact corpse's nameplate, which is why targeting
+  failed whenever its glow showed (it hadn't with friendly units only: no nameplates, nothing to measure).
+  - The plate's height is asked for with pcall; at the first refusal TargetKit stops asking for the session, logs it
+    once ("the game doesn't let addons measure nameplates here"), and ties go by the unit's id: a steady order, so
+    TK Find still takes each one in turn.
+  - No macro puts "/cleartarget" before a "[noexists]" line any more; every condition is written about the target
+    from before the press, and where two lines can both find someone, the one that should win comes last.
+    TK Find's choice is its line alone (no by-name lines after it, they could override the choice). Its fixed
+    macro: "/cleartarget", then plain "/target name" lines, the first list entry last (no "[dead]" clean-up line:
+    it would see the old target; a corpse of that name can be taken). TK Sap without an enemy player in Sap range:
+    `/targetenemy [noexists][dead][noharm]` (or the NPC in Sap range it sees, same condition), then
+    `/targetenemyplayer [noexists][dead][noharm][noplayer]`, then Sap.
+  - Harness: a macro line's conditions now see the target from before the run, as on Forever; the game's Tab
+    targeting can find someone (NEAREST_ENEMY, NEAREST_PLAYER). Tests: 49 (new: unmeasurable nameplates still go
+    round with one log line and no error; by name keeps a target you have instead of dropping it; TK Sap keeps an
+    NPC target unless the game finds a player, keeps that player, and Tabs when nothing is targeted).
+  - Not yet seen in game: whether Forever takes "/target nameplateN" in a macro (TK Find's cycling needs it). If it
+    doesn't, the log says "chose ... but your target is ..." on those presses.
 
 - **2026-11-27** (fourteenth part) TargetKit: same-named friendly NPCs don't cycle (the user: "target macro does not
   cycle through friendly npcs with same name, is that intended?", then "it only targets closest currently"). Not

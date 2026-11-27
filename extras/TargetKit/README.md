@@ -67,11 +67,20 @@ Revised:
   window is open. A press runs what's written, with no addon code in between. Just before combat each macro gets its
   fixed text (the game's own targeting), since macros can't change in combat. Units seen only as your mouseover or a
   soft target (a friendly player with friendly nameplates off, say) are targeted by their exact name, because the
-  mouse is somewhere else by the time you press. TK Find's macro also keeps "/target [noexists] name" lines for your
-  list after its choice, which act only if the choice didn't take. Each macro's last line clicks a marker button so
+  mouse is somewhere else by the time you press. When TargetKit sees nobody from your list, TK Find targets by name
+  ("/cleartarget", then "/target name" for each name, your first entry last so it wins); the game then takes the
+  closest unit of that name, which can be a corpse. Each macro's last line clicks a marker button so
   the log sees the press (TK Sap's mouseover Sap ends its macro early, so that press shows only by its cast).
   Before 1.4.0 the macros held `/click TKFind` on a secure button that held the choice; the 1.3.0 log showed the game
   ran the macro's first line on every press but never that button's macro.
+- **What Forever doesn't allow (1.4.2, from the log):** an addon can't ask a nameplate where it is on screen, so
+  within one range band TargetKit goes round in a steady order instead of lowest-on-screen first (before 1.4.2 that
+  refusal made every look fail: TK Find went "closest, none, closest", and failed whenever CorpseGlow lit a corpse,
+  since that gives the corpse a nameplate). And within one press, a macro's [conditions] see the target you had
+  before it, so the macros never put "/cleartarget" before a "[noexists]" line. TK Sap's lines, when it doesn't have
+  an enemy player in Sap range in sight: no attackable target, the game's nearest enemy (or the NPC in Sap range
+  TargetKit sees); then, unless you already target a living enemy player, the game's nearest enemy player, which wins
+  if there is one; then Sap.
 - **On your bars:** the three macros are under Escape > Macros, General tab: drag **TK Find**, **TK Pickpocket** and
   **TK Sap** to your bars and leave their text as it is (TargetKit rewrites it). A key set in the window runs the same
   macro, so it works without the macro being on a bar.
