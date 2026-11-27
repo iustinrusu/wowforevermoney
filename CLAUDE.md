@@ -124,5 +124,5 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `tools/screenshots.py` | pictures of every tab, wide and 375 px, plus sideways-scroll and console checks (`python tools/screenshots.py before`) |
 | `web/` | the page (index.html, app.js, style.css) |
 | `addon/ForeverMoneyBridge/` | our WoW addon; copied into AddOns when the app starts |
-| `extras/TargetKit/` | our addon outside the app (never installed by it): TK Find, TK Pickpocket, TK Sap macros; copy into AddOns by hand (its README) |
+| `extras/TargetKit/` | our addon outside the app (never installed by it): TK Find, TK Pickpocket, TK Sap macros (`/click TKFind`, `TKPick`, `TKSap`), minimap window for keys and the find list; copy into AddOns by hand (its README) |
 | `data/` | caches and user state (not versioned, except the hand-curated `data/tips.json` and `data/investments.json`) |

@@ -148,7 +148,9 @@ See docs/PROJECT_LOG.md, open items.
 
 - **TargetKit** (`extras/TargetKit`): three one-key macros: TK Find (a find list, closest first, press again for the
   next), TK Pickpocket (the closest humanoid not robbed yet: Sap, then Pick Pocket) and TK Sap (mouseover, else the
-  closest enemy player, including stealthed ones the game reveals). Its README has the details and how to install it.
+  closest enemy player, including stealthed ones the game reveals). A minimap button opens its window: keys for the
+  three macros (Shift, Ctrl and Alt combinations, mouse buttons) and the find list (type a name, or add your target).
+  Its README has the details and how to install it.
 
 ## Command line
 

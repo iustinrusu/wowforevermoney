@@ -910,6 +910,21 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (seventh part) TargetKit 1.1.0 (the user: a minimap button "for rebinding the macros (key combinations,
+  key + key, should be accepted)", to "input the mob that should be targeted" or "set to current selected target", and
+  "being able to create a macro to /use_addon_target, /use_addon_pickpocket, /use_addon_sap ... so I can have them on my
+  action bars"). A Sap icon on the minimap (angle saved in TargetKitDB, account-wide) opens a window:
+  - Keys: Set, then press the key; the capture takes Shift/Ctrl/Alt in the game's ALT-CTRL-SHIFT order, mouse
+    buttons 3 to 5 and the wheel. Left/right click or Escape cancel. One key per macro.
+  - Keys are saved and applied at each login as priority override bindings (SetOverrideBindingClick on the button), so
+    the user's own bindings stay underneath. The window says what the key did before, and Clear gives it back.
+  - WoW can't bind two ordinary keys together; said so in the window and the README.
+  - Find list: a text box (Enter adds), Add my target, Remove per row, wheel scrolling past 8.
+  - Own macros: an addon's slash command can't target or cast, so the buttons got short names for `/click TKFind`,
+    `TKPick`, `TKSap`. The window and `/tkit macros` show the exact line (` LeftButton 1` while the game acts on key
+    down). `/tkit` alone opens the window; `/tkit help` lists the commands.
+  28 tests. Copied into AddOns; not checked in game yet.
+
 - **2026-11-27** (sixth part) TargetKit 1.0.0, a new addon in `extras/` that the app never installs (the user: "create
   a new addon that should not be included in the gea app, but should live in our repo ... revise the prompt"; the
   request and its revised version are in `extras/TargetKit/README.md`). Three macros it makes itself, each a `/click`

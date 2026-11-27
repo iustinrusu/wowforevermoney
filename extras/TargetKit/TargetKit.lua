@@ -14,7 +14,8 @@
 --                  else the game's nearest enemy.
 --
 -- How, within WoW's rules: an addon may never pick a target by itself; only a key press on a secure button can, and
--- the button's macro can only be changed out of combat. So each macro is "/click TargetKitX". Just before the click
+-- the button's macro can only be changed out of combat. So each macro is "/click TKFind" (TKPick, TKSap). Just
+-- before the click
 -- runs (PreClick), out of combat, the addon looks at every unit it can see (nameplates, target, mouseover, soft
 -- targets, focus, your group), ranks them and writes the button's macro: "/target nameplate7" and the spell. In combat,
 -- or when it finds nothing, the button runs a fixed macro made only of the game's own targeting.
@@ -22,7 +23,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.0.0"
+local VERSION = "1.1.0"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
@@ -285,10 +286,10 @@ end
 
 -- ---------- the buttons and their macros ----------
 local BUTTONS = {
-  { name = "TargetKitFind", macro = "TK Find", icon = "INV_Misc_Spyglass_02", build = findBuild, fixed = findFixed },
-  { name = "TargetKitPick", macro = "TK Pickpocket", icon = "INV_Misc_QuestionMark", show = PICK_POCKET,
+  { name = "TKFind", macro = "TK Find", icon = "INV_Misc_Spyglass_02", build = findBuild, fixed = findFixed },
+  { name = "TKPick", macro = "TK Pickpocket", icon = "INV_Misc_QuestionMark", show = PICK_POCKET,
     build = pickBuild, fixed = pickFixed },
-  { name = "TargetKitSap", macro = "TK Sap", icon = "INV_Misc_QuestionMark", show = SAP, build = sapBuild, fixed = sapFixed },
+  { name = "TKSap", macro = "TK Sap", icon = "INV_Misc_QuestionMark", show = SAP, build = sapBuild, fixed = sapFixed },
 }
 
 local function resetButtons()                            -- back to the fixed macros (out of combat only)
@@ -320,11 +321,19 @@ local function makeButtons()
   end
 end
 
-local function macroBody(b)
-  -- with "act on key down" on (the game's default), a /click must say so, or the secure button ignores it
+-- The line a macro needs to press one of the buttons. An addon's own slash command can't target or cast (WoW blocks
+-- addon code from that), so /click on the secure button is the only way, in our macros and in your own (1.1.0, the
+-- user: "being able to create a macro to /use_addon_target, /use_addon_pickpocket, /use_addon_sap ... so I can have
+-- them on my action bars"). With "act on key down" on (the game's default), the /click must say so ("LeftButton 1"),
+-- or the secure button ignores it.
+local function clickLine(name)
   local down = GetCVarBool and GetCVarBool("ActionButtonUseKeyDown")
+  return "/click " .. name .. (down and " LeftButton 1" or "")
+end
+
+local function macroBody(b)
   local show = b.show and spellName(b.show)
-  return (show and ("#showtooltip " .. show .. "\n") or "") .. "/click " .. b.name .. (down and " LeftButton 1" or "")
+  return (show and ("#showtooltip " .. show .. "\n") or "") .. clickLine(b.name)
 end
 
 local function ensureMacros(create)
@@ -351,8 +360,380 @@ local function ensureMacros(create)
   end
 end
 
--- ---------- events ----------
+-- ---------- events (the frame first: it also owns the keys) ----------
 local ev = CreateFrame("Frame")
+
+-- ---------- the find list ----------
+local function addName(name)
+  name = strtrim(name or "")
+  if name == "" then return false, "type a name first (part of one is enough), or target something and use Add my target." end
+  for _, w in ipairs(db.find) do
+    if strlower(w) == strlower(name) then return false, w .. " is already on the find list." end
+  end
+  db.find[#db.find + 1] = name
+  resetButtons()
+  return true, "added " .. name .. " to the find list (" .. #db.find .. " on it). TK Find targets it, closest first."
+end
+
+local function removeName(name)
+  for i, w in ipairs(db.find) do
+    if strlower(w) == strlower(name or "") then
+      table.remove(db.find, i)
+      resetButtons()
+      return true, "removed " .. w .. " from the find list."
+    end
+  end
+  return false, (name or "?") .. " is not on the find list."
+end
+
+-- ---------- keys ----------
+-- 1.1.0 (the user: "a minimap button would be nice too, for rebinding the macros (key combinations, key + key, should
+-- be accepted)"). A key for each macro, saved in TargetKitDB and set again at every login as an override binding. It
+-- clicks the macro's button directly (no macro on a bar needed), it wins over the key's other uses while TargetKit is
+-- loaded, and your own key bindings stay as they were underneath: clear the key, or turn TargetKit off, and the key
+-- does what it did before. WoW binds one key plus any of Shift, Ctrl and Alt, or mouse button 3 to 5 or the wheel; no
+-- addon can bind two ordinary keys pressed together. Keys can't change in combat (the game forbids it).
+local pendingKeys = false
+local function applyKeys()
+  if InCombatLockdown() then pendingKeys = true return end
+  if not (ClearOverrideBindings and SetOverrideBindingClick) then return end
+  ClearOverrideBindings(ev)
+  for _, b in ipairs(BUTTONS) do
+    local key = db.keys[b.name]
+    if key then SetOverrideBindingClick(ev, true, key, b.name, "LeftButton") end
+  end
+end
+
+local function keyText(key)
+  if not key then return "|cff888888no key|r" end
+  return (GetBindingText and GetBindingText(key)) or key
+end
+
+local function actionName(action)            -- what a key did before, in words; nil for nothing or one of ours
+  if not action or action == "" then return nil end
+  local clicked = action:match("^CLICK ([^:]+)")
+  for _, b in ipairs(BUTTONS) do if clicked == b.name then return nil end end
+  return _G["BINDING_NAME_" .. action] or action
+end
+
+local function setKey(b, key)
+  if InCombatLockdown() then return false, "keys can't change in combat; try again after it." end
+  local before = GetBindingAction and actionName(GetBindingAction(key, true))
+  for _, o in ipairs(BUTTONS) do if db.keys[o.name] == key then db.keys[o.name] = nil end end   -- one key, one macro
+  db.keys[b.name] = key
+  applyKeys()
+  return true, b.macro .. " is on " .. keyText(key) .. " now" .. (before and (" (it was " .. before
+    .. "; it does that again if you clear this key)") or "") .. "."
+end
+
+local function clearKey(b)
+  if InCombatLockdown() then return false, "keys can't change in combat; try again after it." end
+  if not db.keys[b.name] then return false, b.macro .. " has no key." end
+  db.keys[b.name] = nil
+  applyKeys()
+  return true, b.macro .. " has no key now; the key does what it did before."
+end
+
+local MODIFIER = { LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true, LALT = true, RALT = true,
+                   LMETA = true, RMETA = true }
+local MOUSE = { MiddleButton = "BUTTON3", Button4 = "BUTTON4", Button5 = "BUTTON5" }    -- left and right: the interface's
+local function withModifiers(key)                                                       -- the game's order: ALT-CTRL-SHIFT
+  return (IsAltKeyDown() and "ALT-" or "") .. (IsControlKeyDown() and "CTRL-" or "") .. (IsShiftKeyDown() and "SHIFT-" or "")
+    .. (IsMetaKeyDown and IsMetaKeyDown() and "META-" or "") .. key
+end
+
+-- ---------- the TargetKit window: keys and the find list (minimap button or /tkit) ----------
+local panel, capturing, refreshPanel
+local LIST_ROWS = 8
+
+local function report(_, msg)
+  tell(msg)
+  if panel then
+    panel.status:SetText(msg)
+    refreshPanel()
+  end
+end
+
+local function stopCapture()
+  capturing = nil
+  if panel then
+    panel.capture:EnableKeyboard(false)
+    panel.capture:Hide()
+  end
+end
+
+local function captured(key)
+  local b = capturing
+  stopCapture()
+  if b then report(setKey(b, key)) end
+end
+
+local function startCapture(b)
+  if InCombatLockdown() then report(false, "keys can't change in combat; try again after it.") return end
+  capturing = b
+  local c = panel.capture
+  c.text:SetText("Press the key for " .. b.macro .. ",\nwith Shift, Ctrl or Alt if you like,\nor mouse button 3 to 5, or turn the"
+    .. " mouse wheel.\n\nEscape or a left or right click cancels.")
+  c:Show()
+  c:EnableKeyboard(true)
+  if c.SetPropagateKeyboardInput then c:SetPropagateKeyboardInput(false) end
+end
+
+local function backdrop(f, alpha)
+  if f.SetBackdrop then
+    f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+                    tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    f:SetBackdropColor(0.04, 0.05, 0.07, alpha or 0.95)
+    f:SetBackdropBorderColor(0.6, 0.8, 1, 0.8)
+  end
+end
+local function label(parent, font, justify)
+  local fs = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlightSmall")
+  fs:SetJustifyH(justify or "LEFT")
+  return fs
+end
+local function button(parent, text, w, onClick)
+  local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+  b:SetSize(w, 20)
+  b:SetText(text)
+  b:SetScript("OnClick", onClick)
+  return b
+end
+local function hover(frame, explain)
+  frame:SetScript("OnEnter", function(self)
+    if not GameTooltip then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText(explain, 1, 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  frame:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+end
+
+local function makePanel()
+  panel = CreateFrame("Frame", "TargetKitPanel", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+  panel:SetSize(360, 486)
+  panel:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+  panel:SetFrameStrata("DIALOG")
+  panel:SetClampedToScreen(true)
+  panel:EnableMouse(true)
+  panel:SetMovable(true)
+  panel:RegisterForDrag("LeftButton")
+  panel:SetScript("OnDragStart", panel.StartMoving)
+  panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
+  backdrop(panel)
+  if UISpecialFrames then table.insert(UISpecialFrames, "TargetKitPanel") end       -- Escape closes it
+  local title = label(panel, "GameFontNormal")
+  title:SetPoint("TOPLEFT", 14, -12)
+  title:SetText("TargetKit " .. VERSION)
+  local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", -2, -2)
+
+  local function head(text, hint, y)
+    local h = label(panel, "GameFontNormalSmall")
+    h:SetPoint("TOPLEFT", 14, y)
+    h:SetText(text)
+    local t = label(panel, "GameFontDisableSmall")
+    t:SetPoint("TOPLEFT", 14, y - 14)
+    t:SetWidth(332)
+    t:SetText(hint)
+  end
+
+  head("Keys", "One key, with Shift, Ctrl or Alt if you like (Shift-F, Ctrl-Alt-3), or mouse button 3 to 5, or the wheel.", -40)
+  panel.keys = {}
+  for i, b in ipairs(BUTTONS) do
+    local y = -78 - (i - 1) * 24
+    local row = {}
+    row.name = label(panel, "GameFontHighlight")
+    row.name:SetPoint("TOPLEFT", 16, y - 3)
+    row.name:SetText(b.macro)
+    row.key = label(panel, "GameFontHighlightSmall")
+    row.key:SetPoint("TOPLEFT", 132, y - 5)
+    row.key:SetWidth(104)
+    row.set = button(panel, "Set", 50, function() startCapture(b) end)
+    row.set:SetPoint("TOPLEFT", 240, y)
+    row.clear = button(panel, "Clear", 56, function() report(clearKey(b)) end)
+    row.clear:SetPoint("LEFT", row.set, "RIGHT", 4, 0)
+    hover(row.set, "Set the key for " .. b.macro .. ": click, then press the key, with Shift, Ctrl or Alt if you like.")
+    hover(row.clear, "Take the key off " .. b.macro .. ". The key does what it did before.")
+    panel.keys[i] = row
+  end
+  panel.bars = label(panel, "GameFontDisableSmall")
+  panel.bars:SetPoint("TOPLEFT", 14, -152)
+  panel.bars:SetWidth(332)
+
+  head("Find list", "TK Find targets these, closest first. Part of a name is enough: \"thug\" finds Defias Thug.", -192)
+  local input = CreateFrame("EditBox", "TargetKitPanelInput", panel, "InputBoxTemplate")
+  input:SetSize(150, 20)
+  input:SetPoint("TOPLEFT", 22, -226)
+  input:SetAutoFocus(false)
+  local function addTyped()
+    report(addName(input:GetText()))
+    input:SetText("")
+    input:ClearFocus()
+  end
+  input:SetScript("OnEnterPressed", addTyped)
+  input:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+  hover(input, "Type a name (or part of one) and press Enter to put it on the find list.")
+  panel.input = input
+  panel.add = button(panel, "Add", 50, addTyped)
+  panel.add:SetPoint("LEFT", input, "RIGHT", 6, 0)
+  panel.addTarget = button(panel, "Add my target", 110, function()
+    local name = UnitName("target")
+    if not name then report(false, "target something first, then click Add my target.") return end
+    report(addName(name))
+  end)
+  panel.addTarget:SetPoint("LEFT", panel.add, "RIGHT", 4, 0)
+  hover(panel.addTarget, "Put the name of what you have targeted now on the find list.")
+
+  panel.rows = {}
+  panel.offset = 0
+  for i = 1, LIST_ROWS do
+    local y = -256 - (i - 1) * 20
+    local row = {}
+    row.name = label(panel, "GameFontHighlightSmall")
+    row.name:SetPoint("TOPLEFT", 18, y - 4)
+    row.name:SetWidth(246)
+    row.remove = button(panel, "Remove", 70, function() report(removeName(row.value)) end)
+    row.remove:SetPoint("TOPLEFT", 272, y)
+    panel.rows[i] = row
+  end
+  panel.more = label(panel, "GameFontDisableSmall")
+  panel.more:SetPoint("TOPLEFT", 18, -256 - LIST_ROWS * 20 - 2)
+  panel:EnableMouseWheel(true)
+  panel:SetScript("OnMouseWheel", function(_, delta)                                -- a long list scrolls
+    panel.offset = panel.offset - delta
+    refreshPanel()
+  end)
+
+  local y = -256 - LIST_ROWS * 20 - 22
+  panel.debug = button(panel, "Debug: off", 96, function() SlashCmdList.TARGETKIT("debug") refreshPanel() end)
+  panel.debug:SetPoint("TOPLEFT", 14, y)
+  hover(panel.debug, "Print in chat, on every press, what the macro chose and why.")
+  panel.macros = button(panel, "Make the macros", 120, function() SlashCmdList.TARGETKIT("macros") end)
+  panel.macros:SetPoint("LEFT", panel.debug, "RIGHT", 4, 0)
+  hover(panel.macros, "Make TK Find, TK Pickpocket and TK Sap again in your macros, if you deleted them.")
+  panel.forget = button(panel, "Forget robbed", 110, function() SlashCmdList.TARGETKIT("forget") end)
+  panel.forget:SetPoint("LEFT", panel.macros, "RIGHT", 4, 0)
+  hover(panel.forget, "TK Pickpocket forgets whom you have robbed, and may try them again.")
+  panel.status = label(panel, "GameFontDisableSmall")
+  panel.status:SetPoint("BOTTOMLEFT", 14, 12)
+  panel.status:SetWidth(332)
+
+  -- the key catcher: over the whole window while you press the key
+  local c = CreateFrame("Button", nil, panel)
+  c:SetAllPoints(panel)
+  c:SetFrameLevel(panel:GetFrameLevel() + 20)
+  local shade = c:CreateTexture(nil, "BACKGROUND")
+  shade:SetAllPoints(c)
+  shade:SetColorTexture(0, 0, 0, 0.88)
+  c.text = label(c, "GameFontHighlight", "CENTER")
+  c.text:SetPoint("CENTER")
+  c.text:SetWidth(320)
+  c:EnableMouse(true)
+  c:EnableMouseWheel(true)
+  c:SetScript("OnKeyDown", function(_, key)
+    if key == "ESCAPE" then stopCapture() report(false, "no key set.") return end
+    if MODIFIER[key] then return end                                                -- wait for the key with it
+    captured(withModifiers(key))
+  end)
+  c:SetScript("OnMouseDown", function(_, mouse)
+    local key = MOUSE[mouse]
+    if key then captured(withModifiers(key)) else stopCapture() report(false, "no key set.") end
+  end)
+  c:SetScript("OnMouseWheel", function(_, delta)
+    captured(withModifiers(delta > 0 and "MOUSEWHEELUP" or "MOUSEWHEELDOWN"))
+  end)
+  c:Hide()
+  panel.capture = c
+  panel:SetScript("OnShow", function() refreshPanel() end)
+  panel:SetScript("OnHide", stopCapture)
+  panel:Hide()
+end
+
+refreshPanel = function()
+  if not panel then return end
+  for i, b in ipairs(BUTTONS) do
+    local row = panel.keys[i]
+    row.key:SetText(keyText(db.keys[b.name]))
+    if db.keys[b.name] then row.clear:Enable() else row.clear:Disable() end
+  end
+  panel.offset = math.max(0, math.min(panel.offset, #db.find - LIST_ROWS))
+  for i, row in ipairs(panel.rows) do
+    local name = db.find[panel.offset + i]
+    row.value = name
+    if name then
+      row.name:SetText(name)
+      row.remove:Show()
+    else
+      row.name:SetText(i == 1 and #db.find == 0 and "|cff888888empty: type a name above, or target something and"
+        .. " click Add my target|r" or "")
+      row.remove:Hide()
+    end
+  end
+  local below = #db.find - panel.offset - LIST_ROWS
+  panel.more:SetText((panel.offset > 0 or below > 0) and ("scroll for more: " .. panel.offset .. " above, "
+    .. math.max(below, 0) .. " below") or "")
+  panel.debug:SetText(debug and "Debug: on" or "Debug: off")
+  panel.bars:SetText("On your bars: drag TK Find, TK Pickpocket or TK Sap from Escape > Macros (General tab), or"
+    .. " put this line in a macro of your own: " .. clickLine("TKSap") .. " (or TKPick, TKFind).")
+end
+
+local function togglePanel()
+  if not panel then makePanel() end
+  if panel:IsShown() then panel:Hide() else panel:Show() end
+end
+
+-- ---------- the minimap button ----------
+-- A Sap icon on the minimap's edge: click it for the TargetKit window, drag it around the edge to move it (the place is
+-- saved in TargetKitDB, account-wide, and kept through relogs and restarts). /tkit minimap hides or brings it back.
+local mmButton
+local function placeButton()
+  local a = math.rad(db.minimap.angle or 235)
+  local r = (Minimap:GetWidth() or 140) / 2 + 10
+  mmButton:ClearAllPoints()
+  mmButton:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * r, math.sin(a) * r)
+end
+
+local function makeMinimapButton()
+  if mmButton or not Minimap then return end
+  mmButton = CreateFrame("Button", "TargetKitMinimapButton", Minimap)
+  mmButton:SetSize(31, 31)
+  mmButton:SetFrameStrata("MEDIUM")
+  mmButton:SetFrameLevel(8)
+  mmButton:RegisterForClicks("AnyUp")
+  mmButton:RegisterForDrag("LeftButton")
+  mmButton:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+  local border = mmButton:CreateTexture(nil, "OVERLAY")
+  border:SetSize(53, 53)
+  border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+  border:SetPoint("TOPLEFT")
+  local back = mmButton:CreateTexture(nil, "BACKGROUND")
+  back:SetSize(20, 20)
+  back:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
+  back:SetPoint("TOPLEFT", 7, -5)
+  local icon = mmButton:CreateTexture(nil, "ARTWORK")
+  icon:SetSize(17, 17)
+  icon:SetTexture("Interface\\Icons\\Ability_Sap")
+  icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
+  icon:SetPoint("TOPLEFT", 7, -6)
+  mmButton:SetScript("OnClick", togglePanel)
+  mmButton:SetScript("OnDragStart", function(self)
+    self:SetScript("OnUpdate", function()
+      local mx, my = Minimap:GetCenter()
+      local px, py = GetCursorPosition()
+      local s = Minimap:GetEffectiveScale()
+      db.minimap.angle = math.floor(math.deg((math.atan2 or atan2)(py / s - my, px / s - mx)) + 0.5) % 360
+      placeButton()
+    end)
+  end)
+  mmButton:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
+  hover(mmButton, "|cff9ad0ffTargetKit|r\nClick: the keys for TK Find, TK Pickpocket and TK Sap, and the find list.\n"
+    .. "Drag: move this button around the minimap (the place is kept).")
+  placeButton()
+  if db.minimap.hide then mmButton:Hide() else mmButton:Show() end
+end
+
+-- ---------- events ----------
 ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("PLAYER_REGEN_DISABLED")                -- fires just before combat locks the buttons
 ev:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -366,13 +747,19 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3)
     db = TargetKitDB
     db.find = db.find or {}
     db.picked = db.picked or {}
+    db.keys = db.keys or {}
+    db.minimap = db.minimap or {}
     for g, t in pairs(db.picked) do if time() - t >= KEEP_PICKED then db.picked[g] = nil end end
     makeButtons()
     if InCombatLockdown() then pendingMacros = true else ensureMacros(not db.macrosMade); db.macrosMade = true end
+    applyKeys()
+    pcall(makeMinimapButton)
   elseif event == "PLAYER_REGEN_DISABLED" then
     resetButtons()
   elseif event == "PLAYER_REGEN_ENABLED" then
+    resetButtons()                                       -- a find list changed in combat
     if pendingMacros then pendingMacros = false; ensureMacros(not db.macrosMade); db.macrosMade = true end
+    if pendingKeys then pendingKeys = false; applyKeys() end
   elseif event == "CVAR_UPDATE" then
     if db and (a1 == "ActionButtonUseKeyDown" or a1 == "ACTION_BUTTON_USE_KEY_DOWN") then
       if InCombatLockdown() then pendingMacros = true else ensureMacros(false) end
@@ -401,47 +788,45 @@ SlashCmdList.TARGETKIT = function(msg)
   msg = strtrim(msg or "")
   local cmd, rest = msg:match("^(%S*)%s*(.-)$")
   cmd = strlower(cmd or "")
-  if cmd == "add" then
+  if cmd == "" then
+    togglePanel()
+  elseif cmd == "add" then
     local name = rest ~= "" and rest or UnitName("target")
     if not name then tell("type /tkit add <name>, or target something first.") return end
-    for _, w in ipairs(db.find) do
-      if strlower(w) == strlower(name) then tell(w .. " is already on the find list.") return end
-    end
-    db.find[#db.find + 1] = name
-    resetButtons()
-    tell("added " .. name .. " to the find list (" .. #db.find .. " on it). TK Find targets it, closest first.")
+    report(addName(name))
   elseif cmd == "remove" or cmd == "del" then
-    for i, w in ipairs(db.find) do
-      if strlower(w) == strlower(rest) then
-        table.remove(db.find, i)
-        resetButtons()
-        tell("removed " .. w .. " from the find list.")
-        return
-      end
-    end
-    tell(rest .. " is not on the find list. /tkit list shows it.")
+    report(removeName(rest))
   elseif cmd == "list" then
     tell(#db.find == 0 and "the find list is empty. /tkit add <name> adds one."
       or ("find list: " .. table.concat(db.find, ", ")))
   elseif cmd == "clear" then
     db.find = {}
     resetButtons()
-    tell("the find list is empty now.")
+    report(true, "the find list is empty now.")
   elseif cmd == "macros" then
     if InCombatLockdown() then tell("not in combat: try again after it.") return end
     ensureMacros(true)
-    tell("macros checked: TK Find, TK Pickpocket, TK Sap.")
+    tell("macros checked: TK Find, TK Pickpocket, TK Sap. In a macro of your own, these lines press them: "
+      .. clickLine("TKFind") .. ", " .. clickLine("TKPick") .. ", " .. clickLine("TKSap") .. ".")
   elseif cmd == "forget" then
     db.picked = {}
     tell("forgot which units you have pickpocketed: TK Pickpocket may try them again.")
   elseif cmd == "debug" then
     debug = not debug
     tell("debug " .. (debug and "on: each press prints what it chose and the macro it ran." or "off."))
+  elseif cmd == "minimap" then
+    db.minimap.hide = not db.minimap.hide
+    if not mmButton then pcall(makeMinimapButton) end
+    if mmButton then if db.minimap.hide then mmButton:Hide() else mmButton:Show() end end
+    tell("minimap button " .. (db.minimap.hide and "hidden. /tkit minimap brings it back." or "shown."))
   else
-    tell(VERSION .. ". Macros: TK Find, TK Pickpocket, TK Sap (Escape > Macros, General tab; drag them to your bars).")
+    tell(VERSION .. ". /tkit alone (or the minimap button) opens the window: keys for the macros and the find list.")
+    tell("Macros: TK Find, TK Pickpocket, TK Sap (Escape > Macros, General tab), or give them keys in the window.")
+    tell("In a macro of your own: " .. clickLine("TKFind") .. ", " .. clickLine("TKPick") .. " or " .. clickLine("TKSap")
+      .. " (an addon's own /command can't target or cast; /click on its button can).")
     tell("/tkit add <name>: put a name (or part of one) on the find list; /tkit add alone adds your target's name.")
     tell("/tkit remove <name>, /tkit list, /tkit clear: change or see the find list.")
     tell("/tkit macros: make the three macros again if you deleted them. /tkit forget: TK Pickpocket forgets whom it robbed.")
-    tell("/tkit debug: print what each press chose and why.")
+    tell("/tkit debug: print what each press chose and why. /tkit minimap: hide or bring back the minimap button.")
   end
 end

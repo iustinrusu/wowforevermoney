@@ -15,6 +15,11 @@ macro should always target closest target available as closest as physically pos
 npcs and enemy players, but enemy players should have priority), and if you can add mouseover interaction for simple
 sap that would be awesome, but it's ok if you can't. revise the prompt". Then: "the pvp sap is especially needed for
 sapping invisible targets, useful in battlegrounds against rogues for example" and "sap does not break stealth".
+Later the same day: "maybe a minimap button would be nice too, for rebinding the macros (key combinations, key + key,
+should be accepted), also an option to input the mob that should be targeted for the target macro would be nice, or
+an option to set to current selected target would be nice too" and "being able to create a macro to /use_addon_target,
+/use_addon_pickpocket, /use_addon_sap (command names are placeholders) would be nice, so I can have them on my action
+bars".
 
 Revised:
 
@@ -39,21 +44,39 @@ Revised:
 > are used out of combat anyway; in combat the macros fall back to the game's own targeting. "Closest" can only mean
 > the nearest range band the game reports (Pick Pocket's range, Sap's, 10, 11, 28 yards, further); within a band, the
 > unit whose nameplate is lower on the screen.
+>
+> 4. **A minimap button** opens a TargetKit window: a key for each macro (Set, then press it: one key with Shift, Ctrl
+>    or Alt if I like, or mouse button 3 to 5, or the wheel; WoW can't bind two ordinary keys pressed together), and
+>    the find list (type a name and press Enter, or **Add my target**; each name with Remove). Keys are kept through
+>    relogs and don't overwrite my own bindings: clearing one gives the key back.
+> 5. **On my bars:** the three macros, or a line of my own. An addon's own slash command can't target or cast (WoW
+>    blocks addon code from that), so the line is `/click TKFind`, `/click TKPick` or `/click TKSap`, with
+>    ` LeftButton 1` at the end while the game acts on key down (its default); the window shows the exact line.
 
 ## Using it
 
 - WoW needs a **full restart** (not `/reload`) to see a new addon; then tick TargetKit in the AddOns list.
-- The three macros appear under Escape > Macros, General tab: drag **TK Find**, **TK Pickpocket** and **TK Sap** to
-  your bars. Each is `/click TargetKitFind` (or Pick, Sap), and the addon writes the real macro just before the click.
-- `/tkit add <name>`, `/tkit remove <name>`, `/tkit list`, `/tkit clear`: the find list.
-- `/tkit macros` makes the three macros again if you deleted them; `/tkit forget` clears whom you robbed;
-  `/tkit debug` prints, on every press, what it chose and the macro it ran.
+- **The window:** click the Sap icon on the minimap's edge (or type `/tkit`). Keys: click **Set** next to a macro and
+  press the key (Shift-F, Ctrl-Alt-3, mouse button 4, Ctrl + wheel down...); **Clear** gives the key back. The key
+  works while TargetKit is loaded and your own binding for it comes back when you clear it. Find list: type a name
+  (part of one is enough) and press Enter, or **Add my target**; **Remove** takes one off; the wheel scrolls a long
+  list. Drag the minimap button to move it; `/tkit minimap` hides it or brings it back.
+- **On your bars:** the three macros are under Escape > Macros, General tab: drag **TK Find**, **TK Pickpocket** and
+  **TK Sap** to your bars. In a macro of your own, the line is `/click TKFind`, `/click TKPick` or `/click TKSap`, plus
+  ` LeftButton 1` while the game acts on key down (the default; the window shows the exact line). The addon writes
+  the real macro just before each click.
+- `/tkit add <name>`, `/tkit remove <name>`, `/tkit list`, `/tkit clear`: the find list from chat.
+- `/tkit macros` makes the three macros again if you deleted them (and prints the lines for your own); `/tkit forget`
+  clears whom you robbed; `/tkit debug` prints, on every press, what it chose and the macro it ran; `/tkit help`.
 - Nameplates matter: the addon sees units through them (enemy nameplates for mobs and players, friendly ones for
   NPCs), plus your target, mouseover, soft targets, focus and group.
 
 ## Limits (the game's, not choices)
 
 - No exact distances: range bands only (see above).
+- Keys: one key with Shift, Ctrl, Alt, or a mouse button or the wheel; two ordinary keys together can't be bound.
+  Keys can't change in combat.
+- An addon's own slash command can't target or cast, so macros press the buttons with `/click`.
 - A stealthed player is invisible to addons until the game reveals them, and even then has no nameplate. TK Sap
   hands that case to the game's own nearest-enemy-player targeting, which does see them.
 - Sap and Pick Pocket on Forever: Sap doesn't break stealth (the user, 2026-11-27). Whether Pick Pocket shares the

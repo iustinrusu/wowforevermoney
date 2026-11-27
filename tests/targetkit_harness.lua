@@ -59,16 +59,70 @@ function GetNumMacros() return #MACROS, 0 end
 
 UIParent = {}
 SlashCmdList = {}
+Minimap = { GetWidth = function() return 140 end, GetCenter = function() return 1800, 950 end,
+            GetEffectiveScale = function() return 1 end }
+CURSOR = { 0, 0 }
+function GetCursorPosition() return CURSOR[1], CURSOR[2] end
+TOOLTIP = nil
+GameTooltip = { SetOwner = function() end, SetText = function(_, t) TOOLTIP = t end, Show = function() end,
+                Hide = function() TOOLTIP = nil end }
+MODS = { alt = false, ctrl = false, shift = false }      -- the modifier keys held down
+function IsAltKeyDown() return MODS.alt end
+function IsControlKeyDown() return MODS.ctrl end
+function IsShiftKeyDown() return MODS.shift end
+-- key bindings: the user's own (BINDINGS) and the override bindings addons set (OVERRIDES)
+BINDINGS = { ["SHIFT-F"] = "MOVEFORWARD" }
+BINDING_NAME_MOVEFORWARD = "Move Forward"
+OVERRIDES = {}
+function SetOverrideBindingClick(owner, priority, key, button, mouse)
+  if COMBAT then error("blocked in combat") end
+  OVERRIDES[key] = { button = button, priority = priority, mouse = mouse }
+end
+function ClearOverrideBindings() if COMBAT then error("blocked in combat") end OVERRIDES = {} end
+function GetBindingAction(key, checkOverride)
+  if checkOverride and OVERRIDES[key] then return "CLICK " .. OVERRIDES[key].button .. ":LeftButton" end
+  return BINDINGS[key] or ""
+end
+function GetBindingText(key) return (key:gsub("SHIFT%-", "Shift-"):gsub("CTRL%-", "Ctrl-"):gsub("ALT%-", "Alt-")) end
+
+local function widget()                         -- font strings and textures: they keep their text and shown state
+  return setmetatable({ text = "", shown = true }, { __index = function(_, k)
+    if k == "SetText" then return function(w, v) w.text = v end end
+    if k == "GetText" then return function(w) return w.text end end
+    if k == "Show" then return function(w) w.shown = true end end
+    if k == "Hide" then return function(w) w.shown = false end end
+    return function() end
+  end })
+end
+
+-- frames keep what the addon and the tests look at; any other method does nothing
+local frameMethods = {
+  SetAttribute = function(self, k, v) if COMBAT then error("blocked in combat") end self.attrs[k] = v end,
+  GetAttribute = function(self, k) return self.attrs[k] end,
+  SetScript = function(self, n, fn) self.scripts[n] = fn end,
+  GetName = function(self) return self.name end,
+  Show = function(self) self.shown = true; if self.scripts.OnShow then self.scripts.OnShow(self) end end,
+  Hide = function(self)
+    local was = self.shown
+    self.shown = false
+    if was and self.scripts.OnHide then self.scripts.OnHide(self) end
+  end,
+  IsShown = function(self) return self.shown end,
+  SetText = function(self, t) self.text = t end,
+  GetText = function(self) return self.text end,
+  Enable = function(self) self.enabled = true end,
+  Disable = function(self) self.enabled = false end,
+  EnableKeyboard = function(self, on) self.keyboard = on end,
+  CreateFontString = function() return widget() end,
+  CreateTexture = function() return widget() end,
+  GetFrameLevel = function() return 1 end,
+  SetPoint = function(self, ...) self.point = { ... } end,
+  GetCenter = function(self) return rawget(self, "cx"), rawget(self, "cy") end,
+}
 frames = {}
 function CreateFrame(kind, name)
-  local f = { scripts = {}, attrs = {}, kind = kind, name = name, shown = true }
-  function f:SetAttribute(k, v) if COMBAT then error("blocked in combat") end self.attrs[k] = v end
-  function f:GetAttribute(k) return self.attrs[k] end
-  function f:SetScript(n, fn) self.scripts[n] = fn end
-  function f:GetName() return self.name end
-  function f:Hide() self.shown = false end
-  function f:RegisterForClicks() end
-  function f:RegisterEvent() end
+  local f = { scripts = {}, attrs = {}, kind = kind, name = name, shown = true, text = "", enabled = true }
+  setmetatable(f, { __index = function(_, k) return frameMethods[k] or function() end end })
   if name then _G[name] = f end
   frames[#frames + 1] = f
   return f
