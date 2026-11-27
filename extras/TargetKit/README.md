@@ -100,6 +100,14 @@ Revised:
   it's known to be in Sap range; else `/cleartarget` and the game's nearest enemy player. That last one is the game's
   own pick, not the physically closest: the user's log had it take the same out-of-range player on every press, which
   is why TargetKit measures and names instead. Your mouseover still comes first.
+- **TK Sap, from the Arathi Basin logs (1.5.1):** the game never answered Sap's range for players there (most are in
+  combat), so the 10 yd band counts as Sap range. When the closest enemy player isn't your target, the macro clears,
+  asks for the game's nearest enemy player, and then names TargetKit's choice; the last line that finds someone wins,
+  so the name wins if the game takes it and the game's pick stands if it doesn't (one try, `/targetexact Rayna-Moonwell`,
+  didn't take). A name that comes with a second part (the game's realm field) is written both ways: the name alone
+  first, unless another player of that name is in sight, then "Name-Part", which wins when it works. If the closest
+  enemy player is your target already, it's just Sap. Nobody in Sap range: the closest one TargetKit sees within
+  28 yd, by name; only further than that, the game's pick alone.
 - **TK Pickpocket walking past a group (1.4.7):** a press goes to the one next to you, never the one you left behind.
   Your target, if it can be robbed and is in Sap range, is the one; else the closest one you can rob, by name. The
   "finish the missing half" rule (Sap or Pick Pocket was still on cooldown) only holds while that mob is still in

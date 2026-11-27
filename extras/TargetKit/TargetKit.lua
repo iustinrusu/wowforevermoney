@@ -38,7 +38,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.5.0"
+local VERSION = "1.5.1"
 local PICK_POCKET, SAP = 921, 6770
 local MELEE = 1752                                        -- Sinister Strike: melee range, and it takes players
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
@@ -312,12 +312,22 @@ local function passed(c, why) return (nameOf(c.unit) or "?") .. " (" .. c.unit .
 local function steady(u)
   return u == "target" or u == "focus" or u:match("^party%d$") or u:match("^raid%d+$")
 end
-local function targetLine(c, cond)
+-- 1.5.1 (the user's Arathi Basin log: "/targetexact Rayna-Moonwell" ran and the target didn't change): a player from another
+-- realm gets two lines, the name alone first and "Name-Realm" last. The last line that finds someone wins, so the full
+-- form wins whenever the game takes it, and the name alone stands when it doesn't. The name alone is left out when
+-- another unit in sight has the same name (the user: "we should also be careful about players with similar names, or
+-- same first name but different last name"). /targetexact takes the whole name only, so "La" never finds "Laura".
+local function targetLine(c, cond, units)
   local pre = cond and (cond .. " ") or ""
   if steady(c.unit) then return "/target " .. pre .. c.unit end
-  local n = fullName(c.unit)
-  if not n then return "/target " .. pre .. c.unit end
-  return "/targetexact " .. pre .. n
+  local ok, n, realm = pcall(UnitName, c.unit)
+  if not ok or not known(n) then return "/target " .. pre .. c.unit end
+  if not known(realm) or realm == "" then return "/targetexact " .. pre .. n end
+  local full = "/targetexact " .. pre .. n .. "-" .. realm
+  for _, o in ipairs(units or {}) do
+    if o.guid ~= c.guid and nameOf(o.unit) == n then return full end       -- another of that name: the full form only
+  end
+  return "/targetexact " .. pre .. n .. "\n" .. full
 end
 local function seen(lists, rejected, others)    -- what a look saw, for the log of the press that uses it
   local out = {}
@@ -376,9 +386,22 @@ local function sapBuild(units)
   rank(npcs)
   local saw = seen({ players, npcs }, rejected)
   local head = { "/cast [@mouseover,harm,nodead] " .. sap, "/stopmacro [@mouseover,harm,nodead]" }
+  -- 1.5.1, the user's Arathi Basin log: for players the game never said yes to Sap's range (most are in combat
+  -- there), the bands went from melee straight to 10 yd. Sap's range is about 10 yd (Classic's), so the 10 yd band
+  -- counts as in Sap range.
   local p = players[1]
-  if p and p.reach <= 2 then
-    head[#head + 1] = targetLine(p)
+  -- Whether the game takes a player's name in a battleground isn't known yet (the Arathi Basin log: "Rayna-Moonwell" didn't
+  -- take). So when the choice isn't your target already, the macro first clears and asks for the game's nearest enemy
+  -- player, then names the choice: the last line that finds someone wins, so the name wins if the game takes it, and
+  -- the game's pick stands if it doesn't, instead of the old target staying.
+  local function named(c)
+    if c.unit == "target" or yes(UnitIsUnit, c.unit, "target") == true then return end   -- already it: just Sap
+    head[#head + 1] = "/cleartarget"
+    head[#head + 1] = "/targetenemyplayer"
+    head[#head + 1] = targetLine(c, nil, units)
+  end
+  if p and p.reach <= 3 then
+    named(p)
     head[#head + 1] = "/cast " .. sap
     return table.concat(head, "\n"), "enemy player in Sap range: " .. describe(p), nameOf(p.unit), saw
   end
@@ -397,7 +420,17 @@ local function sapBuild(units)
     return table.concat(head, "\n"), "no enemy player in Sap range in sight; your target " .. (tname or "?")
       .. " is in Sap range, so it stays (unless it's an NPC and the game finds an enemy player)", nil, saw
   end
-  head[#head + 1] = n and targetLine(n) or "/cleartarget"
+  -- nobody in Sap range, but an enemy player seen within 28 yd: the closest of them, by name (the game's own pick took
+  -- a far one on every press in the user's log)
+  -- (not your target itself: then the game's pick from scratch, which may find one TargetKit can't see, like a rogue
+  -- just out of stealth next to you)
+  if p and p.reach <= 5 and p.unit ~= "target" and yes(UnitIsUnit, p.unit, "target") ~= true then
+    named(p)
+    head[#head + 1] = "/cast " .. sap
+    return table.concat(head, "\n"), "no enemy player in Sap range in sight; the closest one seen: " .. describe(p),
+      nameOf(p.unit), saw
+  end
+  head[#head + 1] = n and targetLine(n, nil, units) or "/cleartarget"
   head[#head + 1] = "/targetenemyplayer"
   head[#head + 1] = "/cast " .. sap
   local why = not yes(UnitExists, "target") and "no target" or (r == nil and ("your target " .. (tname or "?")

@@ -25,7 +25,8 @@ function TargetUnit(what, exact)
   local best
   for tok, u in pairs(UNITS) do
     local n = u.name and u.name:lower()
-    if tok ~= "target" and n and ((exact and n == w) or (not exact and n:find(w, 1, true))) then
+    local full = n and u.realm and (n .. "-" .. u.realm:lower())             -- "Name-Realm" too
+    if tok ~= "target" and n and ((exact and (n == w or full == w)) or (not exact and n:find(w, 1, true))) then
       local r, br = u.reach or 9, best and (best.reach or 9)
       if not best or r < br or (r == br and tostring(u.guid) < tostring(best.guid)) then best = u end
     end
@@ -75,7 +76,7 @@ local function U(t) return UNITS[t] end
 function UnitExists(t) return U(t) ~= nil end
 function UnitIsUnit(a, b) local x, y = U(a), U(b); return x ~= nil and x == y end
 function UnitGUID(t) return U(t) and U(t).guid end
-function UnitName(t) return U(t) and U(t).name end
+function UnitName(t) local u = U(t); if not u then return nil end return u.name, u.realm end   -- realm: another realm's player
 function UnitIsDeadOrGhost(t) return U(t) and U(t).dead or false end
 function UnitIsPlayer(t) return U(t) and U(t).player or false end
 function UnitCanAttack(_, t) return U(t) and U(t).enemy or false end

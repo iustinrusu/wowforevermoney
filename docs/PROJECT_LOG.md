@@ -903,6 +903,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   ("secret" values, as in retail 12.0): `UnitGUID` of enemy units comes back secret, and using it as a table key is
   an error ("attempted to index a table that cannot be indexed with secret keys"). `UnitName("target")` was still
   readable there. Raid members (friendly) read normally.
+- (2026-11-27, TargetKit 1.5.0's log, Arathi Basin) Enemy players' names and range bands read there (CheckInteractDistance
+  and the melee check answered), but `IsSpellInRange(Sap)` never said yes for a player: the bands went from melee
+  range straight to 10 yd (most were in combat, which may be why). `/targetexact Name-Part` (the second part from
+  `UnitName`'s realm field) ran on several presses and the target didn't change. `UnitName` gives that second part
+  for some players (an enemy in Arathi Basin, and earlier a friendly player in Orgrimmar); the user says Forever is
+  one big server per ruleset with layers, so what that part means on Forever is unknown.
 - (2026-11-27, TargetKit 1.4.8's log, Arathi Basin) `/cleartarget` then `/targetenemyplayer` in one macro: the
   target went none, then the game's nearest enemy player, and that was the same player, out of Sap range, on every one
   of ~30 presses (the game prefers what's in front of you, not the physically closest); with no enemy player in view it
@@ -946,6 +952,23 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (twenty-fourth part) TargetKit 1.5.1 (the user: "still not working, first press targets the first
+  available, even if he is further away than melee range. then additional presses failed, even though I had closer
+  targets next to me (initial target ran far away)"; then "we should also be careful about players with similar
+  names, or same first name but different last name" and "cross realm? realms? I think forever has one big server
+  under each ruleset, and multiple layers. are you sure?"). The 1.5.0 log: TargetKit saw the enemy players (names,
+  bands), but no band 2 for any of them, so someone at 5-10 yd didn't count and the game's pick took a far player;
+  when one was in melee range it wrote `/targetexact Rayna-Moonwell`, which the game ran without the target changing.
+  - The 10 yd band (duel range) counts as Sap range for TK Sap (Sap's range is about 10 yd, Classic's figure).
+  - Choice not your target: `/cleartarget`, `/targetenemyplayer`, then the name lines, then Sap (the last line that
+    finds wins). Choice already your target: just Sap. Nobody in Sap range: the closest seen within 28 yd that isn't
+    your target, the same way; else the game's pick from scratch.
+  - Names with a second part (realm field): `/targetexact Name` first, unless another unit in sight has that name,
+    then `/targetexact Name-Part` last. /targetexact matches whole names only.
+  - Harness: UnitName returns a realm; exact name targeting matches "Name-Realm". Tests: 64 (new: 10 yd counts; the
+    two name forms and the same-name case; your target as the closest is just sapped; the closest seen within 28 yd
+    before the game's pick).
 
 - **2026-11-27** (twenty-third part) TargetKit 1.5.0. The user asked how TargetKit decides who is closer: range bands
   only, and for players the first band (Pick Pocket, NPCs only) gave no answer, so two players in Sap range looked the

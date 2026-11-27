@@ -145,7 +145,7 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate2', 'Shadowfang', player=True, reach=2, y=300)
         self.unit('nameplate3', 'Nightstep', player=True, reach=2, y=200)     # lower on screen: nearer
         self.unit('nameplate4', 'Farstrider', player=True, reach=5)
-        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/targetexact Nightstep\n/cast Sap')
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Nightstep\n/cast Sap')
 
     def test_sap_skips_who_it_cannot_sap(self):
         self.unit('nameplate1', 'In Combat', player=True, reach=1, combat=True)
@@ -158,13 +158,38 @@ class TargetKitTests(unittest.TestCase):
         self.assertEqual(text, MOUSEOVER + '\n/targetexact Defias Pathstalker'
                                '\n/targetenemyplayer\n/cast Sap')           # a player the game finds still wins
 
-    def test_sap_with_no_player_in_sight_lets_the_game_find_a_revealed_stealther(self):
-        """A rogue the game has just revealed has no nameplate: only the game's own /targetenemyplayer reaches it."""
+    def test_sap_with_no_player_near_takes_the_closest_seen_else_the_games_pick(self):
+        """1.5.1: nobody in Sap range, but a player seen within 28 yd: that one by name (the game's own pick took a far
+        one on every press in the user's Arathi Basin log). Only players further off: the game's nearest enemy player,
+        which may find one TargetKit can't see (a rogue just out of stealth)."""
         self.unit('nameplate1', 'Farstrider', player=True, reach=4)            # a player, but out of Sap range
         text = self.press('TKSap')
+        self.assertEqual(text, MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Farstrider\n/cast Sap')
+        self.g.UNITS.nameplate1.reach = 6                                       # further than 28 yd
+        text = self.press('TKSap')
         self.assertIn('/cleartarget\n/targetenemyplayer', text)
-        self.assertNotIn('nameplate1', text)
         self.assertTrue(text.startswith(MOUSEOVER))
+
+    def test_sap_counts_10_yd_as_sap_range_for_players(self):
+        """The user's log: the game never answered Sap's range for players there; bands went melee, then 10 yd."""
+        self.unit('nameplate1', 'Nightstep', player=True, reach=3)
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Nightstep\n/cast Sap')
+        self.assertTrue(self.in_log('enemy player in Sap range: Nightstep (nameplate1, 10 yd)'))
+
+    def test_your_target_as_the_closest_is_just_sapped(self):
+        self.unit('target', 'Nightstep', plate=False, player=True, reach=1)
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cast Sap')
+
+    def test_a_player_from_another_realm_gets_the_name_alone_then_name_realm(self):
+        """The user's log: "/targetexact Rayna-Moonwell" ran and the target didn't change. The full form comes last, so it
+        wins whenever the game takes it; the name alone only when no other of that name is in sight."""
+        self.unit('nameplate1', 'Nightstep', player=True, reach=1, realm='Moonwell')
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Nightstep\n/targetexact Nightstep-Moonwell'
+                                                          '\n/cast Sap')
+        self.assertEqual(self.g.UNITS.target.name, 'Nightstep')
+        del self.g.UNITS.target
+        self.unit('nameplate2', 'Nightstep', player=True, reach=5, realm='Duskwood')   # same name, another realm
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Nightstep-Moonwell\n/cast Sap')
 
     def test_in_combat_the_fixed_macro_runs(self):
         self.unit('nameplate1', 'Nightstep', player=True, reach=1)
@@ -180,7 +205,7 @@ class TargetKitTests(unittest.TestCase):
     def test_the_choice_is_written_into_the_macro_before_the_press(self):
         self.unit('nameplate1', 'Nightstep', player=True, reach=2)
         self.tick()
-        self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + MOUSEOVER + '\n/targetexact Nightstep\n/cast Sap'
+        self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Nightstep\n/cast Sap'
                                              '\n/click TKSapMark')
 
     def test_tk_find_is_rewritten_at_most_every_0_4_s_until_a_press(self):
@@ -255,7 +280,7 @@ class TargetKitTests(unittest.TestCase):
         """1.5.0: Pick Pocket takes NPCs only, so for players melee range is asked with Sinister Strike."""
         self.unit('nameplate1', 'Nightstep', player=True, reach=2)             # first in the steady order
         self.unit('nameplate2', 'Shadowfang', player=True, reach=1)            # right next to you
-        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/targetexact Shadowfang\n/cast Sap')
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Shadowfang\n/cast Sap')
         self.assertTrue(self.in_log('enemy player in Sap range: Shadowfang (nameplate2, melee range)'))
 
     def test_looks_are_timed_and_logged_every_5_minutes(self):
@@ -579,7 +604,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.5.0 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.5.1 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
@@ -591,7 +616,7 @@ class TargetKitTests(unittest.TestCase):
         self.press('TKSap')
         self.assertTrue(self.in_log('press: TK Sap: enemy player in Sap range: Nightstep (nameplate2, Sap range) -> '
                                     '/cast [@mouseover,harm,nodead] Sap / /stopmacro [@mouseover,harm,nodead] / '
-                                    '/targetexact Nightstep / /cast Sap'))
+                                    '/cleartarget / /targetenemyplayer / /targetexact Nightstep / /cast Sap'))
         saw = [l for l in self.logged() if 'saw:' in l][-1]
         self.assertIn('Nightstep (nameplate2, Sap range)', saw)
         self.assertIn('Wolf (nameplate1): not humanoid (Sap takes humanoids)', saw)
@@ -655,7 +680,8 @@ class TargetKitTests(unittest.TestCase):
     def test_a_press_logs_what_the_game_ran_and_where_the_target_went(self):
         self.unit('nameplate1', 'Nightstep', player=True, reach=2)
         self.press('TKSap')
-        self.assertTrue(self.in_log('result: TK Sap: the game ran TargetUnit(Nightstep, true), CastSpellByName(Sap);'
+        self.assertTrue(self.in_log('result: TK Sap: the game ran ClearTarget(), TargetNearestEnemyPlayer(),'
+                                    ' TargetUnit(Nightstep, true), CastSpellByName(Sap);'
                                     ' target none -> Nightstep'))
 
     def test_a_choice_the_game_did_not_take_is_flagged(self):
@@ -809,7 +835,7 @@ class TargetKitTests(unittest.TestCase):
         self.assertFalse(self.in_log('ERROR'))
         self.assertTrue(self.in_log("the game hides some units' ids from addons here (nameplate1), so TargetKit knows them"
                                     " by name"))
-        self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + MOUSEOVER + '\n/targetexact Nightstep\n/cast Sap'
+        self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Nightstep\n/cast Sap'
                                              '\n/click TKSapMark')
         self.run_macro(self.body('TKSap'))
         self.assertEqual(self.g.UNITS.target.name, 'Nightstep')
