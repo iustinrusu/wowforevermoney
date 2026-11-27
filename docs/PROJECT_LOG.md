@@ -910,6 +910,20 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (ninth part) TargetKit 1.2.1 (the user: "added a target in the find list but macro does not work when
+  pressing"). The saved log showed:
+  - every press reached the addon and built the right macro: clear the target, `/target [noexists] <name>`, then
+    `/cleartarget [dead,noplayer]`;
+  - the addon saw no unit with that name; most presses saw no unit at all (no nameplates near, friendly nameplates
+    off), so it fell back to the game's target-by-name;
+  - no target change followed any press.
+  The log couldn't tell "the game ran it and found nobody" from "the game didn't run the macro". Now
+  `hooksecurefunc` watches TargetUnit, ClearTarget, TargetNearestEnemy(Player), TargetLastTarget and CastSpellByName/
+  ByID; it only looks after the call and can't get in the macro's way. Between a press's PreClick and PostClick each
+  call is noted. PostClick logs "the game ran ...; target A -> B", and warns (log and chat, once) when a macro with a
+  /target or /cleartarget line ran nothing. TK Find says in chat when nobody on the list was near enough. 3 new tests;
+  the test harness now runs macro lines through the hooked functions.
+
 - **2026-11-27** (eighth part) Explicit logs in both addons (the user: "do we have anything for logging or debugging, in
   case something does not work? logging should be explicit so we can catch issues"). Before, `/gea debug` and
   `/tkit debug` only printed to chat while on, and 15 handler errors in Gold Ever After were swallowed by bare pcalls.

@@ -23,7 +23,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.2.0"
+local VERSION = "1.2.1"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
@@ -61,6 +61,32 @@ end
 local function say(...)                          -- to the log always, to chat with /tkit debug
   log("debug", ...)
   if debug then tell(...) end
+end
+
+local function cvar(name)
+  local ok, v = pcall(GetCVar, name)
+  return ok and tostring(v) or "?"
+end
+
+-- What the game ran for a press (1.2.1, the user: "added a target in the find list but macro does not work when
+-- pressing"; the log showed each press and its macro, but not whether the game ran it). The game's own targeting and
+-- casting functions are watched with hooksecurefunc, which only looks after the fact and can't get in the macro's way.
+-- Between a press's PreClick and PostClick every call to them is noted; PostClick logs them and where the target went,
+-- warns when a macro that should have targeted ran nothing, and TK Find says in chat when it found nobody.
+local clickState                                 -- { b, ran = { "TargetUnit(Game)", ... }, before, text }
+local function noteRan(fname, ...)
+  if not clickState then return end
+  local args = {}
+  for i = 1, select("#", ...) do args[#args + 1] = tostring((select(i, ...))) end
+  clickState.ran[#clickState.ran + 1] = fname .. "(" .. table.concat(args, ", ") .. ")"
+end
+if hooksecurefunc then
+  for _, fname in ipairs({ "TargetUnit", "ClearTarget", "TargetNearestEnemy", "TargetNearestEnemyPlayer",
+                           "TargetLastTarget", "CastSpellByName", "CastSpellByID" }) do
+    if type(_G[fname]) == "function" then
+      hooksecurefunc(fname, function(...) noteRan(fname, ...) end)
+    end
+  end
 end
 
 -- Run a handler; an error is logged with where (and the Lua stack when the game gives it) and said once in chat,
@@ -384,6 +410,29 @@ local BUTTONS = {
 }
 
 local watching                                           -- the last press, for 2 s: what came of it goes to the log
+local warnedNotRun, saidNobody = {}, 0
+local function afterClick(b, down)               -- PostClick: what the game ran, and where the target went
+  local st = clickState
+  clickState = nil
+  if not st or st.b ~= b then return end
+  local after = UnitName("target") or "none"
+  if #st.ran > 0 then
+    log("result", b.macro .. ": the game ran " .. table.concat(st.ran, ", ") .. "; target " .. st.before .. " -> " .. after)
+    if b.name == "TKFind" and after == "none" and #db.find > 0 and GetTime() - saidNobody > 3 then
+      saidNobody = GetTime()
+      tell("TK Find: nobody on your find list (" .. table.concat(db.find, ", ") .. ") is near enough to target."
+        .. " The game's own target-by-name found nobody either.")
+    end
+  elseif st.text:find("/target") or st.text:find("/cleartarget") then
+    log("WARN", b.macro .. ": the game did not run its macro (the click came with down=" .. tostring(down)
+      .. "; act on key down " .. cvar("ActionButtonUseKeyDown") .. ")")
+    if not warnedNotRun[b.name] then
+      warnedNotRun[b.name] = true
+      tell("|cffff6060the game did not run " .. b.macro .. "'s macro.|r /reload and tell Claude: the log has the details.")
+    end
+  end
+end
+
 local function resetButtons()                            -- back to the fixed macros (out of combat only)
   if InCombatLockdown() then return end
   for _, b in ipairs(BUTTONS) do
@@ -400,8 +449,10 @@ local function makeButtons()
     f:Hide()                                             -- clicked by its macro, never seen
     f:SetScript("PreClick", function(self)
       watching = { macro = b.macro, untilT = GetTime() + 2 }
+      clickState = { b = b, ran = {}, before = UnitName("target") or "none", text = "" }
       if InCombatLockdown() then
-        log("press", b.macro .. " in combat, so its fixed macro: " .. tostring(self:GetAttribute("macrotext")))
+        clickState.text = tostring(self:GetAttribute("macrotext") or "")
+        log("press", b.macro .. " in combat, so its fixed macro: " .. clickState.text)
         if debug then tell(b.macro .. ": in combat, so the fixed macro") end
         return
       end
@@ -410,11 +461,13 @@ local function makeButtons()
       if not ok then text, why = nil, "an error (logged), so the fixed macro" end
       text = text or b.fixed()
       try(b.macro .. " set its macro", self.SetAttribute, self, "macrotext", text)
+      clickState.text = text
       log("press", b.macro .. ": " .. (why or "nothing found, so the fixed macro") .. " -> " .. text)
       if #seenNow > 0 then log("press", "  saw: " .. table.concat(seenNow, "; ")) end
       if debug then tell(b.macro .. ": " .. (why or "the fixed macro") .. "\n" .. text) end
     end)
-    f:SetScript("PostClick", function(self)
+    f:SetScript("PostClick", function(self, _, down)
+      try(b.macro .. " result", afterClick, b, down)
       if not InCombatLockdown() then try(b.macro .. " reset", self.SetAttribute, self, "macrotext", b.fixed()) end
     end)
     b.frame = f
@@ -861,10 +914,6 @@ ev:RegisterEvent("UI_ERROR_MESSAGE")
 for _, e in ipairs({ "CVAR_UPDATE", "UNIT_SPELLCAST_FAILED", "PLAYER_TARGET_CHANGED", "ADDON_ACTION_BLOCKED",
                     "ADDON_ACTION_FORBIDDEN" }) do
   pcall(ev.RegisterEvent, ev, e)
-end
-local function cvar(name)
-  local ok, v = pcall(GetCVar, name)
-  return ok and tostring(v) or "?"
 end
 local function outcome(...)                              -- something that came of the last press
   if watching and GetTime() <= watching.untilT then log("result", watching.macro .. ": " .. table.concat({ ... }, " ")) end

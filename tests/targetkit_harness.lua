@@ -12,6 +12,22 @@ function InCombatLockdown() return COMBAT end
 KEYDOWN = true
 function GetCVarBool(name) if name == "ActionButtonUseKeyDown" then return KEYDOWN end end
 function IsInRaid() return false end
+-- what a secure macro calls (tests/test_targetkit_lua.py runs macro lines through these); hooksecurefunc as in WoW
+function TargetUnit(what)
+  if UNITS[what] then UNITS.target = UNITS[what] return end
+  for tok, u in pairs(UNITS) do
+    if tok ~= "target" and u.name and u.name:lower():find(tostring(what):lower(), 1, true) then UNITS.target = u return end
+  end
+end
+function ClearTarget() UNITS.target = nil end
+function TargetNearestEnemy() end
+function TargetNearestEnemyPlayer() end
+function TargetLastTarget() end
+function CastSpellByName() end
+function hooksecurefunc(name, fn)
+  local orig = _G[name]
+  _G[name] = function(...) local r = orig(...); fn(...); return r end
+end
 CVARS = { ActionButtonUseKeyDown = "1", nameplateShowEnemies = "1", nameplateShowFriends = "0", SoftTargetEnemy = "1",
           nameplateMaxDistance = "41" }
 function GetCVar(name) return CVARS[name] end

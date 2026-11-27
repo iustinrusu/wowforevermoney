@@ -1,5 +1,6 @@
 """TargetKit (extras/TargetKit, our addon outside the app): what each of its three buttons chooses, run in Lua 5.1
 through lupa with tests/targetkit_harness.lua standing in for WoW. The names here are made up."""
+import re
 import unittest
 from pathlib import Path
 
@@ -41,14 +42,32 @@ class TargetKitTests(unittest.TestCase):
             self.lua.eval('table.insert')(self.g.PLATES, token)
         return t
 
-    def press(self, button):
-        """Press one of the three macros: PreClick writes the macro, the click runs it, PostClick puts it back."""
+    def press(self, button, run=True):
+        """Press one of the three macros: PreClick writes the macro, the game runs its lines (here without their
+        [conditions]; run=False: the game doesn't run it), PostClick logs what came of it and puts the macro back."""
         b = self.g[button]
         b.scripts['PreClick'](b, 'LeftButton', True)
         text = b.attrs['macrotext']
-        if not self.g.COMBAT:
-            b.scripts['PostClick'](b, 'LeftButton', True)
+        if run:
+            self.run_macro(text)
+        b.scripts['PostClick'](b, 'LeftButton', True)
         return text
+
+    def run_macro(self, text):
+        g = self.g
+        for line in text.split('\n'):
+            cmd, _, rest = line.partition(' ')
+            rest = re.sub(r'^\[[^\]]*\]\s*', '', rest)
+            if cmd == '/cleartarget':
+                g.ClearTarget()
+            elif cmd == '/target':
+                g.TargetUnit(rest)
+            elif cmd == '/targetenemyplayer':
+                g.TargetNearestEnemyPlayer()
+            elif cmd == '/targetenemy':
+                g.TargetNearestEnemy()
+            elif cmd == '/cast':
+                g.CastSpellByName(rest)
 
     def slash(self, msg):
         self.g.SlashCmdList.TARGETKIT(msg)
@@ -337,7 +356,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.2.0 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.2.1 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /click TKSap LeftButton 1'))
 
@@ -405,6 +424,34 @@ class TargetKitTests(unittest.TestCase):
         self.assertIn('window: added Thug to the find list', printed[2])
         self.slash('log clear')
         self.assertEqual(self.logged(), [])
+
+    # --- what the game ran for a press (1.2.1) ---
+    def test_a_press_logs_what_the_game_ran_and_where_the_target_went(self):
+        self.unit('nameplate1', 'Nightstep', player=True, reach=2)
+        self.press('TKSap')
+        self.assertTrue(self.in_log('result: TK Sap: the game ran CastSpellByName(Sap), TargetUnit(nameplate1),'
+                                    ' CastSpellByName(Sap); target none -> Nightstep'))
+
+    def test_a_macro_the_game_did_not_run_is_flagged(self):
+        self.slash('add Game')
+        self.press('TKFind', run=False)
+        self.press('TKFind', run=False)
+        warns = [l for l in self.logged() if 'WARN: TK Find: the game did not run its macro' in l]
+        self.assertEqual(len(warns), 2)
+        self.assertIn('the click came with down=true; act on key down 1', warns[0])
+        said = [l for l in self.g.printed.values() if "the game did not run TK Find's macro" in l]
+        self.assertEqual(len(said), 1)                                       # said once
+
+    def test_find_says_when_nobody_on_the_list_is_near(self):
+        self.slash('add Game')
+        self.press('TKFind')
+        self.assertTrue(self.in_log('result: TK Find: the game ran ClearTarget(), TargetUnit(Game), ClearTarget();'
+                                    ' target none -> none'))
+        self.assertTrue(self.said('TK Find: nobody on your find list (Game) is near enough to target.'))
+        self.unit('mouseover', 'Gamekeeper Ralf', plate=False, enemy=False, reaction=5)
+        self.g.NOW += 5
+        self.press('TKFind')
+        self.assertTrue(self.in_log('target none -> Gamekeeper Ralf'))
 
     def test_the_addon_compiles_and_the_toc_loads_it(self):
         toc = (KIT / 'TargetKit.toc').read_text(encoding='utf-8')

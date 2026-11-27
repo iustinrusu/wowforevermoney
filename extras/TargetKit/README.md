@@ -70,7 +70,10 @@ Revised:
   ran), what came of it in the next 2 seconds (the game's error line such as "Out of range.", the cast, the new
   target), the game settings that matter at login (act on key down, nameplates, soft targeting), the macros and keys
   it made (each key checked to really press the button), anything the game blocked, and every error with where (also
-  said once in chat). `/tkit log` shows the last 15 lines (`/tkit log 40`, `/tkit log clear`); the last 400 are kept
+  said once in chat). Since 1.2.1 each press also records what the game itself ran for it (its targeting and casting
+  functions, watched without getting in the way) and where your target went; if a macro that should target ran
+  nothing, chat says the game didn't run it, and TK Find says in chat when nobody on your list is near enough.
+  `/tkit log` shows the last 15 lines (`/tkit log 40`, `/tkit log clear`); the last 400 are kept
   in the saved file, written on `/reload` or logout. When something doesn't work, `/reload` and say so.
 - `/tkit macros` makes the three macros again if you deleted them (and prints the lines for your own); `/tkit forget`
   clears whom you robbed; `/tkit debug` prints, on every press, what it chose and the macro it ran; `/tkit help`.
