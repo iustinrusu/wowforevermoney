@@ -903,6 +903,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   ("secret" values, as in retail 12.0): `UnitGUID` of enemy units comes back secret, and using it as a table key is
   an error ("attempted to index a table that cannot be indexed with secret keys"). `UnitName("target")` was still
   readable there. Raid members (friendly) read normally.
+- (2026-11-27, TargetKit 1.5.2's log, Arathi Basin; the user: "spamming the button while a rogue was nearby, and when
+  he faded in a bit (still stealthed), I sapped him") The game's own `/targetenemyplayer` took a stealthed rogue the
+  moment he faded in, while TargetKit had no nameplate for him yet (the press before: "You have no target"); the next
+  look saw him in melee range as your target, so the macro was just Sap. So the from-scratch line is what catches a
+  stealther there; TargetKit's own choice only follows once he shows a nameplate. The soft enemy target line was
+  not added (it would Sap whoever you face before TargetKit's closest choice); kept for later if a case needs it.
 - (2026-11-27, the user) Players on Forever have a first and a last name ("FirstName LastName"). The game gives
   addons the last name in `UnitName`'s second value (the realm field in other versions), so a player's whole name is
   "First Last" with a space.
