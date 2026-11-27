@@ -2,7 +2,7 @@
 ## Title: TargetKit
 ## Notes: Three one-key macros: TK Find (your find list, closest first, press again for the next), TK Pickpocket (closest humanoid not yet pickpocketed: Sap, then Pick Pocket) and TK Sap (mouseover, else the closest enemy player, stealthed ones the game reveals included). Type /tkit or click the minimap button: keys for the macros, the find list.
 ## Author: WoWForeverMoney (extras, not part of the app)
-## Version: 1.4.5
+## Version: 1.4.6
 ## SavedVariables: TargetKitDB
 
 TargetKit.lua

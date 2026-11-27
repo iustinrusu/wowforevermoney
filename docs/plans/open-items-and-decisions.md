@@ -102,7 +102,8 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       three or more, press TK Find a few times within 8 s: each press should take the next one; 1.4.1 failed here,
       1.4.2 found the game refuses nameplate lines; 1.4.3/1.4.4 went round with the game's Tab, which landed on
       other mobs; 1.4.5, the user's call: no cycling of same-named mobs, the closest by name, the next list name
-      in sight on each press); TK Sap and TK
+      in sight on each press); TK Sap (1.4.6: with a farther enemy player targeted, a rogue appearing next to you
+      should be taken; check in a battleground or duel area) and TK
       Pickpocket once out of combat. Then `/reload` and Claude reads TargetKitDB.log (chat stays quiet since 1.4.1;
       `/tkit chat` shows TargetKit's notes in chat). Same-named friendly NPCs only ever get the closest (no friendly
       nameplates): the user's choice, enemies matter more.

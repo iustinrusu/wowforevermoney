@@ -185,19 +185,47 @@ class TargetKitTests(unittest.TestCase):
                                              '\n/click TKSapMark')
 
     def test_a_macro_is_rewritten_at_most_every_0_4_s_until_a_press(self):
-        self.unit('nameplate1', 'Nightstep', player=True, reach=2)
+        self.unit('nameplate1', 'Defias Thug', reach=2)
         self.tick()
-        self.assertIn('/targetexact Nightstep', self.body('TKSap'))
+        self.assertIn('/targetexact Defias Thug', self.body('TKPick'))
         edits = self.g.EDITS
-        self.unit('nameplate2', 'Shadowfang', player=True, reach=1)             # nearer
+        self.unit('nameplate2', 'Defias Miner', reach=1)                        # nearer
         self.tick(wait=0.2)
         self.assertEqual(self.g.EDITS, edits)                              # too soon after the last
-        self.assertIn('/targetexact Nightstep', self.body('TKSap'))
+        self.assertIn('/targetexact Defias Thug', self.body('TKPick'))
         self.tick(wait=0.3)
-        self.assertIn('/targetexact Shadowfang', self.body('TKSap'))
+        self.assertIn('/targetexact Defias Miner', self.body('TKPick'))
         edits = self.g.EDITS
         self.tick()
         self.assertEqual(self.g.EDITS, edits)                              # nothing changed: nothing written
+
+    def test_sap_is_rewritten_at_once_when_a_player_comes_into_sap_range(self):
+        """1.4.6: a rogue popping up next to you is in TK Sap's macro without the 0.4 s wait."""
+        self.unit('nameplate1', 'Defias Thug', reach=2)
+        self.tick()
+        self.unit('nameplate2', 'Shadowfang', player=True, reach=2)
+        self.fire('NAME_PLATE_UNIT_ADDED', 'nameplate2')                    # the game says so: a look at once
+        self.assertIn('/targetexact Shadowfang', self.body('TKSap'))
+        self.unit('nameplate3', 'Nightstep', player=True, reach=1)              # closer still
+        self.tick(wait=0.05)                                               # well within 0.4 s
+        self.assertIn('/targetexact Nightstep', self.body('TKSap'))
+
+    def test_sap_lets_go_of_an_enemy_player_out_of_sap_range(self):
+        """The user: "in case a stealthed rogue pops up next to me, it targets him even though I maybe have another
+        target enemy player targeted that is farther away"."""
+        self.unit('target', 'Farstrider', plate=False, player=True, reach=5)
+        self.tick()
+        self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + MOUSEOVER + '\n/cleartarget\n/targetenemyplayer'
+                                             '\n/cast Sap\n/click TKSapMark')
+        rogue = self.lua.table_from({'name': 'Shadowfang', 'guid': 'Player-2', 'enemy': True, 'player': True})
+        self.g.NEAREST_PLAYER = rogue                                      # the game's nearest enemy player
+        self.run_macro(self.body('TKSap'))
+        self.assertEqual(self.g.UNITS.target.name, 'Shadowfang')
+        self.g.UNITS.target = self.g.UNITS.world1 = self.lua.table_from(
+            {'name': 'Farstrider', 'guid': 'Player-3', 'enemy': True, 'player': True, 'reach': 5})
+        self.unit('nameplate1', 'Defias Pathstalker', reach=2)              # an NPC in Sap range
+        self.tick()
+        self.assertIn('\n/targetexact Defias Pathstalker\n/targetenemyplayer\n/cast Sap', self.body('TKSap'))
 
     def test_not_written_while_the_macros_window_is_open_and_hand_edits_are_put_back(self):
         self.g.MacroFrame = self.lua.eval('{ IsShown = function() return true end }')
@@ -478,7 +506,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.4.5 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.4.6 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))

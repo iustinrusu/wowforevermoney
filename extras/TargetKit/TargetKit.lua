@@ -9,10 +9,10 @@
 --   TK Pickpocket  the closest humanoid you can rob (attackable, not a player, alive, not in combat, not pickpocketed
 --                  yet): Sap, then Pick Pocket, in one press (Sap doesn't break stealth on Forever: the user, 2026-11-27).
 --                  If one of the two was still on cooldown, the next press within 10 s on that unit does the other.
---   TK Sap         your mouseover enemy first. Else the closest enemy player in Sap range the addon can see; else the
---                  game's own nearest enemy player, which is how a stealthed player the game has just revealed gets
---                  caught (they have no nameplate, so the addon can't see them); else the closest NPC in Sap range;
---                  else the game's nearest enemy.
+--   TK Sap         your mouseover enemy first. Else the closest enemy player in Sap range the addon can see, whoever
+--                  you have targeted; else the game's own nearest enemy player (an enemy player you target further off
+--                  than Sap's range is let go of first, 1.4.6); else the closest NPC in Sap range; else the game's
+--                  nearest enemy. The macro is rewritten at once when the enemy player to Sap changes (1.4.6).
 --
 -- How, within WoW's rules: an addon may never pick a target by itself; only a key press running a macro can, and a
 -- macro can only be changed out of combat. So out of combat, five times a second, the addon looks at every unit it can
@@ -37,7 +37,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.4.5"
+local VERSION = "1.4.6"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
@@ -332,6 +332,17 @@ local function sapBuild(units)
   end
   local n = npcs[1]
   if n and n.reach > 2 then n = nil end
+  -- 1.4.6 (the user: "in case a stealthed rogue pops up next to me, it targets him even though I maybe have another
+  -- target enemy player targeted that is farther away"): an enemy player you target out of Sap range isn't kept. The
+  -- NPC in Sap range, or nothing, then the game's nearest enemy player, which wins if it finds one.
+  if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") and not dead("target")
+      and reach("target") > 2 then
+    head[#head + 1] = n and targetLine(n) or "/cleartarget"
+    head[#head + 1] = "/targetenemyplayer"
+    head[#head + 1] = "/cast " .. sap
+    return table.concat(head, "\n"), "your target " .. (UnitName("target") or "?") .. " is out of Sap range, so the"
+      .. " game's nearest enemy player" .. (n and (", else " .. describe(n)) or ""), nil, saw
+  end
   -- the NPC in Sap range instead of the game's nearest enemy, unless you have a living enemy player; a player wins
   head[#head + 1] = n and targetLine(n, "[noexists][dead][noharm][noplayer]") or SAP_ANY
   head[#head + 1] = SAP_PLAYER
@@ -553,7 +564,7 @@ end
 -- Into the macro, out of combat only. Unchanged (as the game keeps it): nothing to do. Otherwise at most every
 -- EDIT_GAP seconds, and not while the game's Macros window is open (you may be editing there), unless forced: right
 -- after a press (the next press must get the next unit), a change to the find list, combat starting.
-local function write(b, force)
+local function write(b, force, urgent)                   -- urgent: no EDIT_GAP wait (the Macros window still holds it)
   if not b.body or InCombatLockdown() or not (GetMacroIndexByName and EditMacro) then return end
   local i = GetMacroIndexByName(b.macro)
   if not i or i == 0 then
@@ -570,7 +581,7 @@ local function write(b, force)
   end
   local now = GetTime()
   if not force then
-    if now - (b.editedAt or -100) < EDIT_GAP then return end
+    if not urgent and now - (b.editedAt or -100) < EDIT_GAP then return end
     if MacroFrame and MacroFrame.IsShown and MacroFrame:IsShown() then return end
   end
   EditMacro(i, b.macro, nil, b.body)
@@ -599,7 +610,8 @@ local function prepare(force)                            -- look once, write all
     local body, kept = compose(b, text or b.fixed(n))
     b.state = { text = kept, why = why, expect = expect, saw = saw or {}, extra = extra or {} }
     b.body = body
-    write(b, force)
+    local urgent = b.name == "TKSap" and expect ~= (b.live and b.live.expect)    -- a player came into Sap range
+    write(b, force, urgent)
   end
 end
 
@@ -1108,7 +1120,8 @@ ev:RegisterEvent("PLAYER_REGEN_ENABLED")
 ev:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 ev:RegisterEvent("UI_ERROR_MESSAGE")
 for _, e in ipairs({ "UNIT_SPELLCAST_FAILED", "PLAYER_TARGET_CHANGED", "ADDON_ACTION_BLOCKED",
-                    "ADDON_ACTION_FORBIDDEN", "UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED" }) do
+                    "ADDON_ACTION_FORBIDDEN", "UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED",
+                    "PLAYER_SOFT_ENEMY_CHANGED" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
 local function outcome(...)                              -- something that came of the last press
@@ -1163,8 +1176,9 @@ local function onEvent(_, event, a1, a2, a3)
     outcome("target now", UnitName("target") or "none")
   elseif event == "UPDATE_MOUSEOVER_UNIT" then
     rememberName("mouseover")
-  elseif event == "NAME_PLATE_UNIT_ADDED" then
-    if a1 then rememberName(a1) end
+  elseif event == "NAME_PLATE_UNIT_ADDED" or event == "PLAYER_SOFT_ENEMY_CHANGED" then
+    if a1 and event == "NAME_PLATE_UNIT_ADDED" then rememberName(a1) end
+    if db and not InCombatLockdown() then prepare(false) end         -- someone new in sight: look now
   elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
     if a1 == "TargetKit" then
       log("ERROR", "the game blocked TargetKit from " .. tostring(a2) .. " (" .. event .. ")")

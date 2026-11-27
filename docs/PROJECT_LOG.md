@@ -935,6 +935,21 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (nineteenth part) TargetKit 1.4.6, TK Sap (the user: "hopefully this doesnt affect us and the sap
+  macro, there we don't care what name the target has, it just has to be the closest physically possible, so in case
+  a stealthed rogue pops up next to me, it targets him even though I maybe have another target enemy player
+  targeted that is farther away"). 1.4.5 changed TK Find only. TK Sap already took an enemy player it saw in Sap
+  range by name over your target, but with none seen its lines kept a living enemy player you targeted, however far.
+  - An enemy player target out of Sap range (TargetKit's range check on "target") is let go of: the macro is the NPC
+    in Sap range by name (or /cleartarget), then a plain `/targetenemyplayer` (the last line that finds wins), Sap.
+  - TK Sap's macro is written at once (no 0.4 s gap; the Macros window still holds it) when the enemy player it would
+    Sap changes, and a look runs on NAME_PLATE_UNIT_ADDED and PLAYER_SOFT_ENEMY_CHANGED.
+  - The old note "a stealthed player the game has just revealed has no nameplate, so only the game's nearest enemy
+    player reaches him" was a guess, not checked on Forever; since Tab only goes through units whose nameplates show
+    (Verified facts), whether a revealed stealther can be reached without a nameplate is open.
+  - Tests: 53 (new: a far enemy player target is let go of, with and without an NPC in Sap range; TK Sap rewritten
+    at once when a player comes into Sap range; the 0.4 s gap test now on TK Pickpocket).
+
 - **2026-11-27** (eighteenth part) TargetKit 1.4.5: TK Find no longer uses the game's Tab. The user, after 1.4.4: "it's
   now working but is inconsistent, and seems it's still targeting other mobs other than the ones selected, if it's
   too messy let's just drop cycling". Decision: dropped. Tab on Forever goes through every enemy whose nameplate

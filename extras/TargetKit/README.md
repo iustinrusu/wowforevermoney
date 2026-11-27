@@ -86,6 +86,13 @@ Revised:
   an enemy player in Sap range in sight: no attackable target, the game's nearest enemy (or the NPC in Sap range
   TargetKit sees); then, unless you already target a living enemy player, the game's nearest enemy player, which wins
   if there is one; then Sap.
+- **TK Sap and the closest enemy player (1.4.6):** an enemy player TargetKit sees in Sap range (by nameplate, or as
+  your soft enemy target) is targeted by name and sapped, whoever you have targeted; players' names are unique, so
+  it's exact. An enemy player you target who is further off than Sap's range isn't kept: the macro clears it (or
+  takes the NPC in Sap range) and then the game's nearest enemy player. The macro is rewritten at once when the
+  enemy player to Sap changes, and TargetKit looks again as soon as a nameplate appears or your soft enemy target
+  changes, instead of waiting up to 0.4 s. What no addon can do: Sap a stealthed player the game shows you no
+  nameplate or soft target for; your mouse over him still works (the mouseover Sap line comes first).
 - **On your bars:** the three macros are under Escape > Macros, General tab: drag **TK Find**, **TK Pickpocket** and
   **TK Sap** to your bars and leave their text as it is (TargetKit rewrites it). A key set in the window runs the same
   macro, so it works without the macro being on a bar.
