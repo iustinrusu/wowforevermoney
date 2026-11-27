@@ -268,71 +268,30 @@ class TargetKitTests(unittest.TestCase):
             out.append((self.press('TKFind'), self.g.UNITS.target and self.g.UNITS.target.guid))
         return out
 
-    def test_find_goes_by_name_across_names_and_tabs_only_within_a_name(self):
-        """1.4.3: Forever refuses "/target nameplateN" in a macro, so a unit is reached by name (the closest of that
-        name, any direction) or by the game's Tab (what's in front of you, every enemy). 1.4.4 (the user: "it also
-        targets other mobs, not just the one in the target list"): another name on the list goes first, by name;
-        Tab only for units sharing your target's name."""
+    def test_find_goes_by_name_only_never_tab(self):
+        """1.4.5 (the user: "seems it's still targeting other mobs other than the ones selected, if it's too messy let's
+        just drop cycling"): only by name, so only what's on the list: the next name from the list in sight on each
+        press; mobs that share a name: the closest."""
         self.slash('add thug')
         far = self.unit('nameplate1', 'Defias Thug', reach=5)
         near = self.unit('nameplate2', 'Defias Thug', reach=2)
         river = self.unit('nameplate3', 'Riverpaw Thug', reach=4)                # part of a name is enough
         miner = self.unit('nameplate4', 'Defias Miner', reach=1)                 # not on the list
-        self.g.TAB = self.lua.table_from([near, miner, far, river])             # the game's Tab order
-        got = self.find_presses(5)
-        self.assertEqual([m for m, _ in got], ['/targetexact Defias Thug',      # the closest on the list
-                                               '/targetexact Riverpaw Thug',    # another name, by name
-                                               '/targetexact Defias Thug',      # every name had: round again
-                                               '/targetenemy',                  # the other Defias Thug: Tab only
-                                               '/targetenemy'])                 # Tab landed on the miner: on
-        self.assertEqual([g for _, g in got], [near.guid, river.guid, near.guid, miner.guid, far.guid])
-        self.assertTrue(self.in_log("going round with Tab: Defias Miner isn't on the list (1 of at most 4)"))
-        self.g.UNITS.target = miner
-        self.g.NOW += 9                                                         # a pause, on one not on the list
-        self.assertEqual(self.press('TKFind'), '/targetexact Defias Thug')      # from the closest again
+        self.g.TAB = self.lua.table_from([near, miner, far, river])
+        got = self.find_presses(4)
+        self.assertEqual([m for m, _ in got], ['/targetexact Defias Thug', '/targetexact Riverpaw Thug',
+                                               '/targetexact Defias Thug', '/targetexact Riverpaw Thug'])
+        self.assertEqual([g for _, g in got], [near.guid, river.guid, near.guid, river.guid])
+        self.assertFalse(self.in_log('TargetNearest'))                           # never the game's Tab
+        self.assertNotIn(far.guid, [g for _, g in got])                          # the further one of a name: never
+        self.assertNotIn(miner.guid, [g for _, g in got])
 
-    def test_find_stays_on_the_only_one_in_sight(self):
-        self.slash('add Zhevra Runner')
-        runner = self.unit('nameplate1', 'Zhevra Runner', reach=4, reaction=4)
-        other = self.unit('nameplate2', 'Sunscale Screecher', reach=2)
-        self.g.TAB = self.lua.table_from([runner, other])
-        self.press('TKFind')
-        self.assertEqual(self.g.UNITS.target.guid, runner.guid)
-        self.assertEqual(self.press('TKFind'), '')                              # a Tab would only find the Screecher
-        self.assertEqual(self.g.UNITS.target.guid, runner.guid)
-        self.assertTrue(self.in_log('is the only one on the list in sight: it stays'))
-
-    def test_find_stops_tabbing_when_the_others_are_out_of_tabs_reach(self):
-        """The user's log (1.4.3): Runner, Screecher, Runner, Screecher... while a second Runner further off had a
-        nameplate but Tab never reached it. Now it stays once Tab comes back without another Runner, and tabs again
-        when what's in sight changes."""
+    def test_find_with_one_name_takes_the_closest_every_press(self):
         self.slash('add Zhevra Runner')
         a = self.unit('nameplate1', 'Zhevra Runner', reach=4, reaction=4)
-        self.unit('nameplate2', 'Zhevra Runner', reach=6, reaction=4)            # too far for Tab
-        s = self.unit('nameplate3', 'Sunscale Screecher', reach=3)
-        self.g.TAB = self.lua.table_from([a, s])
-        got = self.find_presses(5)
-        self.assertEqual([m for m, _ in got], ['/targetexact Zhevra Runner', '/targetenemy', '/targetenemy', '', ''])
-        self.assertEqual([g for _, g in got], [a.guid, s.guid, a.guid, a.guid, a.guid])
-        self.assertTrue(self.in_log("the others of that name are out of Tab's reach (too far, or behind you), so it"
-                                    " stays until what's in sight changes"))
-        c = self.unit('nameplate4', 'Zhevra Runner', reach=4, reaction=4)       # a third one comes into view
-        self.g.TAB = self.lua.table_from([a, c, s])
-        self.assertEqual(self.press('TKFind'), '/targetenemy')
-        self.assertEqual(self.g.UNITS.target.guid, c.guid)
-
-    def test_tab_past_others_stops_after_as_many_as_are_in_sight(self):
-        """Tab only goes through what's in front of you: the other Defias Thug may be behind, where Tab never gets."""
-        self.slash('add Defias Thug')
-        near = self.unit('nameplate1', 'Defias Thug', reach=2)
-        self.unit('nameplate2', 'Defias Thug', reach=5)                         # behind you
-        m1 = self.unit('nameplate3', 'Defias Miner', reach=3)
-        m2 = self.unit('nameplate4', 'Defias Pillager', reach=3)
-        self.g.TAB = self.lua.table_from([m1, m2])                              # all Tab can reach
-        got = self.find_presses(7)
-        self.assertEqual([m for m, _ in got], ['/targetexact Defias Thug'] + ['/targetenemy'] * 5
-                         + ['/targetexact Defias Thug'])                        # 4 in sight: then by name again
-        self.assertEqual(got[-1][1], near.guid)
+        self.unit('nameplate2', 'Zhevra Runner', reach=6, reaction=4)
+        self.unit('nameplate3', 'Sunscale Screecher', reach=3)
+        self.assertEqual(self.find_presses(3), [('/targetexact Zhevra Runner', a.guid)] * 3)
 
     def test_find_skips_dead_mobs_but_not_dead_players_or_friendly_npcs(self):
         self.slash('add Baron')
@@ -519,7 +478,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.4.4 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.4.5 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
@@ -682,7 +641,7 @@ class TargetKitTests(unittest.TestCase):
         self.assertFalse(self.g.TargetKitDB.chat)
 
     # --- 1.4.2: what Forever's log showed (Zhevra Runners, and CorpseGlow's corpse nameplate) ---
-    def test_nameplates_that_cannot_be_measured_still_go_round(self):
+    def test_nameplates_that_cannot_be_measured_are_no_error(self):
         """On Forever asking a nameplate where it is on screen is an error ("Can't measure restricted regions"); it
         made every look fail, so TK Find ran its fixed macro (1.4.2)."""
         self.g.C_NamePlate.GetNamePlateForUnit = self.lua.eval(
@@ -694,8 +653,7 @@ class TargetKitTests(unittest.TestCase):
         for _ in range(4):
             self.press('TKFind')
             got.append(self.g.UNITS.target.guid)
-        self.assertEqual(len(set(got[:3])), 3)                               # each press the next one
-        self.assertEqual(got[3], got[0])                                     # then round again
+        self.assertEqual(len(set(got)), 1)                                   # the closest each time (1.4.5)
         self.assertEqual(len([l for l in self.logged() if "doesn't let addons measure nameplates" in l]), 1)
         self.assertFalse(self.in_log('ERROR'))
 

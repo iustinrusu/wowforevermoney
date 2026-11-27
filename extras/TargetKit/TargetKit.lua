@@ -2,9 +2,8 @@
 -- Not part of the WoW Forever Money app: it lives in the repo's extras/ folder and the app never copies it.
 -- The request it follows (revised): extras/TargetKit/README.md.
 --
---   TK Find        your find list (/tkit add <name>): the closest match first (by name). With one of them targeted:
---                  another name from the list in sight, by name (any direction); else another one of the same name,
---                  the game's Tab (only what's in front of you); else it stays (1.4.4).
+--   TK Find        your find list (/tkit add <name>): the closest match, by name. With one of them targeted, the next
+--                  name from the list that's in sight; never the game's Tab, which lands on other mobs (1.4.5).
 --                  Dead mobs are skipped; dead players count, and dead friendly NPCs (a dead neutral or hostile unit
 --                  could be a mob, so it is skipped).
 --   TK Pickpocket  the closest humanoid you can rob (attackable, not a player, alive, not in combat, not pickpocketed
@@ -38,11 +37,11 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.4.4"
+local VERSION = "1.4.5"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
-local CYCLE = 8                       -- seconds: TK Find going round with Tab keeps going if pressed within this
+local CYCLE = 8                       -- seconds: TK Find going round the list's names keeps going within this
 local AGAIN = 10                      -- seconds: TK Pickpocket pressed again on its last unit finishes the job
 local KEEP_PICKED = 2 * 3600          -- a robbed unit is skipped for 2 hours (a respawn is a new unit anyway)
 local MAX_BODY = 255                  -- a macro's text: the game takes up to 255 characters
@@ -471,87 +470,42 @@ local function findBuild(units)
   end
   rank(list)
   local saw = seen({ list }, rejected, others)
-  -- Forever refuses "/target nameplateN" in a macro (1.4.3), so a unit can only be targeted by name, which gives the
-  -- closest of that name in any direction, or by the game's Tab, which goes round what's in front of you, every enemy
-  -- (1.4.4, the user: "it also targets other mobs, not just the one in the target list, and doesnt cycle if targets
-  -- are not in my view"). So with your target on the list: another name from the list in sight goes first, by name;
-  -- only when the others share your target's name is it Tab; with no other list unit in sight it stays. Tab that
-  -- landed on one not on the list Tabs on, but no more often than there are units of that kind in sight.
+  -- Forever refuses "/target nameplateN" in a macro (1.4.3), so a unit can only be targeted by name (the closest of
+  -- that name, in any direction) or by the game's Tab. Tab goes through every enemy in front of you whose nameplate
+  -- shows, so it landed on other mobs; 1.4.5 drops it (the user: "it's now working but is inconsistent, and seems
+  -- it's still targeting other mobs other than the ones selected, if it's too messy let's just drop cycling"). So
+  -- TK Find only ever targets by name, so only what's on your list: the closest match; with one of them targeted,
+  -- the next name from the list in sight (each once a round, then round again). Mobs sharing a name: the closest.
+  if #list == 0 then
+    return nil, "none in sight, so by name (with the full names seen that contain a list entry)", nil, saw
+  end
   local fresh = GetTime() - last.find.t > CYCLE                       -- a pause: a new round
   local done = fresh and {} or (last.find.names or {})
-  local harm = UnitExists("target") and UnitCanAttack("player", "target") and true or false
-  local kinds = 0                                                     -- units Tab could go through
-  for _, c in ipairs(units or {}) do
-    local h = UnitCanAttack("player", c.unit) and true or false
-    if h == harm and not dead(c.unit) then kinds = kinds + 1 end
-  end
-  local tguid, tname = UnitGUID("target"), UnitName("target")
-  local tab = harm and "/targetenemy" or "/targetfriend"
+  local tname = UnitName("target")
   if UnitExists("target") and not findWhyNot("target") then
-    local other, again, sameName
+    local other, again
     for _, c in ipairs(list) do                                       -- closest first
-      if c.guid ~= tguid then
-        local n = UnitName(c.unit)
-        if n ~= tname and not done[n] and not other then other = c end
-        if n ~= tname and not again then again = c end
-        if n == tname then sameName = true end
+      local n = UnitName(c.unit)
+      if n ~= tname then
+        if not done[n] and not other then other = c end
+        if not again then again = c end
       end
     end
     if other then
       local n = UnitName(other.unit)
-      return targetLine(other), "your target " .. (tname or "?") .. " is on the list; next, by name: " .. describe(other),
-        n, saw, { mode = "name", name = n, from = tname }
+      return targetLine(other), "your target " .. (tname or "?") .. " is on the list; the next name, by name: "
+        .. describe(other), n, saw, { name = n, from = tname }
     end
-    if sameName then
-      -- Tab came back to your target without reaching another of the list: the others are out of its reach (too
-      -- far, or behind you; the user's log, Zhevra Runners: it went Runner, Screecher, Runner). Then it stays,
-      -- until what's in sight changes (one comes closer or into view) or a pause.
-      local had = (not fresh and last.find.had) or {}
-      local reached = 0
-      for _ in pairs(had) do reached = reached + 1 end
-      local keys = {}
-      for _, c in ipairs(list) do if c.guid ~= tguid then keys[#keys + 1] = c.guid end end
-      table.sort(keys)
-      local key = table.concat(keys, " ")
-      if not fresh and last.find.back and had[tguid] then
-        if reached >= 2 then
-          return tab, "your target " .. (tname or "?") .. " is on the list; Tab went round all it reaches, so round"
-            .. " again", nil, saw, { mode = "tab", friend = not harm, from = tname, resetHad = true }
-        end
-        if last.find.mode ~= "stay" or last.find.key == key then
-          return "", "your target " .. (tname or "?") .. " is on the list, but Tab came back to it without reaching"
-            .. " another: the others of that name are out of Tab's reach (too far, or behind you), so it stays until"
-            .. " what's in sight changes", nil, saw, { mode = "stay", from = tname, key = key }
-        end
-        return tab, "your target " .. (tname or "?") .. " is on the list and what's in sight changed, so Tab again",
-          nil, saw, { mode = "tab", friend = not harm, from = tname, resetHad = true }
-      end
-      return tab, "your target " .. (tname or "?") .. " is on the list and others in sight share its name, so the"
-        .. " game's Tab to the next " .. (harm and "enemy" or "friendly unit") .. " (" .. #list .. " on the list in"
-        .. " sight)", nil, saw, { mode = "tab", friend = not harm, from = tname }
-    end
-    if again then                                                     -- every name had: round again, by name
+    if again then
       local n = UnitName(again.unit)
       return targetLine(again), "your target " .. (tname or "?") .. " is on the list; every name had, so round again"
-        .. " by name: " .. describe(again), n, saw, { mode = "name", name = n, from = tname, reset = true }
+        .. " by name: " .. describe(again), n, saw, { name = n, from = tname, reset = true }
     end
-    return "", "your target " .. (tname or "?") .. " is the only one on the list in sight: it stays (a Tab would only"
-      .. " find others)", nil, saw, { mode = "stay", from = tname }
-  end
-  if UnitExists("target") and not fresh and last.find.mode == "tab" and #list > 0
-      and (last.find.tabs or 0) < kinds then
-    local friend = last.find.friend
-    return friend and "/targetfriend" or "/targetenemy", "going round with Tab: " .. (tname or "?") .. " isn't on the"
-      .. " list (" .. ((last.find.tabs or 0) + 1) .. " of at most " .. kinds .. ")", nil, saw,
-      { mode = "tab", friend = friend, on = true }
-  end
-  if #list == 0 then
-    return nil, "none in sight, so by name (with the full names seen that contain a list entry)", nil, saw
   end
   local pick = list[1]
   local n = UnitName(pick.unit)
   return targetLine(pick), "the closest on the list: " .. describe(pick) .. " (" .. #list .. " in sight)", n, saw,
-    { mode = "name", name = n }
+    { name = n }
 end
 
 -- ---------- the macros ----------
@@ -685,17 +639,6 @@ local function afterPress(p)                             -- 0.3 s after a press:
   end
 end
 
-local function findReached(mode)                         -- the frame after a TK Find press: a list unit it reached,
-  if mode == "stay" then return end                      -- and whether a Tab came back to one it had already had
-  last.find.back = false
-  if UnitExists("target") and not findWhyNot("target") then
-    local g = UnitGUID("target")
-    last.find.had = last.find.had or {}
-    last.find.back = (mode == "tab" and last.find.had[g]) and true or false
-    last.find.had[g] = true
-  end
-end
-
 local function onPress(b)                                -- the macro's last line ran: the press is real
   local st = b.live or b.state or { text = "", why = "?", saw = {} }
   local now = GetTime()
@@ -714,23 +657,15 @@ local function onPress(b)                                -- the macro's last lin
       note(msg)
     end
     local x = st.extra or {}
-    local pause = now - last.find.t > CYCLE
-    if pause or x.reset then last.find.names = {} end                   -- a pause, or every name had
-    if pause or x.resetHad then last.find.had, last.find.tabbed = {}, false end
+    if now - last.find.t > CYCLE or x.reset then last.find.names = {} end      -- a pause, or every name had
     last.find.names = last.find.names or {}
     if x.from then last.find.names[x.from] = true end
     if x.name then last.find.names[x.name] = true end
-    if x.mode == "tab" then last.find.tabbed = true end
-    if x.key then last.find.key = x.key end
-    last.find.tabs = x.on and ((last.find.tabs or 0) + 1) or 0
-    last.find.t, last.find.mode, last.find.friend = now, x.mode, x.friend
+    last.find.t = now
   end
   local p = { b = b, st = st, ran = ran, before = targetBefore, at = now }
   if C_Timer then
-    C_Timer.After(0, function()                                          -- the next press: written fresh
-      if b.name == "TKFind" then try("TK Find: who the press reached", findReached, (st.extra or {}).mode) end
-      try("TargetKit choosing", prepare, true)
-    end)
+    C_Timer.After(0, function() try("TargetKit choosing", prepare, true) end)    -- the next press: written fresh
     C_Timer.After(0.3, function() try(b.macro .. " result", afterPress, p) end)
   end
 end

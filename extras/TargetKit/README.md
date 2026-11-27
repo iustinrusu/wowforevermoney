@@ -33,10 +33,9 @@ Revised:
 >    nameplate, or dead ones without one, are found by name as a fallback.
 >    (1.4.3, what Forever allows: an addon can't target a unit by its nameplate, only by name, which gives the
 >    closest of that name in any direction, or with the game's Tab, which only goes through what's in front of you
->    and fairly near, every enemy. 1.4.4: the first press takes the closest match by name. With one targeted:
->    another name from the list in sight, by name; else another of the same name, Tab; with no other in sight it
->    stays. Tab that lands on a mob not on the list Tabs on, at most as often as there are such units in sight; Tab
->    that comes back to the same one without reaching another stays, until what's in sight changes or 8 s pass.)
+>    and fairly near, every enemy. 1.4.5, the user's call after trying Tab: "if it's too messy let's just drop
+>    cycling". So TK Find only targets by name, so only what's on the list: the closest match; with one of them
+>    targeted, the next name from the list that's in sight. Mobs that share a name: always the closest.)
 > 2. **TK Pickpocket**: targets the closest humanoid I can rob (attackable, not a player, alive, not in combat, not
 >    pickpocketed yet), then Sap and Pick Pocket in one press (Sap doesn't break stealth on Forever). If one of the
 >    two was still on cooldown, the next press on that unit does the missing one; after that it moves on to the next
@@ -110,13 +109,11 @@ Revised:
   `/reload`); `/tkit chat` (above); `/tkit help`.
 - Nameplates matter: the addon sees units through them (enemy nameplates for mobs and players, friendly ones for
   NPCs), plus your target, mouseover, soft targets, focus and group. It can't target through them: Forever refuses
-  "/target nameplateN" in a macro (1.4.3), so every choice is written by name, and TK Find goes round mobs of the
-  same name with Tab (`/targetenemy`, or `/targetfriend` when your target is friendly). Tab goes through every enemy
-  in front of you, so with other mobs around a press can land on one not on your list (press again), and it never
-  reaches mobs of that name behind you or too far off: turn toward them. Different names on your list go by name,
-  in any direction. (The user, in game: Tab goes only through mobs whose nameplates are showing, while by name
-  reaches one without a nameplate. So turning the camera or zooming out to get more of them on screen is what widens
-  the round.)
+  "/target nameplateN" in a macro (1.4.3), so every choice is written by name, and the game takes the closest unit
+  of that name, in any direction, nameplate showing or not. So TK Find can't go round mobs that share a name: it
+  takes the closest one. With several names on your list, each press goes to the next name in sight. (1.4.3 and
+  1.4.4 went round same-named mobs with the game's Tab, but Tab goes through every enemy in front of you whose
+  nameplate shows, so it landed on other mobs and missed ones behind you; 1.4.5 dropped it.)
 
 ## Limits (the game's, not choices)
 

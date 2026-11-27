@@ -935,6 +935,15 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (eighteenth part) TargetKit 1.4.5: TK Find no longer uses the game's Tab. The user, after 1.4.4: "it's
+  now working but is inconsistent, and seems it's still targeting other mobs other than the ones selected, if it's
+  too messy let's just drop cycling". Decision: dropped. Tab on Forever goes through every enemy whose nameplate
+  shows, so it can't be kept to the list, and nothing else reaches the second of two same-named mobs (Verified
+  facts). TK Find now: the closest list match by name; with one targeted, the next list name in sight (each once a
+  round, then round again); same-named mobs: always the closest. Gone: the Tab, Tab-on, came-back and in-sight rules
+  of 1.4.3/1.4.4. Tests: 51 (the Tab tests replaced: by name only, never Tab, never the further one of a name or a
+  mob off the list; one name: the closest every press).
+
 - **2026-11-27** (seventeenth part) TargetKit 1.4.4 (the user: "kind of works now, but it also targets other mobs,
   not just the one in the target list, and doest cycle if targets are not in my view"). The 1.4.3 log (Zhevra
   Runners): with one Runner in sight every press tabbed to a Sunscale Screecher and back; a second Runner further
