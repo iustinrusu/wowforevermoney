@@ -100,7 +100,13 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       ago" show (the user's screenshot, nothing looted yet). Left: XP and loot counted after a few kills; a container
       as "not opened yet" without the app; addon 1.6.3's fold ("–" at the top right or /gea min: a screenshot folded
       and open, and that the window doesn't jump when folding).
-- [ ] B14. (2026-11-27, TargetKit 1.4.x, our extra addon) Done for TK Find (2026-11-27: a friendly player targeted
+- [ ] B14. (2026-11-27 evening, TargetKit 1.5.6, our extra addon.) Done: TK Find (friendly players; same-named mobs:
+      the closest, the user's choice), TK Sap in battlegrounds (the user: "sap working correctly"; stealthed players
+      first, 1.5.3). Left: TK Pickpocket in the open world and a dungeon (the closest robbable humanoid, a camp of one
+      name, walking past a group); whether dungeons hide mob names like Alterac Valley (the log says "the game hides");
+      TK Find on a name typed in Alterac Valley ("Irondeep Trogg": does the game take it?); TK Sap on mobs outside
+      battlegrounds (1.5.5). After each, `/reload` and Claude reads TargetKitDB.log.
+      Earlier notes: (2026-11-27, TargetKit 1.4.x) Done for TK Find (2026-11-27: a friendly player targeted
       every press, the log shows it). Left: TK Find on enemy mobs that share a name (put one on the list, stand near
       three or more, press TK Find a few times within 8 s: each press should take the next one; 1.4.1 failed here,
       1.4.2 found the game refuses nameplate lines; 1.4.3/1.4.4 went round with the game's Tab, which landed on
