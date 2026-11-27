@@ -120,6 +120,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/coverage.py` | which traded materials/items lack Forever source data; the Wowhead reading queue (items and mobs by gold you can't see yet, high levels first) |
 | `wfm/classicmobs.py` | WoW Classic mob loot from the cMaNGOS dump, cached: only picks the reading queue's order, never a value |
 | `wfm/app.py` | HTTP server, JSON API, SSE live updates, watcher loop |
+| `tools/wowhead_reader.js` | reads the one Wowhead Forever page open in the browser pane (set up as `localStorage.wfm_fn`; pages are opened by hand at the pace above) |
 | `tools/screenshots.py` | pictures of every tab, wide and 375 px, plus sideways-scroll and console checks (`python tools/screenshots.py before`) |
 | `web/` | the page (index.html, app.js, style.css) |
 | `addon/ForeverMoneyBridge/` | our WoW addon; copied into AddOns when the app starts |

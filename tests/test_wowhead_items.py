@@ -370,6 +370,55 @@ class VendorPageTests(unittest.TestCase):
         self.assertEqual(e.vendors_for(self.PATTERN), [])
         self.assertIsNone(e.vendor_price(self.SCHEMATIC))
 
+    def test_a_purchase_of_many_is_priced_per_item(self):
+        # Jyn Stonehoof, 2026-11-27: Heavy Shot comes 200 a purchase for 45c; a made-up 20 a purchase at 5s, 3 a restock
+        from tests.test_engine import SETTINGS, item, make_world
+        from wfm.engine import Engine
+        from wfm.questie import QuestieDB
+        SHOT, BOLTS, JYN = 2519, 9001, 2997
+        p = {f'npc={JYN}': {**page('Jyn Stonehoof', {}, url='https://www.wowhead.com/forever/npc=2997'),
+                            'sells': [[SHOT, -1, 45, 0, 0, 200], [BOLTS, 3, 500, 0, 0, 20], [self.OTHER, -1, 100, 0, 0, 1]]}}
+        data = wi.merge({}, p)[0]
+        self.assertEqual(data['npcs'][str(JYN)]['sells'][0], {'id': SHOT, 'stock': -1, 'cost': 45, 'stack': 200})
+        self.assertNotIn('stack', data['npcs'][str(JYN)]['sells'][2])               # one a purchase: not kept
+        w = make_world({}, [])
+        for i in (SHOT, BOLTS):
+            w.gamedata.items[i] = item(i, f'Item {i}', buy=9999)
+        w.questie = QuestieDB(items={}, npcs={JYN: {'name': 'Jyn Stonehoof', 'friendlyToFaction': 'H', 'zoneID': 1}})
+        w.forever_pages = data
+        e = Engine(w, dict(SETTINGS))
+        self.assertEqual(e.vendor_price(BOLTS)[0], 25)                  # 5s for 20: 25c each, not 5s
+        self.assertEqual(e.vendor_stock_cap(BOLTS), 60)                 # 3 purchases a restock = 60 bolts
+        self.assertEqual(e.vendors_for(SHOT)[0]['wowhead_cost'], 45 / 200)
+
+    def test_rows_with_no_loots_are_left_out_not_the_page(self):
+        # Dark Iron Ore, 2026-11-27: six Dropped by rows read "count -1 of 0" (Wowhead has no Forever loots for them)
+        p = page('Dark Iron Ore', {'dropped-by': {'kind': 'npc', 'total': 3, 'classic': 0,
+                                                  'rows': [[8905, 217, 2028, 53, 54, [1584], 1, None],
+                                                           [12018, -1, 0, 9999, 9999, [2717], 3, None],
+                                                           row(9023, -1, 0)]}})
+        data, saved, problems = wi.merge({}, {'item=11370': p})
+        self.assertEqual((saved, problems), (['item=11370'], []))
+        tab = data['items']['11370']['tabs']['dropped-by']
+        self.assertEqual(([r['id'] for r in tab['rows']], tab['small']), ([8905], 2))
+
+
+class EventVendorTests(unittest.TestCase):
+    def test_javnir_nashak_comes_only_for_the_harvest_festival(self):
+        # checklist A7, 2026-11-27: his Wowhead Forever page's one quest is a Harvest Festival quest
+        from tests.test_engine import SETTINGS, item, make_world
+        from wfm.engine import Engine
+        from wfm.questie import QuestieDB
+        FIREWORK, JAVNIR = 9313, 15012
+        w = make_world({}, [])
+        w.gamedata.items[FIREWORK] = item(FIREWORK, 'Green Firework', buy=20)
+        w.questie = QuestieDB(items={FIREWORK: {'vendors': [JAVNIR]}},
+                              npcs={JAVNIR: {'name': 'Javnir Nashak', 'friendlyToFaction': 'H', 'zoneID': 14,
+                                             'spawns': {14: [[45.0, 10.0]]}}})
+        e = Engine(w, dict(SETTINGS))
+        self.assertTrue(e.vendors_for(FIREWORK)[0]['event'])
+        self.assertIn('event_vendor', e.vendor_flags(FIREWORK) + tuple(e.cheapest(FIREWORK).flags))
+
 
 class NpcFactsTests(unittest.TestCase):
     """An npc page's Quick Facts are kept for kill speed (2026-11-20): health and level as numbers, checked."""

@@ -142,12 +142,20 @@ def clean_row(r) -> dict:
     return out
 
 
+def _no_loots(r) -> bool:
+    """A row with no loots behind it: outof 0, or a count below 0."""
+    vals = r[1:3] if isinstance(r, list) else [r.get('count'), r.get('outof')] if isinstance(r, dict) else []
+    nums = [v for v in vals if isinstance(v, (int, float)) and not isinstance(v, bool)]
+    return len(nums) == 2 and (nums[1] <= 0 or nums[0] < 0)
+
+
 def clean_sell(r) -> dict:
     """A vendor's Sells row, compact [item, stock (-1 = unlimited, else how many a restock), price in copper, the
-    reputation it needs, 1 if it also costs a currency or items] or an object. A price of 0 means not gold (Fizzlefuse's
-    schematics: some other currency; read before the reader kept that)."""
+    reputation it needs, 1 if it also costs a currency or items, how many one purchase gives] or an object. A price of
+    0 means not gold (Fizzlefuse's schematics cost Merchant's Favor, a currency). The price is for one purchase: Light
+    Shot comes 200 at a time for 10c (2026-11-27, Jyn Stonehoof), so `stack` is kept when it is more than 1."""
     if isinstance(r, list):
-        r = dict(zip(('id', 'stock', 'cost', 'standing', 'other_cost'), r))
+        r = dict(zip(('id', 'stock', 'cost', 'standing', 'other_cost', 'stack'), r))
     if not isinstance(r, dict):
         raise ValueError('a sells row must be a list or an object')
     out = {'id': _int(r.get('id'), 1, 10**8)}
@@ -159,6 +167,8 @@ def clean_sell(r) -> dict:
         out['standing'] = _int(r['standing'], 0, 10)
     if r.get('other_cost'):
         out['other_cost'] = True
+    if r.get('stack') is not None and _int(r['stack'], 1, 10**4) > 1:
+        out['stack'] = int(r['stack'])
     return out
 
 
@@ -178,8 +188,12 @@ def clean_page(page: dict) -> dict:
         kind = tab.get('kind') or TAB_KIND.get(tid)
         if kind not in ENTITY.values():
             continue                                   # comments, reagent-for, see-also...: not a source
-        rows = [clean_row(r) for r in tab['rows'][:500]]
-        small = sum(1 for r in rows if r['outof'] < MIN_LOOTED)
+        raw = tab['rows'][:500]
+        # Wowhead's "no Forever loots recorded" marker: count -1 of 0 (Dark Iron Ore's Dropped by, 2026-11-27);
+        # counted with the small samples, never a reason to throw the page away
+        nodata = [r for r in raw if _no_loots(r)]
+        rows = [clean_row(r) for r in raw if not _no_loots(r)]
+        small = sum(1 for r in rows if r['outof'] < MIN_LOOTED) + len(nodata)
         rows = [r for r in rows if r['outof'] >= MIN_LOOTED]
         rows.sort(key=lambda r: (-r['outof'], -r['count'], r['id']))
         out['tabs'][tid] = {'kind': kind, 'total': _int(tab.get('total', len(tab['rows']))),

@@ -44,6 +44,17 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   the market limit and its kill speed, minus what Forever data shows; rare and named mobs (under 5 spawn points in
   QuestieDB) left out. An item without Forever source data: your share of the region's trade in it a day; items only
   dungeon mobs drop are left for the Dungeons view (C4). Read it from the top, skip pages read in the last month.
+- Session 8 (2026-11-27, to-do C1): 20 pages, 2 minutes apart, no block. Item 9149 Philosopher's Stone (B10), npcs
+  248200 Fizzlefuse, 15012 Javnir Nashak (A7), 2685 Mazk Snipeshot, 251365 Jolee Brightmeadows, 2997 Jyn Stonehoof
+  (A0), objects 180655 Floating Debris, 693670 Strange Debris, 630533 Fresh Wreckage, 180582 Oily Blackmouth School
+  (A3: no Forever pool loot on Wowhead yet, so the pools stopped there), then the reading queue's top 10: items 647
+  11737 252894 7077 252892 18360 11370 18364 273122, npc 8521. The reader is now kept in the repo,
+  `tools/wowhead_reader.js` (set it up in the tab with `localStorage.wfm_fn = <the file's text>`, check its SHA-256
+  against the file; `wfm_go3` as before); fixed on the way: a vendor's stock (`avail`), cost options, purchase size,
+  object pages' counts per mode. Fizzlefuse and Javnir were read before the stock fix: their stock is saved as unknown.
+  Batch checked with SHA-256 (13,096 characters), kept in the tab as `wfm_pages_saved_008`. Pages: 150 items, 4
+  objects, 30 npcs. Next session: the reading queue from the top (Data health), one pool page to see whether Wowhead
+  has started recording pools.
 - Session 7 (2026-11-26; the user: "Yes, read them", after asking whether mob farming counts skinning): 4 mob pages,
   2 minutes apart, no block: npcs 2731 Ridge Stalker, 2734 Ridge Stalker Patriarch, 2732 Ridge Huntress, 976 Kurzen
   War Tiger: beasts the WoW Classic dump calls skinnable that no leather page lists. All four have a Forever Skinning

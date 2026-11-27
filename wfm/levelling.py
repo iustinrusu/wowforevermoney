@@ -3,8 +3,10 @@ strategy item 2; overhauled 2026-11-19 at the user's request: "the most efficien
 want, we don't want lesser paths").
 
 The cost of one skill point with a recipe:
-  net cost of one craft = ingredients (cheapest of vendor and AH; a material your own gathering profession provides
-                          counts at what you would get for selling it) - what you get back for the product
+  net cost of one craft = ingredients (cheapest of vendor and AH; a vendor with only a few a restock counts at the
+                          AH price when the AH lists it, since a path needs dozens (2026-11-27); a material your own
+                          gathering profession provides counts at what you would get for selling it)
+                          - what you get back for the product
   expected cost of the point = net cost of one craft / chance that a craft gives a skill point
 What you get back for a product is the best of three, per unit:
   - the AH (after the cut), at the lower of the lowest listing and the region's usual sale price, and only for as many

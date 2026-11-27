@@ -514,3 +514,67 @@ class VendorStockTests(unittest.TestCase):
         o = flip()
         self.assertNotIn('stock_unknown', o.flags)                # seen as unlimited
         self.assertNotIn('limited_stock', o.flags)
+
+
+class VendorThenAHTests(unittest.TestCase):
+    """A vendor with only a few a restock is the cheapest seller of an ingredient: its few first, then the AH (2026-11-27,
+    the user: "fel cloth marked as limited supply from vendor, but it also drops from mobs"). Vi'el sells 2 Felcloth a
+    restock at 80s; 196 were listed at 91s 87c, yet every Felcloth craft was held to 2 Felcloth a day.
+    Hand-worked: the recipe uses 2 of the ingredient. The vendor sells 3 a restock at 10s (game file price); the
+    product sells 50 a day in the region (your 20%: 10 crafts a day) at 50s, 47s 50c after the cut."""
+
+    def world(self, ah=None):
+        recipe = Recipe(spell_id=600, name='Fine Dish', profession='Cooking', skill_line=185, product_id=PRODUCT,
+                        product_count=1, reagents=[(LIMITED, 2)], trivial_low=140, trivial_high=180, min_rank=1)
+        prices = {PRODUCT: {'numAuctions': 6, 'minBuyout': 5000, 'marketValue': 5000, 'regionSoldPerDay': 50,
+                            'regionSalePercent': 0.5}}
+        if ah:
+            prices[LIMITED] = {'numAuctions': 50, 'minBuyout': ah, 'marketValue': ah, 'regionSoldPerDay': 100,
+                               'regionSalePercent': 0.5}
+        w = make_world(prices, [recipe])
+        w.skillup.thresholds[600] = [100, 140, 160, 180]
+        return w
+
+    def craft(self, w):
+        return next(o for o in Engine(w, dict(SETTINGS, gold=1000)).crafts() if o.detail['recipe_spell'] == 600)
+
+    def test_the_rest_come_from_the_ah(self):
+        o = self.craft(self.world(ah=1500))
+        # the vendor's 3 cover 1.5 crafts; the AH's 100 a day at 20% = 20 more cover 10: the product's 10 a day are made.
+        # 10 crafts need 20: 3 at 10s, 17 at 15s -> 17 x 5s = 85s more than at the vendor's price
+        self.assertEqual(o.units_day, 10)
+        self.assertEqual(o.cost_unit, 2000 + 850)               # the average craft: 28s 50c
+        self.assertEqual(o.profit_unit, 4750 - 2850)
+        self.assertEqual(o.daily, 10 * 2750 - 8500)             # 1g 90s
+        self.assertIn('vendor_then_ah', o.flags)
+        self.assertNotIn('limited_mat', o.flags)
+        m = o.detail['mats'][0]
+        self.assertEqual((m['unit'], m['vendor_stock'], m['then']['unit'], m['then']['per_day']), (1000, 3, 1500, 20))
+
+    def test_only_the_vendors_few_when_the_ah_copies_dont_pay(self):
+        o = self.craft(self.world(ah=4000))
+        # a craft with AH copies costs 80s and sells for 47s 50c: only the 1.5 crafts the vendor's 3 cover
+        self.assertEqual(o.units_day, 1.5)
+        self.assertEqual(o.cost_unit, 2000)
+        self.assertEqual(o.daily, int(1.5 * 2750))
+        self.assertIn('limited_mat', o.flags)
+        self.assertNotIn('vendor_then_ah', o.flags)
+
+    def test_nothing_on_the_ah_keeps_the_vendor_limit(self):
+        o = self.craft(self.world())
+        self.assertEqual(o.units_day, 1.5)
+        self.assertIn('limited_mat', o.flags)
+        self.assertNotIn('then', o.detail['mats'][0])
+
+    def test_no_limited_label_where_the_stock_covers_the_market(self):
+        w = self.world()
+        w.prices[PRODUCT]['regionSoldPerDay'] = 5            # your 20%: 1 craft a day, 2 of the vendor's 3
+        o = self.craft(w)
+        self.assertEqual(o.units_day, 1)
+        self.assertNotIn('limited_mat', o.flags)              # Felcloth Bag: 0.07 a day, Vi'el's 2 cover it
+
+    def test_levelling_buys_by_the_dozen_at_the_ah_price(self):
+        e = Engine(self.world(ah=1500), dict(SETTINGS))
+        self.assertEqual((e.cheapest(LIMITED).value, e.cheapest(LIMITED).source), (1000, 'vendor'))
+        self.assertEqual(e.cheapest_in_bulk(LIMITED).value, 1500)
+        self.assertEqual(Engine(self.world(), dict(SETTINGS)).cheapest_in_bulk(LIMITED).value, 1000)   # none listed

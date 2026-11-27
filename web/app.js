@@ -37,7 +37,8 @@ const FLAGS = {
   skill_estimated: ['', 'skill level estimated', 'Exact skill requirement unknown; estimated'],
   sell_to_vendor: ['good', 'vendor sale', 'Selling to a vendor beats the AH'],
   mat_not_listed: ['warn', 'an ingredient isn\'t listed', 'An ingredient has no listings right now'],
-  limited_mat: ['warn', 'ingredient in limited stock', 'An ingredient comes from a limited-stock vendor'],
+  limited_mat: ['warn', 'ingredient in limited stock', 'An ingredient comes from a vendor who has only a few at a time and restocks slowly, and buying more on the auction house would not pay (or nobody lists it there): this row counts only as many crafts as that vendor\'s stock allows'],
+  vendor_then_ah: ['', 'vendor first, then AH', 'The cheapest seller of an ingredient is a vendor with only a few at a time. The row counts those first, then buys the rest on the auction house at its price (only your share of what it sells a day), and the cost per craft is the average of both. The ingredients table says how many come from the vendor'],
   limited_stock: ['warn', 'limited stock', 'Vendor has limited stock that restocks over time'],
   other_profession: ['', 'other profession', 'You don\'t have this profession'],
   classic_disenchant: ['warn', 'Classic disenchant table', 'Its profit comes from disenchanting the product, valued with a WoW Classic reference table (ForeverRecipes, provisional estimates), not Forever data. Never a Top pick or part of your plan; check what you really get in game'],
@@ -1156,7 +1157,7 @@ function oppDetail(o) {
       : d.learn.how === 'trainer' ? `Trainer, ${money(d.learn.cost)}${d.level_required ? ` (at character level ${d.level_required} or higher)` : ''}`
       : d.learn.how === 'tool' ? `Nothing to learn: you need a ${itemLink(d.learn.item_id, d.learn.name)}, which you keep (it is not used up). ${d.learn.owned ? 'You have one.' : `${d.learn.owned === false ? 'Your bags, bank and gear have none: ' : ''}it costs ${d.learn.cost !== null ? money(d.learn.cost) : '? (not on AH / vendor)'} (${esc(d.learn.source || '')}), once.`}`
       : `${esc(d.learn.name || 'recipe')}: ${d.learn.cost !== null ? money(d.learn.cost) : 'not on AH / vendor'} (${esc(d.learn.source || '')})`;
-    html += `<h3>Ingredients <small>per craft</small></h3><table><tbody>${d.mats.map((m) => `<tr><td>${m.count}×</td><td>${itemLink(m.item_id, m.name)}${madeWith(m)}</td><td class="num">${money(m.unit)}</td><td>${esc(m.source)} ${flagHtml(m.flags)}</td></tr>`).join('')}</tbody></table>
+    html += `<h3>Ingredients <small>per craft</small></h3><table><tbody>${d.mats.map((m) => `<tr><td>${m.count}×</td><td>${itemLink(m.item_id, m.name)}${madeWith(m)}</td><td class="num">${money(m.unit)}</td><td>${esc(m.source)} ${flagHtml(m.flags)}${m.then ? `<div class="hint">the vendor has ${m.vendor_stock} at a time; the rest come from the AH at ${money(m.then.unit)} each (${esc(m.then.source)}), up to your share of its sales: about ${num(m.then.per_day, 1)} a day</div>` : ''}</td></tr>`).join('')}</tbody></table>
       <div class="kv" style="margin-top:8px">${d.disenchant ? `<div>Disenchanted (total) <span class="pill">Classic table</span></div><div>about ${money(d.revenue)}: each one gives ${deMats(d.disenchant)}${deWho(d.disenchant)}</div>` : `<div>Sells for (total)</div><div>${money(d.revenue)} via ${esc(d.sell_channel)} (${esc(d.sell_source)})</div>`}
       <div>Skill needed</div><div>${d.skill_required}${d.skill_exact ? '' : ' (estimated)'} ${d.thresholds ? `<span class="pill">orange/yellow/green/grey: ${d.thresholds.join(' / ')}</span>` : ''}</div>
       <div>${d.tool ? 'Tool' : 'Learn it'}</div><div>${learnText}</div>

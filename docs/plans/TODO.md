@@ -90,8 +90,10 @@ B2. [x] (done 2026-11-20: the Night watch look, signed off by the user; docs/pla
 ## C. Then the rest
 
 C1. [ ] (in progress: the top 100 and the 4 skinning items done 2026-11-20; 2 minutes apart, at most 20 a session.
-       Next: the Philosopher's Stone page (checklist B10), more vendors (A0), Fizzlefuse again, Javnir Nashak (A7),
-       then the 26 pools (A3); see the plan's Progress section)
+       2026-11-27, session 8: the Philosopher's Stone (B10, still open), Fizzlefuse, Javnir Nashak (A7 done), 3
+       vendors (A0), 4 pools (A3 paused: Wowhead has no Forever pool loot yet), the reading queue's top 10.
+       Next: the reading queue from the top, and one pool page to see whether Wowhead records pools yet; see the plan's
+       Progress section)
        **Forever source data for every material** (fixes "some skins not counted", pool loot, mob drops, node
        yields; the user's top priority for data accuracy, 2026-11-14): `docs/plans/material-coverage.md`. Work in the
        order at the top of that file: other Forever data sources, the item-page data format, 5 top pages a session

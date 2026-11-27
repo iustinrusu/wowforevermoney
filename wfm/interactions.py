@@ -33,6 +33,11 @@ LOOT = [
     ('Quest rewards', 'not counted', 'quest items are worth their vendor price only'),
 ]
 MIN_SOLD = 1.0           # a product counts as traded at 1+ sold a day in the region
+# What Wowhead Forever pages say about spells the game data gives no player source (checklist B10), by name
+CHECKED = [('Power Crystal', "Wowhead Forever, 2026-11-27: the Philosopher's Stone page lists Transmute: Red Power "
+                             "Crystal to Blue Power Crystal among the spells it is the tool for (the stone binds when "
+                             "picked up and alchemists make it at skill 225), but gives it no profession, skill or way "
+                             "to learn it, so who can cast these is still unknown")]
 
 
 def _traded(prices: dict, iid: int) -> tuple[float, int]:
@@ -69,7 +74,9 @@ def report(gd, prices: dict) -> dict:
         add(how.split(':')[0].split(' (')[0].capitalize(), False)
         spd, gold = _traded(prices, product)
         if spd >= MIN_SOLD:
-            missing.append({'spell': spell, 'name': name, 'product': product, 'how': how, 'sold_per_day': spd,
+            note = next((n for word, n in CHECKED if word in (name or '')), '')
+            missing.append({'spell': spell, 'name': name, 'product': product,
+                            'how': how + (f'. {note}' if note else ''), 'sold_per_day': spd,
                             'gold_a_day': gold, 'reagents': mats})
     missing.sort(key=lambda m: -m['gold_a_day'])
     tools = sum(1 for r in gd.recipes if getattr(r, 'tools_needed', ()) or getattr(r, 'tool_items', ()))

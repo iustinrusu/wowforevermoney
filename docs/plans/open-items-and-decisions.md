@@ -10,7 +10,14 @@ are done or decided (with the date). Don't drop an item without the user's say.
 Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a session; at a 403 stop, then try one page after 30 minutes, 2 hours, the next day; after a second block, 5 a session (the exact reading order:
 `docs/plans/material-coverage.md`, Progress section).
 
-- [ ] A0. (2026-11-20: 9 vendors read: Borya, Kania, Wizzle Brassbolts, Kor'gar, Vi'el, Fizzlefuse, Kelsey Yance,
+- [ ] A0. (2026-11-27: 3 more read, the vendors behind the biggest "stock unknown" flips: Mazk Snipeshot sells
+      Bronze Tube 2 a restock (14 vendors sell it; the other 13 still unread), Jolee Brightmeadows and Jyn Stonehoof
+      sell everything without a limit. Fizzlefuse re-read: all 29 items cost Merchant's Favor (currency 3402), 45-1,000
+      each. The reader now reads the stock right (`avail`) and how many one purchase gives (Light Shot: 200).
+      All stock-unknown flips together are worth about 14g a day, so further vendor pages are low priority. Next if
+      wanted: Blacksmith Rand / Bronk Steelrage / Rarc (Rusted Chain gear), Nerrist or Keena (Recipe: Curiously Tasty
+      Omelet).)
+      (2026-11-20: 9 vendors read: Borya, Kania, Wizzle Brassbolts, Kor'gar, Vi'el, Fizzlefuse, Kelsey Yance,
       Aurian Highgrove, Nixxrax Fillamug. Borya doesn't sell Pattern: Invoker's Cord in Forever (QuestieDB's 46g-a-day
       flip was a phantom); Wizzle doesn't sell Copper Modulator, Kor'gar does, 2 a restock; Fizzlefuse's schematics
       cost a currency, not gold. The app now trusts a read vendor page over QuestieDB. Next, by profit at stake: the Hand
@@ -23,7 +30,11 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       Pearl 5500; 20 read on 2026-11-15).
 - [x] A2. (done 2026-11-20: "some skins not counted" is gone from all 40 skinning spots) The 4 skinning items left:
       Black Whelp Scale (7286), Worn Dragonscale (8165), Green Dragonscale (15412), Chimera Leather (15423).
-- [ ] A3. 26 fishing-pool object pages, debris and wreckage first (list in the plan, step 3). Answers whether floating
+- [ ] A3. (2026-11-27: paused. Wowhead has recorded no Forever loot for pools yet: Floating Debris 180655, Oily
+      Blackmouth School 180582 and the Forever-only Fresh Wreckage 630533 have no Contains tab; Strange Debris 693670
+      holds only a quest item. Re-check one pool page in a later session; the rest of the list waits until one has
+      data. Meanwhile the addon records pool catches itself: B5.)
+      26 fishing-pool object pages, debris and wreckage first (list in the plan, step 3). Answers whether floating
       debris is where most of the fishing gold is (the user's hunch).
 - [ ] A4. Each herb and ore node's own page, so node values have no Classic parts left.
 - [ ] A5. Mobs' own pages, so mob farming counts every drop (coins, gray items, gear), not only materials.
@@ -35,7 +46,9 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       the realm's daily sales for an hour's loot, the rest at the vendor price (Breath of Wind: about 50 an hour, your
       share 9.9 a day). And kill speed from each mob's health and level instead of one pace for all.
 - [ ] A6. Re-read later the 22 pages where Wowhead had no Forever data yet (Data health lists them).
-- [ ] A7. Javnir Nashak's Wowhead Forever page (Green Firework vendor, Durotar): always there, or only during an
+- [x] A7. (done 2026-11-27: only during the Harvest Festival. His Forever page's one quest, Honoring a Hero, is in
+      Wowhead's Harvest Festival category, and its comment says he appears then; his fireworks now count as an event
+      vendor's.) Javnir Nashak's Wowhead Forever page (Green Firework vendor, Durotar): always there, or only during an
       event? (moved from D3, 2026-11-15: Claude reads it in a reading session instead of asking the user)
 
 ## B. Work left that needs no Wowhead
@@ -103,7 +116,13 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       Unstable Magic (215 kinds of mob drop it, 390g traded a day), Shellfish, Pristine Black Diamond, Vulture
       Gizzard; dungeon gear and patterns belong to the Dungeons view (to-do 8). Each needs its Wowhead Forever page
       (Wowhead budget) to become a farming row.
-- [ ] B10. (2026-11-20: spell 1289305 read. "Transmute: Red Power Crystal to Blue Power Crystal": 2-second cast,
+- [ ] B10. (2026-11-27: the Philosopher's Stone page read. It is the tool for 16 spells: the alchemy transmutes, Flask
+      of Petrification, Refined Scale of Onyxia, the Forever-only Transmute: Legionite (Alchemy 275, from a drop) and
+      Transmute: Red Power Crystal to Blue Power Crystal, the one with no profession, skill or source at all. The stone
+      binds when picked up and alchemists make it at 225, so it is probably an alchemist's spell, but nothing says how
+      it is learned. Data health "Item interactions" now says this on the Power Crystal rows. Still open: only someone
+      in game can tell (an alchemist with a Philosopher's Stone: is it in the spellbook or the Alchemy window?).)
+      (2026-11-20: spell 1289305 read. "Transmute: Red Power Crystal to Blue Power Crystal": 2-second cast,
       tool Philosopher's Stone, 1 Red Power Crystal makes 1 Blue. Wowhead lists no profession skill and nothing that
       teaches it, so who can cast it is still open; the Philosopher's Stone's own page is the next one to read.)
       (2026-11-19) Power Crystal transmutations (Forever-only spells 1289305, 1308151-1308225: 5 crystals of one

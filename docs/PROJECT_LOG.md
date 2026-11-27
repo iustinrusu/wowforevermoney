@@ -24,6 +24,34 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-27 A vendor with only a few a restock comes first, then the AH (the user: "i remembered seeing fel cloth
+  marked as limited supply from vendor, but it also drops from mobs, can we check and fix this issue and other similar
+  issues? or was this a problem because of missing wowhead data?").** Not missing data: Vi'el's Wowhead Forever page
+  (read 2026-11-19) does say 2 Felcloth a restock at 80s. The app treated the cheapest seller as the only one, so a
+  limited vendor capped every craft at its stock although the AH had plenty (196 Felcloth listed at 91s 87c, 383 sold
+  a day in the region); 251 items are sold only by such vendors (Silverleaf 3, Golden Sansam 3, Gromsblood 5). Now
+  (`Engine.after_vendor_stock`, `_craft_row`): a craft takes the vendor's stock first, then buys the rest on the AH at
+  its price, up to your share of its market a day, and makes only as many as still pay; the cost per craft is the
+  average (flag `vendor_then_ah`, "vendor first, then AH"). "Ingredient in limited stock" (`limited_mat`) only where
+  the stock really holds the crafts down: it showed on Felcloth Bag (0.07 a day, Vi'el's 2 cover it) and Mooncloth
+  (its 4-day cooldown sets the pace). The levelling planner prices such an ingredient at the AH when listed
+  (`Engine.cheapest_in_bulk`): a path buys dozens, the vendor's few don't last. Not counted, as before: looting it
+  yourself (farming has its own rows) and how long a restock takes (the stock counts as a day's). On the real data: 34
+  of 619 craft rows changed, all up (Major Healing Potion 3 -> 40 a day, Flask of the Titans 0.17 -> 1); Alchemy's
+  levelling path 1-300 went from earning 26g 4s to costing 17g 67s (it had priced every Peacebloom and Silverleaf at
+  the herb vendor's 40c, who has 2-3 at a time; the AH sells them for 1s 23c-2s 65c), First Aid 17g 56s -> 18g 65s,
+  the others unchanged.
+- **2026-11-27 Fishing pools have no Forever loot on Wowhead yet (checklist A3).** Floating Debris (180655), Oily
+  Blackmouth School (180582) and the Forever-only Fresh Wreckage (630533, Riverglades) have no Contains tab at all;
+  Strange Debris (693670, Durotar) holds only Banner Scrap, a quest item. So the 26-pool reading list was stopped after
+  3 pools; the pages left went to the reading queue. Re-check one pool page now and then (when Wowhead starts
+  recording them). Pool value stays what the zone counts show.
+- **2026-11-27 The page reader lives in the repo (`tools/wowhead_reader.js`).** The Wowhead tab's storage lost it
+  twice, and the rebuilt one had lost the vendor Sells part. It still only reads the page that is open; pages are
+  opened by hand at the user's pace. Fixed on the way: a vendor's stock is the `avail` field (not `stock`), its price
+  is one way to pay among several (`[[copper, currencies, items]]`), `stack` = how many one purchase gives (Light Shot:
+  200 for 10c; the engine divides the price and multiplies the stock by it), object pages keep the loot count per mode.
+
 - **2026-11-20 Kill speed by mob health.** Kills per hour (Settings, 60) now means a typical normal mob of your level;
   each mob is paced by its health against that (0.5x to 1.5x): Forever health from its Wowhead page where read, else
   the typical health at its level from the WoW Classic database's median (labelled a Classic rule, like the skinning
@@ -876,11 +904,25 @@ moved into `forever-data-next.md`.
   recording at a vendor; fishing `sources`/`pools` (does GetLootSourceInfo give the pool's object id?).
 - No JavaScript syntax check in the tests (no Node on this PC): check the browser console after editing
   `web/app.js`; tests/test_web.py catches broken flag labels and names declared twice.
-- Is Javnir Nashak (Green Firework vendor, Durotar) permanent or event-only? Questie gives no hint; Claude reads
-  his Wowhead Forever page in a reading session (checklist A7).
+- Done 2026-11-27: Javnir Nashak (Green Firework vendor, Durotar) is a Harvest Festival vendor (his Wowhead Forever
+  page; checklist A7).
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (fourth part) To-do C1, reading session 8 (20 pages, 2 minutes apart, no block; details in
+  `docs/plans/material-coverage.md`) and the limited-vendor fix (decisions above). Pages: the Philosopher's Stone
+  (B10: Transmute: Red Power Crystal to Blue Power Crystal is among the 16 spells it is the tool for, with no
+  profession, skill or way to learn it: still open; Data health "Item interactions" says so), Fizzlefuse again (all 29
+  items cost Merchant's Favor, currency 3402, 45-1,000 each), Javnir Nashak (A7: Harvest Festival only; `EVENT_NPCS`),
+  vendors behind the biggest stock-unknown flips (Mazk Snipeshot: Bronze Tube 2 a restock; Jolee Brightmeadows and Jyn
+  Stonehoof: unlimited), 4 pools (empty, decision above), then the reading queue's top 10 (Destiny, Libram of
+  Voracity, Pattern: Warbear Helm, Heart of Fire, Pattern: Dawn Armor, Harnessing Shadows, Dark Iron Ore, Blighted
+  Horror, The Emerald Dream, Blueprint: Molten Foundry). Pages now: 150 items, 4 objects, 30 npcs. Importer: rows
+  Wowhead marks "count -1 of 0" are left out (6 of Dark Iron Ore's 13 would have thrown the page away), a vendor row's
+  purchase size is kept. Tests: 9 new (5 vendor-then-AH, 4 importer and event vendor), 388 pass; the audit and the
+  consistency check on real data: 0 differences. Checked in the browser: "vendor first, then AH" on the rows and the
+  ingredients line ("the vendor has 3 at a time; the rest come from the AH at 16s 15c each ..."), no script errors.
 
 - **2026-11-27** (fifth part) Addon 1.6.8: a minimap button for the farm meter (the user: "can we have a minimap button
   for gea farm meter too? maybe with start, stop, minimize, debug etc, all commands in a list when clicking?" and

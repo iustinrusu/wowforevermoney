@@ -41,6 +41,9 @@ FISH_WORDS = re.compile(r'\b(Fish|Snapper|Lobster|Eel|Squid|Salmon|Sagefish|Yell
 EVENT_WORDS = ('holiday', 'festival', 'darkmoon', 'fireworks vendor', 'lunar', 'midsummer', 'winter veil',
                'hallow', 'brewfest', 'love is in the air', 'noblegarden', "children's week")
 DARKMOON_ZONES = {12, 215}       # Elwynn Forest + Mulgore: where the Darkmoon Faire alternates
+# Event-only vendors found on their Wowhead Forever pages, whose subtitle doesn't say so (checklist A7, 2026-11-27):
+# Javnir Nashak's one quest, Honoring a Hero, is a Harvest Festival quest, and the page's comment says he comes then
+EVENT_NPCS = {15012: 'Harvest Festival'}
 # How sure we are of an opportunity's numbers, from its flags (1 = no doubts). Used to rank picks, not to change
 # the numbers shown: a pick with doubtful prices ranks below an equally good one with solid prices.
 DOUBT = {'price_check': 0.7, 'price_check_fails': 0.4, 'listed_far_above_sales': 0.8, 'sale_price_outlier': 0.7, 'slow_to_sell': 0.7, 'crowded': 0.7, 'sells_lower': 0.6, 'price_looks_off': 0.6, 'none_listed': 0.8, 'mat_not_listed': 0.8, 'small_sample': 0.8,
@@ -215,12 +218,13 @@ class Engine:
             sub = str(npc.get('subName') or '').lower()
             # Event-only vendors: holiday vendors, and the Darkmoon Faire (its NPCs spawn in both Elwynn Forest
             # and Mulgore, where the Faire alternates). Vendors with no known spawn may not be reachable at all.
-            event = any(w in sub for w in EVENT_WORDS) or DARKMOON_ZONES <= spawn_zones
+            event = any(w in sub for w in EVENT_WORDS) or DARKMOON_ZONES <= spawn_zones or npc_id in EVENT_NPCS
             seen = (((getattr(self.w, 'profile', None) or {}).get('vendors') or {}).get(npc_id) or {}).get('items') or {}
             seen_stock = (seen.get(iid) or {}).get('stock')
+            per_buy = int((row or {}).get('stack') or 1)    # Light Shot: 200 a purchase, for the price shown
             if row is not None and row.get('stock') is not None:
                 # Wowhead Forever: how many a restock, -1 = unlimited (Forever data: before the Classic list)
-                listed, known, source = (row['stock'] if row['stock'] > 0 else None), True, 'Wowhead Forever'
+                listed, known, source = (row['stock'] * per_buy if row['stock'] > 0 else None), True, 'Wowhead Forever'
             else:
                 listed = (self.su.limited_stock.get(iid) or {}).get(npc_id)
                 source = 'Classic database' if listed is not None else None
@@ -230,7 +234,7 @@ class Engine:
             out.append({'npc': npc_id, 'name': npc.get('name', f'NPC {npc_id}'), 'zone': self.gd.zones.get(zone_id, ''),
                         'coords': spawn, 'friendly': friendly, 'stock': listed,
                         'stock_known': known, 'stock_source': source,
-                        'wowhead_cost': (row or {}).get('cost'),
+                        'wowhead_cost': (row['cost'] / per_buy if row and row.get('cost') else (row or {}).get('cost')),
                         'event': event, 'located': bool(spawn_zones or zone_id)})
         return out
 
@@ -300,6 +304,30 @@ class Engine:
         if stocks and all(stocks):
             return max(stocks)
         return None
+
+    def after_vendor_stock(self, iid: int, vendor_each: int) -> dict:
+        """For an ingredient whose cheapest source is a vendor with only a few a restock: that stock, and where the
+        rest come from. The AH, when it lists the item (at its price, and only your share of its market a day). Until
+        2026-11-27 the vendor's stock was the end of it: Vi'el's 2 Felcloth a restock held every Felcloth craft to 2
+        Felcloth a day, while 196 were listed at 91s 87c (the user: "fel cloth marked as limited supply from vendor,
+        but it also drops from mobs"). Looting it yourself is not counted: farming has its own rows."""
+        out = {'vendor_stock': self.vendor_stock_cap(iid) or 0}
+        q = ah_buy(self.price(iid))
+        if q and q.value >= vendor_each:
+            out['then'] = {'unit': q.value, 'source': q.source, 'flags': list(q.flags),
+                           'per_day': round(sold_per_day(self.price(iid)) * self.share, 2)}
+        return out
+
+    def cheapest_in_bulk(self, iid: int) -> Quote | None:
+        """The price of an ingredient bought by the dozen (the levelling planner): the cheapest source, except that a
+        vendor with only a few a restock gives way to the AH when the AH lists it (a path needs far more than the
+        vendor's few; 2026-11-27). Without an AH listing the vendor's price stays, flagged limited_stock."""
+        q = self.cheapest(iid)
+        if q and q.source == 'vendor' and 'limited_stock' in q.flags:
+            ah = ah_buy(self.price(iid))
+            if ah:
+                return ah
+        return q
 
     def cheapest(self, iid: int) -> Quote | None:
         options = []
@@ -711,7 +739,7 @@ class Engine:
             colors = (orange, int(th[1]), int(th[2]), int(th[3]))
             mats, cost, ok = [], 0, True
             for mid, cnt in r.reagents:
-                q = self.cheapest(mid)
+                q = self.cheapest_in_bulk(mid)        # a path buys dozens: a vendor's few a restock don't last
                 it = self.gd.items.get(mid)
                 own = bool(gathered.get(mid, set()) & gather) and not (it and it.class_id == 7 and
                                                                        it.subclass_id in MOB_KINDS)
@@ -809,6 +837,8 @@ class Engine:
                 cost += q.value * cnt
                 mats.append({'item_id': mid, 'name': self.name(mid), 'count': cnt, 'unit': q.value, 'source': q.source,
                              'flags': list(q.flags)})
+                if q.source == 'vendor' and 'limited_stock' in q.flags:
+                    mats[-1].update(self.after_vendor_stock(mid, q.value))
                 made = self.tool_made.get(mid)
                 if made:          # Refined Deeprock Salt: costed at what it sells for, but your Salt Shaker makes it
                     mats[-1]['made_with'] = {'tool': self.name(made.tool_id), 'tool_id': made.tool_id,
@@ -839,10 +869,15 @@ class Engine:
             crafts_demand = self.demand_per_day(r.product_id, channel) / max(r.product_count, 1)
         crafts_uncapped = min(crafts_demand, MAX_UNITS_PER_DAY)          # as if you had the gold for it
         mat_limit = None
+        topped_up = [m for m in mats if m.get('then')]    # a vendor's few a restock, then the AH (after_vendor_stock)
         for m in mats:
             if m['source'] == 'vendor' and 'limited_stock' in m['flags']:
-                cap = self.vendor_stock_cap(m['item_id']) or 0
-                crafts_uncapped = min(crafts_uncapped, cap / m['count'])
+                cap = (m.get('vendor_stock') or self.vendor_stock_cap(m['item_id']) or 0) / m['count']
+                if m.get('then'):           # beyond the stock: your share of the AH's market a day
+                    cap += m['then']['per_day'] / m['count']
+                    if cap < crafts_uncapped:
+                        mat_limit = m['name']
+                crafts_uncapped = min(crafts_uncapped, cap)
             elif m['source'] != 'vendor':
                 # you can't buy more of an AH ingredient a day than its market trades at your share
                 cap = sold_per_day(self.price(m['item_id'])) * self.share / m['count']
@@ -851,7 +886,24 @@ class Engine:
         per_cooldown = cooldown_per_day(r)
         if per_cooldown is not None and per_cooldown < crafts_uncapped:
             crafts_uncapped, mat_limit = per_cooldown, None
-        crafts_day = min(crafts_uncapped, self.affordable(cost))
+
+        def extra(n: float) -> float:
+            """What buying beyond the vendors' stock on the AH adds to n crafts (each copy at the AH price)."""
+            return sum(max(0.0, n * m['count'] - m['vendor_stock']) * (m['then']['unit'] - m['unit'])
+                       for m in topped_up)
+        if topped_up:
+            # crafts beyond a vendor's stock cost more: make only as many as still pay (the total is concave in n)
+            points = {crafts_uncapped} | {m['vendor_stock'] / m['count'] for m in topped_up
+                                          if m['vendor_stock'] / m['count'] < crafts_uncapped}
+            crafts_uncapped = max(sorted(points), key=lambda n: n * profit - extra(n))     # a tie: the fewer crafts
+        avg_extra = (lambda n: extra(n) / n if n > 0 else 0.0)
+        crafts_day = min(crafts_uncapped, self.affordable(cost + avg_extra(crafts_uncapped)))
+        beyond = [m for m in topped_up if crafts_uncapped * m['count'] > m['vendor_stock'] + 1e-9]
+        total_uncapped = crafts_uncapped * profit - extra(crafts_uncapped)
+        if topped_up:                   # the average craft: its share of the dearer AH copies
+            n = crafts_day if crafts_day > 0 else crafts_uncapped
+            cost = int(round(cost + avg_extra(n)))
+            profit = revenue - cost
         req, exact = self.required_skill(r)
         have = self.profs.get(r.profession)
         flags = list(q.flags) if (q and channel == 'AH') else []
@@ -867,7 +919,12 @@ class Engine:
             flags.append('sell_to_vendor')
         if any('none_listed' in m['flags'] for m in mats):
             flags.append('mat_not_listed')
-        if any('limited_stock' in m['flags'] for m in mats):
+        if beyond:
+            flags.append('vendor_then_ah')    # the vendor's few, the rest bought on the AH (in the cost)
+        # only where the vendor's stock really holds the crafts down: Felcloth Bag sells 0.07 a day, and Vi'el's 2
+        # Felcloth cover it; Mooncloth waits for its cooldown. Both showed "ingredient in limited stock" before.
+        if any('limited_stock' in m['flags'] and m not in beyond and m['source'] == 'vendor'
+               and crafts_uncapped * m['count'] >= (m.get('vendor_stock') or 0) - 1e-9 for m in mats):
             flags.append('limited_mat')
         if any('event_vendor' in m['flags'] for m in mats):
             flags.append('event_vendor')      # an ingredient is only sold during events
@@ -935,7 +992,7 @@ class Engine:
                     'thresholds': self.su.thresholds.get(r.spell_id), 'learn': self.learn_cost(r),
                     'req_level': product.req_level if product else 0,
                     'sold_per_day': sold_per_day(self.price(r.product_id)),
-                    'daily_if_affordable': int(profit * crafts_uncapped), 'limited_by_mat': mat_limit,
+                    'daily_if_affordable': int(total_uncapped), 'limited_by_mat': mat_limit,
                     'cooldown_hours': round(r.cooldown_ms / 3_600_000, 2) if per_cooldown is not None else None,
                     # the cooldown sets the pace (not the market or your gold): the profit comes once a cooldown, on
                     # the day you craft it, so the page shows a craft's profit and how often (the user, 2026-11-20:
