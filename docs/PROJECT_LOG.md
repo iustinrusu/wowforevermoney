@@ -903,6 +903,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   ("secret" values, as in retail 12.0): `UnitGUID` of enemy units comes back secret, and using it as a table key is
   an error ("attempted to index a table that cannot be indexed with secret keys"). `UnitName("target")` was still
   readable there. Raid members (friendly) read normally.
+- (2026-11-27, TargetKit 1.5.1's log, Arathi Basin) In a battleground the game refuses targeting an enemy player by
+  name from a macro: `/targetexact Name` and `/targetexact Name-Part` both ran (TargetUnit called) on ~15 presses
+  with the player in melee range, and the target stayed on the one `/targetenemyplayer` had just taken. With the
+  nameplate refusal (Verified facts above), a macro in a battleground can reach an enemy player only through the
+  game's own picks (Tab: `/targetenemy`, `/targetenemyplayer`) or the mouseover; which one is closest can be seen by
+  an addon but not chosen. Untested there: the soft enemy target token in a macro.
 - (2026-11-27, TargetKit 1.5.0's log, Arathi Basin) Enemy players' names and range bands read there (CheckInteractDistance
   and the melee check answered), but `IsSpellInRange(Sap)` never said yes for a player: the bands went from melee
   range straight to 10 yd (most were in combat, which may be why). `/targetexact Name-Part` (the second part from
