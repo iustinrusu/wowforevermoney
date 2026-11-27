@@ -23,7 +23,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.2.1"
+local VERSION = "1.2.2"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
@@ -174,13 +174,18 @@ local function dead(unit) return (UnitIsDeadOrGhost or UnitIsDead)(unit) and tru
 -- every unit the addon can see, once each: nameplates first (their tokens are the steadiest for the click), then
 -- mouseover, soft targets, target, focus and your group
 local TOKENS = { "mouseover", "softenemy", "softinteract", "softfriend", "target", "focus" }
+local rememberName                                       -- set below (TK Find)
 local function visibleUnits()
   local out, seen = {}, {}
   local function add(u)
     local ok, exists = pcall(UnitExists, u)
     if not (ok and exists) or UnitIsUnit(u, "player") then return end
     local g = UnitGUID(u)
-    if g and not seen[g] then seen[g] = true; out[#out + 1] = { unit = u, guid = g } end
+    if g and not seen[g] then
+      seen[g] = true
+      out[#out + 1] = { unit = u, guid = g }
+      if rememberName then rememberName(u) end
+    end
   end
   if C_NamePlate and C_NamePlate.GetNamePlates then
     for _, plate in ipairs(C_NamePlate.GetNamePlates() or {}) do
@@ -354,14 +359,41 @@ local function findWhyNot(unit)
   return "dead, and neutral or hostile, so it could be a mob"
 end
 
+-- Full names seen this session (your target, mouseover, nameplates), 1.2.2. The user put "Game" on the list for a unit
+-- named "Game something": the addon matches part of a name itself, but its fallback is the game's own /target by
+-- name, and whether that takes part of a name isn't checked on Forever. So the fallback also targets, by full name,
+-- every unit seen whose name contains a list entry.
+local seenNames, seenCount = {}, 0                       -- lower-case name -> the name
+rememberName = function(unit)
+  local ok, n = pcall(UnitName, unit)
+  if not ok or not n or n == "" or n == UNKNOWNOBJECT then return end
+  local key = strlower(n)
+  if seenNames[key] then return end
+  if seenCount >= 500 then seenNames, seenCount = {}, 0 end
+  seenNames[key] = n
+  seenCount = seenCount + 1
+end
+
+local function namesFor(w)                               -- full names seen that contain w, then w itself
+  local out, lw = {}, strlower(w)
+  for key, n in pairs(seenNames) do
+    if key ~= lw and key:find(lw, 1, true) then out[#out + 1] = n end
+  end
+  table.sort(out)
+  out[#out + 1] = w
+  return out
+end
+
 local function findFixed()                               -- by name: reaches units with no nameplate (far, or dead)
   local lines = { "/cleartarget" }
   local size = #lines[1]
   for _, w in ipairs(db.find) do
-    local line = "/target [noexists] " .. w
-    if size + #line + 40 > MAX_TEXT then break end
-    lines[#lines + 1] = line
-    size = size + #line + 1
+    for _, n in ipairs(namesFor(w)) do
+      local line = "/target [noexists] " .. n
+      if size + #line + 40 > MAX_TEXT then break end
+      lines[#lines + 1] = line
+      size = size + #line + 1
+    end
   end
   lines[#lines + 1] = "/cleartarget [dead,noplayer]"     -- a dead mob found by name: let go of it
   return table.concat(lines, "\n")
@@ -386,7 +418,7 @@ local function findBuild()
   end
   rank(list)
   seen({ list }, rejected, others)
-  if #list == 0 then return nil, "none in sight: by name" end
+  if #list == 0 then return nil, "none in sight, so by name (with the full names seen that contain a list entry)" end
   local now = GetTime()
   if now - last.find.t > CYCLE then last.find.visited = {} end
   local pick
@@ -912,7 +944,7 @@ ev:RegisterEvent("PLAYER_REGEN_ENABLED")
 ev:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 ev:RegisterEvent("UI_ERROR_MESSAGE")
 for _, e in ipairs({ "CVAR_UPDATE", "UNIT_SPELLCAST_FAILED", "PLAYER_TARGET_CHANGED", "ADDON_ACTION_BLOCKED",
-                    "ADDON_ACTION_FORBIDDEN" }) do
+                    "ADDON_ACTION_FORBIDDEN", "UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
 local function outcome(...)                              -- something that came of the last press
@@ -958,7 +990,12 @@ local function onEvent(_, event, a1, a2, a3)
   elseif event == "UNIT_SPELLCAST_FAILED" then
     if a1 == "player" then outcome(spellName(a3) or tostring(a3), "failed") end
   elseif event == "PLAYER_TARGET_CHANGED" then
+    rememberName("target")
     outcome("target now", UnitName("target") or "none")
+  elseif event == "UPDATE_MOUSEOVER_UNIT" then
+    rememberName("mouseover")
+  elseif event == "NAME_PLATE_UNIT_ADDED" then
+    if a1 then rememberName(a1) end
   elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
     if a1 == "TargetKit" then
       log("ERROR", "the game blocked TargetKit from " .. tostring(a2) .. " (" .. event .. ")")

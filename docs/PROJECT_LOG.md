@@ -910,6 +910,13 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (tenth part) TargetKit 1.2.2 (the user: the unit was "Game something" and only "Game" was on the list).
+  The addon's own matching takes part of a name, but it only sees units with a nameplate. The user's friendly
+  nameplates are off (GetCVar("nameplateShowFriends") gave nil), so a friendly unit is left to the game's
+  `/target <name>`, and whether that takes part of a name isn't checked on Forever. Now the addon remembers the full
+  names it sees this session (target, mouseover, nameplates; up to 500). TK Find's fallback targets each seen full
+  name containing a list entry first, then the entry as typed. 1 new test.
+
 - **2026-11-27** (ninth part) TargetKit 1.2.1 (the user: "added a target in the find list but macro does not work when
   pressing"). The saved log showed:
   - every press reached the addon and built the right macro: clear the target, `/target [noexists] <name>`, then

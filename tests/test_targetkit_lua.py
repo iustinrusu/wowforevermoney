@@ -356,7 +356,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.2.1 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.2.2 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /click TKSap LeftButton 1'))
 
@@ -452,6 +452,19 @@ class TargetKitTests(unittest.TestCase):
         self.g.NOW += 5
         self.press('TKFind')
         self.assertTrue(self.in_log('target none -> Gamekeeper Ralf'))
+
+    def test_a_partial_name_also_tries_the_full_names_seen(self):
+        """The user put "Game" on the list for a unit named "Game something" (made-up names here)."""
+        self.slash('add Game')
+        self.unit('target', 'Game Warden Ollie', plate=False, enemy=False, reaction=5)
+        self.fire('PLAYER_TARGET_CHANGED')                      # seen as your target once
+        self.unit('mouseover', 'Gamebird', plate=False, enemy=False, reaction=5)
+        self.fire('UPDATE_MOUSEOVER_UNIT')
+        del self.g.UNITS.target
+        del self.g.UNITS.mouseover                              # now neither is in sight
+        self.assertEqual(self.press('TKFind'), '/cleartarget\n/target [noexists] Game Warden Ollie\n'
+                                               '/target [noexists] Gamebird\n/target [noexists] Game\n'
+                                               '/cleartarget [dead,noplayer]')
 
     def test_the_addon_compiles_and_the_toc_loads_it(self):
         toc = (KIT / 'TargetKit.toc').read_text(encoding='utf-8')
