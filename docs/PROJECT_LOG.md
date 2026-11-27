@@ -903,6 +903,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   ("secret" values, as in retail 12.0): `UnitGUID` of enemy units comes back secret, and using it as a table key is
   an error ("attempted to index a table that cannot be indexed with secret keys"). `UnitName("target")` was still
   readable there. Raid members (friendly) read normally.
+- (2026-11-27, TargetKit 1.4.8's log, the same battleground) `/cleartarget` then `/targetenemyplayer` in one macro: the
+  target went none, then the game's nearest enemy player, and that was the same player, out of Sap range, on every one
+  of ~30 presses (the game prefers what's in front of you, not the physically closest); with no enemy player in view it
+  found nobody ("You have no target"). The range check (`IsSpellInRange` on "target") read fine there.
 - (2026-11-27, the user in game with TargetKit 1.4.4) Targeting by name reaches a mob whose nameplate isn't showing;
   the game's Tab only goes through mobs whose nameplates are showing (on screen, within the nameplate range, 41 yd
   in the user's settings). So cycling same-named mobs covers only those on screen; no addon way around it.
@@ -942,6 +946,21 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (twenty-second part) TargetKit 1.4.9 (the user: "still not working great. i feel it shouldnt be that
+  hard, just clear target before casting sap and the new target should be another closer one, right? /target I
+  think targets closest by default"). The 1.4.8 macro did clear first; the game's own `/targetenemyplayer` then took
+  the same out-of-range player every press (Verified facts). `/target` needs a name or a unit; nothing in a macro
+  means "the physically closest enemy". So TargetKit has to choose, and 1.4.8 had made it blind in battlegrounds by
+  skipping every unit whose id is hidden, though the log showed names and range still read.
+  - A unit whose GUID is hidden is seen by its name (key "name:Name-Realm"; players' names are unique), marked
+    masked. For TK Sap a masked unit counts as attackable and as a player when the game hides those (friends' ids
+    read normally, so a hidden one is an enemy); hidden combat or creature type mean "try it". So the closest enemy
+    player in Sap range is targeted by `/targetexact Name-Realm`.
+  - Every name read goes through nameOf (pcall, hidden = unknown); creature type, Sap debuff, realm likewise.
+    pickWhyNot and findWhyNot run in pcall per unit.
+  - Tests: 59 (the battleground test now: ids hidden, names and range readable: the closest player by name; range
+    hidden too: from scratch). Not yet tried in game.
 
 - **2026-11-27** (twenty-first part) TargetKit 1.4.8 (the user: "sap macro does not work, after targeting the first
   enemy, pressing the button again does not switch to closer targets, target stays on the one selected initially").

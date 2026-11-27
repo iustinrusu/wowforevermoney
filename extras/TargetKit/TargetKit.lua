@@ -38,7 +38,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.4.8"
+local VERSION = "1.4.9"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
@@ -156,6 +156,12 @@ local function nameOf(u)                                 -- a unit's name, nil w
   local ok, n = pcall(UnitName, u)
   if ok and known(n) then return n end
 end
+local function fullName(u)                               -- with the realm for another realm's player (battlegrounds)
+  local ok, n, realm = pcall(UnitName, u)
+  if not ok or not known(n) then return nil end
+  if known(realm) and realm ~= "" then n = n .. "-" .. realm end
+  return n
+end
 
 -- ---------- what the addon can see about a unit ----------
 local function inRange(id, unit)
@@ -189,20 +195,23 @@ local function reach(unit)
   return 6
 end
 
-local function isHumanoid(unit)
-  local name, id = UnitCreatureType(unit)
-  if type(id) == "number" then return id == HUMANOID end
+local function isHumanoid(unit)                          -- nil when the game hides it
+  local ok, name, id = pcall(UnitCreatureType, unit)
+  if not ok then return nil end
+  if known(id) and type(id) == "number" then return id == HUMANOID end
+  if not known(name) then return nil end
   local info = C_CreatureInfo and C_CreatureInfo.GetCreatureTypeInfo and C_CreatureInfo.GetCreatureTypeInfo(HUMANOID)
-  return name ~= nil and name == ((info and info.name) or "Humanoid")
+  return name == ((info and info.name) or "Humanoid")
 end
 
 local function hasSap(unit)
   for i = 1, 40 do
     local id
     if C_UnitAuras and C_UnitAuras.GetDebuffDataByIndex then
-      local d = C_UnitAuras.GetDebuffDataByIndex(unit, i)
-      if not d then return false end
+      local ok, d = pcall(C_UnitAuras.GetDebuffDataByIndex, unit, i)
+      if not ok or not known(d) then return false end                 -- none, or hidden: not known to be sapped
       id = d.spellId
+      if not known(id) then return false end
     elseif UnitDebuff then
       local name, _, _, _, _, _, _, _, _, spellId = UnitDebuff(unit, i)
       if not name then return false end
@@ -226,17 +235,20 @@ local function visibleUnits()
   local function add(u)
     if not yes(UnitExists, u) or yes(UnitIsUnit, u, "player") ~= false then return end
     local ok, g = pcall(UnitGUID, u)
-    if not ok or not known(g) then                       -- hidden by the game (battlegrounds): not seen
+    local masked = false
+    if not ok or not known(g) then                       -- hidden by the game (battlegrounds): its name stands in
+      local n = fullName(u)
       if not hidden then
         hidden = true
-        log("addon", "the game hides some units from addons here (" .. u .. "'s id is secret), so TargetKit doesn't"
-          .. " see them; TK Sap takes the game's nearest enemy player instead")
+        log("addon", "the game hides some units' ids from addons here (" .. u .. "), so TargetKit knows them by name"
+          .. (n and "" or " (this one's name is hidden too, so it isn't seen)"))
       end
-      return
+      if not n then return end
+      g, masked = "name:" .. n, true
     end
     if not seen[g] then
       seen[g] = true
-      out[#out + 1] = { unit = u, guid = g }
+      out[#out + 1] = { unit = u, guid = g, masked = masked }
       if rememberName then rememberName(u) end
     end
   end
@@ -284,20 +296,15 @@ local function rank(list)
 end
 
 local BAND = { "Pick Pocket range", "Sap range", "10 yd", "11 yd", "28 yd", "further" }
-local function describe(c) return (UnitName(c.unit) or "?") .. " (" .. c.unit .. ", " .. BAND[c.reach] .. ")" end
+local function describe(c) return (nameOf(c.unit) or "?") .. " (" .. c.unit .. ", " .. BAND[c.reach] .. ")" end
 
-local function passed(c, why) return (UnitName(c.unit) or "?") .. " (" .. c.unit .. "): " .. why end
+local function passed(c, why) return (nameOf(c.unit) or "?") .. " (" .. c.unit .. "): " .. why end
 
 -- The line that targets a unit the addon chose. Your target or focus, or someone in your group, by token. Anything else
 -- by name, exactly: the mouseover and the soft targets follow the mouse and camera (1.4.0), and Forever refuses a
 -- nameplate's token in a macro (1.4.3). The game takes the closest unit of that name.
 local function steady(u)
   return u == "target" or u == "focus" or u:match("^party%d$") or u:match("^raid%d+$")
-end
-local function fullName(u)
-  local n, realm = UnitName(u)
-  if n and realm and realm ~= "" then n = n .. "-" .. realm end
-  return n
 end
 local function targetLine(c, cond)
   local pre = cond and (cond .. " ") or ""
@@ -332,11 +339,14 @@ local function sapFixed()
     "/cast " .. sap }, "\n")
 end
 
-local function sapWhyNot(u)
-  if not UnitCanAttack("player", u) then return "can't be attacked" end
+-- 1.4.9: the game may hide any of these (battlegrounds). Unknown isn't a no: for a unit whose id is hidden (an enemy,
+-- friends' ids read normally) it's taken as attackable; whether it's fighting, or humanoid, unknown means try it.
+local function sapWhyNot(u, masked)
+  local attack = yes(UnitCanAttack, "player", u)
+  if attack == false or (attack == nil and not masked) then return "can't be attacked" end
   if dead(u) then return "dead" end
-  if UnitAffectingCombat(u) then return "in combat (Sap needs it out of combat)" end
-  if not isHumanoid(u) then return "not humanoid (Sap takes humanoids)" end
+  if yes(UnitAffectingCombat, u) then return "in combat (Sap needs it out of combat)" end
+  if isHumanoid(u) == false then return "not humanoid (Sap takes humanoids)" end
   if hasSap(u) then return "sapped already" end
 end
 
@@ -345,10 +355,12 @@ local function sapBuild(units)
   local players, npcs, rejected = {}, {}, {}
   for _, c in ipairs(units or visibleUnits()) do
     local u = c.unit
-    local why = sapWhyNot(u)
+    local okWhy, why = pcall(sapWhyNot, u, c.masked)
+    if not okWhy then why = "the game hides it here" end
+    local isPlayer = yes(UnitIsPlayer, u)
     if why then
       rejected[#rejected + 1] = passed(c, why)
-    elseif UnitIsPlayer(u) then
+    elseif isPlayer or (isPlayer == nil and c.masked) then
       players[#players + 1] = c
     else
       npcs[#npcs + 1] = c
@@ -362,7 +374,7 @@ local function sapBuild(units)
   if p and p.reach <= 2 then
     head[#head + 1] = targetLine(p)
     head[#head + 1] = "/cast " .. sap
-    return table.concat(head, "\n"), "enemy player in Sap range: " .. describe(p), UnitName(p.unit), saw
+    return table.concat(head, "\n"), "enemy player in Sap range: " .. describe(p), nameOf(p.unit), saw
   end
   local n = npcs[1]
   if n and n.reach > 2 then n = nil end
@@ -424,14 +436,15 @@ local function pickBuild(units)
     local sapped, robbed = hasSap("target"), picked(t)
     local r = reach("target") or 6
     if sapped and not robbed and r <= 1 then
-      return "/cast " .. PP(), "Pick Pocket the one just sapped: " .. (UnitName("target") or "?"), UnitName("target"), {}
+      return "/cast " .. PP(), "Pick Pocket the one just sapped: " .. (nameOf("target") or "?"), nameOf("target"), {}
     elseif robbed and not sapped and r <= 2 then
-      return "/cast " .. SAPN(), "Sap the one just robbed: " .. (UnitName("target") or "?"), UnitName("target"), {}
+      return "/cast " .. SAPN(), "Sap the one just robbed: " .. (nameOf("target") or "?"), nameOf("target"), {}
     end
   end
   local list, rejected, refused = {}, {}, {}
   for _, c in ipairs(units or visibleUnits()) do
-    local why = pickWhyNot(c)
+    local okWhy, why = pcall(pickWhyNot, c)
+    if not okWhy then why = "the game hides it here" end
     if why then
       rejected[#rejected + 1] = passed(c, why)
       refused[#refused + 1] = c
@@ -445,9 +458,9 @@ local function pickBuild(units)
   -- near or nearer gets it instead (a camp of Defias Thugs: the one you just robbed). Then another name in Sap range,
   -- else the game's Tab to the next enemy in front of you (1.4.7).
   local function blocker(c)
-    local n = UnitName(c.unit)
+    local n = nameOf(c.unit)
     for _, o in ipairs(refused) do
-      if UnitName(o.unit) == n then
+      if nameOf(o.unit) == n then
         o.reach = o.reach or reach(o.unit) or 6
         if o.reach <= c.reach then return o end
       end
@@ -460,7 +473,7 @@ local function pickBuild(units)
       local cast = {}
       if not hasSap(o.unit) then cast[#cast + 1] = "/cast " .. SAPN() end
       cast[#cast + 1] = "/cast " .. PP()
-      return table.concat(cast, "\n"), "your target, in Sap range, to rob: " .. describe(o), UnitName(o.unit), saw
+      return table.concat(cast, "\n"), "your target, in Sap range, to rob: " .. describe(o), nameOf(o.unit), saw
     end
   end
   local c = list[1]
@@ -482,7 +495,7 @@ local function pickBuild(units)
     if yes(UnitExists, "target") and yes(UnitCanAttack, "player", "target") and not dead("target")
         and (reach("target") or 6) > 2 then
       return "/cleartarget\n/targetenemy\n/cast " .. SAPN() .. "\n/cast " .. PP(), "no humanoid to rob in sight, and"
-        .. " your target " .. (UnitName("target") or "?") .. " is out of Sap range: the game's nearest enemy instead",
+        .. " your target " .. (nameOf("target") or "?") .. " is out of Sap range: the game's nearest enemy instead",
         nil, saw
     end
     return nil, "no humanoid to rob in sight", nil, saw
@@ -490,12 +503,12 @@ local function pickBuild(units)
   local lines = { targetLine(c) }
   if not hasSap(c.unit) then lines[#lines + 1] = "/cast " .. SAPN() end
   lines[#lines + 1] = "/cast " .. PP()
-  return table.concat(lines, "\n"), "closest to rob: " .. describe(c), UnitName(c.unit), saw
+  return table.concat(lines, "\n"), "closest to rob: " .. describe(c), nameOf(c.unit), saw
 end
 
 -- ---------- TK Find ----------
 local function wanted(unit)
-  local name = UnitName(unit)
+  local name = nameOf(unit)
   if not name then return false end
   name = strlower(name)
   for _, w in ipairs(db.find) do
@@ -563,7 +576,8 @@ local function findBuild(units)
   if #db.find == 0 then return "", "empty list", nil, {} end
   local list, rejected, others = {}, {}, 0
   for _, c in ipairs(units or visibleUnits()) do
-    local why = findWhyNot(c.unit)
+    local okWhy, why = pcall(findWhyNot, c.unit)
+    if not okWhy then why = "the game hides it here" end
     if not why then
       list[#list + 1] = c
     elseif why == "not on the find list" then
@@ -585,29 +599,29 @@ local function findBuild(units)
   end
   local fresh = GetTime() - last.find.t > CYCLE                       -- a pause: a new round
   local done = fresh and {} or (last.find.names or {})
-  local tname = UnitName("target")
+  local tname = nameOf("target")
   if UnitExists("target") and not findWhyNot("target") then
     local other, again
     for _, c in ipairs(list) do                                       -- closest first
-      local n = UnitName(c.unit)
+      local n = nameOf(c.unit)
       if n ~= tname then
         if not done[n] and not other then other = c end
         if not again then again = c end
       end
     end
     if other then
-      local n = UnitName(other.unit)
+      local n = nameOf(other.unit)
       return targetLine(other), "your target " .. (tname or "?") .. " is on the list; the next name, by name: "
         .. describe(other), n, saw, { name = n, from = tname }
     end
     if again then
-      local n = UnitName(again.unit)
+      local n = nameOf(again.unit)
       return targetLine(again), "your target " .. (tname or "?") .. " is on the list; every name had, so round again"
         .. " by name: " .. describe(again), n, saw, { name = n, from = tname, reset = true }
     end
   end
   local pick = list[1]
-  local n = UnitName(pick.unit)
+  local n = nameOf(pick.unit)
   return targetLine(pick), "the closest on the list: " .. describe(pick) .. " (" .. #list .. " in sight)", n, saw,
     { name = n }
 end
@@ -727,10 +741,10 @@ end
 
 local function afterPress(p)                             -- 0.3 s after a press: what the game ran, where the target went
   local b, st = p.b, p.st
-  local after = UnitName("target") or "none"
+  local after = nameOf("target") or "none"
   log("result", b.macro .. ": the game ran " .. (#p.ran > 0 and table.concat(p.ran, ", ") or "nothing we watch")
     .. "; target " .. p.before .. " -> " .. after)
-  if st.expect and UnitName("target") ~= st.expect then
+  if st.expect and nameOf("target") ~= st.expect then
     log("WARN", b.macro .. ": it chose " .. (st.why or "?") .. ", but your target is " .. after
       .. " (the game didn't take the macro's target line)")
     if not saidMissed[b.name] then
@@ -746,7 +760,7 @@ local function afterPress(p)                             -- 0.3 s after a press:
     log("result", msg)
     note(msg)
   end
-  if b.name == "TKPick" and st.expect and UnitName("target") == st.expect then   -- its last unit, for the half-done rule
+  if b.name == "TKPick" and st.expect and nameOf("target") == st.expect then   -- its last unit, for the half-done rule
     last.pick.guid, last.pick.t = UnitGUID("target"), p.at
   end
 end
@@ -1058,7 +1072,7 @@ local function makePanel()
   panel.add = button(panel, "Add", 50, addTyped)
   panel.add:SetPoint("LEFT", input, "RIGHT", 6, 0)
   panel.addTarget = button(panel, "Add my target", 110, function()
-    local name = UnitName("target")
+    local name = nameOf("target")
     if not name then report(false, "target something first, then click Add my target.") return end
     report(addName(name))
   end)
@@ -1264,7 +1278,7 @@ local function onEvent(_, event, a1, a2, a3)
     prepare(true)                                        -- out of combat again: look and write
     if pendingKeys then pendingKeys = false; applyKeys() end
   elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
-    if a1 == "player" then outcome("cast", spellName(a3) or tostring(a3), "on", UnitName("target") or "no target") end
+    if a1 == "player" then outcome("cast", spellName(a3) or tostring(a3), "on", nameOf("target") or "no target") end
     if a1 == "player" and a3 == PICK_POCKET and db then        -- robbed: skip it from now on
       local g = UnitGUID("target")
       if known(g) then db.picked[g] = time() end
@@ -1273,7 +1287,7 @@ local function onEvent(_, event, a1, a2, a3)
     if a1 == "player" then outcome(spellName(a3) or tostring(a3), "failed") end
   elseif event == "PLAYER_TARGET_CHANGED" then
     rememberName("target")
-    outcome("target now", UnitName("target") or "none")
+    outcome("target now", nameOf("target") or "none")
   elseif event == "UPDATE_MOUSEOVER_UNIT" then
     rememberName("mouseover")
   elseif event == "NAME_PLATE_UNIT_ADDED" or event == "PLAYER_SOFT_ENEMY_CHANGED" then
@@ -1311,7 +1325,7 @@ local function slash(msg)
   if cmd == "" then
     togglePanel()
   elseif cmd == "add" then
-    local name = rest ~= "" and rest or UnitName("target")
+    local name = rest ~= "" and rest or nameOf("target")
     if not name then tell("type /tkit add <name>, or target something first.") return end
     local _, said = addName(name)
     report(nil, said, true)
