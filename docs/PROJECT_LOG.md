@@ -899,11 +899,11 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   `Creature-0-<server>-<map>-<instance copy>-<npc id>-<spawn>`: the same NPC in map 229 (Blackrock Spire) shows up
   with a different instance-copy number and spawn part each time. So a mob in a new instance or battleground, or a
   respawn, is a new GUID: TargetKit's "robbed already" list (by GUID, 2 hours) doesn't skip it.
-- (2026-11-27, TargetKit 1.4.7's log, a battleground) In battlegrounds Forever hides some unit values from addons
+- (2026-11-27, TargetKit 1.4.7's log, Arathi Basin) In battlegrounds Forever hides some unit values from addons
   ("secret" values, as in retail 12.0): `UnitGUID` of enemy units comes back secret, and using it as a table key is
   an error ("attempted to index a table that cannot be indexed with secret keys"). `UnitName("target")` was still
   readable there. Raid members (friendly) read normally.
-- (2026-11-27, TargetKit 1.4.8's log, the same battleground) `/cleartarget` then `/targetenemyplayer` in one macro: the
+- (2026-11-27, TargetKit 1.4.8's log, Arathi Basin) `/cleartarget` then `/targetenemyplayer` in one macro: the
   target went none, then the game's nearest enemy player, and that was the same player, out of Sap range, on every one
   of ~30 presses (the game prefers what's in front of you, not the physically closest); with no enemy player in view it
   found nobody ("You have no target"). The range check (`IsSpellInRange` on "target") read fine there.
