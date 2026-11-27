@@ -113,10 +113,17 @@ Revised:
 - **TK Sap's order now (1.5.3; the user: "ideally fading rogues should be highest priority out of all rules"):**
   1. your mouseover enemy; 2. a stealthed enemy player TargetKit sees (a Stealth, Vanish, Prowl or Shadowmeld effect
   on him), within 28 yd, kept once he's your target; 3. the closest enemy player in Sap range (melee range first,
-  then up to 10 yd); 4. your target, when known to be in Sap range; 5. the game's nearest enemy player from scratch.
+  then up to 10 yd); 4. the closest humanoid NPC in Sap range, or your target when known to be in Sap range; 5. from
+  scratch: in a battleground or arena the game's nearest enemy player, anywhere else (with no enemy player in sight)
+  the game's nearest enemy, mobs too (1.5.5). In a battleground an NPC choice also gives way to an enemy player the
+  game finds; elsewhere it doesn't.
   Number 5 is what catches a rogue as he fades in: in the user's Arathi Basin log TargetKit saw nobody (no nameplate
   yet) and the game's pick took him. What no addon can do: put a rogue TargetKit can't see yet ahead of another player
   it does see in Sap range; then your mouse over the rogue is the way.
+- **TK Pickpocket and your mouseover (1.5.5):** just before its casts, TK Pickpocket targets your mouseover enemy if
+  there is one, so hovering a mob and pressing robs that one. That's the way where the game hides the mobs from
+  TargetKit (Alterac Valley: no names, no ids, so it can't see a single NPC and falls back to the game's nearest
+  enemy).
 - **TK Pickpocket walking past a group (1.4.7):** a press goes to the one next to you, never the one you left behind.
   Your target, if it can be robbed and is in Sap range, is the one; else the closest one you can rob, by name. The
   "finish the missing half" rule (Sap or Pick Pocket was still on cooldown) only holds while that mob is still in

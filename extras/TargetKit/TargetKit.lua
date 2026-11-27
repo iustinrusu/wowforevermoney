@@ -38,7 +38,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.5.4"
+local VERSION = "1.5.5"
 local PICK_POCKET, SAP = 921, 6770
 local MELEE = 1752                                        -- Sinister Strike: melee range, and it takes players
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
@@ -235,6 +235,13 @@ end
 
 local function dead(unit) return yes(UnitIsDeadOrGhost or UnitIsDead, unit) or false end
 
+-- In a battleground or an arena (1.5.5): there TK Sap's lines put enemy players first, to catch fading rogues;
+-- anywhere else the game's nearest enemy, mobs too (the user: "sap should also work on mobs too").
+local function inPvP()
+  local ok, inside, kind = pcall(IsInInstance)
+  return ok and inside and (kind == "pvp" or kind == "arena") and true or false
+end
+
 -- 1.5.3 (the user: "ideally fading rogues should be highest priority out of all rules of targeting"): a unit with a
 -- stealth effect on it, found by spell id (Classic's: Stealth, Vanish, Prowl, Shadowmeld) or by that spell's name in
 -- your client's language. Hidden or unreadable auras mean no.
@@ -382,7 +389,7 @@ local function sapFixed()
     "/cast [@mouseover,harm,nodead] " .. sap,
     "/stopmacro [@mouseover,harm,nodead]",
     "/cleartarget",
-    "/targetenemyplayer",
+    inPvP() and "/targetenemyplayer" or "/targetenemy",
     "/cast " .. sap }, "\n")
 end
 
@@ -455,21 +462,30 @@ local function sapBuild(units)
   local tplayer = yes(UnitIsPlayer, "target")
   if r and r <= (tplayer and 3 or 2) and yes(UnitCanAttack, "player", "target")
       and yes(UnitIsDeadOrGhost, "target") == false then
-    if not tplayer then head[#head + 1] = "/targetenemyplayer" end
+    local pvp = inPvP()
+    if not tplayer and pvp then head[#head + 1] = "/targetenemyplayer" end
     head[#head + 1] = "/cast " .. sap
     return table.concat(head, "\n"), "no enemy player in Sap range in sight; your target " .. (tname or "?")
-      .. " is in Sap range, so it stays" .. (tplayer and "" or " (unless the game finds an enemy player)"), nil, saw
+      .. " is in Sap range, so it stays" .. ((tplayer or not pvp) and "" or " (unless the game finds an enemy player)"),
+      nil, saw
   end
   -- 4. Else the NPC in Sap range, or nothing, then the game's nearest enemy player, which wins if it finds one. This is
   -- what caught a rogue fading in that TargetKit couldn't see yet (the user's log); so a player seen further off than
   -- Sap's range is no longer named instead (1.5.1 did that, 1.5.3 took it out).
+  -- 1.5.5: outside battlegrounds and arenas, with no enemy player in sight, mobs count: the NPC in Sap range alone,
+  -- else the game's nearest enemy of any kind.
+  local players_first = inPvP() or #players > 0
   head[#head + 1] = n and targetLine(n, nil, units) or "/cleartarget"
-  head[#head + 1] = "/targetenemyplayer"
+  if players_first then head[#head + 1] = "/targetenemyplayer"
+  elseif not n then head[#head + 1] = "/targetenemy" end
   head[#head + 1] = "/cast " .. sap
   local why = not yes(UnitExists, "target") and "no target" or (r == nil and ("your target " .. (tname or "?")
     .. " can't be measured here") or ("your target " .. (tname or "?") .. " is out of Sap range"))
+  if n and not players_first then
+    return table.concat(head, "\n"), "no enemy player in sight; the closest NPC in Sap range: " .. describe(n), nil, saw
+  end
   return table.concat(head, "\n"), "no enemy player in Sap range in sight; " .. why .. ", so the game's nearest enemy"
-    .. " player from scratch" .. (n and (", else " .. describe(n)) or ""), nil, saw
+    .. (players_first and " player" or "") .. " from scratch" .. (n and (", else " .. describe(n)) or ""), nil, saw
 end
 
 -- ---------- TK Pickpocket ----------
@@ -480,8 +496,23 @@ local function picked(guid)
   return t and time() - t < KEEP_PICKED
 end
 
+-- 1.5.5 (the user: yes to "Add a mouseover option to TK Pickpocket, so hovering an NPC and pressing robs that one"; in
+-- Alterac Valley the game hid the NPCs from TargetKit): just before its casts every TK Pickpocket macro targets your
+-- mouseover enemy, if there is one. It comes after the other targeting lines, so it wins.
+local PICK_MOUSE = "/target [@mouseover,harm,nodead] mouseover"
+local function withMouse(text)
+  if not text then return nil end
+  local out, done = {}, false
+  for line in text:gmatch("[^\n]+") do
+    if not done and line:find("^/cast") then out[#out + 1] = PICK_MOUSE done = true end
+    out[#out + 1] = line
+  end
+  if not done then out[#out + 1] = PICK_MOUSE end
+  return table.concat(out, "\n")
+end
+
 local function pickFixed()
-  return table.concat({ "/targetenemy [noharm][dead]", "/cast " .. SAPN(), "/cast " .. PP() }, "\n")
+  return withMouse(table.concat({ "/targetenemy [noharm][dead]", "/cast " .. SAPN(), "/cast " .. PP() }, "\n"))
 end
 
 local function pickWhyNot(c)
@@ -499,7 +530,12 @@ end
 -- though I'm already gone and going away from it"): the half-done rule only holds while the unit is in range for the
 -- missing half; with nobody to rob in sight, a target out of Sap range is let go of; and the macro is rewritten at
 -- once when its choice changes (see prepare).
+local pickChoose
 local function pickBuild(units)
+  local text, why, expect, saw, extra = pickChoose(units)
+  return withMouse(text), why, expect, saw, extra
+end
+pickChoose = function(units)
   -- its last unit, half done (Sap or Pick Pocket still on cooldown then): the missing half, while in range for it
   local t = UnitGUID("target")
   if not known(t) then t = nil end                       -- hidden by the game: unknown

@@ -12,6 +12,8 @@ function InCombatLockdown() return COMBAT end
 KEYDOWN = true
 function GetCVarBool(name) if name == "ActionButtonUseKeyDown" then return KEYDOWN end end
 function IsInRaid() return false end
+INSTANCE = "none"                               -- "pvp": a battleground (TargetKit 1.5.5)
+function IsInInstance() return INSTANCE ~= "none", INSTANCE end
 -- secret values, as in battlegrounds on Forever (TargetKit 1.4.8): a unit field set to SECRET reads as a hidden value
 SECRET = setmetatable({}, { __tostring = function() return "<secret>" end })
 function issecretvalue(v) return v == SECRET end

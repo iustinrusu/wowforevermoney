@@ -971,6 +971,19 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (twenty-eighth part) TargetKit 1.5.5 (the user: "yes add it; sap should also work on mobs too, not
+  only real enemy players; pickpocket should target nearest mob, why is it not working?"). Pickpocket in Alterac
+  Valley: the game hid every nameplate unit's id and name, so TargetKit saw no NPC (Verified facts); out in the world
+  it picks the closest robbable humanoid itself.
+  - TK Pickpocket: every macro gets `/target [@mouseover,harm,nodead] mouseover` just before its first cast (after the
+    other targeting lines, so the mouseover wins), the fixed macro too.
+  - TK Sap: `inPvP()` (IsInInstance "pvp" or "arena"). Outside it, with no enemy player in sight: the NPC in Sap range
+    by name alone (no `/targetenemyplayer` after it), else `/cleartarget` + `/targetenemy` (any enemy); an NPC target
+    in Sap range is kept without `/targetenemyplayer`. In PvP, or with an enemy player in sight, as before (players
+    first). The fixed macro: `/targetenemyplayer` in PvP, `/targetenemy` elsewhere.
+  - Harness: IsInInstance (INSTANCE). Tests: 68 (new: the pickpocket mouseover wins; Sap outside PvP takes any enemy,
+    in PvP the nearest enemy player; the NPC path with and without PvP).
+
 - **2026-11-27** (twenty-seventh part) TargetKit 1.5.4 (the user: "sap working correctly, but now pickpocket does not
   work; also question, does sap macro work on mobs too?"). The log's 15 TK Pickpocket presses were all in a
   battleground (Arathi Basin: only players, who can't be pickpocketed, and no humanoid mobs), so "no humanoid to rob"

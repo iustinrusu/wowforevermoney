@@ -12,7 +12,9 @@ except ImportError:          # pip install lupa
 ROOT = Path(__file__).resolve().parent.parent
 KIT = ROOT / 'extras' / 'TargetKit'
 MOUSEOVER = '/cast [@mouseover,harm,nodead] Sap\n/stopmacro [@mouseover,harm,nodead]'
-SAP_FIXED = MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/cast Sap'      # from scratch (1.4.8)
+SAP_FIXED = MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/cast Sap'      # from scratch, players first (1.4.8)
+SAP_FIXED_WORLD = MOUSEOVER + '\n/cleartarget\n/targetenemy\n/cast Sap'      # no enemy player around, outside PvP (1.5.5)
+PICK_MOUSE = '/target [@mouseover,harm,nodead] mouseover'                  # TK Pickpocket's mouseover line (1.5.5)
 MACRO = {'TKFind': 'TK Find', 'TKPick': 'TK Pickpocket', 'TKSap': 'TK Sap'}
 
 
@@ -63,7 +65,8 @@ class TargetKitTests(unittest.TestCase):
             self.run_macro(text)
         self.g.NOW += 0.31
         self.g.RUN_TIMERS()
-        return '\n'.join(l for l in text.split('\n') if not l.startswith(('#showtooltip', '/click TK')))
+        return '\n'.join(l for l in text.split('\n') if not l.startswith(('#showtooltip', '/click TK'))
+                         and l != PICK_MOUSE)
 
     def holds(self, conds):
         """A macro line's [conditions], the ones TargetKit writes: [a,b][c] is (a and b) or c; @unit, exists, dead,
@@ -130,9 +133,9 @@ class TargetKitTests(unittest.TestCase):
         macros = {m.name: m.body for m in self.g.MACROS.values()}
         self.assertEqual(macros, {
             'TK Find': '/click TKFindMark',                             # an empty find list
-            'TK Pickpocket': '#showtooltip Pick Pocket\n/targetenemy [noharm][dead]\n/cast Sap\n/cast Pick Pocket'
-                             '\n/click TKPickMark',
-            'TK Sap': '#showtooltip Sap\n' + SAP_FIXED + '\n/click TKSapMark'})
+            'TK Pickpocket': '#showtooltip Pick Pocket\n/targetenemy [noharm][dead]\n' + PICK_MOUSE
+                             + '\n/cast Sap\n/cast Pick Pocket\n/click TKPickMark',
+            'TK Sap': '#showtooltip Sap\n' + SAP_FIXED_WORLD + '\n/click TKSapMark'})
         self.assertTrue(self.g.TargetKitDB.macrosMade)
         self.assertFalse([f for f in self.g.frames.values() if f.template == 'SecureActionButtonTemplate'])
         self.assertIsNone(self.g.TKSap)
@@ -155,8 +158,9 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate5', 'Friend', player=True, reach=1, enemy=False)
         self.unit('nameplate6', 'Defias Pathstalker', reach=2)                  # the NPC in Sap range
         text = self.press('TKSap')
-        self.assertEqual(text, MOUSEOVER + '\n/targetexact Defias Pathstalker'
-                               '\n/targetenemyplayer\n/cast Sap')           # a player the game finds still wins
+        self.assertEqual(text, MOUSEOVER + '\n/targetexact Defias Pathstalker\n/cast Sap')   # outside PvP: the NPC
+        self.g.INSTANCE = 'pvp'                                                 # in a battleground a player wins
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/targetenemyplayer\n/cast Sap')   # (now your target)
 
     def test_sap_with_no_player_in_sap_range_leaves_it_to_the_games_pick(self):
         """1.5.3: nobody in Sap range: the game's nearest enemy player from scratch, which caught a rogue fading in that
@@ -210,7 +214,7 @@ class TargetKitTests(unittest.TestCase):
         self.fire('PLAYER_REGEN_DISABLED')                     # just before combat locks the buttons
         self.g.COMBAT = True
         text = self.press('TKSap')                             # nothing may change it now
-        self.assertIn('/cleartarget\n/targetenemyplayer', text)
+        self.assertIn('/cleartarget\n/targetenemy', text)
         self.assertNotIn('Nightstep', text)
         self.assertTrue(self.in_log('press: TK Sap: the fixed macro (in combat, or just before)'))
 
@@ -250,8 +254,8 @@ class TargetKitTests(unittest.TestCase):
     def test_pickpocket_lets_go_of_a_far_target_with_nobody_to_rob_in_sight(self):
         self.unit('target', 'Defias Thug', plate=False, reach=5, combat=True)  # can't be robbed, and far
         self.tick()
-        self.assertEqual(self.body('TKPick'), '#showtooltip Pick Pocket\n/cleartarget\n/targetenemy\n/cast Sap\n'
-                                              '/cast Pick Pocket\n/click TKPickMark')
+        self.assertEqual(self.body('TKPick'), '#showtooltip Pick Pocket\n/cleartarget\n/targetenemy\n' + PICK_MOUSE
+                                              + '\n/cast Sap\n/cast Pick Pocket\n/click TKPickMark')
 
     def test_pickpocket_in_a_camp_of_one_name_skips_the_one_just_robbed(self):
         """By name the game takes the closest of that name: the Defias Thug just robbed, next to you."""
@@ -266,8 +270,8 @@ class TargetKitTests(unittest.TestCase):
         self.assertEqual(self.g.UNITS.target.guid, fresh.guid)
         self.g.NOW += 11                                                    # past the half-done rule's 10 s
         self.tick()
-        self.assertEqual(self.body('TKPick'), '#showtooltip Pick Pocket\n/cast Sap\n/cast Pick Pocket\n'
-                                              '/click TKPickMark')          # your target, robbable, near: that one
+        self.assertEqual(self.body('TKPick'), '#showtooltip Pick Pocket\n' + PICK_MOUSE + '\n/cast Sap\n'
+                                              '/cast Pick Pocket\n/click TKPickMark')   # your target, robbable, near
         self.fire('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-2', 921)         # robbed too
         self.unit('nameplate3', 'Defias Miner', reach=2)                        # another name in Sap range
         self.assertEqual(self.press('TKPick'), '/targetexact Defias Miner\n/cast Sap\n/cast Pick Pocket')
@@ -278,6 +282,25 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate3', 'Defias Miner', reach=2)
         self.g.TargetKitDB.picked[robbed.guid] = self.g.WALL                   # robbed a moment ago
         self.assertEqual(self.press('TKPick'), '/targetexact Defias Miner\n/cast Sap\n/cast Pick Pocket')
+
+    def test_pickpocket_takes_your_mouseover_enemy_over_its_own_choice(self):
+        """1.5.5: in Alterac Valley the game hid the NPCs from TargetKit; hovering one and pressing robs that one."""
+        self.unit('nameplate1', 'Defias Thug', reach=1)
+        hovered = self.unit('mouseover', 'Defias Miner', plate=False, reach=2)
+        self.tick()
+        self.assertEqual(self.body('TKPick'), '#showtooltip Pick Pocket\n/targetexact Defias Thug\n' + PICK_MOUSE
+                                              + '\n/cast Sap\n/cast Pick Pocket\n/click TKPickMark')
+        self.run_macro(self.body('TKPick'))
+        self.assertEqual(self.g.UNITS.target.guid, hovered.guid)               # the last line that finds wins
+
+    def test_sap_outside_pvp_takes_the_nearest_enemy_mobs_too(self):
+        """1.5.5, the user: "sap should also work on mobs too, not only real enemy players"."""
+        self.unit('target', 'Defias Thug', plate=False, reach=5)               # far
+        self.tick()
+        self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + SAP_FIXED_WORLD + '\n/click TKSapMark')
+        self.g.INSTANCE = 'pvp'                                                 # a battleground: players first
+        self.tick()
+        self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + SAP_FIXED + '\n/click TKSapMark')
 
     def test_pickpocket_is_rewritten_at_once_as_you_walk_past(self):
         self.unit('nameplate1', 'Defias Thug', reach=1)
@@ -616,7 +639,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.5.4 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.5.5 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
@@ -652,7 +675,7 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate1', 'Nightstep', player=True, reach=2)
         self.g.C_NamePlate.GetNamePlateForUnit = self.lua.eval('function() error("boom") end')
         text = self.press('TKSap')
-        self.assertIn('/cleartarget\n/targetenemyplayer', text)                # the fixed macro
+        self.assertIn('/cleartarget\n/targetenemy', text)                # the fixed macro
         self.press('TKSap')
         errors = [l for l in self.logged() if 'ERROR: TK Sap choosing' in l]
         self.assertGreaterEqual(len(errors), 2)
@@ -821,6 +844,7 @@ class TargetKitTests(unittest.TestCase):
 
     def test_sap_keeps_a_target_only_while_it_is_known_to_be_in_sap_range(self):
         """1.4.8: kept only when TargetKit knows it's in Sap range; an NPC there gives way to a player the game finds."""
+        self.g.INSTANCE = 'pvp'                                                 # a battleground: a player beats an NPC
         thug = self.unit('target', 'Defias Thug', plate=False, reach=2)
         self.press('TKSap')
         self.assertTrue(self.in_log(' is in Sap range, so it stays'))
