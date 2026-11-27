@@ -2,7 +2,7 @@
 ## Title: |cffe8c060Gold Ever After|r
 ## Notes: Saves your level, gold, professions, real vendor prices, and what you loot where (with time spent) for the WoW Forever Money app. Farm meter (gold and XP; the app's prices, or TSM in game without the app): /gea start, /gea stop, /gea min folds it to one line (also /fmb). Written on logout or /reload.
 ## Author: WoWForeverMoney
-## Version: 1.6.5
+## Version: 1.6.6
 ## SavedVariables: ForeverMoneyBridgeDB
 
 Checks.lua

@@ -882,6 +882,16 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (third part) Addon 1.6.6: `/gea debug` and `/gea` say which version runs. The user: "still not working
+  after opening heavy junkbox". WoW's AddOns folder still had 1.6.3 (19 Nov): the app hadn't run since 26 Nov 14:50,
+  and only the app's start copies the addon, so the 1.6.4 box fix never reached the game (the saved file has no
+  16885 entry; the box was opened on the old code). Copied 1.6.6 in with the new `python -m wfm.profile` (same as the
+  app's start: Checks.lua and Prices.lua kept). The version is also a constant in Meter.lua, because WoW reads the
+  .toc only at a full restart; a test keeps the two the same. CLAUDE.md: run `python -m wfm.profile` after every
+  addon change. Also fixed `install_addon.bat`, which kept the app's Checks.lua but overwrote its Prices.lua with the
+  empty default (the meter fell back to TSM prices until the app ran again). 364 tests pass. The box fix itself is
+  still unverified in game (checklist B8).
+
 - **2026-11-27** (second part) Addon 1.6.5: a running meter session survives `/reload` and logout (the user: "Yes, add
   that", to "should a running meter session survive /reload?"). Before, the session lived only in the addon's memory,
   so a `/reload` lost it. Now at PLAYER_LOGOUT (a `/reload` too) it goes into the saved file as `meter.running`, keyed by

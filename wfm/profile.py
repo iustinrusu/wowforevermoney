@@ -199,3 +199,14 @@ def install_addon(src: Path, addons_dir: Path, log=print) -> bool:
         shutil.copy2(f, dest / f.name)
     log(f'Installed {ADDON_NAME} {ver(src_toc)} into {dest}')
     return True
+
+
+if __name__ == '__main__':
+    # python -m wfm.profile: copy the addon into WoW now, as the app does when it starts (then /reload in game)
+    from . import paths
+    wow = paths.find_wow_dir()
+    if not wow:
+        raise SystemExit('WoW: Forever not found')
+    root = Path(__file__).resolve().parent.parent
+    if not install_addon(root / 'addon' / ADDON_NAME, paths.GamePaths(wow).addons):
+        print(f'{ADDON_NAME} in WoW is already the latest')

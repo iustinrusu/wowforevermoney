@@ -201,6 +201,14 @@ class MeterTests(unittest.TestCase):
         self.slash('')
         self.assertIn('/gea min (fold the window to one line and back), /gea hide, /gea show', g.printed[len(g.printed)])
 
+    def test_debug_and_the_help_say_which_version_runs(self):
+        toc = (ADDON / 'ForeverMoneyBridge.toc').read_text(encoding='utf-8')
+        version = toc.split('## Version:')[1].split()[0]
+        self.slash('debug')
+        self.assertIn(f'Gold Ever After|r {version} debug on', self.g.printed[len(self.g.printed)])
+        self.slash('')
+        self.assertIn(f'Gold Ever After|r {version}: /gea start', self.g.printed[len(self.g.printed)])
+
     def test_price_source_can_be_the_app(self):
         self.g.ForeverMoneyBridge_Prices = self.lua.eval('{made = 1795000000 - 7200, items = {[8150] = 5000}, containers = {}}')
         self.slash('prices app')

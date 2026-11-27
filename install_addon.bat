@@ -36,11 +36,13 @@ echo Couldn't create %DEST%
 echo Try running this file again with right-click, Run as administrator.
 goto :end
 :have_dest
-rem Checks.lua is written by the app (the items to check in game): keep the existing one.
+rem Checks.lua and Prices.lua are written by the app (the items to check in game, the meter's prices): keep the
+rem existing ones, as the app's own copy does (wfm/profile.py APP_WRITTEN).
 for %%F in ("%SRC%\*") do (
-  if /i not "%%~nxF"=="Checks.lua" copy /y "%%~fF" "%DEST%\" >nul || goto :copy_failed
+  if /i not "%%~nxF"=="Checks.lua" if /i not "%%~nxF"=="Prices.lua" copy /y "%%~fF" "%DEST%\" >nul || goto :copy_failed
 )
 if not exist "%DEST%\Checks.lua" copy /y "%SRC%\Checks.lua" "%DEST%\" >nul || goto :copy_failed
+if not exist "%DEST%\Prices.lua" copy /y "%SRC%\Prices.lua" "%DEST%\" >nul || goto :copy_failed
 
 set "VER="
 for /f "tokens=2 delims=:" %%V in ('findstr /b /c:"## Version:" "%SRC%\%NAME%.toc"') do set "VER=%%V"

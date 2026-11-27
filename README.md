@@ -124,6 +124,8 @@ See docs/PROJECT_LOG.md, open items.
   paused, and the time away doesn't count). After longer, it's saved as it stood when you logged out.
 - **Boxes you open** (lockboxes, junkboxes, clams, trunks): a box you loot counts nothing until you open it, then what's
   inside counts under "Opened". `/gea debug` prints in chat what the meter makes of each loot window.
+- **Which version is running:** `/gea debug` and `/gea` say it (for example "Gold Ever After 1.6.6"). The app copies
+  a new addon into WoW when it starts, so after an update start the app, then `/reload` in game.
 - **Install without the app:** double-click `install_addon.bat`. It finds WoW: Forever (TSM desktop app
   settings, the Battle.net install entry, then the usual folders on drives C to H), or asks for the folder.
   It never overwrites the item-check list (`Checks.lua`) the app wrote.

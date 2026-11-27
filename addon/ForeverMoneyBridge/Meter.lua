@@ -12,10 +12,13 @@
 -- line (total, gold an hour, time) and "+" opens it again; remembered between sessions. /gea hide hides it completely,
 -- /gea show brings it back. Folded or hidden, the session keeps counting.
 -- 1.6.5: a session running at a /reload or logout carries on at the next login within 30 minutes (else it is saved).
+-- 1.6.6: /gea debug and /gea say which version of this code is running (the .toc's version only changes in game after
+-- a full restart of WoW, so the number lives here too; a test keeps the two the same).
 
 local _, ns = ...                   -- the addon's shared table: ns.bagItem (ForeverMoneyBridge.lua), the box a loot
                                     -- window came from
 ns = ns or {}
+local VERSION = "1.6.6"             -- the same as the .toc's ## Version (tests/test_meter_lua.py checks)
 local CUT = 0.05
 local TSM_PRICE = "first(DBMinBuyout, DBMarket, DBRegionMarketAvg)"
 -- newer clients (WoW: Forever) moved these into C_Item / C_Spell; the old globals may not exist
@@ -722,7 +725,8 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
     refresh()
   elseif cmd == "debug" then
     debug = not debug
-    print("|cffe8c060Gold Ever After|r debug " .. (debug and "on: what the meter counts is printed here" or "off"))
+    print("|cffe8c060Gold Ever After|r " .. VERSION .. " debug " .. (debug and "on: what the meter counts is printed here"
+      or "off"))
   elseif cmd == "prices tsm" or cmd == "prices app" or cmd == "prices auto" then
     db().prices = cmd:sub(8)
     for k in pairs(cache) do cache[k] = nil end
@@ -751,7 +755,7 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
     refresh()
   else
     if original then original(msg) end
-    print("|cffe8c060Gold Ever After|r: /gea start, /gea pause, /gea resume, /gea stop, /gea min (fold the window to"
+    print("|cffe8c060Gold Ever After|r " .. VERSION .. ": /gea start, /gea pause, /gea resume, /gea stop, /gea min (fold the window to"
       .. " one line and back), /gea hide, /gea show (it keeps counting while hidden), /gea prices, /gea debug.")
   end
 end

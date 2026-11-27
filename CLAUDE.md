@@ -69,7 +69,11 @@ python -m unittest discover -s tests -t .      # the farm meter tests need `pip 
 python -m wfm.audit
 python -m wfm.anomalies
 python -m wfm.classicdb --update
+python -m wfm.profile                          # copy the addon into WoW now (then /reload in game)
 ```
+
+After every change to `addon/`, run `python -m wfm.profile` straight away. The app copies the addon only when it starts,
+so while it's closed a fix never reaches the game (2026-11-27: the user tested the 1.6.4 box fix on 1.6.3).
 
 Only one copy of the app runs at a time (it holds a mutex on port 47651). The browser pane's `preview_stop`
 doesn't kill the python process on this machine, so stop it by PID.
