@@ -158,17 +158,27 @@ class TargetKitTests(unittest.TestCase):
         self.assertEqual(text, MOUSEOVER + '\n/targetexact Defias Pathstalker'
                                '\n/targetenemyplayer\n/cast Sap')           # a player the game finds still wins
 
-    def test_sap_with_no_player_near_takes_the_closest_seen_else_the_games_pick(self):
-        """1.5.1: nobody in Sap range, but a player seen within 28 yd: that one by name (the game's own pick took a far
-        one on every press in the user's Arathi Basin log). Only players further off: the game's nearest enemy player,
-        which may find one TargetKit can't see (a rogue just out of stealth)."""
+    def test_sap_with_no_player_in_sap_range_leaves_it_to_the_games_pick(self):
+        """1.5.3: nobody in Sap range: the game's nearest enemy player from scratch, which caught a rogue fading in that
+        TargetKit couldn't see (the user's Arathi Basin log). 1.5.1 named a player seen within 28 yd instead, which
+        would have taken him over the rogue."""
         self.unit('nameplate1', 'Farstrider', player=True, reach=4)            # a player, but out of Sap range
-        text = self.press('TKSap')
-        self.assertEqual(text, MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Farstrider\n/cast Sap')
-        self.g.UNITS.nameplate1.reach = 6                                       # further than 28 yd
-        text = self.press('TKSap')
-        self.assertIn('/cleartarget\n/targetenemyplayer', text)
-        self.assertTrue(text.startswith(MOUSEOVER))
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/cast Sap')
+
+    def test_a_stealthed_player_comes_first_of_all(self):
+        """1.5.3, the user: "ideally fading rogues should be highest priority out of all rules of targeting"."""
+        self.unit('nameplate1', 'Nightstep', player=True, reach=1)              # right next to you
+        self.unit('nameplate2', 'Shadowfang', player=True, reach=3, stealthed=True)   # a rogue fading in, a bit off
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Shadowfang'
+                                                          '\n/cast Sap')
+        self.assertTrue(self.in_log('a stealthed enemy player, first of all: Shadowfang (nameplate2, 10 yd)'))
+
+    def test_a_stealthed_target_is_kept(self):
+        """Once the game's pick has caught the rogue, a closer player doesn't take his place."""
+        self.unit('target', 'Shadowfang', plate=False, player=True, reach=3, stealthed=True)
+        self.unit('nameplate1', 'Nightstep', player=True, reach=1)
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cast Sap')
+        self.assertTrue(self.in_log('(your target: kept)'))
 
     def test_sap_counts_10_yd_as_sap_range_for_players(self):
         """The user's log: the game never answered Sap's range for players there; bands went melee, then 10 yd."""
@@ -606,7 +616,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.5.2 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.5.3 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))

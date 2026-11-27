@@ -110,6 +110,13 @@ Revised:
   `/targetexact First Last`, which wins when the game takes it. If the closest
   enemy player is your target already, it's just Sap. Nobody in Sap range: the closest one TargetKit sees within
   28 yd, by name; only further than that, the game's pick alone.
+- **TK Sap's order now (1.5.3; the user: "ideally fading rogues should be highest priority out of all rules"):**
+  1. your mouseover enemy; 2. a stealthed enemy player TargetKit sees (a Stealth, Vanish, Prowl or Shadowmeld effect
+  on him), within 28 yd, kept once he's your target; 3. the closest enemy player in Sap range (melee range first,
+  then up to 10 yd); 4. your target, when known to be in Sap range; 5. the game's nearest enemy player from scratch.
+  Number 5 is what catches a rogue as he fades in: in the user's Arathi Basin log TargetKit saw nobody (no nameplate
+  yet) and the game's pick took him. What no addon can do: put a rogue TargetKit can't see yet ahead of another player
+  it does see in Sap range; then your mouse over the rogue is the way.
 - **TK Pickpocket walking past a group (1.4.7):** a press goes to the one next to you, never the one you left behind.
   Your target, if it can be robbed and is in Sap range, is the one; else the closest one you can rob, by name. The
   "finish the missing half" rule (Sap or Pick Pocket was still on cooldown) only holds while that mob is still in

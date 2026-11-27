@@ -97,7 +97,9 @@ function debugprofilestop() PROFILE_MS = PROFILE_MS + PROFILE_STEP return PROFIL
 function CheckInteractDistance(t, i) local u = U(t); if not u then return false end
   return u.reach <= ({ [3] = 3, [2] = 4, [4] = 5 })[i] end
 C_UnitAuras = { GetDebuffDataByIndex = function(t, i) local u = U(t)
-  if u and u.sapped and i == 1 then return { spellId = 6770 } end end }
+  if u and u.sapped and i == 1 then return { spellId = 6770 } end end,
+  GetBuffDataByIndex = function(t, i) local u = U(t)                       -- stealthed: Stealth on the unit
+    if u and u.stealthed and i == 1 then return { spellId = 1784, name = "Stealth" } end end }
 C_NamePlate = {
   GetNamePlates = function() local out = {} for _, tok in ipairs(PLATES) do out[#out + 1] = { namePlateUnitToken = tok } end return out end,
   GetNamePlateForUnit = function(t) local u = U(t)

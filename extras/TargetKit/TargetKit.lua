@@ -38,7 +38,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.5.2"
+local VERSION = "1.5.3"
 local PICK_POCKET, SAP = 921, 6770
 local MELEE = 1752                                        -- Sinister Strike: melee range, and it takes players
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
@@ -235,6 +235,35 @@ end
 
 local function dead(unit) return yes(UnitIsDeadOrGhost or UnitIsDead, unit) or false end
 
+-- 1.5.3 (the user: "ideally fading rogues should be highest priority out of all rules of targeting"): a unit with a
+-- stealth effect on it, found by spell id (Classic's: Stealth, Vanish, Prowl, Shadowmeld) or by that spell's name in
+-- your client's language. Hidden or unreadable auras mean no.
+local STEALTH_IDS = { [1784] = true, [1785] = true, [1786] = true, [1787] = true, [1856] = true, [1857] = true,
+                      [11327] = true, [11329] = true, [5215] = true, [6783] = true, [9913] = true, [20580] = true }
+local stealthNames
+local function hasStealth(unit)
+  if not stealthNames then
+    stealthNames = {}
+    for id in pairs(STEALTH_IDS) do local n = spellName(id); if n then stealthNames[n] = true end end
+  end
+  for i = 1, 40 do
+    local id, name
+    if C_UnitAuras and C_UnitAuras.GetBuffDataByIndex then
+      local ok, d = pcall(C_UnitAuras.GetBuffDataByIndex, unit, i)
+      if not ok or not known(d) then return false end
+      id, name = d.spellId, d.name
+    elseif UnitBuff then
+      local ok, n, _, _, _, _, _, _, _, sid = pcall(UnitBuff, unit, i)
+      if not ok or not known(n) then return false end
+      id, name = sid, n
+    else
+      return false
+    end
+    if (known(id) and STEALTH_IDS[id]) or (known(name) and stealthNames[name]) then return true end
+  end
+  return false
+end
+
 -- every unit the addon can see, once each: nameplates first (their tokens are the steadiest for the click), then
 -- mouseover, soft targets, target, focus and your group
 local TOKENS = { "mouseover", "softenemy", "softinteract", "softfriend", "target", "focus" }
@@ -345,7 +374,6 @@ end
 -- The targeting lines' conditions are about the target you had before the press (that's what the game checks), and the
 -- last line that finds someone wins: no attackable target, the game's nearest enemy; then, unless you already have a
 -- living enemy player, the game's nearest enemy player (revealed stealthers too), which wins if there is one.
-local SAP_PLAYER = "/targetenemyplayer [noexists][dead][noharm][noplayer]"
 -- The fixed macro (in combat, or when a look fails) starts from scratch every press (1.4.8): it can't know whether
 -- your target is near, and the user wants "the closest physically possible".
 local function sapFixed()
@@ -387,52 +415,54 @@ local function sapBuild(units)
   end
   rank(players)
   rank(npcs)
+  local sneak                                            -- the closest stealthed enemy player TargetKit sees
+  for _, c in ipairs(players) do
+    if not sneak and hasStealth(c.unit) then sneak = c end
+  end
   local saw = seen({ players, npcs }, rejected)
   local head = { "/cast [@mouseover,harm,nodead] " .. sap, "/stopmacro [@mouseover,harm,nodead]" }
-  -- 1.5.1, the user's Arathi Basin log: for players the game never said yes to Sap's range (most are in combat
-  -- there), the bands went from melee straight to 10 yd. Sap's range is about 10 yd (Classic's), so the 10 yd band
-  -- counts as in Sap range.
-  local p = players[1]
-  -- Whether the game takes a player's name in a battleground isn't known yet (1.5.1's Arathi Basin log: neither
-  -- "First" exactly nor "First-Last" took; the right form, "First Last", came in 1.5.2). So when the choice isn't your target already, the macro first clears and asks for the game's nearest enemy
-  -- player, then names the choice: the last line that finds someone wins, so the name wins if the game takes it, and
-  -- the game's pick stands if it doesn't, instead of the old target staying.
+  -- When the choice isn't your target already, the macro first clears and asks for the game's nearest enemy player,
+  -- then names the choice: the last line that finds someone wins, so the name wins when the game takes it and the
+  -- game's pick stands when it doesn't.
+  local function isTarget(c) return c.unit == "target" or yes(UnitIsUnit, c.unit, "target") == true end
   local function named(c)
-    if c.unit == "target" or yes(UnitIsUnit, c.unit, "target") == true then return end   -- already it: just Sap
+    if isTarget(c) then return end                       -- already it: just Sap
     head[#head + 1] = "/cleartarget"
     head[#head + 1] = "/targetenemyplayer"
     head[#head + 1] = targetLine(c, nil, units)
   end
+  -- 1. A stealthed enemy player TargetKit sees, within 28 yd: first of all (1.5.3), and kept once he's your target.
+  if sneak and sneak.reach <= 5 then
+    named(sneak)
+    head[#head + 1] = "/cast " .. sap
+    return table.concat(head, "\n"), "a stealthed enemy player, first of all: " .. describe(sneak)
+      .. (isTarget(sneak) and " (your target: kept)" or ""), nameOf(sneak.unit), saw
+  end
+  -- 2. The closest enemy player in Sap range. For players the game never said yes to Sap's range in the user's Arathi
+  -- Basin log (most are in combat there), so the 10 yd band counts (Sap's range is about 10 yd, Classic's).
+  local p = players[1]
   if p and p.reach <= 3 then
     named(p)
     head[#head + 1] = "/cast " .. sap
     return table.concat(head, "\n"), "enemy player in Sap range: " .. describe(p), nameOf(p.unit), saw
   end
+  -- 3. Your target, when TargetKit knows it's in Sap range, attackable and alive; an NPC there gives way to an enemy
+  -- player the game finds.
   local n = npcs[1]
   if n and n.reach > 2 then n = nil end
-  -- Your target is kept only when TargetKit knows it's in Sap range, attackable and alive (then a player the game finds
-  -- wins over an NPC). Else, further off or hidden by the game (enemy players in battlegrounds, 1.4.8; an enemy player
-  -- you target out of Sap range, 1.4.6: "in case a stealthed rogue pops up next to me, it targets him even though I
-  -- maybe have another target enemy player targeted that is farther away"), it's let go of: the NPC in Sap range, or
-  -- nothing, then the game's nearest enemy player, which wins if it finds one.
   local tname = nameOf("target")
   local r = yes(UnitExists, "target") and reach("target")
-  if r and r <= 2 and yes(UnitCanAttack, "player", "target") and yes(UnitIsDeadOrGhost, "target") == false then
-    head[#head + 1] = SAP_PLAYER
+  local tplayer = yes(UnitIsPlayer, "target")
+  if r and r <= (tplayer and 3 or 2) and yes(UnitCanAttack, "player", "target")
+      and yes(UnitIsDeadOrGhost, "target") == false then
+    if not tplayer then head[#head + 1] = "/targetenemyplayer" end
     head[#head + 1] = "/cast " .. sap
     return table.concat(head, "\n"), "no enemy player in Sap range in sight; your target " .. (tname or "?")
-      .. " is in Sap range, so it stays (unless it's an NPC and the game finds an enemy player)", nil, saw
+      .. " is in Sap range, so it stays" .. (tplayer and "" or " (unless the game finds an enemy player)"), nil, saw
   end
-  -- nobody in Sap range, but an enemy player seen within 28 yd: the closest of them, by name (the game's own pick took
-  -- a far one on every press in the user's log)
-  -- (not your target itself: then the game's pick from scratch, which may find one TargetKit can't see, like a rogue
-  -- just out of stealth next to you)
-  if p and p.reach <= 5 and p.unit ~= "target" and yes(UnitIsUnit, p.unit, "target") ~= true then
-    named(p)
-    head[#head + 1] = "/cast " .. sap
-    return table.concat(head, "\n"), "no enemy player in Sap range in sight; the closest one seen: " .. describe(p),
-      nameOf(p.unit), saw
-  end
+  -- 4. Else the NPC in Sap range, or nothing, then the game's nearest enemy player, which wins if it finds one. This is
+  -- what caught a rogue fading in that TargetKit couldn't see yet (the user's log); so a player seen further off than
+  -- Sap's range is no longer named instead (1.5.1 did that, 1.5.3 took it out).
   head[#head + 1] = n and targetLine(n, nil, units) or "/cleartarget"
   head[#head + 1] = "/targetenemyplayer"
   head[#head + 1] = "/cast " .. sap

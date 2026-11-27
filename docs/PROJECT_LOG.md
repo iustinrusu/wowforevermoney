@@ -966,6 +966,20 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (twenty-sixth part) TargetKit 1.5.3, TK Sap and fading rogues (the user: "two enemies in view, one
+  fading rogue and one player in sight a little further away, that's what I really need. ideally fading rogues should
+  be highest priority out of all rules of targeting, but I don't know that's possible to code"). The log before the
+  catch: TargetKit saw no enemy (no nameplate, not the soft target); the game's `/targetenemyplayer` took the rogue.
+  - New first rule after the mouseover: an enemy player TargetKit sees with a stealth effect (spell ids 1784-1787,
+    1856/1857, 11327/11329, 5215/6783/9913, 20580, Classic's, or those spells' names in the client's language),
+    within 28 yd; kept when he's your target (so a closer player doesn't replace a caught rogue).
+  - 1.5.1's "closest player seen within 28 yd, by name" is gone: with nobody in Sap range the game's pick from scratch
+    runs, which is what catches an unseen fading rogue (the named player would have won over him).
+  - `[noplayer]` isn't a macro condition: the keep line is now a plain `/targetenemyplayer` before Sap when your
+    target is an NPC, and nothing when it's a player.
+  - Can't be done: preferring a rogue TargetKit can't see over a player it sees in Sap range.
+  - Harness: GetBuffDataByIndex gives Stealth for stealthed units. Tests: 66.
+
 - **2026-11-27** (twenty-fifth part) TargetKit 1.5.2 (the user: "in forever players have "FirstName LastName" format,
   so /target might be better even if looser, right? /targetexact FirstName fails because LastName is missing,
   correct?"). Yes: `UnitName`'s second value is the last name, and 1.5.1 wrote "First-Last" (nobody's name) and the
