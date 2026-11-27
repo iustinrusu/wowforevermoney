@@ -30,7 +30,9 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       Pearl 5500; 20 read on 2026-11-15).
 - [x] A2. (done 2026-11-20: "some skins not counted" is gone from all 40 skinning spots) The 4 skinning items left:
       Black Whelp Scale (7286), Worn Dragonscale (8165), Green Dragonscale (15412), Chimera Leather (15423).
-- [ ] A3. (2026-11-27: paused. Wowhead has recorded no Forever loot for pools yet: Floating Debris 180655, Oily
+- [ ] A3. (2026-11-28, session 9: Floating Wreckage 180662 checked, no Contains tab either: still paused; check one
+      more pool page next session.)
+      (2026-11-27: paused. Wowhead has recorded no Forever loot for pools yet: Floating Debris 180655, Oily
       Blackmouth School 180582 and the Forever-only Fresh Wreckage 630533 have no Contains tab; Strange Debris 693670
       holds only a quest item. Re-check one pool page in a later session; the rest of the list waits until one has
       data. Meanwhile the addon records pool catches itself: B5.)
@@ -38,6 +40,9 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       debris is where most of the fishing gold is (the user's hunch).
 - [ ] A4. Each herb and ore node's own page, so node values have no Classic parts left.
 - [ ] A5. Mobs' own pages, so mob farming counts every drop (coins, gray items, gear), not only materials.
+      (2026-11-28, session 9: 5 more, the reading queue's top mobs: Plague Monstrosity 50g an hour (was 0.48g),
+      Plague Ravager 43g, Blighted Surge 27g, Mossflayer Cannibal 21g, Rotting Behemoth 17g; 35 mob pages in all.
+      Samples of 59-75 kills for the three water elementals: details in `docs/plans/mob-farming-review.md`.)
       (2026-11-20 review, `docs/plans/mob-farming-review.md`: Toxic Horror is 17th of 554 open-world mobs by Classic
       value a kill; a 20-page reading list for the candidates: Tanaris air elementals for Breath of Wind, Silithus
       Essence of Air, Eastern Plaguelands Essence of Undeath, recipe drops such as Crusader. Read the same evening:

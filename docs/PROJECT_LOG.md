@@ -726,6 +726,17 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-28 (Wowhead Forever npc pages): Forever drops Essence of Water about twice as often as the WoW Classic
+  table: Toxic Horror 85 of 617 kills (13.8%; Classic 7.2%), and on smaller samples Plague Monstrosity 12 of 75
+  (16%; 4.8%), Plague Ravager 6 of 60 (10%; 3.2%), Blighted Horror 5 of 64 (7.8%; 5.8%), Blighted Surge 3 of 59 (5.1%;
+  2.9%). The Eastern Plaguelands water elementals give no coins (no Worth on their pages).
+- 2026-11-28 (the browser pane): a script on a Wowhead page can't send to 127.0.0.1 (fetch fails), but the tab can
+  navigate there; a URL fragment of 19,289 characters went through whole (`tools/receive_batch.py`). Wowhead's item
+  pages put the name in `h1.wh-heading-responsive`, npc pages in `h1.heading-size-1`; the page title is
+  "<name> - Item - WoW Forever", and names may contain " - " themselves.
+- 2026-11-28: Floating Wreckage (object 180662) has no Contains tab on Wowhead Forever: still no pool loot recorded
+  (like the four pools of 2026-11-27).
+
 - 2026-11-26: in the Forever client `GetRealmName()` now returns an empty string to ForeverMoneyBridge (its entries
   since about 2026-11-21 have realm ""; before, "CAMWOW EU5 Realm 4 PvP"). TSM's character names are "First Last"
   where the addon's `UnitName` gives the first word; the app matches them by that first word.
@@ -988,6 +999,21 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-28** (thirty-second part) Wowhead reading session 9 (to-do C1/C2, checklist A3/A5; the user picked it over
+  the Dungeons view). 20 pages, 2 minutes apart, no block: Floating Wreckage (still no Forever pool loot, A3 paused),
+  then the reading queue's top 19 (5 mobs, 14 items; list in `docs/plans/material-coverage.md`, Progress). Imported:
+  164 items, 5 objects, 35 npcs. Coverage: dropped by mobs 82 -> 95 of 1,638, looted items covered in full 126 -> 139;
+  mob farming rows 1,079 -> 1,142. Plague Monstrosity 0.48g -> 50.40g an hour and Plague Ravager 43.08g (new) are
+  now 2nd and 4th of all mob rows, from Essence of Water on small samples (59-75 kills; Forever's rate is about twice
+  Classic's, Verified facts; second-guessing in `docs/plans/mob-farming-review.md`).
+  - `tools/receive_batch.py`: the batch is saved exactly (the tab navigates to 127.0.0.1 with it in the URL fragment;
+    SHA-256 printed), no more copying 20k characters by hand. Only this session's pages went in: the tab's working
+    copy of session 8 still had Fizzlefuse's and Javnir Nashak's stock as unlimited, where the import says unknown.
+  - `tools/wowhead_reader.js`: an item's name from `h1.wh-heading-responsive`, or the title without " - Item - WoW
+    Forever" ("Formula: Enchant Weapon - Fiery Weapon" was cut to "Formula: Enchant Weapon"; fixed in that page
+    before saving). The tab's `wfm_fn` matches the file (SHA-256 3a63f75e...).
+  - Tests: 480 pass; nothing new in red on Data health (`python -m wfm.audit`). No downloads.
 
 - **2026-11-27** (thirty-first part) ROI (the user: "add ROI (return of investment %) on suitable entries"; Decisions).
   - `pricing.roi(profit, cost)`; `Opportunity.roi` for `ROI_KINDS`; "at usual" / "up to" and the region's average sale

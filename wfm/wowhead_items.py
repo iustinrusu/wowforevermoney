@@ -19,8 +19,9 @@ from fewer than MIN_LOOTED loots (counted in `small`): a handful of loots says n
 loots are flagged as a small sample wherever they are used. Coins are not on these pages.
 
 The pages are read in the browser pane at the user's pace (docs/plans/material-coverage.md) and kept in that tab's
-localStorage. The pane does not let a public site reach this PC (it blocks requests to 127.0.0.1), so a batch is
-read out of the tab and saved with `python -m wfm.wowhead_items import <file.json>`, which checks every field.
+localStorage. The pane does not let a public site send to this PC (it blocks requests to 127.0.0.1), but the tab may
+navigate there: `tools/receive_batch.py` takes a batch from the URL fragment and saves it exactly (since 2026-11-28),
+then `python -m wfm.wowhead_items import <file.json>` checks every field and merges it.
 Rows may come compact, as [id, count, outof, minlevel, maxlevel, zone, classification, stack].
 """
 from __future__ import annotations

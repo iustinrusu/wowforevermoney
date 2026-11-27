@@ -85,6 +85,28 @@ your share, so an hour of them would flood it (point 4).
   data, realistic prices and the market limit, Toxic Horror is the best open-world mob farm the app knows of.** Still
   open: mobs whose own page isn't read (most rows are a floor), and a reading queue ranked by gold at stake and level.
 
+- **2026-11-28 Five more mobs' own pages (reading session 9, the queue's top five mobs).** Gold an hour at the
+  2026-11-27 22:22 scan, with the market limit and kill speed (before: from item pages only, or no row):
+
+  | Mob | Gold an hour | Kills an hour | Mostly from | Kills on the page |
+  |---|---|---|---|---|
+  | Plague Monstrosity, Eastern Plaguelands 57-58 | 50.40g (was 0.48g) | 61 | Essence of Water 12 of 75 (16%), 44.94g | 75 |
+  | Plague Ravager, Eastern Plaguelands 55-56 | 43.08g (no row) | 65 | Essence of Water 6 of 60 (10%), 37.39g | 60 |
+  | Blighted Surge, Eastern Plaguelands 54-55 | 26.62g (no row) | 70 | Essence of Water 3 of 59 (5%), 20.49g | 59 |
+  | Mossflayer Cannibal, Eastern Plaguelands 57-59 | 21.18g (no row) | 74 | Powerful Mojo 18 of 305, 9.74g; Runecloth; 5s 30c a kill | 305 |
+  | Rotting Behemoth, Western Plaguelands 55-56 | 16.91g (was 1.79g) | 65 | one Recipe: Greater Nature Protection Potion of 99, 6.74g; 4s 51c a kill | 99 |
+
+  Plague Monstrosity and Plague Ravager are now 2nd and 4th of all mob farming rows (Wandering Skeleton first, 78g
+  with drops partly known; Toxic Horror 3rd, 48.51g at this scan). Second-guessed: the three water elementals' samples
+  are small (59-75 kills, just over the app's 50 for a solid rate), and no second source has them (Everloot: none of
+  the five). Forever does drop Essence of Water more often than Classic on every mob read: Toxic Horror 85 of 617
+  (13.8%, Classic 7.2%), Blighted Horror 7.8% (5.8%), Plague Monstrosity 16% (4.8%), Plague Ravager 10% (3.2%),
+  Blighted Surge 5.1% (2.9%), so the higher rate is real, about twice Classic's on the solid sample. Plague
+  Monstrosity's 16% is likely the high end: at twice its Classic rate (9.6%) it would make about 30g an hour. A
+  re-read later (more kills recorded) settles it. The market limit is working: Essence of Water counts 4g 58s each
+  from Plague Monstrosity's 10 an hour and 5g 77s from Blighted Surge's 3.5. Rotting Behemoth rests on one recipe drop
+  in 99 kills (a guess, not a rate).
+
 ## Proposed next steps (the user decides)
 1. **Wowhead reading session, 20 pages** (pace in CLAUDE.md): item pages Breath of Wind (7081), Essence of Undeath
    (12808), Elemental Air (7069), Globe of Water (7079), Formula: Enchant Weapon - Crusader (16252), Pattern:

@@ -67,7 +67,8 @@
   const hp = qf.match(/Health:\s*([^\n]+)/); if (hp && nums(hp[1]).length) facts.health = nums(hp[1]);
   const li = [...document.querySelectorAll('.infobox li')].find(l => /Worth/.test(l.innerText));
   if (li) { const c = s => { const e = li.querySelector('.money' + s); return e ? +e.innerText.replace(/\D/g, '') || 0 : 0; }; facts.worth = c('gold') * 10000 + c('silver') * 100 + c('copper'); }
-  const name = (document.querySelector('h1.heading-size-1') || {}).innerText || title.split(' - ')[0];
+  // item pages' heading is h1.wh-heading-responsive, npc pages' h1.heading-size-1; the title keeps " - " inside names
+  const name = (document.querySelector('h1.heading-size-1, h1.wh-heading-responsive') || {}).innerText || title.replace(/\s+-\s+(Item|NPC|Object|Spell)\s+-\s+WoW Forever.*$/, '');
   const page = { name: name.replace(/\s*<[^>]*>\s*$/, '').trim(), url: location.href.split('#')[0], read: new Date().toISOString().slice(0, 10), tabs };
   if (m[1] === 'npc') page.facts = facts;
   if (sells) { page.sells = sells; page.sells_classic = sellsClassic; }

@@ -92,6 +92,8 @@ B2. [x] (done 2026-11-20: the Night watch look, signed off by the user; docs/pla
 C1. [ ] (in progress: the top 100 and the 4 skinning items done 2026-11-20; 2 minutes apart, at most 20 a session.
        2026-11-27, session 8: the Philosopher's Stone (B10, still open), Fizzlefuse, Javnir Nashak (A7 done), 3
        vendors (A0), 4 pools (A3 paused: Wowhead has no Forever pool loot yet), the reading queue's top 10.
+       2026-11-28, session 9: Floating Wreckage (still no pool loot), the queue's next 19 (5 mobs, 14 items); batches
+       now saved exactly with `tools/receive_batch.py`.
        Next: the reading queue from the top, and one pool page to see whether Wowhead records pools yet; see the plan's
        Progress section)
        **Forever source data for every material** (fixes "some skins not counted", pool loot, mob drops, node
@@ -102,7 +104,8 @@ C2. [ ] (first version done 2026-11-14: Gathering -> Mob farming, one row per mo
        mobs' own pages for complete loot, coins. 2026-11-20 review: math and ranking right; gaps and a 20-page reading
        list, a market limit on farmed loot and kill speed by mob health proposed: `docs/plans/mob-farming-review.md`;
        all three done the same day, and the reading queue the user suggested: Data health "Wowhead reading
-       queue", items and mobs by gold a day the app can't see yet, high levels first) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with
+       queue", items and mobs by gold a day the app can't see yet, high levels first; 2026-11-28: 5 more mobs' own
+       pages, Plague Monstrosity and Plague Ravager now 2nd and 4th of all mob rows, small samples) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with
        drop rates from Wowhead Forever ("Dropped by", material-coverage step 4) and the kills-per-hour setting, never
        your own logged time.
 C3. [ ] (2026-11-15: items 1 (profession advisor), 2 (levelling planner), 3 (vertical integration, "With your own

@@ -44,6 +44,20 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   the market limit and its kill speed, minus what Forever data shows; rare and named mobs (under 5 spawn points in
   QuestieDB) left out. An item without Forever source data: your share of the region's trade in it a day; items only
   dungeon mobs drop are left for the Dungeons view (C4). Read it from the top, skip pages read in the last month.
+- Session 9 (2026-11-27 late evening to 2026-11-28, to-do C1; the user chose the reading session over the Dungeons
+  view): 20 pages, 2 minutes apart, no block. One pool first: object 180662 Floating Wreckage, no Contains tab, so
+  Wowhead still has no Forever pool loot (A3 stays paused). Then the reading queue's top 19: npcs 8522 Plague
+  Monstrosity, 8520 Plague Ravager, 8519 Blighted Surge, 8562 Mossflayer Cannibal, 1812 Rotting Behemoth; items 11302
+  284871 2824 1981 13446 273128 287040 11207 17007 248825 287013 287021 287034 287019. The first batch saved without
+  copying by hand: the tab went to `tools/receive_batch.py` (127.0.0.1) with the batch in the URL fragment (SHA-256
+  checked, 19,289 characters); kept in the tab as `wfm_pages_saved_009`. Only this session's pages were imported: the
+  tab's working copy of session 8 still said Fizzlefuse's and Javnir Nashak's stock is unlimited (-1), where the import
+  says unknown on purpose. Reader fix: a name with " - " in it (Formula: Enchant Weapon - Fiery Weapon) was cut at the
+  page title, since item pages' heading is `h1.wh-heading-responsive`, not `h1.heading-size-1` (that page's name was
+  set right before saving). Pages: 164 items, 5 objects, 35 npcs. Coverage: items dropped by mobs with Forever data
+  82 -> 95 of 1,638, looted items covered in full 126 -> 139; mob farming rows 1,079 -> 1,142 (results in
+  `docs/plans/mob-farming-review.md`). Fel Leather now has 13 Forever "Skinned from" rows. Next: the queue from the top
+  (Blackrock Slayer, Sky Shadow, Anguished Highborne, Thaurissan Firewalker, Wolfrunner Shoes, ...), one pool page.
 - Session 8 (2026-11-27, to-do C1): 20 pages, 2 minutes apart, no block. Item 9149 Philosopher's Stone (B10), npcs
   248200 Fizzlefuse, 15012 Javnir Nashak (A7), 2685 Mazk Snipeshot, 251365 Jolee Brightmeadows, 2997 Jyn Stonehoof
   (A0), objects 180655 Floating Debris, 693670 Strange Debris, 630533 Fresh Wreckage, 180582 Oily Blackmouth School
@@ -89,6 +103,11 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   per page a batch of [wait 10, wait 10, run wfm_go2, navigate, run wfm_fn]; 3 pages per batch (the tool stops a call
   after about 4 minutes; 25 actions max). Every 10-15 pages read `wfm_pages` out, save it to a file and run the
   importer, then clear it. Saved copies stay in the tab as `wfm_pages_saved_00N`.
+  Since session 9 (2 minutes apart): per page one batch of [8 x wait 10 s, run `wfm_go3`, navigate, run `wfm_fn`]
+  (the page's scripts time out after 45 s, so never wait longer inside one). At the end, put only the session's pages
+  in `wfm_pages_saved_00N` (special characters as \u escapes), start `python tools/receive_batch.py <file>`, set the
+  tab's `location.href` to `http://127.0.0.1:8799/#` + the encoded batch (a fetch from the Wowhead page to this PC is
+  blocked, a navigation is not), check the printed SHA-256 against the tab's, import, clear `wfm_pages`.
 
 ## Order to work in (decided with the user, 2026-11-14)
 The user's goal: all the Forever data, the only way to accurate numbers. Reading the top of the queue covers most of

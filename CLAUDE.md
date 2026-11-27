@@ -127,6 +127,7 @@ doesn't kill the python process on this machine, so stop it by PID.
 | `wfm/classicmobs.py` | WoW Classic mob loot from the cMaNGOS dump, cached: only picks the reading queue's order, never a value |
 | `wfm/app.py` | HTTP server, JSON API, SSE live updates, watcher loop |
 | `tools/wowhead_reader.js` | reads the one Wowhead Forever page open in the browser pane (set up as `localStorage.wfm_fn`; pages are opened by hand at the pace above) |
+| `tools/receive_batch.py` | saves a session's batch of pages from the Wowhead tab exactly (the tab navigates to it with the batch in the URL fragment; 127.0.0.1 only), then `python -m wfm.wowhead_items import` |
 | `tools/screenshots.py` | pictures of every tab, wide and 375 px, plus sideways-scroll and console checks (`python tools/screenshots.py before`) |
 | `web/` | the page (index.html, app.js, style.css) |
 | `addon/ForeverMoneyBridge/` | our WoW addon; copied into AddOns when the app starts |
