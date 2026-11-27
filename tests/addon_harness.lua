@@ -4,7 +4,9 @@ NOW, MONEY, XP, XPMAX, LEVEL = 1000, 50000, 1000, 50000, 40
 printed = {}
 function print(...) local t = {} for i = 1, select("#", ...) do t[#t + 1] = tostring(select(i, ...)) end printed[#printed + 1] = table.concat(t, " ") end
 function GetTime() return NOW end
-function time() return 1795000000 end
+WALL = 1795000000                               -- the wall clock, time()
+function time() return WALL end
+function UnitGUID() return "Player-0-00000001" end
 function GetMoney() return MONEY end
 function UnitXP() return XP end
 function UnitXPMax() return XPMAX end

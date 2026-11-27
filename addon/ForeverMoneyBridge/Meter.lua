@@ -11,6 +11,7 @@
 -- Fold (1.6.3, the user: "collapse feature / minimize feature"): the "–" button or /gea min folds the window to one
 -- line (total, gold an hour, time) and "+" opens it again; remembered between sessions. /gea hide hides it completely,
 -- /gea show brings it back. Folded or hidden, the session keeps counting.
+-- 1.6.5: a session running at a /reload or logout carries on at the next login within 30 minutes (else it is saved).
 
 local _, ns = ...                   -- the addon's shared table: ns.bagItem (ForeverMoneyBridge.lua), the box a loot
                                     -- window came from
@@ -460,7 +461,7 @@ local function start()
   print("|cffe8c060Gold Ever After|r started. /gea pause, /gea min (one line), /gea stop.")
 end
 
-local function stop()
+local function stop(endedAt)          -- endedAt: when it really ended (a session saved at logout), else now
   if not session then return end
   local boxes = 0
   for _, n in pairs(session.unopened) do boxes = boxes + n end
@@ -473,7 +474,7 @@ local function stop()
   local m = db()
   m.sessions = m.sessions or {}
   local xp = session.xp or 0
-  table.insert(m.sessions, 1, { ended = time(), zone = session.zone, minutes = math.floor(secs / 6 + 0.5) / 10,
+  table.insert(m.sessions, 1, { ended = endedAt or time(), zone = session.zone, minutes = math.floor(secs / 6 + 0.5) / 10,
     items = session.items, money = session.money, value = value, total = total,
     perHour = secs > 0 and math.floor(total / secs * 3600) or 0, prices = session.app and "app" or "tsm",
     pricesMade = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0,
@@ -484,6 +485,53 @@ local function stop()
     xp > 0 and (", " .. comma(xp) .. " XP" .. (secs >= 60 and (" (" .. comma(xp / secs * 3600) .. " an hour)") or "")) or ""))
   session = nil
   if win then win:Hide() end
+end
+
+-- 1.6.5 (the user: a running session should survive /reload): WoW drops the addon's memory on a /reload or logout, so
+-- a running session is kept in the saved file (meter.running, per character) and carried on at the next login when
+-- that comes within 30 minutes. The time in between is not counted and a pause stays a pause. Later than that, it is
+-- saved as a finished session, as it stood at the logout.
+local RESUME_MINUTES = 30
+local moneyQuietUntil = 0            -- just after a login your gold can still be loading in: that is not loot
+
+local function me() return UnitGUID and UnitGUID("player") or "?" end
+
+local function keepRunning()           -- at PLAYER_LOGOUT (a /reload too)
+  local m = db()
+  m.running = m.running or {}
+  if not session then m.running[me()] = nil return end
+  m.running[me()] = { saved = time(), elapsed = elapsed(), paused = session.paused, money = session.money,
+    xp = session.xp, items = session.items, unopened = session.unopened, loots = session.loots, seen = session.seen,
+    zone = session.zone, app = session.app, hidden = (win and not win:IsShown()) or nil }
+end
+
+local function carryOn()               -- at PLAYER_LOGIN
+  local m = db()
+  local s = m.running and m.running[me()]
+  if not s then return end
+  m.running[me()] = nil
+  local now = GetTime()
+  session = { start = now - (s.elapsed or 0), paused = true, pausedAt = now, pausedFor = 0, money = s.money or 0,
+    xp = s.xp or 0, items = s.items or {}, unopened = s.unopened or {}, loots = s.loots or {}, seen = s.seen or {},
+    zone = s.zone or "?", app = s.app }
+  local away = time() - (s.saved or 0)
+  if away > RESUME_MINUTES * 60 then
+    print(string.format("|cffe8c060Gold Ever After|r: you logged out %s ago with a session running, so it ends there.",
+      duration(away / 60)))
+    stop(s.saved)
+    return
+  end
+  if not s.paused then session.paused, session.pausedAt = false, nil end
+  lastMoney = GetMoney()
+  moneyQuietUntil = now + 5
+  xpLast, xpMaxLast = nil, nil
+  noteXP()                                            -- the XP bar now: only what comes after counts
+  makeWindow()
+  win.pause:SetText(session.paused and "Resume" or "Pause")
+  if s.hidden then win:Hide() else win:Show() end
+  refresh()
+  print(string.format("|cffe8c060Gold Ever After|r carried on with your session (%s so far%s). /gea stop ends it.",
+    duration(elapsed() / 60), session.paused and ", paused" or ""))
 end
 
 -- loot: your own "You receive loot: ..." chat messages (matched with the game's own templates, so any language),
@@ -585,11 +633,13 @@ end
 
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "CHAT_MSG_LOOT", "CHAT_MSG_MONEY", "PLAYER_MONEY",
-                    "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "BAG_UPDATE_DELAYED" }) do
+                    "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "BAG_UPDATE_DELAYED", "PLAYER_LOGIN", "PLAYER_LOGOUT" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
 ev:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
+  if event == "PLAYER_LOGIN" then pcall(carryOn) return end      -- a session running at the last logout or /reload
+  if event == "PLAYER_LOGOUT" then pcall(keepRunning) return end
   if event == "PLAYER_XP_UPDATE" or event == "PLAYER_LEVEL_UP" then
     if session then pcall(noteXP) end                  -- paused: the bar moves on, nothing is counted
     return
@@ -635,7 +685,7 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
     local now = GetMoney()
     local delta = lastMoney and now - lastMoney or 0
     lastMoney = now
-    if delta <= 0 then return end
+    if delta <= 0 or GetTime() < moneyQuietUntil then return end
     if GetTime() - moneyChatAt <= 2 then addMoney(delta); moneyChatAt = 0 else moneyDelta = delta
       if C_Timer then C_Timer.After(2, function() moneyDelta = nil end) end end   -- not loot (a sale, mail, a quest) unless a message follows
   end

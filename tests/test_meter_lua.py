@@ -21,6 +21,7 @@ def load_addon(*files):
     lua.execute((ROOT / 'tests' / 'addon_harness.lua').read_text(encoding='utf-8'))
     run = lua.eval('function(src, name, ns) local f = assert(loadstring(src, name)); f("ForeverMoneyBridge", ns) end')
     ns = lua.table()
+    lua.globals().ADDON_NS, lua.globals().RUN_FILE = ns, run        # for a /reload (MeterTests.reload)
     for name in files:
         run((ADDON / name).read_text(encoding='utf-8'), name, ns)
     return lua
@@ -42,7 +43,7 @@ class MeterTests(unittest.TestCase):
                                    + (f'x{n}.' if n > 1 else '.'))
 
     def refresh(self):
-        win = self.g.frames[3]
+        win = self.g.frames[getattr(self, 'win_at', 3)]
         win.scripts['OnUpdate'](win, 1.5)
         return win
 
@@ -294,6 +295,89 @@ class MeterTests(unittest.TestCase):
         self.fire('BAG_UPDATE_DELAYED')
         self.assertEqual(self.refresh().remind.text, '')
 
+
+    # --- a running session through a /reload or logout (1.6.5) ---
+    def reload(self, away=20):
+        """/reload or log out and in: PLAYER_LOGOUT, Meter.lua runs again (its memory gone, the saved file kept),
+        PLAYER_LOGIN. `away` seconds pass in between."""
+        self.fire('PLAYER_LOGOUT')
+        self.g.NOW += away
+        self.g.WALL += away
+        self.g.RUN_FILE((ADDON / 'Meter.lua').read_text(encoding='utf-8'), 'Meter.lua', self.g.ADDON_NS)
+        self.events = self.g.frames[len(self.g.frames)]
+        self.slash = self.g.SlashCmdList.FOREVERMONEYBRIDGE
+        self.win_at = len(self.g.frames) + 1             # the window it opens again (its buttons come after it)
+        self.fire('PLAYER_LOGIN')
+
+    def test_a_session_carries_on_after_a_reload(self):
+        self.slash('start')
+        self.loot(8150, 'Deeprock Salt', 3)                # 3 x 297 = 891
+        self.g.NOW += 600
+        self.reload()
+        self.assertIsNone(self.g.ForeverMoneyBridgeDB.meter.running['Player-0-00000001'])   # taken back out
+        win = self.refresh()
+        self.assertTrue(win.shown)
+        self.assertEqual(win.kv[1].text, '10:00')           # the 20 s of the reload don't count
+        self.assertEqual(win.kv[2].text, '|cffc7c7cf8s|r |cffeda55f91c|r')
+        self.assertIn('carried on with your session (10 min so far)', self.g.printed[len(self.g.printed)])
+        self.loot(8150, 'Deeprock Salt', 2)                # + 2 x 297 = 1,485 in all
+        self.g.NOW += 600
+        self.slash('stop')
+        s = self.g.ForeverMoneyBridgeDB.meter.sessions[1]
+        self.assertEqual((s.minutes, s['items'][8150], s.value), (20, 5, 1485))
+        self.assertEqual(len(self.g.ForeverMoneyBridgeDB.meter.sessions), 1)
+
+    def test_a_pause_stays_a_pause_and_a_hidden_window_hidden(self):
+        self.slash('start')
+        self.g.NOW += 300
+        self.slash('pause')
+        self.slash('hide')
+        self.g.NOW += 1000                                  # paused: not counted
+        self.reload()
+        win = self.refresh()
+        self.assertFalse(win.shown)
+        self.assertEqual(win.kv[1].text, '5:00  |cffffd100paused|r')
+        self.assertEqual(win.pause.text, 'Resume')
+        self.slash('resume')
+        self.g.NOW += 60
+        self.assertEqual(self.refresh().kv[1].text, '6:00')
+
+    def test_after_more_than_30_minutes_it_is_saved_as_it_stood(self):
+        self.slash('start')
+        self.loot(8150, 'Deeprock Salt', 3)
+        self.g.NOW += 600
+        self.reload(away=31 * 60)
+        self.assertIn('you logged out 31 min ago with a session running, so it ends there', ''.join(
+            self.g.printed.values()))
+        s = self.g.ForeverMoneyBridgeDB.meter.sessions[1]
+        self.assertEqual((s.minutes, s.value, s.ended), (10, 891, 1795000000))   # ended at the logout
+        self.assertIn('not running', (self.slash('show'), self.g.printed[len(self.g.printed)])[1])
+
+    def test_no_session_running_means_nothing_carried_on(self):
+        self.slash('start')
+        self.slash('stop')
+        self.reload()
+        self.assertIsNone(self.g.ForeverMoneyBridgeDB.meter.running['Player-0-00000001'])
+        self.assertEqual(len(self.g.ForeverMoneyBridgeDB.meter.sessions), 1)
+
+    def test_another_characters_session_waits_for_them(self):
+        self.g.ForeverMoneyBridgeDB = self.lua.eval(
+            '{meter = {running = {["Player-0-00000002"] = {saved = 1795000000, elapsed = 60, money = 5, items = {}}}}}')
+        self.reload()
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.running['Player-0-00000002'].elapsed, 60)
+        self.assertIsNone(self.g.ForeverMoneyBridgeDB.meter.sessions)
+
+    def test_gold_loading_in_after_a_login_is_not_loot(self):
+        self.slash('start')
+        self.reload()
+        self.g.MONEY += 1000000                              # your gold arriving after the login
+        self.fire('PLAYER_MONEY')
+        self.fire('CHAT_MSG_MONEY', 'You loot 3 Silver')
+        self.g.NOW += 6
+        self.fire('CHAT_MSG_MONEY', 'You loot 5 Silver')
+        self.g.MONEY += 500
+        self.fire('PLAYER_MONEY')
+        self.assertEqual(self.refresh().kv[3].text, '|cffc7c7cf5s|r')
 
 @unittest.skipUnless(lua51, 'lupa is not installed (pip install lupa)')
 class LootLogTests(unittest.TestCase):

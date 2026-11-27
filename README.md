@@ -120,6 +120,10 @@ See docs/PROJECT_LOG.md, open items.
 - **Fold the meter:** the "–" button at the top right (or `/gea min`) folds the window to one line: the total, gold an
   hour and the time; "+" opens it again. It stays folded for the next session until you open it. `/gea hide` hides it
   completely and `/gea show` brings it back. Folded or hidden, it keeps counting (only Pause and Stop change that).
+- **`/reload` or log out mid-session:** the session carries on when you're back within 30 minutes (paused stays
+  paused, and the time away doesn't count). After longer, it's saved as it stood when you logged out.
+- **Boxes you open** (lockboxes, junkboxes, clams, trunks): a box you loot counts nothing until you open it, then what's
+  inside counts under "Opened". `/gea debug` prints in chat what the meter makes of each loot window.
 - **Install without the app:** double-click `install_addon.bat`. It finds WoW: Forever (TSM desktop app
   settings, the Battle.net install entry, then the usual folders on drives C to H), or asks for the folder.
   It never overwrites the item-check list (`Checks.lua`) the app wrote.

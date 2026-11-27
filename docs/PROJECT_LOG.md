@@ -882,6 +882,16 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (second part) Addon 1.6.5: a running meter session survives `/reload` and logout (the user: "Yes, add
+  that", to "should a running meter session survive /reload?"). Before, the session lived only in the addon's memory,
+  so a `/reload` lost it. Now at PLAYER_LOGOUT (a `/reload` too) it goes into the saved file as `meter.running`, keyed by
+  the character's GUID (local only; the app doesn't read the meter's data). At PLAYER_LOGIN that character's session
+  carries on if the logout was under 30 minutes ago: active time continues from where it was (the time away is not
+  counted), paused stays paused, a hidden window stays hidden, same price source. After longer it's saved as a finished
+  session, ended at the logout, with a chat line saying so. Another character's session waits for them. For 5 s after
+  the login a gold change doesn't count as loot (your gold may still be loading in). Tests: 6 new (a `/reload` in the
+  harness: logout, Meter.lua run again with the saved file kept, login), 363 pass. README: the meter section says so.
+
 - **2026-11-27** Addon 1.6.4: containers opened from your bags are found again (the user: "farm meter addon seems to
   not recognize when I lockpick and open heavy junkboxes. maybe this happens to other items too?"). It was every
   container, not only junkboxes: the loot log's `containers` had 21 kinds opened up to 2026-11-24 22:27 and none since,
