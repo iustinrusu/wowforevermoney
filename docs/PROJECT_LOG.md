@@ -971,6 +971,12 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (twenty-ninth part) TargetKit 1.5.6 (the user: "Add my target does not work in alterac valley on
+  Irondeep Troggs"). There the game hides the target's name from addons (as for nameplates, Verified facts), so the
+  button got no name and said "target something first", which was wrong. Now `targetForList` says the game hides the
+  name and to type it instead (part of one is enough); `/tkit add` alone the same. No other way to read a hidden
+  name. Whether TK Find's by-name lines (`/target Irondeep Trogg`) take there is untested. Tests: 69.
+
 - **2026-11-27** (twenty-eighth part) TargetKit 1.5.5 (the user: "yes add it; sap should also work on mobs too, not
   only real enemy players; pickpocket should target nearest mob, why is it not working?"). Pickpocket in Alterac
   Valley: the game hid every nameplate unit's id and name, so TargetKit saw no NPC (Verified facts); out in the world

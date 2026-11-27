@@ -38,7 +38,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.5.5"
+local VERSION = "1.5.6"
 local PICK_POCKET, SAP = 921, 6770
 local MELEE = 1752                                        -- Sinister Strike: melee range, and it takes players
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
@@ -976,6 +976,19 @@ end
 local ev = CreateFrame("Frame")
 
 -- ---------- the find list ----------
+-- Your target's name for the find list, or why there's none. 1.5.6 (the user: "Add my target does not work in alterac
+-- valley on Irondeep Troggs"): there the game hides your target's name from addons, so the old answer "target
+-- something first" was wrong; it says so now, and to type the name instead. how: what you did ("click Add my target").
+local function targetForList(how)
+  local n = nameOf("target")
+  if n then return n end
+  if yes(UnitExists, "target") then
+    return nil, "the game hides your target's name from addons here (battlegrounds such as Alterac Valley), so"
+      .. " TargetKit can't read it. Type the name instead (part of one is enough) and press Enter."
+  end
+  return nil, "target something first, then " .. how .. "."
+end
+
 local function addName(name)
   name = strtrim(name or "")
   if name == "" then return false, "type a name first (part of one is enough), or target something and use Add my target." end
@@ -1206,8 +1219,8 @@ local function makePanel()
   panel.add = button(panel, "Add", 50, addTyped)
   panel.add:SetPoint("LEFT", input, "RIGHT", 6, 0)
   panel.addTarget = button(panel, "Add my target", 110, function()
-    local name = nameOf("target")
-    if not name then report(false, "target something first, then click Add my target.") return end
+    local name, why = targetForList("click Add my target")
+    if not name then report(false, why) return end
     report(addName(name))
   end)
   panel.addTarget:SetPoint("LEFT", panel.add, "RIGHT", 4, 0)
@@ -1459,8 +1472,9 @@ local function slash(msg)
   if cmd == "" then
     togglePanel()
   elseif cmd == "add" then
-    local name = rest ~= "" and rest or nameOf("target")
-    if not name then tell("type /tkit add <name>, or target something first.") return end
+    local name, why = rest, nil
+    if name == "" then name, why = targetForList("type /tkit add") end
+    if not name then tell(why) return end
     local _, said = addName(name)
     report(nil, said, true)
   elseif cmd == "remove" or cmd == "del" then

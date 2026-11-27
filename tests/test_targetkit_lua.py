@@ -606,6 +606,19 @@ class TargetKitTests(unittest.TestCase):
         panel.addTarget.scripts['OnClick'](panel.addTarget)
         self.assertEqual(panel.status.text, 'target something first, then click Add my target.')
 
+    def test_add_my_target_says_so_when_the_game_hides_the_name(self):
+        """1.5.6, the user: "Add my target does not work in alterac valley on Irondeep Troggs"."""
+        panel = self.open_window()
+        self.unit('target', self.g.SECRET, plate=False)                       # a name the game hides from addons
+        panel.addTarget.scripts['OnClick'](panel.addTarget)
+        self.assertIn("the game hides your target's name from addons here", panel.status.text)
+        self.assertIn('Type the name instead', panel.status.text)
+        self.assertEqual(len(self.g.TargetKitDB.find), 0)
+        self.slash('add')
+        self.assertTrue(self.said("the game hides your target's name from addons here"))
+        self.slash('add Irondeep')                                            # typed: fine
+        self.assertEqual(list(self.g.TargetKitDB.find.values()), ['Irondeep'])
+
     def test_a_long_find_list_scrolls(self):
         panel = self.open_window()
         for i in range(10):
@@ -639,7 +652,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.5.5 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.5.6 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
