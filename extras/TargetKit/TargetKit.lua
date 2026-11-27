@@ -13,29 +13,30 @@
 --                  caught (they have no nameplate, so the addon can't see them); else the closest NPC in Sap range;
 --                  else the game's nearest enemy.
 --
--- How, within WoW's rules: an addon may never pick a target by itself; only a key press on a secure button can, and
--- the button's macro can only be changed out of combat. So each macro is "/click TKFind" (TKPick, TKSap). Out of
--- combat, five times a second, the addon looks at every unit it can see (nameplates, target, mouseover, soft targets,
--- focus, your group), ranks them and writes each button's macro ahead of time: "/target nameplate7" and the spell. A
--- press runs whatever is written then, with no addon code in between. In combat, or when it finds nothing, the button
--- runs a fixed macro made only of the game's own targeting.
--- 1.3.0 (the user: "tried with a friendly player again, did not work"; the 1.2.x log showed the game never ran the
--- macro, though TargetKit had found the player and written "/target mouseover"): until then the macro was written in
--- PreClick, addon code running inside the press, and the button was hidden. Either can stop the game running a
--- secure macro, so neither is done any more: the macros are written ahead of time and the buttons are shown (1 pixel,
--- see-through, no mouse).
+-- How, within WoW's rules: an addon may never pick a target by itself; only a key press running a macro can, and a
+-- macro can only be changed out of combat. So out of combat, five times a second, the addon looks at every unit it can
+-- see (nameplates, target, mouseover, soft targets, focus, your group), ranks them and writes its choice into the three
+-- macros themselves (EditMacro): "/target nameplate7" and the spell. A press runs whatever is written then, with no
+-- addon code in between. In combat, or when it finds nothing, a macro holds a fixed text made only of the game's own
+-- targeting. The keys you set in the TargetKit window run the same macros.
+-- 1.4.0 (the user: "still cant target friendly saved targets with the macro"). Until 1.3.0 each macro was
+-- "/click TKFind" on a secure button holding the choice. The 1.3.0 log showed the game ran the macro's first line (a
+-- /click on a plain button) on every press, but never the secure button's macro after it, so the choice never ran.
+-- There is no secure button any more: the choice is in the macro, the way RXPGuides keeps its targeting macro on
+-- Forever. The mouseover and soft targets move with the mouse and camera, so they are written by name (/targetexact).
 -- Distance: the game gives addons no distance to other units, only "in range" checks, so "closest" is the nearest of
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.3.0"
+local VERSION = "1.4.0"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
 local CYCLE = 8                       -- seconds: TK Find pressed again within this goes to the next match
 local AGAIN = 10                      -- seconds: TK Pickpocket pressed again on its last unit finishes the job
 local KEEP_PICKED = 2 * 3600          -- a robbed unit is skipped for 2 hours (a respawn is a new unit anyway)
-local MAX_TEXT = 1000                 -- a button's macro text stays under the game's 1023 characters
+local MAX_BODY = 255                  -- a macro's text: the game takes up to 255 characters
+local EDIT_GAP = 0.4                  -- seconds: a macro is rewritten at most this often while nothing is pressed
 
 local db
 local debug = false
@@ -76,14 +77,14 @@ end
 -- What the game ran for a press (1.2.1, the user: "added a target in the find list but macro does not work when
 -- pressing"; the log showed each press and its macro, but not whether the game ran it). The game's own targeting and
 -- casting functions are watched with hooksecurefunc, which only looks after the fact and can't get in the macro's way.
--- From a press's first line (the marker, see onPress) for 0.3 s every call to them is noted; then they are logged with
--- where the target went, and TK Find says in chat when it found nobody.
-local clickState                                 -- { b, ran = { "TargetUnit(Game)", ... }, before }
+-- Every call is noted with its time; a press's last line (the marker, see onPress) picks up the ones of that moment,
+-- and 0.3 s later they are logged with where the target went.
+local recent = {}                                -- { t = GetTime(), s = "TargetUnit(nameplate3)" }, the last 20
 local function noteRan(fname, ...)
-  if not clickState then return end
   local args = {}
   for i = 1, select("#", ...) do args[#args + 1] = tostring((select(i, ...))) end
-  clickState.ran[#clickState.ran + 1] = fname .. "(" .. table.concat(args, ", ") .. ")"
+  recent[#recent + 1] = { t = GetTime(), s = fname .. "(" .. table.concat(args, ", ") .. ")" }
+  if #recent > 20 then table.remove(recent, 1) end
 end
 if hooksecurefunc then
   for _, fname in ipairs({ "TargetUnit", "ClearTarget", "TargetNearestEnemy", "TargetNearestEnemyPlayer",
@@ -229,6 +230,25 @@ local BAND = { "Pick Pocket range", "Sap range", "10 yd", "11 yd", "28 yd", "fur
 local function describe(c) return (UnitName(c.unit) or "?") .. " (" .. c.unit .. ", " .. BAND[c.reach] .. ")" end
 
 local function passed(c, why) return (UnitName(c.unit) or "?") .. " (" .. c.unit .. "): " .. why end
+
+-- The line that targets a unit the addon chose. A nameplate, your target or focus, or someone in your group keeps its
+-- token until the press. The mouseover and the soft targets don't: they follow the mouse and camera (clicking the macro
+-- on your bar moves the mouse off the unit), so those are targeted by name, exactly (1.4.0).
+local function steady(u)
+  return u == "target" or u == "focus" or u:match("^nameplate%d+$") or u:match("^party%d$") or u:match("^raid%d+$")
+end
+local function fullName(u)
+  local n, realm = UnitName(u)
+  if n and realm and realm ~= "" then n = n .. "-" .. realm end
+  return n
+end
+local function targetLine(c, cond)
+  local pre = cond and (cond .. " ") or ""
+  if steady(c.unit) then return "/target " .. pre .. c.unit end
+  local n = fullName(c.unit)
+  if not n then return "/target " .. pre .. c.unit end
+  return "/targetexact " .. pre .. n
+end
 local function seen(lists, rejected, others)    -- what a look saw, for the log of the press that uses it
   local out = {}
   for _, list in ipairs(lists) do for _, c in ipairs(list) do out[#out + 1] = describe(c) end end
@@ -278,7 +298,7 @@ local function sapBuild(units)
   local head = { "/cast [@mouseover,harm,nodead] " .. sap, "/stopmacro [@mouseover,harm,nodead]" }
   local p = players[1]
   if p and p.reach <= 2 then
-    head[#head + 1] = "/target " .. p.unit
+    head[#head + 1] = targetLine(p)
     head[#head + 1] = "/cast " .. sap
     return table.concat(head, "\n"), "enemy player in Sap range: " .. describe(p), p.guid, saw
   end
@@ -286,11 +306,11 @@ local function sapBuild(units)
   if n and n.reach > 2 then n = nil end
   head[#head + 1] = "/cleartarget [dead][noharm][noplayer]"
   head[#head + 1] = "/targetenemyplayer [noexists]"
-  if n then head[#head + 1] = "/target [noexists] " .. n.unit end
+  if n then head[#head + 1] = targetLine(n, "[noexists]") end
   head[#head + 1] = "/targetenemy [noexists]"
   head[#head + 1] = "/cast " .. sap
   return table.concat(head, "\n"), "no enemy player in Sap range in sight: the game's nearest enemy player"
-    .. (n and (", else " .. describe(n)) or ""), n and n.guid, saw
+    .. (n and (", else " .. describe(n)) or ""), nil, saw        -- no sure choice: the game may pick first
 end
 
 -- ---------- TK Pickpocket ----------
@@ -336,7 +356,7 @@ local function pickBuild(units)
   local saw = seen({ list }, rejected)
   local c = list[1]
   if not c then return nil, "no humanoid to rob in sight", nil, saw end
-  local lines = { "/target " .. c.unit }
+  local lines = { targetLine(c) }
   if not hasSap(c.unit) then lines[#lines + 1] = "/cast " .. SAPN() end
   lines[#lines + 1] = "/cast " .. PP()
   return table.concat(lines, "\n"), "closest to rob: " .. describe(c), c.guid, saw
@@ -386,22 +406,29 @@ local function namesFor(w)                               -- full names seen that
   return out
 end
 
-local function findFixed()                               -- by name: reaches units with no nameplate (far, or dead)
-  local lines = { "/cleartarget" }
-  local size = #lines[1]
+local LET_GO = "/cleartarget [dead,noplayer]"            -- a dead mob found by name: let go of it
+
+local function byName(n, used)                           -- "/target [noexists] name" lines, as many as fit in n
+  local lines, size = {}, used or 0
   for _, w in ipairs(db.find) do
-    for _, n in ipairs(namesFor(w)) do
-      local line = "/target [noexists] " .. n
-      if size + #line + 40 > MAX_TEXT then break end
+    for _, name in ipairs(namesFor(w)) do
+      local line = "/target [noexists] " .. name
+      if size + 1 + #line > n then return lines end
       lines[#lines + 1] = line
-      size = size + #line + 1
+      size = size + 1 + #line
     end
   end
-  lines[#lines + 1] = "/cleartarget [dead,noplayer]"     -- a dead mob found by name: let go of it
+  return lines
+end
+
+local function findFixed(n)                              -- by name: reaches units with no nameplate (far, or dead)
+  local lines = { "/cleartarget" }
+  for _, l in ipairs(byName((n or MAX_BODY) - #LET_GO - 1, #lines[1])) do lines[#lines + 1] = l end
+  lines[#lines + 1] = LET_GO
   return table.concat(lines, "\n")
 end
 
-local function findBuild(units)
+local function findBuild(units, n)
   if #db.find == 0 then return "", "empty list", nil, {} end
   local list, rejected, others = {}, {}, 0
   for _, c in ipairs(units or visibleUnits()) do
@@ -427,11 +454,16 @@ local function findBuild(units)
   if not pick then pick, again = list[1], true end                       -- all seen: round again, closest first
   local i = 0
   for k, c in ipairs(list) do if c == pick then i = k end end
-  return "/target " .. pick.unit, describe(pick) .. ", " .. i .. " of " .. #list, pick.guid, saw, again
+  -- then the by-name lines, which only act if you have no target after the first line (it didn't take)
+  local lines = { targetLine(pick) }
+  local tail = not dead(pick.unit) and LET_GO or nil
+  for _, l in ipairs(byName((n or MAX_BODY) - (tail and (#tail + 1) or 0), #lines[1])) do lines[#lines + 1] = l end
+  if tail then lines[#lines + 1] = tail end
+  return table.concat(lines, "\n"), describe(pick) .. ", " .. i .. " of " .. #list, pick.guid, saw, again
 end
 
--- ---------- the buttons and their macros ----------
-local BUTTONS = {
+-- ---------- the macros ----------
+local BUTTONS = {             -- name: the marker button (TKFindMark) and the key in TargetKitDB.keys
   { name = "TKFind", macro = "TK Find", icon = "INV_Misc_Spyglass_02", build = findBuild, fixed = findFixed },
   { name = "TKPick", macro = "TK Pickpocket", icon = "INV_Misc_QuestionMark", show = PICK_POCKET,
     build = pickBuild, fixed = pickFixed },
@@ -439,40 +471,116 @@ local BUTTONS = {
 }
 
 local watching                                           -- the last press, for 2 s: what came of it goes to the log
-local saidNobody, warnedNotRun, keyAt, markAt = 0, {}, {}, {}
+local saidNobody, saidMissed, targetBefore = 0, {}, "none"
 
--- Each button's macro, written ahead of time (out of combat only). Its first line clicks the button's marker (a plain
--- button: clicking it runs no addon code, but its Click is watched by hooksecurefunc), so a press shows in the log.
-local function setText(b, text, why, chosen, saw, again)
-  b.state = { text = text, why = why, chosen = chosen, saw = saw or {}, again = again }
-  local full = "/click " .. b.name .. "Mark" .. (text ~= "" and ("\n" .. text) or "")
-  if b.frame:GetAttribute("macrotext") ~= full then b.frame:SetAttribute("macrotext", full) end
+-- A macro: its tooltip line, the choice, and last a /click on a plain button (the marker). Clicking that runs no
+-- addon code, but its Click is watched by hooksecurefunc, so a press shows in the log. It comes last so that nothing
+-- of the addon's comes before the targeting (TK Sap's mouseover Sap ends its macro early, so that press isn't logged;
+-- its cast is).
+local function marker(b) return "/click " .. b.name .. "Mark" end
+local function tooltipLine(b)
+  local show = b.show and spellName(b.show)
+  return show and ("#showtooltip " .. show .. "\n") or ""
+end
+local function room(b) return MAX_BODY - #tooltipLine(b) - #marker(b) - 1 end
+
+local function fit(text, n)                              -- whole lines, up to n characters
+  if #text <= n then return text, false end
+  local out = ""
+  for line in text:gmatch("[^\n]+") do
+    local more = out == "" and line or (out .. "\n" .. line)
+    if #more > n then break end
+    out = more
+  end
+  return out, true
 end
 
-local function prepare()                                 -- look once, write all three (out of combat)
-  if not db or InCombatLockdown() or not BUTTONS[1].frame then return end
-  local units = visibleUnits()
-  for _, b in ipairs(BUTTONS) do
-    local text, why, chosen, saw, again
-    local ok = try(b.macro .. " choosing", function() text, why, chosen, saw, again = b.build(units) end)
-    if not ok then text, why, chosen, saw = nil, "an error (logged), so the fixed macro", nil, {} end
-    if not text then why = why or "nothing found, so the fixed macro" end
-    setText(b, text or b.fixed(), why, chosen, saw, again)
+local function compose(b, text)
+  local kept, short = fit(text or "", room(b))
+  if short and b.cutSaid ~= text then
+    b.cutSaid = text
+    log("WARN", b.macro .. ": its macro would be over " .. MAX_BODY .. " characters, so it was cut to: " .. kept)
+  end
+  return tooltipLine(b) .. (kept ~= "" and (kept .. "\n") or "") .. marker(b), kept
+end
+
+-- Into the macro, out of combat only. Unchanged (as the game keeps it): nothing to do. Otherwise at most every
+-- EDIT_GAP seconds, and not while the game's Macros window is open (you may be editing there), unless forced: right
+-- after a press (the next press must get the next unit), a change to the find list, combat starting.
+local function write(b, force)
+  if not b.body or InCombatLockdown() or not (GetMacroIndexByName and EditMacro) then return end
+  local i = GetMacroIndexByName(b.macro)
+  if not i or i == 0 then
+    if not b.missingSaid then
+      b.missingSaid = true
+      log("WARN", b.macro .. ": not in your macros (deleted?), so it can't be written; /tkit macros makes it again")
+    end
+    return
+  end
+  b.missingSaid = nil
+  if b.body == b.written and select(3, GetMacroInfo(i)) == b.stored then
+    b.live = b.state                                     -- the same text: this look's reasons stand for it
+    return
+  end
+  local now = GetTime()
+  if not force then
+    if now - (b.editedAt or -100) < EDIT_GAP then return end
+    if MacroFrame and MacroFrame.IsShown and MacroFrame:IsShown() then return end
+  end
+  EditMacro(i, b.macro, nil, b.body)
+  b.written, b.editedAt, b.live = b.body, now, b.state
+  b.stored = select(3, GetMacroInfo(GetMacroIndexByName(b.macro)))
+  if not b.firstSaid then                                -- once a session: the game took the edit (or not, below)
+    b.firstSaid = true
+    log("macros", b.macro .. ": TargetKit writes its choice into it from now on; first: " .. b.body)
+  end
+  if b.stored ~= b.body and not b.mismatchSaid then
+    b.mismatchSaid = true
+    log("WARN", b.macro .. ": written as " .. b.body .. ", but the game keeps it as " .. tostring(b.stored))
   end
 end
 
-local function resetButtons()                            -- back to the fixed macros (out of combat only)
-  if InCombatLockdown() or not BUTTONS[1].frame then return end
-  for _, b in ipairs(BUTTONS) do setText(b, b.fixed(), "the fixed macro (in combat, or just before)") end
+local function prepare(force)                            -- look once, write all three (out of combat)
+  if not db or InCombatLockdown() then return end
+  targetBefore = UnitName("target") or "none"
+  local units = visibleUnits()
+  for _, b in ipairs(BUTTONS) do
+    local n = room(b)
+    local text, why, chosen, saw, again
+    local ok = try(b.macro .. " choosing", function() text, why, chosen, saw, again = b.build(units, n) end)
+    if not ok then text, why, chosen, saw = nil, "an error (logged), so the fixed macro", nil, {} end
+    if not text then why = why or "nothing found, so the fixed macro" end
+    local body, kept = compose(b, text or b.fixed(n))
+    b.state = { text = kept, why = why, chosen = chosen, saw = saw or {}, again = again }
+    b.body = body
+    write(b, force)
+  end
 end
 
-local function afterPress(b)                             -- 0.3 s after a press: what the game ran, where the target went
-  local st = clickState
-  if not st or st.b ~= b then return end
-  clickState = nil
+local function resetMacros()                             -- the fixed macros, just before combat locks them
+  if not db or InCombatLockdown() then return end
+  for _, b in ipairs(BUTTONS) do
+    local body, kept = compose(b, b.fixed(room(b)))
+    b.state = { text = kept, why = "the fixed macro (in combat, or just before)", saw = {} }
+    b.body = body
+    write(b, true)
+  end
+end
+
+local function afterPress(p)                             -- 0.3 s after a press: what the game ran, where the target went
+  local b, st = p.b, p.st
   local after = UnitName("target") or "none"
-  log("result", b.macro .. ": the game ran " .. (#st.ran > 0 and table.concat(st.ran, ", ") or "nothing we watch")
-    .. "; target " .. st.before .. " -> " .. after)
+  log("result", b.macro .. ": the game ran " .. (#p.ran > 0 and table.concat(p.ran, ", ") or "nothing we watch")
+    .. "; target " .. p.before .. " -> " .. after)
+  if st.chosen and UnitGUID("target") ~= st.chosen then
+    log("WARN", b.macro .. ": it chose " .. (st.why or "?") .. ", but your target is " .. after
+      .. " (the game didn't take the macro's first target line)")
+    if not saidMissed[b.name] then
+      saidMissed[b.name] = true
+      tell("|cffff6060" .. b.macro .. " chose a target, but the game didn't target it|r (your target: " .. after
+        .. "). /reload and tell Claude: the log has the details.")
+    end
+  end
   if b.name == "TKFind" and after == "none" and #db.find > 0 and GetTime() - saidNobody > 3 then
     saidNobody = GetTime()
     tell("TK Find: nobody on your find list (" .. table.concat(db.find, ", ") .. ") is near enough to target."
@@ -480,12 +588,13 @@ local function afterPress(b)                             -- 0.3 s after a press:
   end
 end
 
-local function onPress(b)                                -- the macro's first line ran: the press is real
-  local st = b.state or { text = "", why = "?", saw = {} }
+local function onPress(b)                                -- the macro's last line ran: the press is real
+  local st = b.live or b.state or { text = "", why = "?", saw = {} }
   local now = GetTime()
-  markAt[b.name] = now
   watching = { macro = b.macro, untilT = now + 2 }
-  clickState = { b = b, ran = {}, before = UnitName("target") or "none" }
+  local ran = {}
+  for _, r in ipairs(recent) do if now - r.t <= 0.1 then ran[#ran + 1] = r.s end end
+  recent = {}
   log("press", b.macro .. ": " .. (st.why or "?") .. " -> " .. st.text)
   if #st.saw > 0 then log("press", "  saw: " .. table.concat(st.saw, "; ")) end
   if debug then tell(b.macro .. ": " .. (st.why or "?") .. "\n" .. st.text) end
@@ -502,85 +611,39 @@ local function onPress(b)                                -- the macro's first li
   elseif b.name == "TKPick" and st.chosen then
     last.pick.guid, last.pick.t = st.chosen, now
   end
+  local p = { b = b, st = st, ran = ran, before = targetBefore }
   if C_Timer then
-    C_Timer.After(0, function() try("TargetKit choosing", prepare) end)       -- the next press: written fresh
-    C_Timer.After(0.3, function() try(b.macro .. " result", afterPress, b) end)
+    C_Timer.After(0, function() try("TargetKit choosing", prepare, true) end)    -- the next press: written fresh
+    C_Timer.After(0.3, function() try(b.macro .. " result", afterPress, p) end)
   end
 end
 
-local function onKey(b)                                  -- TK macro pressed: its button's marker should follow at once
-  local now = GetTime()
-  keyAt[b.name] = now
-  if not C_Timer then return end
-  C_Timer.After(0.3, function()
-    if (markAt[b.name] or -1) >= now then return end
-    log("WARN", b.macro .. ": its macro was pressed, but the game didn't run " .. b.name .. "'s macro (act on key down "
-      .. cvar("ActionButtonUseKeyDown") .. ")")
-    if not warnedNotRun[b.name] then
-      warnedNotRun[b.name] = true
-      tell("|cffff6060the game did not run " .. b.macro .. "'s macro.|r /reload and tell Claude: the log has the details.")
-    end
-  end)
-end
-
-local function invisible(f)                              -- shown (a hidden button may not run), but not seen
-  f:SetSize(1, 1)
-  f:SetAlpha(0)
-  f:EnableMouse(false)
-  f:ClearAllPoints()
-  f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
-end
-
-local function makeButtons()
+local function makeMarkers()
   for _, b in ipairs(BUTTONS) do
-    local f = CreateFrame("Button", b.name, UIParent, "SecureActionButtonTemplate")
-    f:SetAttribute("type", "macro")
-    f:RegisterForClicks("AnyUp", "AnyDown")
-    invisible(f)
-    b.frame = f
-    local mark = CreateFrame("Button", b.name .. "Mark", UIParent)            -- the macro's first line
-    invisible(mark)
-    local key = CreateFrame("Button", b.name .. "Press", UIParent)            -- the TK macro's first line
-    invisible(key)
-    if hooksecurefunc then
-      hooksecurefunc(mark, "Click", function() try(b.macro .. " press", onPress, b) end)
-      hooksecurefunc(key, "Click", function() try(b.macro .. " key", onKey, b) end)
+    if not b.mark then
+      local mark = CreateFrame("Button", b.name .. "Mark", UIParent)          -- the macro's last line
+      mark:SetSize(1, 1)
+      mark:SetAlpha(0)
+      mark:EnableMouse(false)
+      mark:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
+      if hooksecurefunc then hooksecurefunc(mark, "Click", function() try(b.macro .. " press", onPress, b) end) end
+      b.mark = mark
     end
-    setText(b, b.fixed(), "the fixed macro")
   end
 end
 
--- The line a macro needs to press one of the buttons. An addon's own slash command can't target or cast (WoW blocks
--- addon code from that), so /click on the secure button is the only way, in our macros and in your own (1.1.0, the
--- user: "being able to create a macro to /use_addon_target, /use_addon_pickpocket, /use_addon_sap ... so I can have
--- them on my action bars"). With "act on key down" on (the game's default), the /click must say so ("LeftButton 1"),
--- or the secure button ignores it.
-local function clickLine(name)
-  local down = GetCVarBool and GetCVarBool("ActionButtonUseKeyDown")
-  return "/click " .. name .. (down and " LeftButton 1" or "")
-end
-
-local function macroBody(b)                              -- the marker first: a press the button doesn't run shows
-  local show = b.show and spellName(b.show)
-  return (show and ("#showtooltip " .. show .. "\n") or "") .. "/click " .. b.name .. "Press\n" .. clickLine(b.name)
-end
-
-local function ensureMacros(create)
+local function ensureMacros(create)                      -- make the three if they are missing (out of combat)
   if InCombatLockdown() or not GetMacroIndexByName then return end
   local made = {}
   for _, b in ipairs(BUTTONS) do
-    local body = macroBody(b)
     local i = GetMacroIndexByName(b.macro)
     if i and i > 0 then
-      local _, icon, old = GetMacroInfo(i)
-      if old ~= body then
-        EditMacro(i, b.macro, icon, body)
-        log("macros", b.macro .. ": its text updated to " .. body)
-      end
+      b.written = nil                                    -- the next look writes it afresh
     elseif create then
-      local account = GetNumMacros()
-      if account < (MAX_ACCOUNT_MACROS or 120) then
+      if GetNumMacros() < (MAX_ACCOUNT_MACROS or 120) then
+        local body = b.body or compose(b, b.fixed(room(b)))
         CreateMacro(b.macro, b.icon, body, nil)
+        b.written = nil
         made[#made + 1] = b.macro
         log("macros", b.macro .. ": made, " .. body)
       else
@@ -592,7 +655,8 @@ local function ensureMacros(create)
     end
   end
   if #made > 0 then
-    tell("made the macros " .. table.concat(made, ", ") .. " (Escape > Macros, General tab): drag them to your bars.")
+    tell("made the macros " .. table.concat(made, ", ") .. " (Escape > Macros, General tab): drag them to your bars."
+      .. " TargetKit rewrites their text as you play, so leave it as it is.")
   end
 end
 
@@ -607,7 +671,7 @@ local function addName(name)
     if strlower(w) == strlower(name) then return false, w .. " is already on the find list." end
   end
   db.find[#db.find + 1] = name
-  prepare()
+  prepare(true)
   return true, "added " .. name .. " to the find list (" .. #db.find .. " on it). TK Find targets it, closest first."
 end
 
@@ -615,7 +679,7 @@ local function removeName(name)
   for i, w in ipairs(db.find) do
     if strlower(w) == strlower(name or "") then
       table.remove(db.find, i)
-      prepare()
+      prepare(true)
       return true, "removed " .. w .. " from the find list."
     end
   end
@@ -625,21 +689,21 @@ end
 -- ---------- keys ----------
 -- 1.1.0 (the user: "a minimap button would be nice too, for rebinding the macros (key combinations, key + key, should
 -- be accepted)"). A key for each macro, saved in TargetKitDB and set again at every login as an override binding. It
--- clicks the macro's button directly (no macro on a bar needed), it wins over the key's other uses while TargetKit is
--- loaded, and your own key bindings stay as they were underneath: clear the key, or turn TargetKit off, and the key
+-- runs the macro (1.4.0; no need to have it on a bar), it wins over the key's other uses while TargetKit is loaded, and your own key bindings stay as they were underneath: clear the key, or turn TargetKit off, and the key
 -- does what it did before. WoW binds one key plus any of Shift, Ctrl and Alt, or mouse button 3 to 5 or the wheel; no
 -- addon can bind two ordinary keys pressed together. Keys can't change in combat (the game forbids it).
 local pendingKeys = false
 local function applyKeys()
   if InCombatLockdown() then pendingKeys = true return end
-  if not (ClearOverrideBindings and SetOverrideBindingClick) then return end
+  if not (ClearOverrideBindings and (SetOverrideBindingMacro or SetOverrideBinding)) then return end
   ClearOverrideBindings(ev)
   for _, b in ipairs(BUTTONS) do
     local key = db.keys[b.name]
     if key then
-      SetOverrideBindingClick(ev, true, key, b.name, "LeftButton")
+      if SetOverrideBindingMacro then SetOverrideBindingMacro(ev, true, key, b.macro)
+      else SetOverrideBinding(ev, true, key, "MACRO " .. b.macro) end
       local now = GetBindingAction and GetBindingAction(key, true)
-      if now == "CLICK " .. b.name .. ":LeftButton" or not GetBindingAction then
+      if now == "MACRO " .. b.macro or not GetBindingAction then
         log("keys", b.macro .. " on " .. key)
       else
         local what = (now == nil or now == "") and "nothing" or tostring(now)
@@ -658,8 +722,8 @@ end
 
 local function actionName(action)            -- what a key did before, in words; nil for nothing or one of ours
   if not action or action == "" then return nil end
-  local clicked = action:match("^CLICK ([^:]+)")
-  for _, b in ipairs(BUTTONS) do if clicked == b.name then return nil end end
+  local clicked, macro = action:match("^CLICK ([^:]+)"), action:match("^MACRO (.+)$")
+  for _, b in ipairs(BUTTONS) do if clicked == b.name or macro == b.macro then return nil end end
   return _G["BINDING_NAME_" .. action] or action
 end
 
@@ -922,8 +986,8 @@ refreshPanel = function()
   panel.more:SetText((panel.offset > 0 or below > 0) and ("scroll for more: " .. panel.offset .. " above, "
     .. math.max(below, 0) .. " below") or "")
   panel.debug:SetText(debug and "Debug: on" or "Debug: off")
-  panel.bars:SetText("On your bars: drag TK Find, TK Pickpocket or TK Sap from Escape > Macros (General tab), or"
-    .. " put this line in a macro of your own: " .. clickLine("TKSap") .. " (or TKPick, TKFind).")
+  panel.bars:SetText("On your bars: drag TK Find, TK Pickpocket or TK Sap from Escape > Macros (General tab)."
+    .. " TargetKit rewrites their text as you play, so leave it as it is.")
 end
 
 local function togglePanel()
@@ -983,11 +1047,11 @@ end
 
 -- ---------- events ----------
 ev:RegisterEvent("PLAYER_LOGIN")
-ev:RegisterEvent("PLAYER_REGEN_DISABLED")                -- fires just before combat locks the buttons
+ev:RegisterEvent("PLAYER_REGEN_DISABLED")                -- fires just before combat locks the macros
 ev:RegisterEvent("PLAYER_REGEN_ENABLED")
 ev:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 ev:RegisterEvent("UI_ERROR_MESSAGE")
-for _, e in ipairs({ "CVAR_UPDATE", "UNIT_SPELLCAST_FAILED", "PLAYER_TARGET_CHANGED", "ADDON_ACTION_BLOCKED",
+for _, e in ipairs({ "UNIT_SPELLCAST_FAILED", "PLAYER_TARGET_CHANGED", "ADDON_ACTION_BLOCKED",
                     "ADDON_ACTION_FORBIDDEN", "UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
@@ -1000,7 +1064,7 @@ ev:SetScript("OnUpdate", function(_, dt)
   acc = acc + (dt or 0)
   if acc < 0.2 then return end
   acc = 0
-  if db and not InCombatLockdown() then try("TargetKit choosing", prepare) end
+  if db and not InCombatLockdown() then try("TargetKit choosing", prepare, false) end
 end)
 
 local function onEvent(_, event, a1, a2, a3)
@@ -1019,21 +1083,17 @@ local function onEvent(_, event, a1, a2, a3)
     db.keys = db.keys or {}
     db.minimap = db.minimap or {}
     for g, t in pairs(db.picked) do if time() - t >= KEEP_PICKED then db.picked[g] = nil end end
-    makeButtons()
-    prepare()
+    makeMarkers()
     if InCombatLockdown() then pendingMacros = true else ensureMacros(not db.macrosMade); db.macrosMade = true end
+    prepare(true)
     applyKeys()
     pcall(makeMinimapButton)
   elseif event == "PLAYER_REGEN_DISABLED" then
-    resetButtons()
+    resetMacros()
   elseif event == "PLAYER_REGEN_ENABLED" then
-    prepare()                                            -- out of combat again: look and write
     if pendingMacros then pendingMacros = false; ensureMacros(not db.macrosMade); db.macrosMade = true end
+    prepare(true)                                        -- out of combat again: look and write
     if pendingKeys then pendingKeys = false; applyKeys() end
-  elseif event == "CVAR_UPDATE" then
-    if db and (a1 == "ActionButtonUseKeyDown" or a1 == "ACTION_BUTTON_USE_KEY_DOWN") then
-      if InCombatLockdown() then pendingMacros = true else ensureMacros(false) end
-    end
   elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
     if a1 == "player" then outcome("cast", spellName(a3) or tostring(a3), "on", UnitName("target") or "no target") end
     if a1 == "player" and a3 == PICK_POCKET and db then        -- robbed: skip it from now on
@@ -1091,13 +1151,13 @@ local function slash(msg)
       or ("find list: " .. table.concat(db.find, ", ")))
   elseif cmd == "clear" then
     db.find = {}
-    prepare()
+    prepare(true)
     report(true, "the find list is empty now.")
   elseif cmd == "macros" then
     if InCombatLockdown() then tell("not in combat: try again after it.") return end
     ensureMacros(true)
-    tell("macros checked: TK Find, TK Pickpocket, TK Sap. In a macro of your own, these lines press them: "
-      .. clickLine("TKFind") .. ", " .. clickLine("TKPick") .. ", " .. clickLine("TKSap") .. ".")
+    prepare(true)
+    tell("macros checked: TK Find, TK Pickpocket, TK Sap (Escape > Macros, General tab).")
   elseif cmd == "forget" then
     db.picked = {}
     tell("forgot which units you have pickpocketed: TK Pickpocket may try them again.")
@@ -1124,8 +1184,8 @@ local function slash(msg)
   else
     tell(VERSION .. ". /tkit alone (or the minimap button) opens the window: keys for the macros and the find list.")
     tell("Macros: TK Find, TK Pickpocket, TK Sap (Escape > Macros, General tab), or give them keys in the window.")
-    tell("In a macro of your own: " .. clickLine("TKFind") .. ", " .. clickLine("TKPick") .. " or " .. clickLine("TKSap")
-      .. " (an addon's own /command can't target or cast; /click on its button can).")
+    tell("TargetKit writes its choice into those macros as you play (out of combat), so use them as they are: a"
+      .. " macro of your own can't run them (the game doesn't run a macro from inside another).")
     tell("/tkit add <name>: put a name (or part of one) on the find list; /tkit add alone adds your target's name.")
     tell("/tkit remove <name>, /tkit list, /tkit clear: change or see the find list.")
     tell("/tkit macros: make the three macros again if you deleted them. /tkit forget: TK Pickpocket forgets whom it robbed.")

@@ -97,6 +97,11 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       ago" show (the user's screenshot, nothing looted yet). Left: XP and loot counted after a few kills; a container
       as "not opened yet" without the app; addon 1.6.3's fold ("–" at the top right or /gea min: a screenshot folded
       and open, and that the window doesn't jump when folding).
+- [ ] B14. (2026-11-27, TargetKit 1.4.0, our extra addon) After `/reload`, open Escape > Macros: TK Find's text now
+      holds the targeting itself (with a find-list name nearby, a line like "/targetexact Name" or "/target
+      nameplate3"). Press TK Find with a friendly player from the list nearby (mouse over them once, or have them as
+      soft target): they get targeted. If not, chat says "chose a target, but the game didn't target it"; `/reload`
+      and Claude reads TargetKitDB.log. Also try TK Sap and TK Pickpocket once out of combat.
 - [x] B11. (done 2026-11-19: every recipe with where to learn it, then rank training in to-do A3) Levelling paths
       stop where the next patterns only drop (Leatherworking at 270): use ForeverRecipes' pattern sellers and drop
       chances, and rank training fees (TODO 1d).

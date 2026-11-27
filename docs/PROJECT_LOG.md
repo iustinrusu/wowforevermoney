@@ -873,6 +873,12 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   spawn locations aren't usable from the dump. Trunk tier by pool tier: Tightly Sealed < Watertight <
   Iron Bound < Mithril Bound.
 - ItemSparse `Flags_0 & 0x4` = openable (has its own loot); `LockID > 0` = needs Lockpicking/key.
+- (2026-11-27, TargetKit 1.3.0's log, game build 71139) On Forever, a `/click` in a macro on an addon's plain
+  button runs (its Click is called), but a `/click` in a macro on an addon's SecureActionButtonTemplate button with a
+  `macrotext` doesn't run that macro: 14 presses, the plain marker fired every time, the secure button's macro never.
+  1.2.x showed the same with the macro set in PreClick and PostClick seeing `down=true`. Not known which part the game
+  refuses (the secure button from a macro, or a macro run from inside a macro). EditMacro from an addon out of combat
+  works (TargetKit and RXPGuides' targeting macro both rewrite macros that way on Forever).
 
 ## What to do next
 
@@ -909,6 +915,34 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (twelfth part) TargetKit 1.4.0 (the user: "still cant target friendly saved targets with the macro").
+  The 1.3.0 log: 14 presses of TK Find, each logged "its macro was pressed, but the game didn't run TKFind's macro";
+  no press, result or blocked line. So the TK macro's first line (`/click TKFindPress`, a plain button) ran every time
+  and its `/click TKFind LeftButton 1` into the secure button never ran that button's macro (now under Verified facts).
+  - No secure buttons any more. TargetKit writes its choice into the three macros themselves with EditMacro, out of
+    combat, as RXPGuides keeps its targeting macro on Forever: at most every 0.4 s while nothing is pressed (EditMacro
+    refreshes the action bars), at once after a press (the next press gets the next unit), at once after a find-list
+    change, never while the game's Macros window is open unless forced, and rewritten if edited by hand. Just before
+    combat (PLAYER_REGEN_DISABLED) each gets its fixed text. Macros are 255 characters at most: the text is cut at a
+    whole line (logged), and TK Find's by-name lines stop where the room ends.
+  - Units seen only as mouseover or a soft target (a friendly player with friendly nameplates off, the user's case)
+    are written `/targetexact Name` (with `-Realm` for another realm): by the press the mouse is on the bar or the soft
+    target has moved, so `/target mouseover` would miss. Nameplates, target, focus, party and raid keep their token.
+  - TK Find's macro keeps `/target [noexists] name` lines after its choice (the full names seen, then the list's),
+    acting only if the choice didn't take (for example if the game refused a nameplate token in a macro).
+  - Keys now bind to the macro (SetOverrideBindingMacro, "MACRO TK Find") instead of clicking a button.
+  - The marker `/click TK<X>Mark` (a plain button, watched with hooksecurefunc) is the macro's last line, so no addon
+    code comes before the targeting. TK Sap's mouseover Sap ends its macro with /stopmacro, so that press shows only by
+    its cast. The calls to the game's targeting and casting functions are noted with their time and picked up by the
+    marker. New in the log: the first write of each macro in a session, a WARN if the game keeps a different text,
+    and a WARN (chat once) when a macro chose a unit and 0.3 s later your target isn't it.
+  - Gone: `/click TKFind` for macros of your own (it can't work on Forever), the TK<X>Press key markers, the
+    act-on-key-down handling. The window and `/tkit help` say to use the TK macros (or keys) as they are.
+  - Tests: 45 (was 40). The harness now runs a macro line's [conditions] (exists, dead, player, harm, @unit,
+    /stopmacro), `/targetexact`, EditMacro's 255 limit and keeps the icon; new tests: written into the macro, the 0.4 s
+    gap, the Macros window and hand edits, a deleted macro, the not-taken choice, a friendly player by name, a long
+    list under 255. Untested in game.
 
 - **2026-11-27** (eleventh part) TargetKit 1.3.0 (the user: "tried with a friendly player again, did not work"; they
   spammed the button). The log settled it: the game never ran the macro.

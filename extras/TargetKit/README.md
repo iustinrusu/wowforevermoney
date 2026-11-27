@@ -49,9 +49,9 @@ Revised:
 >    or Alt if I like, or mouse button 3 to 5, or the wheel; WoW can't bind two ordinary keys pressed together), and
 >    the find list (type a name and press Enter, or **Add my target**; each name with Remove). Keys are kept through
 >    relogs and don't overwrite my own bindings: clearing one gives the key back.
-> 5. **On my bars:** the three macros, or a line of my own. An addon's own slash command can't target or cast (WoW
->    blocks addon code from that), so the line is `/click TKFind`, `/click TKPick` or `/click TKSap`, with
->    ` LeftButton 1` at the end while the game acts on key down (its default); the window shows the exact line.
+> 5. **On my bars:** the three macros. (Asked for: a line of my own for my own macros. Not possible since 1.4.0: an
+>    addon's own slash command can't target or cast, and on Forever the game doesn't run a `/click` from a macro into
+>    an addon's secure button, so the choice has to be in the TK macros themselves.)
 
 ## Using it
 
@@ -61,24 +61,33 @@ Revised:
   works while TargetKit is loaded and your own binding for it comes back when you clear it. Find list: type a name
   (part of one is enough) and press Enter, or **Add my target**; **Remove** takes one off; the wheel scrolls a long
   list. Drag the minimap button to move it; `/tkit minimap` hides it or brings it back.
-- **How a press works (1.3.0):** out of combat TargetKit looks around five times a second and writes each button's
-  macro ahead of time, so a press runs what's already written, with no addon code in between (1.2.x wrote it during
-  the press, and the game didn't run it). Each macro's first line clicks a marker button so the log can see the press.
+- **How a press works (1.4.0):** out of combat TargetKit looks around five times a second and writes its choice
+  into the three macros themselves ("/target nameplate7", "/targetexact Name" and the spell), at most every 0.4 s
+  while nothing is pressed, at once after a press so the next one gets the next unit, and not while the game's Macros
+  window is open. A press runs what's written, with no addon code in between. Just before combat each macro gets its
+  fixed text (the game's own targeting), since macros can't change in combat. Units seen only as your mouseover or a
+  soft target (a friendly player with friendly nameplates off, say) are targeted by their exact name, because the
+  mouse is somewhere else by the time you press. TK Find's macro also keeps "/target [noexists] name" lines for your
+  list after its choice, which act only if the choice didn't take. Each macro's last line clicks a marker button so
+  the log sees the press (TK Sap's mouseover Sap ends its macro early, so that press shows only by its cast).
+  Before 1.4.0 the macros held `/click TKFind` on a secure button that held the choice; the 1.3.0 log showed the game
+  ran the macro's first line on every press but never that button's macro.
 - **On your bars:** the three macros are under Escape > Macros, General tab: drag **TK Find**, **TK Pickpocket** and
-  **TK Sap** to your bars. In a macro of your own, the line is `/click TKFind`, `/click TKPick` or `/click TKSap`, plus
-  ` LeftButton 1` while the game acts on key down (the default; the window shows the exact line). The addon writes
-  the real macro just before each click.
+  **TK Sap** to your bars and leave their text as it is (TargetKit rewrites it). A key set in the window runs the same
+  macro, so it works without the macro being on a bar.
 - `/tkit add <name>`, `/tkit remove <name>`, `/tkit list`, `/tkit clear`: the find list from chat.
 - **The log**, always on: every press (which macro, every unit it saw and why it took or passed over each, the macro it
   ran), what came of it in the next 2 seconds (the game's error line such as "Out of range.", the cast, the new
   target), the game settings that matter at login (act on key down, nameplates, soft targeting), the macros and keys
   it made (each key checked to really press the button), anything the game blocked, and every error with where (also
   said once in chat). Since 1.2.1 each press also records what the game itself ran for it (its targeting and casting
-  functions, watched without getting in the way) and where your target went; if a macro that should target ran
-  nothing, chat says the game didn't run it, and TK Find says in chat when nobody on your list is near enough.
+  functions, watched without getting in the way) and where your target went. Since 1.4.0: when a macro chose a unit
+  and your target isn't that unit 0.3 s later, the log says so every time and chat once ("chose a target, but the
+  game didn't target it"); the first write of each macro in a session is logged, and a warning if the game keeps a
+  different text than was written. TK Find says in chat when nobody on your list is near enough.
   `/tkit log` shows the last 15 lines (`/tkit log 40`, `/tkit log clear`); the last 400 are kept
   in the saved file, written on `/reload` or logout. When something doesn't work, `/reload` and say so.
-- `/tkit macros` makes the three macros again if you deleted them (and prints the lines for your own); `/tkit forget`
+- `/tkit macros` makes the three macros again if you deleted them; `/tkit forget`
   clears whom you robbed; `/tkit debug` prints, on every press, what it chose and the macro it ran; `/tkit help`.
 - Nameplates matter: the addon sees units through them (enemy nameplates for mobs and players, friendly ones for
   NPCs), plus your target, mouseover, soft targets, focus and group.
@@ -88,7 +97,10 @@ Revised:
 - No exact distances: range bands only (see above).
 - Keys: one key with Shift, Ctrl, Alt, or a mouse button or the wheel; two ordinary keys together can't be bound.
   Keys can't change in combat.
-- An addon's own slash command can't target or cast, so macros press the buttons with `/click`.
+- An addon's own slash command can't target or cast, and a macro can't change in combat: in combat the macros hold
+  the game's own targeting. A macro is at most 255 characters, so a long find list is cut to the names that fit.
+- A macro of your own can't run TK Find's choice (no `/click` into an addon's secure button runs on Forever, and the
+  game doesn't run a macro from inside another): use the TK macros, or keys.
 - A stealthed player is invisible to addons until the game reveals them, and even then has no nameplate. TK Sap
   hands that case to the game's own nearest-enemy-player targeting, which does see them.
 - Sap and Pick Pocket on Forever: Sap doesn't break stealth (the user, 2026-11-27). Whether Pick Pocket shares the

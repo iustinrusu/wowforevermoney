@@ -13,10 +13,12 @@ KEYDOWN = true
 function GetCVarBool(name) if name == "ActionButtonUseKeyDown" then return KEYDOWN end end
 function IsInRaid() return false end
 -- what a secure macro calls (tests/test_targetkit_lua.py runs macro lines through these); hooksecurefunc as in WoW
-function TargetUnit(what)
+function TargetUnit(what, exact)                -- a token, or a name (part of one; exact: the whole name)
   if UNITS[what] then UNITS.target = UNITS[what] return end
+  local w = tostring(what):lower()
   for tok, u in pairs(UNITS) do
-    if tok ~= "target" and u.name and u.name:lower():find(tostring(what):lower(), 1, true) then UNITS.target = u return end
+    local n = u.name and u.name:lower()
+    if tok ~= "target" and n and ((exact and n == w) or (not exact and n:find(w, 1, true))) then UNITS.target = u return end
   end
 end
 function ClearTarget() UNITS.target = nil end
@@ -80,8 +82,14 @@ C_NamePlate = {
 MACROS = {}
 MAX_ACCOUNT_MACROS = 120
 function GetMacroIndexByName(n) for i, m in ipairs(MACROS) do if m.name == n then return i end end return 0 end
-function GetMacroInfo(i) local m = MACROS[i]; return m.name, m.icon, m.body end
-function EditMacro(i, n, icon, body) if COMBAT then error("blocked in combat") end MACROS[i] = { name = n, icon = icon, body = body } end
+function GetMacroInfo(i) local m = MACROS[i]; if not m then return nil end return m.name, m.icon, m.body end
+EDITS = 0
+function EditMacro(i, n, icon, body)            -- icon nil: keep it
+  if COMBAT then error("blocked in combat") end
+  if #body > 255 then error("a macro takes 255 characters") end
+  EDITS = EDITS + 1
+  MACROS[i] = { name = n, icon = icon or MACROS[i].icon, body = body }
+end
 function CreateMacro(n, icon, body) if COMBAT then error("blocked in combat") end
   MACROS[#MACROS + 1] = { name = n, icon = icon, body = body } return #MACROS end
 function GetNumMacros() return #MACROS, 0 end
@@ -103,13 +111,13 @@ function IsShiftKeyDown() return MODS.shift end
 BINDINGS = { ["SHIFT-F"] = "MOVEFORWARD" }
 BINDING_NAME_MOVEFORWARD = "Move Forward"
 OVERRIDES = {}
-function SetOverrideBindingClick(owner, priority, key, button, mouse)
+function SetOverrideBindingMacro(owner, priority, key, macro)
   if COMBAT then error("blocked in combat") end
-  OVERRIDES[key] = { button = button, priority = priority, mouse = mouse }
+  OVERRIDES[key] = { macro = macro, priority = priority }
 end
 function ClearOverrideBindings() if COMBAT then error("blocked in combat") end OVERRIDES = {} end
 function GetBindingAction(key, checkOverride)
-  if checkOverride and OVERRIDES[key] then return "CLICK " .. OVERRIDES[key].button .. ":LeftButton" end
+  if checkOverride and OVERRIDES[key] then return "MACRO " .. OVERRIDES[key].macro end
   return BINDINGS[key] or ""
 end
 function GetBindingText(key) return (key:gsub("SHIFT%-", "Shift-"):gsub("CTRL%-", "Ctrl-"):gsub("ALT%-", "Alt-")) end
@@ -150,8 +158,9 @@ local frameMethods = {
   Click = function(self, ...) if self.scripts.OnClick then self.scripts.OnClick(self, ...) end end,
 }
 frames = {}
-function CreateFrame(kind, name)
-  local f = { scripts = {}, attrs = {}, kind = kind, name = name, shown = true, text = "", enabled = true }
+function CreateFrame(kind, name, parent, template)
+  local f = { scripts = {}, attrs = {}, kind = kind, name = name, shown = true, text = "", enabled = true,
+              template = template }
   setmetatable(f, { __index = function(_, k) return frameMethods[k] or function() end end })
   if name then _G[name] = f end
   frames[#frames + 1] = f
