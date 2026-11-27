@@ -59,9 +59,13 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 - [x] B7. (done 2026-11-20, to-do B1: report in docs/plans/comprehensive-review.md) Comprehensive review of the whole app (UI, UX, logic, accuracy, no discrepancies between views): planned
       for a new chat after the usage reset, `docs/plans/comprehensive-review.md` (the user, 2026-11-15).
 
-- [ ] B8. (2026-11-27, addon 1.6.6 is in WoW's AddOns folder since 12:50, so `/reload` first; `/gea debug` then says
-      "Gold Ever After 1.6.6 debug on". The user's first try ("still not working after opening heavy junkbox") ran on
-      1.6.3: the app hadn't run since 26 Nov, so nothing had copied 1.6.4.
+- [ ] B8. (2026-11-27, addon 1.6.7: `/reload`, `/gea debug` says "Gold Ever After 1.6.7 debug on". Open a box: chat
+      says "box opened into your bags: item N gave ..." and the window's Items and "Opened" go up. Two coin loots
+      in quick succession: both count under Gold looted. If a box gives coins, check Gold looted goes up too (coins
+      count from their "You loot" line; a box that gives coins with no line would be missed).
+      Earlier: the user's first try ("still not working after opening heavy junkbox") ran on 1.6.3, since the app
+      hadn't run since 26 Nov; on 1.6.6 the box's reminder went but its contents didn't count, which showed boxes
+      open straight into the bags.
       Addon 1.6.4: open a lockbox, junkbox or clam with `/gea debug` on during a session; chat says
       "loot window: containers from item N (found by source / used / locked)", or "(which box: not found)". A screenshot
       of that line tells which way works on Forever since the 25 Nov patch; then /gea stop, /reload, and the loot log's

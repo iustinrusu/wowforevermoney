@@ -882,6 +882,31 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (fourth part) Addon 1.6.7: boxes that open straight into your bags count, and coins count from your
+  own line. Two reports from the user in Alterac Valley, pick-pocketing in the mine:
+  - "i looted 3 silver 15 then 1 silver 29, but meter shows only 3 15" ("it was done in quick succession"). The meter
+    paired each coin line with the change in your gold within 2 s, and the first change's 2 s timer cleared the
+    second change before its line came (reproduced in a test: 3s 15c exactly). Now the amount is read from your own
+    line with the client's words (YOU_LOOT_MONEY, LOOT_MONEY_SPLIT, the guild-bank forms first; GOLD/SILVER/
+    COPPER_AMOUNT); someone else's line (LOOT_MONEY, "X loots ...") is ignored. The pairing stays only for a line the
+    meter can't read, and its timer now clears only its own change.
+  - "opened heavy junkbox and unopened boxes text disappeared, but value of essence of agony x2 and blinding powder
+    x3 did not add". The user reloaded so the saved file could be read: the running session had counted 13
+    pick-pockets and no box loot window, neither item was in its items, and no loot window in any zone had ever held
+    either item. So since the 25 Nov patch boxes open straight into the bags, with no loot window (and no "You receive
+    loot" line); the reminder went because the box left the bags. Not the app being closed: both items have TSM
+    prices in game (Blinding Powder's lowest listing 2s 69c).
+    Fix: ForeverMoneyBridge.lua watches the bags (BAG_UPDATE_DELAYED). When a container (the game's hasLoot flag, or
+    the meter's container check) leaves them, the items that came in within 2 s either side, not during or just
+    after a loot window and not accounted for by a "You receive loot" line, are what it gave, settled 2 s after it
+    left. Nothing counts while a vendor, bank, mailbox, trade window, guild bank or auction house is open. A box with
+    nothing coming in counts as opened empty (so a destroyed one would too). Each goes to the loot log (containers,
+    as a loot window did) and to the meter (ns.onBoxOpened: items, "Opened"). A box that still opens a loot window
+    is left to it (ns.boxWindowAt).
+  Tests: 10 new (the race, own/other/guild/split coin lines, the fallback, the junkbox into bags, contents before the
+  box leaves, an empty box, vendor, mob loot next to a box, a box with a window, the loot log alone). Not checked in
+  game yet (checklist B8).
+
 - **2026-11-27** (third part) Addon 1.6.6: `/gea debug` and `/gea` say which version runs. The user: "still not working
   after opening heavy junkbox". WoW's AddOns folder still had 1.6.3 (19 Nov): the app hadn't run since 26 Nov 14:50,
   and only the app's start copies the addon, so the 1.6.4 box fix never reached the game (the saved file has no

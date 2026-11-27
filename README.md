@@ -123,7 +123,12 @@ See docs/PROJECT_LOG.md, open items.
 - **`/reload` or log out mid-session:** the session carries on when you're back within 30 minutes (paused stays
   paused, and the time away doesn't count). After longer, it's saved as it stood when you logged out.
 - **Boxes you open** (lockboxes, junkboxes, clams, trunks): a box you loot counts nothing until you open it, then what's
-  inside counts under "Opened". `/gea debug` prints in chat what the meter makes of each loot window.
+  inside counts under "Opened". Since the 25 Nov 2026 patch most boxes open straight into your bags with no loot
+  window, so the addon watches your bags: when a box leaves them, the items that arrive within 2 seconds (not from a
+  loot window, and not while a vendor, bank, mailbox, trade window or the auction house is open) are what it held.
+  `/gea debug` prints in chat what the meter makes of each loot window and each box.
+- **Gold looted** counts your own coin lines ("You loot 3 Silver, 15 Copper", "Your share of the loot is ..."), so two
+  loots in quick succession both count. Other players' coins, sales, mail and quest rewards don't.
 - **Which version is running:** `/gea debug` and `/gea` say it (for example "Gold Ever After 1.6.6"). The app copies
   a new addon into WoW when it starts, so after an update start the app, then `/reload` in game.
 - **Install without the app:** double-click `install_addon.bat`. It finds WoW: Forever (TSM desktop app

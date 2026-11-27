@@ -14,11 +14,13 @@
 -- 1.6.5: a session running at a /reload or logout carries on at the next login within 30 minutes (else it is saved).
 -- 1.6.6: /gea debug and /gea say which version of this code is running (the .toc's version only changes in game after
 -- a full restart of WoW, so the number lives here too; a test keeps the two the same).
+-- 1.6.7: coins count from your own chat line ("You loot 3 Silver, 15 Copper"); see coinLine below. And boxes that
+-- open straight into your bags (no loot window since the 25 Nov patch) count what they gave: ns.onBoxOpened.
 
 local _, ns = ...                   -- the addon's shared table: ns.bagItem (ForeverMoneyBridge.lua), the box a loot
                                     -- window came from
 ns = ns or {}
-local VERSION = "1.6.6"             -- the same as the .toc's ## Version (tests/test_meter_lua.py checks)
+local VERSION = "1.6.7"             -- the same as the .toc's ## Version (tests/test_meter_lua.py checks)
 local CUT = 0.05
 local TSM_PRICE = "first(DBMinBuyout, DBMarket, DBRegionMarketAvg)"
 -- newer clients (WoW: Forever) moved these into C_Item / C_Spell; the old globals may not exist
@@ -115,6 +117,8 @@ local function isContainer(id)
   end
   return openable[id] == true
 end
+
+ns.isContainer = isContainer          -- for the bag watcher in ForeverMoneyBridge.lua
 
 -- XP: what the XP bar gained while the meter runs (kills, quests, exploring); a level up in between counts the rest
 -- of the old level plus the new one
@@ -552,8 +556,42 @@ end
 local LOOT_ONE = LOOT_ITEM_SELF and pattern(LOOT_ITEM_SELF)
 local LOOT_MANY = LOOT_ITEM_SELF_MULTIPLE and pattern(LOOT_ITEM_SELF_MULTIPLE)
 
+-- Coins (1.6.7): the amount comes from your own chat line, "You loot 3 Silver, 15 Copper" or "Your share of the loot
+-- is ...", read with the client's own words. Before, each line was paired with the change in your gold within 2 s,
+-- and two loots in quick succession (the user pick-pocketing two mobs in a row) lost the second: the first gold
+-- change's 2-second timer threw the second one away. The pairing is left only for a line the meter can't read.
+local COIN_UNITS = {}
+for _, u in ipairs({ { GOLD_AMOUNT or "%d Gold", 10000 }, { SILVER_AMOUNT or "%d Silver", 100 },
+                     { COPPER_AMOUNT or "%d Copper", 1 } }) do
+  COIN_UNITS[#COIN_UNITS + 1] = { pattern(u[1]):sub(2, -2), u[2] }     -- "(%d+) Silver", not anchored
+end
+local MONEY_SELF = {}                  -- the guild-bank forms first: their second amount went to the guild, not you
+for _, fmt in ipairs({ YOU_LOOT_MONEY_GUILD or false, LOOT_MONEY_SPLIT_GUILD or false, YOU_LOOT_MONEY or false,
+                       LOOT_MONEY_SPLIT or false }) do
+  if type(fmt) == "string" then MONEY_SELF[#MONEY_SELF + 1] = pattern(fmt) end
+end
+local MONEY_OTHER = type(LOOT_MONEY) == "string" and pattern(LOOT_MONEY) or nil     -- "Brakka loots 5 Silver."
+local function coins(text)
+  local total, found = 0, false
+  for _, u in ipairs(COIN_UNITS) do
+    local n = text:match(u[1])
+    if n then total, found = total + tonumber(n) * u[2], true end
+  end
+  return found and total or nil
+end
+-- Copper in one of your own coin lines; false: someone else's line; nil: a line the meter can't read.
+local function coinLine(msg)
+  for _, p in ipairs(MONEY_SELF) do
+    local amount = msg:match(p)
+    if amount then return coins(amount) end
+  end
+  if MONEY_OTHER and msg:match(MONEY_OTHER) then return false end
+end
+
 local windowKind, windowCounted, skipUntil = nil, false, 0
 local moneyChatAt, moneyDelta = 0, nil
+local chatCoins = false                -- a coin line was read: gold changes are no longer needed for loot
+local moneyTimer = 0                   -- which gold change the 2 s timer belongs to
 
 -- What kind of loot a window is: the loot source (a creature, an object, an item) plus the spell you just cast.
 -- Spells by id (every rank), turned into this client's names too, so it works in any language.
@@ -629,6 +667,26 @@ local function reconcileBoxes()
   end
 end
 
+-- A box that opened straight into your bags (1.6.7; ForeverMoneyBridge.lua watches the bags, see there): what it
+-- gave counts like loot, and the box under "Opened". Its contents come with no "You receive loot" line (the user's
+-- Heavy Junkbox: the meter counted none), so nothing here is counted twice. A box inside goes to "not opened yet".
+-- The reminder itself is lowered by reconcileBoxes when the box leaves your bags.
+function ns.onBoxOpened(box, items)
+  if not session or session.paused then return end
+  local got = {}
+  for id, n in pairs(items) do
+    if isContainer(id) then
+      session.unopened[id] = (session.unopened[id] or 0) + n
+    else
+      session.items[id] = (session.items[id] or 0) + n
+    end
+    got[#got + 1] = (GetItemInfo(id) or ("item " .. id)) .. " x" .. n
+  end
+  session.loots.containers = (session.loots.containers or 0) + 1
+  say("box opened into your bags: item " .. box .. (#got > 0 and (" gave " .. table.concat(got, ", "))
+    or " gave no items (empty, or coins only)"))
+end
+
 local function addMoney(delta)
   session.money = session.money + delta
   say("gold looted:", money(delta))
@@ -683,14 +741,23 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
     session.items[id] = (session.items[id] or 0) + n
     say("item:", link, "x" .. n, money(price(id) * n))
   elseif event == "CHAT_MSG_MONEY" then
-    if moneyDelta then addMoney(moneyDelta); moneyDelta = nil else moneyChatAt = GetTime() end
+    local copper = coinLine(msg or "")
+    if copper then                                     -- your own line: its amount, whatever the timing
+      chatCoins, moneyDelta = true, nil
+      addMoney(copper)
+    elseif copper == nil then                          -- a line the meter can't read: pair it with the gold change
+      if moneyDelta then addMoney(moneyDelta); moneyDelta = nil else moneyChatAt = GetTime() end
+    end                                                -- false: someone else's coins
   elseif event == "PLAYER_MONEY" then
     local now = GetMoney()
     local delta = lastMoney and now - lastMoney or 0
     lastMoney = now
-    if delta <= 0 or GetTime() < moneyQuietUntil then return end
-    if GetTime() - moneyChatAt <= 2 then addMoney(delta); moneyChatAt = 0 else moneyDelta = delta
-      if C_Timer then C_Timer.After(2, function() moneyDelta = nil end) end end   -- not loot (a sale, mail, a quest) unless a message follows
+    if chatCoins or delta <= 0 or GetTime() < moneyQuietUntil then return end
+    if GetTime() - moneyChatAt <= 2 then addMoney(delta); moneyChatAt = 0 else
+      moneyDelta, moneyTimer = delta, moneyTimer + 1   -- not loot (a sale, mail, a quest) unless a line follows
+      local mine = moneyTimer                          -- within 2 s; an older timer leaves a newer change alone
+      if C_Timer then C_Timer.After(2, function() if moneyTimer == mine then moneyDelta = nil end end) end
+    end
   end
 end)
 

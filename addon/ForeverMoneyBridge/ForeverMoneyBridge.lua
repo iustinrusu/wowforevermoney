@@ -198,18 +198,24 @@ local function lootSourceKind()
   return (strsplit("-", guid)), guid
 end
 
-local function recordContainer(id)
+local function recordOpened(id, items)       -- one box opened and what it gave: item id -> count
   local d = db()
   d.containers = d.containers or {}
   local c = d.containers[id] or { opened = 0, items = {} }
   d.containers[id] = c
   c.opened = c.opened + 1
   c.lastSeen = time()
+  for got, n in pairs(items) do c.items[got] = (c.items[got] or 0) + n end
+end
+
+local function recordContainer(id)          -- from its loot window
+  local items = {}
   for slot = 1, (GetNumLootItems and GetNumLootItems() or 0) do
     local got = itemIdFromLink(GetLootSlotLink and GetLootSlotLink(slot))
     local _, _, quantity = GetLootSlotInfo(slot)
-    if got then c.items[got] = (c.items[got] or 0) + (quantity or 1) end
+    if got then items[got] = (items[got] or 0) + (quantity or 1) end
   end
+  recordOpened(id, items)
 end
 
 local function recordLoot()
@@ -218,6 +224,7 @@ local function recordLoot()
   local fishing = IsFishingLoot and IsFishingLoot()
   local box = (kind == "Item" or (kind == nil and not fishing)) and ns.bagItem(guid) or nil
   if kind == "Item" or box then
+    ns.boxWindowAt = GetTime()  -- the bag watcher below leaves this box to the window
     if box then recordContainer(box) end
     return                    -- never count container contents as fishing or mob loot
   end
@@ -267,6 +274,123 @@ local function recordLoot()
       if pool then pool.items[id] = (pool.items[id] or 0) + (quantity or 1) end
     end
   end
+end
+
+-- Boxes that open straight into your bags (1.6.7). Since the WoW Forever patch of 25 Nov 2026 a lockbox, junkbox or
+-- clam opened from your bags shows no loot window: what it holds just appears in your bags. The user, 2026-11-27: a
+-- Heavy Junkbox's Essence of Agony x2 and Blinding Powder x3 counted nowhere; the saved file showed no loot window had
+-- ever held either item, and the farm meter had counted no "You receive loot" line for them.
+-- So the bags are watched. When a container leaves them, the items that came in within 2 seconds of it (before or
+-- after), other than from a loot window, are what it held. While a vendor, bank, mailbox, trade window or the auction
+-- house is open nothing counts (selling a box and buying something is not opening it). A box that leaves with nothing
+-- coming in counts as opened and empty (or coins only; coins come with their own "You loot" line), so destroying one
+-- also counts as opening it. Each one goes to the loot log (containers, as from a loot window) and to
+-- ns.onBoxOpened (the farm meter). A box opened through a loot window is left to that window (ns.boxWindowAt).
+local PAIR = 2                         -- seconds between a box leaving your bags and what it gave coming in
+local bagSnap                          -- item id -> count in your bags at the last BAG_UPDATE_DELAYED
+local boxKinds = {}                    -- item id -> true: seen in your bags as something you can open
+local gains, gone = {}, {}             -- {id, n, t}: items that came in, not from a loot window; {id, t}: boxes gone
+local windowOpen, windowShut = false, -99
+local busy = {}                        -- vendor, bank, mail, trade, auction house: open now
+local BUSY = { MERCHANT_SHOW = "merchant", MERCHANT_CLOSED = "merchant", BANKFRAME_OPENED = "bank",
+               BANKFRAME_CLOSED = "bank", MAIL_SHOW = "mail", MAIL_CLOSED = "mail", TRADE_SHOW = "trade",
+               TRADE_CLOSED = "trade", AUCTION_HOUSE_SHOW = "auction", AUCTION_HOUSE_CLOSED = "auction",
+               GUILDBANKFRAME_OPENED = "guildbank", GUILDBANKFRAME_CLOSED = "guildbank" }
+
+-- "You receive loot" lines: items from a loot window, so never what a box gave (checked when the box is settled, PAIR
+-- seconds after it left, so it works whichever comes first, the line or the bag update)
+local function lootPattern(fmt)               -- "You receive loot: %s." -> "^You receive loot: (.+)%.$"
+  fmt = fmt:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
+  fmt = fmt:gsub("%%%%s", "(.+)"):gsub("%%%%d", "(%%d+)")
+  return "^" .. fmt .. "$"
+end
+local LOOT_ONE = LOOT_ITEM_SELF and lootPattern(LOOT_ITEM_SELF)
+local LOOT_MANY = LOOT_ITEM_SELF_MULTIPLE and lootPattern(LOOT_ITEM_SELF_MULTIPLE)
+local lootLines = {}                         -- {id, n, t}
+local function onLootLine(msg)
+  local link, n
+  if LOOT_MANY then link, n = msg:match(LOOT_MANY) end
+  if not link and LOOT_ONE then link = msg:match(LOOT_ONE) end
+  local id = itemIdFromLink(link)
+  if not id then return end                  -- someone else's loot
+  local now, keep = GetTime(), {}
+  for _, l in ipairs(lootLines) do if now - l.t <= 10 then keep[#keep + 1] = l end end
+  keep[#keep + 1] = { id = id, n = tonumber(n) or 1, t = now }
+  lootLines = keep
+end
+
+local function bagCounts()
+  local counts, openable = {}, {}
+  for bag = 0, lastBag() do
+    for slot = 1, slots(bag) do
+      local id = itemAt(bag, slot)
+      if id then
+        local n, hasLoot = 1, false
+        if C_Container and C_Container.GetContainerItemInfo then
+          local info = C_Container.GetContainerItemInfo(bag, slot)
+          if info then n, hasLoot = info.stackCount or 1, info.hasLoot end
+        elseif GetContainerItemInfo then
+          local _, count, _, _, _, lootable = GetContainerItemInfo(bag, slot)
+          n, hasLoot = count or 1, lootable
+        end
+        counts[id] = (counts[id] or 0) + n
+        if hasLoot then openable[id] = true end
+      end
+    end
+  end
+  return counts, openable
+end
+
+local function boxDone(ev)                   -- PAIR seconds after a box left: what came in around then
+  for i, o in ipairs(gone) do if o == ev then table.remove(gone, i) break end end
+  for _, g in ipairs(gains) do                 -- what a loot line accounts for was loot, not this box's
+    for _, l in ipairs(lootLines) do
+      if l.id == g.id and l.n > 0 and math.abs(l.t - g.t) <= 3 then
+        local same = math.min(l.n, g.n)
+        l.n, g.n = l.n - same, g.n - same
+      end
+    end
+  end
+  local items, keep = {}, {}
+  for _, g in ipairs(gains) do
+    local d = math.abs(g.t - ev.t)
+    local mine = d <= PAIR
+    for _, o in ipairs(gone) do                -- another box that left closer in time gets it
+      if mine and math.abs(g.t - o.t) < d then mine = false end
+    end
+    if mine then
+      if g.n > 0 then items[g.id] = (items[g.id] or 0) + g.n end
+    else
+      keep[#keep + 1] = g
+    end
+  end
+  gains = keep
+  recordOpened(ev.id, items)
+  if ns.onBoxOpened then pcall(ns.onBoxOpened, ev.id, items) end
+end
+
+local function onBags()
+  local counts, openable = bagCounts()
+  for id in pairs(openable) do boxKinds[id] = true end
+  local before = bagSnap
+  bagSnap = counts
+  local now = GetTime()
+  if not before or next(busy) or windowOpen or now - windowShut <= 1 then return end   -- loot windows count themselves
+  for id, n in pairs(counts) do
+    local up = n - (before[id] or 0)
+    if up > 0 then gains[#gains + 1] = { id = id, n = up, t = now } end
+  end
+  for id, n in pairs(before) do
+    if (counts[id] or 0) < n and (boxKinds[id] or (ns.isContainer and ns.isContainer(id)))
+        and now - (ns.boxWindowAt or -99) > 10 then
+      local ev = { id = id, t = now }
+      gone[#gone + 1] = ev
+      if C_Timer then C_Timer.After(PAIR, function() pcall(boxDone, ev) end) end
+    end
+  end
+  local keep = {}                            -- what no box can claim any more
+  for _, g in ipairs(gains) do if now - g.t <= 2 * PAIR then keep[#keep + 1] = g end end
+  gains = keep
 end
 
 -- Real vendor prices and stock (game files don't know vendor-specific markups, e.g. Black Market agents)
@@ -377,8 +501,22 @@ f:RegisterEvent("SKILL_LINES_CHANGED")
 f:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 f:RegisterEvent("LOOT_OPENED")
 f:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+for _, e in ipairs({ "BAG_UPDATE_DELAYED", "LOOT_READY", "LOOT_CLOSED", "CHAT_MSG_LOOT" }) do pcall(f.RegisterEvent, f, e) end
+for e in pairs(BUSY) do pcall(f.RegisterEvent, f, e) end    -- some may not exist in this client
 f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
-  if event == "LOOT_OPENED" then
+  if event == "BAG_UPDATE_DELAYED" then
+    pcall(onBags)
+  elseif event == "CHAT_MSG_LOOT" then
+    pcall(onLootLine, arg1 or "")
+  elseif event == "LOOT_READY" then
+    windowOpen = true
+  elseif event == "LOOT_CLOSED" then
+    windowOpen, windowShut = false, GetTime()
+  elseif BUSY[event] then
+    busy[BUSY[event]] = (event:find("_SHOW$") or event:find("_OPENED$")) and true or nil
+    if event == "MERCHANT_SHOW" then pcall(recordMerchant) end
+  elseif event == "LOOT_OPENED" then
+    windowOpen = true
     pcall(recordLoot)
   elseif event == "GET_ITEM_INFO_RECEIVED" then
     if arg1 and pendingInfo[arg1] then

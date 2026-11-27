@@ -375,17 +375,185 @@ class MeterTests(unittest.TestCase):
         self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.running['Player-0-00000002'].elapsed, 60)
         self.assertIsNone(self.g.ForeverMoneyBridgeDB.meter.sessions)
 
+    # --- coins (1.6.7: two loots in quick succession lost the second) ---
+    def coin_loot(self, copper, line, gold_first=True, wait=0.0):
+        """Coins looted: the chat line and the change in your gold (the client sends them in either order), then
+        `wait` seconds pass, running the addon's timers."""
+        if not gold_first:
+            self.fire('CHAT_MSG_MONEY', line)
+        self.g.MONEY += copper
+        self.fire('PLAYER_MONEY')
+        if gold_first:
+            self.fire('CHAT_MSG_MONEY', line)
+        self.g.NOW += wait
+        self.g.RUN_TIMERS()
+
+    def test_two_coin_loots_in_quick_succession_both_count(self):
+        """The user's two pick-pockets in the Alterac Valley mine: 3s 15c, then 1s 29c within 2 s; the meter showed
+        3s 15c."""
+        self.slash('start')
+        self.g.MONEY += 315
+        self.fire('PLAYER_MONEY')                                    # the first gold change starts a 2 s timer
+        self.fire('CHAT_MSG_MONEY', 'You loot 3 Silver, 15 Copper')
+        self.g.NOW += 1.5
+        self.g.MONEY += 129
+        self.fire('PLAYER_MONEY')                                    # the second, 1.5 s later
+        self.g.NOW += 0.6
+        self.g.RUN_TIMERS()                                          # the first timer runs out
+        self.fire('CHAT_MSG_MONEY', 'You loot 1 Silver, 29 Copper')  # then the second's line
+        self.assertEqual(self.refresh().kv[3].text, '|cffc7c7cf4s|r |cffeda55f44c|r')
+
     def test_gold_loading_in_after_a_login_is_not_loot(self):
         self.slash('start')
         self.reload()
-        self.g.MONEY += 1000000                              # your gold arriving after the login
+        self.g.MONEY += 1000000                              # your gold arriving after the login: no loot line
         self.fire('PLAYER_MONEY')
-        self.fire('CHAT_MSG_MONEY', 'You loot 3 Silver')
+        self.g.NOW += 1
+        self.fire('CHAT_MSG_MONEY', 'You loot something')    # even with a line the meter can't read just after
         self.g.NOW += 6
         self.fire('CHAT_MSG_MONEY', 'You loot 5 Silver')
         self.g.MONEY += 500
         self.fire('PLAYER_MONEY')
         self.assertEqual(self.refresh().kv[3].text, '|cffc7c7cf5s|r')
+
+    def test_coins_count_from_your_own_lines_only(self):
+        self.slash('start')
+        self.coin_loot(700, 'Brakka loots 7 Silver.')                     # someone else's (your gold moved too)
+        self.coin_loot(210, 'Your share of the loot is 2 Silver, 10 Copper.')
+        self.coin_loot(300, 'You loot 3 Silver (15 Copper deposited to guild bank)', gold_first=False)
+        self.coin_loot(10203, 'You loot 1 Gold, 2 Silver, 3 Copper', wait=3)
+        self.assertEqual(self.refresh().kv[3].text,
+                         '|cffffd7001g|r |cffc7c7cf7s|r |cffeda55f13c|r')         # 210 + 300 + 10,203
+
+    def test_a_line_the_meter_cant_read_is_paired_with_the_gold_change(self):
+        """The old way, kept for a client whose coin words the meter can't read: quick succession works there too."""
+        self.slash('start')
+        self.g.MONEY += 315
+        self.fire('PLAYER_MONEY')
+        self.fire('CHAT_MSG_MONEY', 'You loot some coins')
+        self.g.NOW += 1.5
+        self.g.MONEY += 129
+        self.fire('PLAYER_MONEY')
+        self.g.NOW += 0.6
+        self.g.RUN_TIMERS()                                  # the first gold change's timer leaves the second alone
+        self.fire('CHAT_MSG_MONEY', 'You loot more coins')
+        self.assertEqual(self.refresh().kv[3].text, '|cffc7c7cf4s|r |cffeda55f44c|r')
+
+    # --- boxes that open straight into your bags (1.6.7: no loot window since the 25 Nov 2026 patch) ---
+    def both(self, *args):
+        """An event both the loot log (frames[1], which watches the bags) and the meter get, in that order."""
+        self.g.frames[1].scripts['OnEvent'](self.g.frames[1], *args)
+        self.fire(*args)
+
+    def bag(self, slot, iid=None, count=1, has_loot=False):
+        self.g.BAGS[0][slot] = self.lua.eval('{id = %d, count = %d, hasLoot = %s}' % (iid, count, str(has_loot).lower())) \
+            if iid else None
+
+    def loot_both(self, iid, name, n=1):
+        self.both('CHAT_MSG_LOOT', f'You receive loot: |cffffffff|Hitem:{iid}::::::::|h[{name}]|h|r'
+                                   + (f'x{n}.' if n > 1 else '.'))
+
+    def containers(self):
+        return self.g.ForeverMoneyBridgeDB.containers or self.lua.table()
+
+    def pick_junkbox_into_bags(self):
+        self.both('BAG_UPDATE_DELAYED')                      # the bags as they were
+        self.both('UNIT_SPELLCAST_SUCCEEDED', 'player', None, 921)
+        self.both('LOOT_READY')
+        self.loot_both(16885, 'Heavy Junkbox')
+        self.bag(3, 16885, has_loot=True)
+        self.both('BAG_UPDATE_DELAYED')
+        self.both('LOOT_CLOSED')
+        self.g.NOW += 20
+
+    def open_into_bags(self, gave, then=2.0):
+        """Right-click the box: no loot window, the box leaves the bags and what it held comes in."""
+        self.bag(3)
+        for i, (iid, n) in enumerate(gave):
+            self.bag(4 + i, iid, n)
+        self.both('BAG_UPDATE_DELAYED')
+        self.g.NOW += then
+        self.g.RUN_TIMERS()
+
+    def test_a_junkbox_that_opens_into_your_bags_counts_what_it_gave(self):
+        """The user's Heavy Junkbox: Essence of Agony x2 and Blinding Powder x3, no loot window."""
+        self.slash('debug')
+        self.slash('start')
+        self.pick_junkbox_into_bags()
+        self.assertIn('1 container not opened yet', self.refresh().remind.text)
+        self.open_into_bags([(8923, 2), (5530, 3)])
+        win = self.refresh()
+        self.assertEqual(win.remind.text, '')
+        self.assertEqual(win.kv[2].text, '|cffc7c7cf8s|r |cffeda55f65c|r')         # 2 x 50 + 3 x 255
+        self.assertTrue(self.said('box opened into your bags: item 16885 gave'))
+        self.assertEqual(win.loots.text, 'Picked 1  ·  Opened 1')
+        log = self.g.ForeverMoneyBridgeDB.containers[16885]
+        self.assertEqual((log.opened, log['items'][8923], log['items'][5530]), (1, 2, 3))
+        self.slash('stop')
+        s = self.g.ForeverMoneyBridgeDB.meter.sessions[1]
+        self.assertEqual((s['items'][8923], s['items'][5530]), (2, 3))
+
+    def test_what_comes_in_just_before_the_box_leaves_is_its_too(self):
+        self.slash('start')
+        self.pick_junkbox_into_bags()
+        self.bag(4, 5530, 3)                                 # the contents first,
+        self.both('BAG_UPDATE_DELAYED')
+        self.g.NOW += 0.5
+        self.bag(3)                                          # the box a moment later
+        self.both('BAG_UPDATE_DELAYED')
+        self.g.NOW += 2
+        self.g.RUN_TIMERS()
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.containers[16885]['items'][5530], 3)
+        self.assertEqual(self.refresh().kv[2].text, '|cffc7c7cf7s|r |cffeda55f65c|r')
+
+    def test_an_empty_box_counts_as_opened(self):
+        self.slash('debug')
+        self.slash('start')
+        self.pick_junkbox_into_bags()
+        self.open_into_bags([])
+        self.assertTrue(self.said('item 16885 gave no items (empty, or coins only)'))
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.containers[16885].opened, 1)
+        self.assertEqual(self.refresh().kv[2].text, '|cffeda55f0c|r')
+        self.assertIn('Opened 1', self.refresh().loots.text)
+
+    def test_selling_a_box_and_buying_is_not_opening_it(self):
+        self.slash('start')
+        self.pick_junkbox_into_bags()
+        self.both('MERCHANT_SHOW')
+        self.open_into_bags([(5530, 3)])                     # sold the box, bought Blinding Powder
+        self.both('MERCHANT_CLOSED')
+        self.assertIsNone(self.containers()[16885])
+        self.assertEqual(self.refresh().kv[2].text, '|cffeda55f0c|r')
+        self.assertEqual(self.refresh().remind.text, '')      # it did leave your bags
+
+    def test_mob_loot_is_not_box_contents(self):
+        self.slash('start')
+        self.pick_junkbox_into_bags()
+        self.both('LOOT_READY')                              # a mob's loot window: its salt counts from its line
+        self.loot_both(8150, 'Deeprock Salt', 2)
+        self.bag(6, 8150, 2)
+        self.both('LOOT_CLOSED')
+        self.g.NOW += 1.5                                    # its bag update a little late
+        self.both('BAG_UPDATE_DELAYED')
+        self.open_into_bags([(5530, 3)])                     # and the box straight after
+        self.assertIsNone(self.containers()[16885]['items'][8150])
+        self.assertEqual(self.refresh().kv[2].text, '|cffc7c7cf13s|r |cffeda55f59c|r')   # 2 x 297 + 3 x 255
+
+    def test_a_box_with_a_loot_window_is_left_to_the_window(self):
+        """Boxes that still open a loot window (1.6.4's way): counted once, from the window."""
+        self.slash('start')
+        self.pick_junkbox_into_bags()
+        self.g.BAGS[0][3].guid = 'Item-0-0-00000ABC'
+        self.g.LOOT_SOURCES = self.lua.eval('{[2] = "Item-0-0-00000ABC"}')
+        self.g.LOOT_SLOTS = self.lua.eval('{{nil, 0}, {"|Hitem:8150::|h", 2}}')
+        self.both('LOOT_READY')
+        self.both('LOOT_OPENED')
+        self.loot_both(8150, 'Deeprock Salt', 2)
+        self.both('LOOT_CLOSED')
+        self.g.NOW += 3                                      # the bags update well after the window
+        self.open_into_bags([(8150, 2)])
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.containers[16885].opened, 1)
+        self.assertEqual(self.refresh().kv[2].text, '|cffc7c7cf5s|r |cffeda55f94c|r')    # 2 x 297, once
 
 @unittest.skipUnless(lua51, 'lupa is not installed (pip install lupa)')
 class LootLogTests(unittest.TestCase):
@@ -407,6 +575,17 @@ class LootLogTests(unittest.TestCase):
         box = self.g.ForeverMoneyBridgeDB.containers[16885]
         self.assertEqual((box.opened, box['items'][8150]), (1, 2))
         self.assertIsNone(self.g.ForeverMoneyBridgeDB.activity.Tanaris)          # not mob loot
+
+    def test_a_box_that_opens_into_your_bags_is_logged_under_it(self):
+        """Without the meter: the game's own 'can be opened' flag tells a box (Heavy Junkbox in slot 5)."""
+        self.fire('BAG_UPDATE_DELAYED')
+        self.g.BAGS[0][5] = None
+        self.g.BAGS[0][6] = self.lua.eval('{id = 8923, count = 2}')
+        self.fire('BAG_UPDATE_DELAYED')
+        self.g.NOW += 2
+        self.g.RUN_TIMERS()
+        box = self.g.ForeverMoneyBridgeDB.containers[16885]
+        self.assertEqual((box.opened, box['items'][8923]), (1, 2))
 
     def test_by_the_lock_when_the_window_gives_no_source(self):
         self.g.LOOT_SOURCES = self.lua.eval('{}')

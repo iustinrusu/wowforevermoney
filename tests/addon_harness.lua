@@ -25,13 +25,13 @@ function GetLootSourceInfo(slot) return LOOT_SOURCES[slot] end
 function GetNumLootItems() return math.max(#LOOT_SLOTS, 1) end
 function GetLootSlotLink(slot) return LOOT_SLOTS[slot] and LOOT_SLOTS[slot][1] end
 function GetLootSlotInfo(slot) return "icon", "name", LOOT_SLOTS[slot] and LOOT_SLOTS[slot][2] or 0 end
--- your bags: bag -> slot -> { id, guid, locked, hasLoot }
+-- your bags: bag -> slot -> { id, count, guid, locked, hasLoot }
 BAGS = { [0] = {} }
 C_Container = {
   GetContainerNumSlots = function(bag) return BAGS[bag] and 16 or 0 end,
   GetContainerItemID = function(bag, slot) local i = BAGS[bag] and BAGS[bag][slot]; return i and i.id end,
   GetContainerItemInfo = function(bag, slot) local i = BAGS[bag] and BAGS[bag][slot]
-    return i and { itemID = i.id, isLocked = i.locked or false, hasLoot = i.hasLoot or false } end,
+    return i and { itemID = i.id, stackCount = i.count or 1, isLocked = i.locked or false, hasLoot = i.hasLoot or false } end,
   UseContainerItem = function() end,
 }
 ItemLocation = { CreateFromBagAndSlot = function(_, bag, slot) return { bag = bag, slot = slot } end }
@@ -39,7 +39,7 @@ C_Item = {
   GetItemGUID = function(loc) local i = BAGS[loc.bag] and BAGS[loc.bag][loc.slot]
     if not i then error("invalid item location") end return i.guid end,
   GetItemCount = function(id) local n = 0
-    for _, b in pairs(BAGS) do for _, i in pairs(b) do if i.id == id then n = n + 1 end end end return n end,
+    for _, b in pairs(BAGS) do for _, i in pairs(b) do if i.id == id then n = n + (i.count or 1) end end end return n end,
 }
 function GetRealmName() return "" end
 function UnitName() return "Testchar" end
@@ -48,19 +48,31 @@ function UnitClass() return "Rogue", "ROGUE" end
 function IsFishingLoot() return false end
 LOOT_ITEM_SELF = "You receive loot: %s."
 LOOT_ITEM_SELF_MULTIPLE = "You receive loot: %sx%d."
+YOU_LOOT_MONEY, LOOT_MONEY_SPLIT = "You loot %s", "Your share of the loot is %s."
+YOU_LOOT_MONEY_GUILD = "You loot %s (%s deposited to guild bank)"
+LOOT_MONEY = "%s loots %s."
+GOLD_AMOUNT, SILVER_AMOUNT, COPPER_AMOUNT = "%d Gold", "%d Silver", "%d Copper"
 ITEM_OPENABLE, LOCKED = "<Right Click to Open>", "Locked"
 UIParent = {}
 SlashCmdList = { FOREVERMONEYBRIDGE = function() end }
 ITEMS = { [8150] = { "Deeprock Salt", 250 }, [8171] = { "Rugged Hide", 500 }, [6359] = { "Firefin Snapper", 2 },
-          [7973] = { "Big-mouth Clam", 0 }, [999] = { "Soulbound Thing", 77 }, [16885] = { "Heavy Junkbox", 0 } }
+          [7973] = { "Big-mouth Clam", 0 }, [999] = { "Soulbound Thing", 77 }, [16885] = { "Heavy Junkbox", 0 },
+          [8923] = { "Essence of Agony", 0 }, [5530] = { "Blinding Powder", 125 } }
 function GetItemInfo(id) local i = ITEMS[id]; if not i then return nil end
   return i[1], "link", 1, 1, 1, "t", "s", 20, "", "icon", i[2] end
-TSM_PRICES = { [8150] = 313, [8171] = 520, [6359] = 1000 }
+TSM_PRICES = { [8150] = 313, [8171] = 520, [6359] = 1000, [8923] = 53, [5530] = 269 }
 TSM_API = { GetCustomPriceValue = function(str, itemString) return TSM_PRICES[tonumber(itemString:match("i:(%d+)"))] end }
 TOOLTIPS = { [7973] = { "Big-mouth Clam", "<Right Click to Open>" }, [8150] = { "Deeprock Salt" },
              [16885] = { "Heavy Junkbox", "Locked" } }
 C_TooltipInfo = { GetItemByID = function(id) local l = {} for _, t in ipairs(TOOLTIPS[id] or {}) do l[#l + 1] = { leftText = t } end return { lines = l } end }
-C_Timer = { After = function() end }
+TIMERS = {}                -- C_Timer.After calls; RUN_TIMERS() runs the ones due by NOW, in order
+C_Timer = { After = function(delay, f) TIMERS[#TIMERS + 1] = { at = NOW + delay, f = f } end }
+function RUN_TIMERS()
+  local due = {}
+  for i = #TIMERS, 1, -1 do if TIMERS[i].at <= NOW then table.insert(due, table.remove(TIMERS, i)) end end
+  table.sort(due, function(a, b) return a.at < b.at end)
+  for _, t in ipairs(due) do t.f() end
+end
 
 local function fontString()
   local fs = { text = "", shown = true }
