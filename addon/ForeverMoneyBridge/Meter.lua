@@ -17,11 +17,19 @@
 -- 1.6.7: coins count from your own chat line ("You loot 3 Silver, 15 Copper"); see coinLine below. And boxes that
 -- open straight into your bags (no loot window since the 25 Nov patch) count what they gave: ns.onBoxOpened.
 -- 1.6.8: a minimap button with every command in a list (end of this file), and /gea help.
+-- 1.6.9: everything it counts or skips, and why, goes to the addon's log (ns.log, always on); errors are logged, not
+-- swallowed (ns.try). /gea log shows the last lines.
 
 local _, ns = ...                   -- the addon's shared table: ns.bagItem (ForeverMoneyBridge.lua), the box a loot
                                     -- window came from
 ns = ns or {}
-local VERSION = "1.6.8"             -- the same as the .toc's ## Version (tests/test_meter_lua.py checks)
+local log = ns.log or function() end
+local try = ns.try or function(_, fn, ...) return pcall(fn, ...) end
+local function note(...)                   -- a chat message that also goes to the log
+  print(...)
+  log("meter", ...)
+end
+local VERSION = "1.6.9"             -- the same as the .toc's ## Version (tests/test_meter_lua.py checks)
 local CUT = 0.05
 local TSM_PRICE = "first(DBMinBuyout, DBMarket, DBRegionMarketAvg)"
 -- newer clients (WoW: Forever) moved these into C_Item / C_Spell; the old globals may not exist
@@ -467,6 +475,8 @@ local function start()
   win.pause:SetText("Pause")
   refresh()
   print("|cffe8c060Gold Ever After|r started. /gea pause, /gea min (one line), /gea stop.")
+  log("meter", "session started in " .. session.zone .. "; prices: " .. (session.app and "the app's" or "TSM in game")
+    .. " (" .. priceMode() .. ")")
 end
 
 local function stop(endedAt)          -- endedAt: when it really ended (a session saved at logout), else now
@@ -474,7 +484,7 @@ local function stop(endedAt)          -- endedAt: when it really ended (a sessio
   local boxes = 0
   for _, n in pairs(session.unopened) do boxes = boxes + n end
   if boxes > 0 then
-    print(string.format("|cffe8c060Gold Ever After|r: %d container%s not opened yet, so not counted. Open them and they count in your next session (or /gea start again first).", boxes, boxes == 1 and "" or "s"))
+    note(string.format("|cffe8c060Gold Ever After|r: %d container%s not opened yet, so not counted. Open them and they count in your next session (or /gea start again first).", boxes, boxes == 1 and "" or "s"))
   end
   local secs = elapsed()
   local value = totals()
@@ -488,7 +498,7 @@ local function stop(endedAt)          -- endedAt: when it really ended (a sessio
     pricesMade = ForeverMoneyBridge_Prices and ForeverMoneyBridge_Prices.made or 0,
     xp = xp, xpPerHour = secs > 0 and math.floor(xp / secs * 3600) or 0, level = UnitLevel("player") })
   while #m.sessions > 50 do table.remove(m.sessions) end
-  print(string.format("|cffe8c060Gold Ever After|r stopped: %s in %d min%s%s. Saved.", money(total), secs / 60,
+  note(string.format("|cffe8c060Gold Ever After|r stopped: %s in %d min%s%s. Saved.", money(total), secs / 60,
     secs >= 60 and (" (" .. money(total / secs * 3600) .. " an hour)") or "",
     xp > 0 and (", " .. comma(xp) .. " XP" .. (secs >= 60 and (" (" .. comma(xp / secs * 3600) .. " an hour)") or "")) or ""))
   session = nil
@@ -524,7 +534,7 @@ local function carryOn()               -- at PLAYER_LOGIN
     zone = s.zone or "?", app = s.app }
   local away = time() - (s.saved or 0)
   if away > RESUME_MINUTES * 60 then
-    print(string.format("|cffe8c060Gold Ever After|r: you logged out %s ago with a session running, so it ends there.",
+    note(string.format("|cffe8c060Gold Ever After|r: you logged out %s ago with a session running, so it ends there.",
       duration(away / 60)))
     stop(s.saved)
     return
@@ -538,7 +548,7 @@ local function carryOn()               -- at PLAYER_LOGIN
   win.pause:SetText(session.paused and "Resume" or "Pause")
   if s.hidden then win:Hide() else win:Show() end
   refresh()
-  print(string.format("|cffe8c060Gold Ever After|r carried on with your session (%s so far%s). /gea stop ends it.",
+  note(string.format("|cffe8c060Gold Ever After|r carried on with your session (%s so far%s). /gea stop ends it.",
     duration(elapsed() / 60), session.paused and ", paused" or ""))
 end
 
@@ -547,7 +557,10 @@ end
 -- loot it was and to tell containers opened from your bags (which box: ns.bagItem) from mob, chest and fishing loot
 -- (with auto loot the window can be gone before it's read).
 local debug = false
-local function say(...) if debug then print("|cffe8c060Gold Ever After|r", ...) end end
+local function say(...)                  -- always to the log; in chat too with /gea debug
+  log("meter", ...)
+  if debug then print("|cffe8c060Gold Ever After|r", ...) end
+end
 
 local function pattern(fmt)            -- "You receive loot: %s." -> "^You receive loot: (.+)%.$"
   fmt = fmt:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
@@ -702,13 +715,13 @@ end
 ev:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
   if event == "PLAYER_LOGIN" then                     -- a session running at the last logout or /reload; the minimap button
-    pcall(carryOn)
-    if setupMinimap then pcall(setupMinimap) end
+    try("farm meter: carry on a session", carryOn)
+    if setupMinimap then try("farm meter: minimap button", setupMinimap) end
     return
   end
-  if event == "PLAYER_LOGOUT" then pcall(keepRunning) return end
+  if event == "PLAYER_LOGOUT" then try("farm meter: keep the session", keepRunning) return end
   if event == "PLAYER_XP_UPDATE" or event == "PLAYER_LEVEL_UP" then
-    if session then pcall(noteXP) end                  -- paused: the bar moves on, nothing is counted
+    if session then try("farm meter: XP", noteXP) end                  -- paused: the bar moves on, nothing is counted
     return
   end
   if event == "UNIT_SPELLCAST_SUCCEEDED" then
@@ -724,12 +737,12 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
     return
   end
   if event == "LOOT_READY" or event == "LOOT_OPENED" then
-    pcall(noteWindow)
+    try("farm meter: loot window", noteWindow)
   elseif event == "LOOT_CLOSED" then
     windowCounted = false
     windowKind = nil
   elseif event == "BAG_UPDATE_DELAYED" then
-    pcall(reconcileBoxes)
+    try("farm meter: boxes left", reconcileBoxes)
   elseif event == "CHAT_MSG_LOOT" then
     if GetTime() <= skipUntil then return end
     local link, n = nil, 1
@@ -752,12 +765,20 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
       chatCoins, moneyDelta = true, nil
       addMoney(copper)
     elseif copper == nil then                          -- a line the meter can't read: pair it with the gold change
+      say("coins: a line the meter can't read, paired with the change in your gold:", msg)
       if moneyDelta then addMoney(moneyDelta); moneyDelta = nil else moneyChatAt = GetTime() end
-    end                                                -- false: someone else's coins
+    else
+      say("coins: someone else's, not counted:", msg)
+    end
   elseif event == "PLAYER_MONEY" then
     local now = GetMoney()
     local delta = lastMoney and now - lastMoney or 0
     lastMoney = now
+    if delta > 0 and GetTime() < moneyQuietUntil then
+      say("your gold went up " .. money(delta, true) .. " just after logging in: not counted (your gold loading in)")
+    elseif delta > 0 and chatCoins then
+      say("your gold went up " .. money(delta, true) .. ": counted only when a loot line of yours says so")
+    end
     if chatCoins or delta <= 0 or GetTime() < moneyQuietUntil then return end
     if GetTime() - moneyChatAt <= 2 then addMoney(delta); moneyChatAt = 0 else
       moneyDelta, moneyTimer = delta, moneyTimer + 1   -- not loot (a sale, mail, a quest) unless a line follows
@@ -784,6 +805,7 @@ local HELP = {
   { "prices tsm", "always TSM in game (the app isn't needed)" },
   { "debug", "print in chat what the meter counts and why (each loot window, box and coin line); again to stop" },
   { "minimap", "hide the minimap button, or bring it back" },
+  { "log", "the last 15 lines of the addon's log (what it counted or skipped and why, and any error); /gea log 40 for more" },
   { "help", "this list" },
 }
 local function printHelp()
@@ -814,10 +836,23 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
     if session then makeWindow():Show(); refresh() else print(NOT_RUNNING) end
   elseif cmd == "pause" and session and not session.paused then
     session.paused, session.pausedAt = true, GetTime()
+    log("meter", "paused")
     win.pause:SetText("Resume")
     refresh()
   elseif cmd == "help" then
     printHelp()
+  elseif cmd == "log" or cmd:match("^log %d+$") or cmd == "log clear" then
+    local l = ForeverMoneyBridgeDB and ForeverMoneyBridgeDB.log
+    if cmd == "log clear" then
+      if l then for i = #l, 1, -1 do l[i] = nil end end
+      print("|cffe8c060Gold Ever After|r: the log is empty now.")
+    elseif not l or #l == 0 then
+      print("|cffe8c060Gold Ever After|r: the log is empty.")
+    else
+      local n = tonumber(cmd:match("%d+")) or 15
+      print("|cffe8c060Gold Ever After|r log, the last " .. math.min(n, #l) .. " of " .. #l .. " lines (/reload saves it to disk):")
+      for i = math.max(1, #l - n + 1), #l do print("  " .. l[i]) end
+    end
   elseif cmd == "minimap" then
     if toggleMinimap then toggleMinimap() end
   elseif cmd == "debug" then
@@ -845,6 +880,7 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
       .. " TSM's data (else its average there, else the region's), minus the 5% AH cut, or the vendor price when that"
       .. " is higher. TSM's data is as new as your last login or /reload.")
   elseif cmd == "resume" and session and session.paused then
+    log("meter", "resumed")
     session.pausedFor = session.pausedFor + (GetTime() - session.pausedAt)
     session.paused = false
     lastMoney = GetMoney()
@@ -854,7 +890,7 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
     if original then original(msg) end
     print("|cffe8c060Gold Ever After|r " .. VERSION .. ": /gea start, /gea pause, /gea resume, /gea stop, /gea min (fold the window to"
       .. " one line and back), /gea hide, /gea show (it keeps counting while hidden), /gea prices, /gea debug, /gea minimap,"
-      .. " /gea help (all of them, explained).")
+      .. " /gea log, /gea help (all of them, explained).")
   end
 end
 
@@ -913,6 +949,8 @@ local function menuEntries()
   head("More")
   add("Debug", "debug", "Print in chat what the meter counts and why: each loot window, box and coin line. Click again"
     .. " to stop.", debug)
+  add("Show the log in chat", "log", "Print the last 15 lines of the addon's log: what it counted or skipped and why,"
+    .. " and any error. /reload saves the log to disk.")
   add("List every command in chat", "help", "Print every /gea command with what it does.")
   add("Hide this minimap button", "minimap", "Hide the coin on the minimap. Type /gea minimap to bring it back.")
   return e
@@ -1042,7 +1080,7 @@ end
 
 toggleMinimap = function()
   mm().hide = not mm().hide
-  if not mmButton then pcall(setupMinimap) end
+  if not mmButton then try("farm meter: minimap button", setupMinimap) end
   if mmButton then if mm().hide then mmButton:Hide() else mmButton:Show() end end
   if menu then menu:Hide() end
   print("|cffe8c060Gold Ever After|r minimap button " .. (mm().hide and "hidden. /gea minimap brings it back."

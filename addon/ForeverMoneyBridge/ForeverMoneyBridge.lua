@@ -7,6 +7,59 @@
 local ADDON, ns = ...      -- ns: the table WoW gives every file of this addon (Meter.lua uses ns.bagItem)
 ns = ns or {}
 
+-- The log (1.6.9, the user: "logging should be explicit so we can catch issues"). Always on, not only with /gea debug:
+-- what the addon did and why (the farm meter's every count and skip, the box watcher, the loot log) and every error it
+-- caught, with where. Kept in ForeverMoneyBridgeDB.log, the last 600 lines; WoW writes it to disk on /reload or
+-- logout, where Claude can read it. /gea log shows the last lines in chat. Lines from before the saved file is
+-- loaded wait in `early` and go in first.
+local LOG_MAX = 600
+local early, svReady = {}, false
+local function clean(v)                    -- no colour codes or links in the log, one line each
+  return (tostring(v):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1"):gsub("\n", " / "))
+end
+local function store(line)
+  if not svReady then early[#early + 1] = line return end
+  ForeverMoneyBridgeDB = ForeverMoneyBridgeDB or {}
+  local l = ForeverMoneyBridgeDB.log
+  if type(l) ~= "table" then l = {}; ForeverMoneyBridgeDB.log = l end
+  l[#l + 1] = line
+  while #l > LOG_MAX do table.remove(l, 1) end
+end
+function ns.log(kind, ...)
+  local parts = {}
+  for i = 1, select("#", ...) do parts[#parts + 1] = clean(select(i, ...)) end
+  store((date and date("%m-%d %H:%M:%S") or "") .. string.format(" [%.1f] ", GetTime()) .. kind .. ": "
+    .. table.concat(parts, " "))
+end
+
+-- Run a handler; an error is logged with where it happened (and the Lua stack when the game gives it) and said once in
+-- chat, never swallowed in silence. The same error again is logged its first 3 times, then every 50th.
+local failed = {}
+function ns.try(where, fn, ...)
+  local n, args = select("#", ...), { ... }
+  local ok, err = xpcall(function() return fn(unpack(args, 1, n)) end, function(e)
+    return tostring(e) .. (debugstack and (" @ " .. debugstack(2, 3, 0)) or "")
+  end)
+  if not ok then
+    failed[where] = (failed[where] or 0) + 1
+    local count = failed[where]
+    if count <= 3 or count % 50 == 0 then
+      ns.log("ERROR", where .. (count > 1 and (" (" .. count .. " times so far)") or "") .. ":", err)
+    end
+    if count == 1 then
+      print("|cffe8c060Gold Ever After|r: |cffff6060an error in " .. where .. "|r (" .. clean(err):sub(1, 120)
+        .. "). It's in the log: /gea log shows it, /reload saves it for a closer look.")
+    end
+  end
+  return ok
+end
+
+function ns.logReady()                     -- the saved file is loaded: what waited goes in first
+  svReady = true
+  for _, line in ipairs(early) do store(line) end
+  early = {}
+end
+
 -- Which bag item a loot window came from (a clam, lockbox, junkbox, trunk, sack...), shared through `ns` by the
 -- loot log below and the farm meter (Meter.lua). Kept in this file, not a new one: WoW may only find a new addon
 -- file after a full restart, where this one updates with a /reload.
@@ -225,7 +278,12 @@ local function recordLoot()
   local box = (kind == "Item" or (kind == nil and not fishing)) and ns.bagItem(guid) or nil
   if kind == "Item" or box then
     ns.boxWindowAt = GetTime()  -- the bag watcher below leaves this box to the window
-    if box then recordContainer(box) end
+    if box then
+      recordContainer(box)
+      ns.log("loot log", "a loot window from item " .. box .. ": logged under that box")
+    else
+      ns.log("loot log", "a loot window from an item in your bags, but which one wasn't found: not logged")
+    end
     return                    -- never count container contents as fishing or mob loot
   end
   local activity
@@ -365,8 +423,12 @@ local function boxDone(ev)                   -- PAIR seconds after a box left: w
     end
   end
   gains = keep
+  local got = {}
+  for id, n in pairs(items) do got[#got + 1] = ((GetItemInfo and GetItemInfo(id)) or ("item " .. id)) .. " x" .. n end
+  ns.log("box", "item " .. ev.id .. " opened into your bags: " .. (#got > 0 and ("gave " .. table.concat(got, ", "))
+    or "nothing came in (empty, coins only, or destroyed)"))
   recordOpened(ev.id, items)
-  if ns.onBoxOpened then pcall(ns.onBoxOpened, ev.id, items) end
+  if ns.onBoxOpened then ns.try("farm meter: box opened", ns.onBoxOpened, ev.id, items) end
 end
 
 local function onBags()
@@ -374,18 +436,30 @@ local function onBags()
   for id in pairs(openable) do boxKinds[id] = true end
   local before = bagSnap
   bagSnap = counts
+  if not before then return end
   local now = GetTime()
-  if not before or next(busy) or windowOpen or now - windowShut <= 1 then return end   -- loot windows count themselves
+  local left = {}                            -- containers that left your bags
+  for id, n in pairs(before) do
+    if (counts[id] or 0) < n and (boxKinds[id] or (ns.isContainer and ns.isContainer(id))) then left[#left + 1] = id end
+  end
+  local skip = (next(busy) and ("a " .. next(busy) .. " window was open"))
+    or ((windowOpen or now - windowShut <= 1) and "a loot window was open or had just closed") or nil
+  if skip then                               -- loot windows count themselves; a vendor or bank is not opening a box
+    for _, id in ipairs(left) do ns.log("box", "item " .. id .. " left your bags while " .. skip .. ": not counted as opened") end
+    return
+  end
   for id, n in pairs(counts) do
     local up = n - (before[id] or 0)
     if up > 0 then gains[#gains + 1] = { id = id, n = up, t = now } end
   end
-  for id, n in pairs(before) do
-    if (counts[id] or 0) < n and (boxKinds[id] or (ns.isContainer and ns.isContainer(id)))
-        and now - (ns.boxWindowAt or -99) > 10 then
+  for _, id in ipairs(left) do
+    if now - (ns.boxWindowAt or -99) <= 10 then
+      ns.log("box", "item " .. id .. " left your bags after its own loot window: counted from that window")
+    else
+      ns.log("box", "item " .. id .. " left your bags: what comes in within " .. PAIR .. " s is what it held")
       local ev = { id = id, t = now }
       gone[#gone + 1] = ev
-      if C_Timer then C_Timer.After(PAIR, function() pcall(boxDone, ev) end) end
+      if C_Timer then C_Timer.After(PAIR, function() ns.try("box watcher", boxDone, ev) end) end
     end
   end
   local keep = {}                            -- what no box can claim any more
@@ -490,6 +564,7 @@ local function tsmVendor()
   end)
 end
 
+f:RegisterEvent("ADDON_LOADED")
 f:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 f:RegisterEvent("MERCHANT_SHOW")
 f:RegisterEvent("MERCHANT_UPDATE")
@@ -504,32 +579,39 @@ f:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 for _, e in ipairs({ "BAG_UPDATE_DELAYED", "LOOT_READY", "LOOT_CLOSED", "CHAT_MSG_LOOT" }) do pcall(f.RegisterEvent, f, e) end
 for e in pairs(BUSY) do pcall(f.RegisterEvent, f, e) end    -- some may not exist in this client
 f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
-  if event == "BAG_UPDATE_DELAYED" then
-    pcall(onBags)
+  if event == "ADDON_LOADED" then
+    if arg1 == ADDON then
+      ns.logReady()
+      local build = GetBuildInfo and select(2, GetBuildInfo())
+      ns.log("addon", "Gold Ever After loaded" .. (build and (", game build " .. build) or ""))
+    end
+  elseif event == "BAG_UPDATE_DELAYED" then
+    ns.try("bag watcher", onBags)
   elseif event == "CHAT_MSG_LOOT" then
-    pcall(onLootLine, arg1 or "")
+    ns.try("loot lines", onLootLine, arg1 or "")
   elseif event == "LOOT_READY" then
     windowOpen = true
   elseif event == "LOOT_CLOSED" then
     windowOpen, windowShut = false, GetTime()
   elseif BUSY[event] then
     busy[BUSY[event]] = (event:find("_SHOW$") or event:find("_OPENED$")) and true or nil
-    if event == "MERCHANT_SHOW" then pcall(recordMerchant) end
+    if event == "MERCHANT_SHOW" then ns.try("vendor prices", recordMerchant) end
   elseif event == "LOOT_OPENED" then
     windowOpen = true
-    pcall(recordLoot)
+    ns.try("loot log", recordLoot)
   elseif event == "GET_ITEM_INFO_RECEIVED" then
     if arg1 and pendingInfo[arg1] then
       local ok, done = pcall(storeItemInfo, arg1)
+      if not ok then ns.log("ERROR", "item check " .. arg1 .. ":", done) end
       if ok and done then pendingInfo[arg1] = nil end
     end
   elseif event == "PLAYER_LOGIN" then
-    pcall(snapshot, event)
-    if C_Timer then C_Timer.After(5, function() pcall(snapshot, "DELAYED_LOGIN") end) end   -- gold is loaded by then
-    if C_Timer then C_Timer.After(15, function() pcall(checkItems) end) end   -- after the login rush
-    if C_Timer then C_Timer.After(30, function() pcall(tsmVendor) end) end    -- TSM's vendor prices, once it has loaded
+    ns.try("snapshot", snapshot, event)
+    if C_Timer then C_Timer.After(5, function() ns.try("snapshot", snapshot, "DELAYED_LOGIN") end) end   -- gold is loaded by then
+    if C_Timer then C_Timer.After(15, function() ns.try("item checks", checkItems) end) end   -- after the login rush
+    if C_Timer then C_Timer.After(30, function() ns.try("TSM vendor prices", tsmVendor) end) end    -- once TSM has loaded
   elseif event == "MERCHANT_SHOW" or event == "MERCHANT_UPDATE" then
-    pcall(recordMerchant)
+    ns.try("vendor prices", recordMerchant)
   elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
     if arg1 == "player" then
       local name = arg3 and ((C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(arg3))
@@ -538,7 +620,7 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
       if activity then lastCast.activity, lastCast.t = activity, GetTime() end
     end
   else
-    pcall(snapshot, event)
+    ns.try("snapshot", snapshot, event)
   end
 end)
 

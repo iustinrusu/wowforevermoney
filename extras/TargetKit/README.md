@@ -66,6 +66,12 @@ Revised:
   ` LeftButton 1` while the game acts on key down (the default; the window shows the exact line). The addon writes
   the real macro just before each click.
 - `/tkit add <name>`, `/tkit remove <name>`, `/tkit list`, `/tkit clear`: the find list from chat.
+- **The log**, always on: every press (which macro, every unit it saw and why it took or passed over each, the macro it
+  ran), what came of it in the next 2 seconds (the game's error line such as "Out of range.", the cast, the new
+  target), the game settings that matter at login (act on key down, nameplates, soft targeting), the macros and keys
+  it made (each key checked to really press the button), anything the game blocked, and every error with where (also
+  said once in chat). `/tkit log` shows the last 15 lines (`/tkit log 40`, `/tkit log clear`); the last 400 are kept
+  in the saved file, written on `/reload` or logout. When something doesn't work, `/reload` and say so.
 - `/tkit macros` makes the three macros again if you deleted them (and prints the lines for your own); `/tkit forget`
   clears whom you robbed; `/tkit debug` prints, on every press, what it chose and the macro it ran; `/tkit help`.
 - Nameplates matter: the addon sees units through them (enemy nameplates for mobs and players, friendly ones for

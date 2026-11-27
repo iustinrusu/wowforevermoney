@@ -910,6 +910,28 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (eighth part) Explicit logs in both addons (the user: "do we have anything for logging or debugging, in
+  case something does not work? logging should be explicit so we can catch issues"). Before, `/gea debug` and
+  `/tkit debug` only printed to chat while on, and 15 handler errors in Gold Ever After were swallowed by bare pcalls.
+  Now, always on:
+  - Gold Ever After 1.6.9: `ForeverMoneyBridgeDB.log`, last 600 lines.
+    - The meter's every count and skip.
+    - Coin lines (someone else's, unreadable) and gold changes with no loot line.
+    - The box watcher's every box that left the bags, and why it was or wasn't counted.
+    - Loot-log box windows; session start, stop, carry-on, pause and resume.
+    - Every error, via `ns.try` (xpcall, with the stack when the game gives it), logged and said once in chat.
+    - Lines from before the saved file loads wait and go in first (ADDON_LOADED).
+    - `/gea log [n|clear]`, and "Show the log in chat" in the minimap menu.
+  - TargetKit 1.2.0: `TargetKitDB.log`, last 400 lines.
+    - Every press: what it saw, each unit taken or passed over with the reason, and the macro.
+    - What came of it in the next 2 s: the game's error line, the cast, the new target.
+    - Settings at login (ActionButtonUseKeyDown, nameplates, SoftTargetEnemy, nameplate range).
+    - Macros made or updated; keys set and checked with GetBindingAction (a warning in chat if the key does something
+      else).
+    - ADDON_ACTION_BLOCKED/FORBIDDEN for TargetKit; every handler wrapped in `try`. `/tkit log [n|clear]`.
+  CLAUDE.md now says to read these logs first when the user reports an addon problem. The app's Lua parser reads
+  saved files with a log in them. 14 new tests, 430 in all. Not checked in game yet.
+
 - **2026-11-27** (seventh part) TargetKit 1.1.0 (the user: a minimap button "for rebinding the macros (key combinations,
   key + key, should be accepted)", to "input the mob that should be targeted" or "set to current selected target", and
   "being able to create a macro to /use_addon_target, /use_addon_pickpocket, /use_addon_sap ... so I can have them on my

@@ -328,6 +328,84 @@ class TargetKitTests(unittest.TestCase):
         self.assertFalse(button.shown)
         self.assertTrue(self.g.TargetKitDB.minimap.hide)
 
+    # --- the log (1.2.0, the user: "logging should be explicit so we can catch issues") ---
+    def logged(self):
+        l = self.g.TargetKitDB.log
+        return [l[i] for i in range(1, len(l) + 1)] if l else []
+
+    def in_log(self, text):
+        return any(text in line for line in self.logged())
+
+    def test_login_logs_the_settings_that_matter_and_the_macros(self):
+        self.assertTrue(self.in_log('addon: TargetKit 1.2.0 loaded; act on key down 1, enemy nameplates 1, friendly'
+                                    ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
+        self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /click TKSap LeftButton 1'))
+
+    def test_a_press_logs_what_it_saw_why_and_the_macro(self):
+        self.unit('nameplate1', 'Wolf', reach=1, type=1)
+        self.unit('nameplate2', 'Nightstep', player=True, reach=2)
+        self.unit('nameplate3', 'Bodyguard', player=True, reach=1, combat=True)
+        self.press('TKSap')
+        self.assertTrue(self.in_log('press: TK Sap: enemy player in Sap range: Nightstep (nameplate2, Sap range) -> '
+                                    '/cast [@mouseover,harm,nodead] Sap / /stopmacro [@mouseover,harm,nodead] / '
+                                    '/target nameplate2 / /cast Sap'))
+        saw = [l for l in self.logged() if 'saw:' in l][-1]
+        self.assertIn('Nightstep (nameplate2, Sap range)', saw)
+        self.assertIn('Wolf (nameplate1): not humanoid (Sap takes humanoids)', saw)
+        self.assertIn('Bodyguard (nameplate3): in combat (Sap needs it out of combat)', saw)
+
+    def test_what_came_of_a_press_is_logged_for_2_seconds(self):
+        target = self.unit('nameplate1', 'Nightstep', player=True, reach=2)
+        self.press('TKSap')
+        self.g.UNITS.target = target
+        self.fire('PLAYER_TARGET_CHANGED')
+        self.fire('UI_ERROR_MESSAGE', 51, 'You must be in stealth.')
+        self.fire('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-1', 6770)
+        self.g.NOW += 3
+        self.fire('UI_ERROR_MESSAGE', 51, 'Out of range.')                 # later: not from that press
+        self.assertTrue(self.in_log('result: TK Sap: target now Nightstep'))
+        self.assertTrue(self.in_log('result: TK Sap: the game said: You must be in stealth.'))
+        self.assertTrue(self.in_log('result: TK Sap: cast Sap on Nightstep'))
+        self.assertFalse(self.in_log('Out of range.'))
+
+    def test_an_error_is_logged_and_said_once_and_the_fixed_macro_runs(self):
+        self.unit('nameplate1', 'Nightstep', player=True, reach=2)
+        self.g.UnitCreatureType = self.lua.eval('function() error("boom") end')
+        fixed = self.g.TKSap.attrs['macrotext']
+        self.assertEqual(self.press('TKSap'), fixed)
+        self.press('TKSap')
+        errors = [l for l in self.logged() if 'ERROR: TK Sap press' in l]
+        self.assertEqual(len(errors), 2)
+        self.assertIn('boom', errors[0])
+        self.assertTrue(self.in_log('press: TK Sap: an error (logged), so the fixed macro'))
+        said = [l for l in self.g.printed.values() if 'an error in TK Sap press' in l]
+        self.assertEqual(len(said), 1)
+
+    def test_what_the_game_blocks_is_logged(self):
+        self.fire('ADDON_ACTION_BLOCKED', 'TargetKit', 'TargetUnit()')
+        self.fire('ADDON_ACTION_BLOCKED', 'SomeOtherAddon', 'CastSpellByName()')
+        self.assertTrue(self.in_log('ERROR: the game blocked TargetKit from TargetUnit() (ADDON_ACTION_BLOCKED)'))
+        self.assertFalse(self.in_log('SomeOtherAddon'))
+        self.assertTrue(self.said('the game blocked TargetKit from TargetUnit()'))
+
+    def test_a_key_is_checked_after_it_is_set(self):
+        self.open_window()
+        self.set_key(3, 'F', mods=('shift',))
+        self.assertTrue(self.in_log('keys: TK Sap on SHIFT-F'))
+        self.g.SetOverrideBindingClick = self.lua.eval('function() end')     # something else keeps the key
+        self.set_key(2, 'G')
+        self.assertTrue(self.in_log("WARN: TK Pickpocket on G, but the key does nothing instead"))
+        self.assertTrue(self.said("TK Pickpocket's key G does something else"))
+
+    def test_tkit_log_shows_the_last_lines_and_clears(self):
+        self.slash('add Thug')
+        self.slash('log 2')
+        printed = [self.g.printed[i] for i in range(len(self.g.printed) - 2, len(self.g.printed) + 1)]
+        self.assertIn('log, the last 2 of', printed[0])
+        self.assertIn('window: added Thug to the find list', printed[2])
+        self.slash('log clear')
+        self.assertEqual(self.logged(), [])
+
     def test_the_addon_compiles_and_the_toc_loads_it(self):
         toc = (KIT / 'TargetKit.toc').read_text(encoding='utf-8')
         self.assertIn('## SavedVariables: TargetKitDB', toc)

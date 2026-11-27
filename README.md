@@ -134,6 +134,11 @@ See docs/PROJECT_LOG.md, open items.
   coin around the minimap to move it: its place is saved and kept through relogs, `/reload` and game restarts (the same
   spot on every character). The coin is grey while no session runs or it is paused. "Hide this minimap button" in
   the list hides it; `/gea minimap` brings it back. `/gea help` prints every command with what it does.
+- **The log:** the addon writes down what it does and why, all the time: every item and coin the meter counts or skips
+  (and why), each box it sees leave your bags, the loot log, and every error, with where it happened (errors are also
+  announced once in chat). `/gea log` shows the last 15 lines (`/gea log 40` for more, `/gea log clear` empties it).
+  It keeps the last 600 lines in the addon's saved file; WoW writes that on `/reload` or logout. When something looks
+  wrong, `/reload` and say so: the log tells what happened.
 - **Which version is running:** `/gea debug` and `/gea` say it (for example "Gold Ever After 1.6.6"). The app copies
   a new addon into WoW when it starts, so after an update start the app, then `/reload` in game.
 - **Install without the app:** double-click `install_addon.bat`. It finds WoW: Forever (TSM desktop app

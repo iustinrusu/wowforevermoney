@@ -12,6 +12,9 @@ function InCombatLockdown() return COMBAT end
 KEYDOWN = true
 function GetCVarBool(name) if name == "ActionButtonUseKeyDown" then return KEYDOWN end end
 function IsInRaid() return false end
+CVARS = { ActionButtonUseKeyDown = "1", nameplateShowEnemies = "1", nameplateShowFriends = "0", SoftTargetEnemy = "1",
+          nameplateMaxDistance = "41" }
+function GetCVar(name) return CVARS[name] end
 SPELL_FAILED_TARGET_NO_POCKETS = "No pockets to pick"
 
 -- units by token: { guid, name, reach (1 Pick Pocket range, 2 Sap range, 3 duel, 4 trade, 5 follow, 6 further),

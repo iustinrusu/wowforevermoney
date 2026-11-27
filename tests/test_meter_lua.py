@@ -34,6 +34,7 @@ class MeterTests(unittest.TestCase):
         self.g = self.lua.globals()
         self.slash = self.g.SlashCmdList.FOREVERMONEYBRIDGE
         self.events = self.g.frames[2]      # frames[1] is the loot log's
+        self.g.frames[1].scripts['OnEvent'](self.g.frames[1], 'ADDON_LOADED', 'ForeverMoneyBridge')   # the log can be saved
 
     def fire(self, *args):
         self.events.scripts['OnEvent'](self.events, *args)
@@ -404,7 +405,8 @@ class MeterTests(unittest.TestCase):
         self.assertEqual([r.label.text for r in rows], [
             f'|cffe8c060Gold Ever After {version}|r', 'Start a session', 'Fold the window to one line',
             '|cffe8c060Prices: how items are valued|r', 'Auto', "Always the app's", 'Always TSM in game',
-            '|cffe8c060More|r', 'Debug', 'List every command in chat', 'Hide this minimap button'])
+            '|cffe8c060More|r', 'Debug', 'Show the log in chat', 'List every command in chat',
+            'Hide this minimap button'])
         self.assertEqual([r.label.text for r in rows if r.check.shown], ['Auto'])          # the choice now, ticked
         self.assertTrue(all(r.explain for r in rows if r.cmd))                            # each one explained
         self.assertEqual(self.g.GoldEverAfterMenu.point[1], 'TOPLEFT')                    # minimap on the left
@@ -482,6 +484,81 @@ class MeterTests(unittest.TestCase):
         button.scripts['OnEnter'](button)
         self.assertIn('Running, 2 min so far: |cffc7c7cf2s|r |cffeda55f97c|r.', self.g.TOOLTIP)
         self.assertIn('Click: every command in a list.', self.g.TOOLTIP)
+
+    # --- the log (1.6.9, the user: "logging should be explicit so we can catch issues") ---
+    def logged(self):
+        l = self.g.ForeverMoneyBridgeDB.log
+        return [l[i] for i in range(1, len(l) + 1)] if l else []
+
+    def in_log(self, text):
+        return any(text in line for line in self.logged())
+
+    def test_the_log_keeps_what_the_meter_did_without_debug(self):
+        self.slash('start')
+        self.loot(8150, 'Deeprock Salt', 2)
+        self.slash('pause')
+        self.slash('resume')
+        self.slash('stop')
+        self.assertTrue(self.in_log('addon: Gold Ever After loaded'))
+        self.assertTrue(self.in_log('meter: session started in Tanaris; prices: TSM in game (auto)'))
+        self.assertTrue(self.in_log('meter: item: [Deeprock Salt] x2 5s 94c'))            # no colour codes or links
+        self.assertTrue(self.in_log('meter: paused') and self.in_log('meter: resumed'))
+        self.assertTrue(self.in_log('meter: Gold Ever After stopped: 5s 94c in 0 min. Saved.'))
+        self.assertFalse(self.said('item: '))                                              # chat stays quiet
+
+    def test_coin_lines_and_gold_changes_are_explained(self):
+        self.slash('start')
+        self.coin_loot(315, 'You loot 3 Silver, 15 Copper')
+        self.coin_loot(700, 'Brakka loots 7 Silver.')
+        self.assertTrue(self.in_log("coins: someone else's, not counted: Brakka loots 7 Silver."))
+        self.assertTrue(self.in_log('your gold went up 7s: counted only when a loot line of yours says so'))
+
+    def test_boxes_are_explained(self):
+        self.slash('start')
+        self.pick_junkbox_into_bags()
+        self.open_into_bags([(8923, 2), (5530, 3)])
+        self.assertTrue(self.in_log('box: item 16885 left your bags: what comes in within 2 s is what it held'))
+        opened = [l for l in self.logged() if 'item 16885 opened into your bags: gave' in l]
+        self.assertEqual(len(opened), 1)
+        self.assertIn('Essence of Agony x2', opened[0])
+        self.assertIn('Blinding Powder x3', opened[0])
+        self.bag(3, 16885, has_loot=True)
+        self.both('BAG_UPDATE_DELAYED')
+        self.both('MERCHANT_SHOW')
+        self.bag(3)
+        self.both('BAG_UPDATE_DELAYED')
+        self.assertTrue(self.in_log('item 16885 left your bags while a merchant window was open: not counted as opened'))
+
+    def test_an_error_is_logged_every_time_but_said_once(self):
+        self.slash('start')
+        self.g.IsFishingLoot = self.lua.eval('function() error("boom") end')
+        self.fire('LOOT_READY')
+        self.fire('LOOT_CLOSED')
+        self.fire('LOOT_READY')
+        errors = [l for l in self.logged() if 'ERROR: farm meter: loot window' in l]
+        self.assertEqual(len(errors), 2)
+        self.assertIn('boom', errors[0])
+        self.assertIn('(2 times so far)', errors[1])
+        said = [l for l in self.g.printed.values() if 'an error in farm meter: loot window' in l]
+        self.assertEqual(len(said), 1)
+        self.assertIn('/gea log shows it', said[0])
+
+    def test_the_log_keeps_the_last_600_lines(self):
+        for i in range(650):
+            self.g.ADDON_NS.log('test', f'line {i}')
+        lines = self.logged()
+        self.assertEqual(len(lines), 600)
+        self.assertTrue(lines[0].endswith('test: line 50'))
+
+    def test_gea_log_shows_the_last_lines(self):
+        for i in range(5):
+            self.g.ADDON_NS.log('test', f'line {i}')
+        self.slash('log 2')
+        printed = [self.g.printed[i] for i in range(len(self.g.printed) - 2, len(self.g.printed) + 1)]
+        self.assertIn('log, the last 2 of 6 lines', printed[0])
+        self.assertTrue(printed[1].endswith('test: line 3') and printed[2].endswith('test: line 4'))
+        self.slash('log clear')
+        self.assertEqual(self.logged(), [])
 
     # --- coins (1.6.7: two loots in quick succession lost the second) ---
     def coin_loot(self, copper, line, gold_first=True, wait=0.0):
@@ -676,6 +753,14 @@ class LootLogTests(unittest.TestCase):
 
     def fire(self, *args):
         self.events.scripts['OnEvent'](self.events, *args)
+
+    def test_lines_from_before_the_saved_file_loads_go_in_first(self):
+        self.g.ADDON_NS.log('test', 'before')                  # the saved file isn't loaded yet: it waits
+        self.assertIsNone(self.g.ForeverMoneyBridgeDB)
+        self.fire('ADDON_LOADED', 'ForeverMoneyBridge')
+        log = self.g.ForeverMoneyBridgeDB.log
+        self.assertTrue(log[1].endswith('test: before'))
+        self.assertIn('addon: Gold Ever After loaded', log[2])
 
     def test_a_junkbox_opened_without_the_bag_hook_is_logged_under_the_box(self):
         self.g.LOOT_SOURCES = self.lua.eval('{[2] = "Item-0-0-00000ABC"}')
