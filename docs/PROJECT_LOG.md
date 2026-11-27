@@ -24,6 +24,16 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-27 ROI on every entry where gold goes in up front (the user: "add ROI (return of investment %) on suitable
+  entries").** ROI = profit each, after the AH cut, / cost each (`pricing.roi`, a share: 0.5 = 50%), the same profit
+  and cost the rows already show, so it adds no new assumption. Suitable: crafts (the ingredients), vendor flips (the
+  vendor's price), AH -> vendor and cheap relists (the listing): `engine.ROI_KINDS`, worked out when a row is made
+  (`Opportunity.roi`). Not suitable: farming, fishing, skinning, nodes (they cost time, not gold; a lure an hour isn't
+  an investment); Investments (no sale price to measure against: the long-term average still holds launch prices);
+  My bags (you already own it); the levelling planner (an expense). Not in the cost, as in the profits: AH deposits,
+  listings that don't sell, a recipe's own price, a tool you keep. ROI says nothing about speed, so the hover help
+  sends you to "Sales a day". Ranking is unchanged (it already weighs your gold through what you can afford).
+
 - **2026-11-27 A vendor with only a few a restock comes first, then the AH (the user: "i remembered seeing fel cloth
   marked as limited supply from vendor, but it also drops from mobs, can we check and fix this issue and other similar
   issues? or was this a problem because of missing wowhead data?").** Not missing data: Vi'el's Wowhead Forever page
@@ -978,6 +988,25 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (thirty-first part) ROI (the user: "add ROI (return of investment %) on suitable entries"; Decisions).
+  - `pricing.roi(profit, cost)`; `Opportunity.roi` for `ROI_KINDS`; "at usual" / "up to" and the region's average sale
+    price get their own (`at_usual.roi`, `upside.roi`, `detail.roi_at_avg_sale`); plan steps: gain / gold needed, the two
+    figures each card shows (cash-in, farming and the goal need no gold: none); Sniper resale rows: profit at the snipe
+    price (about 58% by its rule, "+": a cheaper catch gives more; vendor snipes none); Niches and Biggest markets carry
+    the supplying row's.
+  - Page: an "ROI" column after "Cost each" (Daily routines, Occasional big flips, Crafting, vendor flips, an item's
+    ways to make money; left out of a table where no row has one; sortable), with the other price's ROI under it when it
+    reads differently; the row details give the working ("1g 9s profit / 5g 54s up front: every 1g you put in earns 19s
+    78c on top of getting it back"); an ROI chip on plan cards that need gold; a pill on Niches, Biggest markets' ways in
+    and the Sniper; "How to read this page" and README say what it is.
+  - On the real data: all 694 craft and 441 vendor-flip rows have one and it equals profit / cost. The highest are
+    wishful listings already flagged "listed far above sales" / "hard to sell" and hidden by default (Mining Pick bought
+    for 9c, listed at 1g 87s), whose "at usual" ROI shows the realistic figure; Refined Deeprock Salt (148,733%: 3s of
+    Deeprock Salt makes a 47g salt once every 71 hours with the Salt Shaker) is real.
+  - Tests: tests/test_roi.py (12: the helper, each row kind, at usual / up to, the average sale, plan steps, the Sniper,
+    Biggest markets); 480 in all pass. `tools/screenshots.py check`: every tab wide and at phone width, no sideways
+    scrolling, no script errors.
 
 - **2026-11-27** (thirtieth part) Gold Ever After 1.6.10 (the user: "also, opened heavy junkbox and those in the
   screenshot did not add to the farm meter (still not fixed)"). The log: "box: item 16885 left your bags while a loot

@@ -183,6 +183,16 @@ def liquidity(p: dict | None, min_sold_per_day: float = 0.0) -> dict:
             'flags': flags, 'why': '; '.join(why)}
 
 
+def roi(profit, cost) -> float | None:
+    """Return on investment (the user, 2026-11-27): profit (after the AH cut) as a share of the gold put in up front.
+    0.5 = 50%: every 1g you put in comes back as 1g 50s. None when nothing is paid up front (no return to measure).
+    Not counted, as in the profits: AH deposits, listings that don't sell, a recipe's own price, a tool you keep (a
+    Salt Shaker), and how long a sale takes (a row's "sales a day" says that)."""
+    if profit is None or cost is None or cost <= 0:
+        return None
+    return round(profit / cost, 4)
+
+
 def fmt_money(copper: float) -> str:
     sign = '-' if copper < 0 else ''
     c = int(round(abs(copper)))

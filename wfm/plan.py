@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import math
 
+from .pricing import roi
+
 MAX_ACTIONS = 8
 PER_TYPE = {'routine': 3, 'farm': 1, 'big_flip': 1}   # at most this many per type (2 if not listed): a varied plan
 DEFAULT_PER_TYPE = 2
@@ -75,6 +77,9 @@ def _action(type_, title, why, gain, minutes, confidence=1.0, gold_needed=0, key
     a = {'type': type_, 'label': TYPE_LABEL[type_], 'title': title, 'why': why, 'gain': int(gain),
          'minutes': round(minutes, 1), 'confidence': round(confidence, 3), 'gold_needed': int(gold_needed),
          'key': key, 'item_id': item_id}
+    # the step's gain on the gold it needs up front, the two figures its card shows (each step's gain sits on that same
+    # gold: a routine's day of profit on a day's ingredients, one sale on one item); cash-in, farming, goals need none
+    a['roi'] = roi(a['gain'], a['gold_needed'])
     a.update(extra)
     return a
 

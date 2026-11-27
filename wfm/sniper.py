@@ -5,13 +5,14 @@ hourly, so a cheap listing seen there is usually gone, and sniping happens in ga
 live). What the history can tell is which items are worth watching for, and at what price:
   resale snipe   a snapshot's lowest listing under CHEAP x its reference (the lower of the realm's listing average
                  and the region's sale price at that time), for an item that sells (region 1+ a day). Snipe at
-                 CHEAP x today's reference or less: about 35% profit after the AH cut at the usual price.
+                 CHEAP x today's reference or less: about 35% profit after the AH cut at the usual price, a return
+                 (ROI) of about 58% on what you pay at the snipe price, more if you buy for less.
   vendor snipe   a lowest listing under what a vendor pays for it. Snipe at the vendor price or less.
 Ranked by how often it happened in our snapshots times what one catch is worth.
 """
 from __future__ import annotations
 
-from .pricing import usual_sale
+from .pricing import roi, usual_sale
 
 CHEAP = 0.6
 MIN_SOLD = 1.0
@@ -45,7 +46,10 @@ def build(rows, prices: dict, vendor_sell: dict[int, int], names=None, scans: in
             options.append(('sell to a vendor', v, 0, vendor))          # gain per catch depends on the listing
         for how, price, gain, k in options:
             out.append({'item_id': item, 'name': names(item) if names else str(item), 'how': how, 'snipe_at': price,
-                        'gain': gain, 'times': k, 'snapshots': len(mbs), 'share': round(k / len(mbs), 3),
+                        # resale: the profit on what you pay at the snipe price (at least: a cheaper catch gives more);
+                        # vendor: none, the profit depends on the listing you catch
+                        'gain': gain, 'roi': roi(gain, price) if gain else None,
+                        'times': k, 'snapshots': len(mbs), 'share': round(k / len(mbs), 3),
                         'sold_per_day': round(spd, 1),
                         'why': (f"caught under {CHEAP:.0%} of its normal price ({normal}c: its typical lowest listing "
                                 f"or usual sale, the lower) in {k} of {len(mbs)} snapshots; sells {spd:,.0f} a day in "

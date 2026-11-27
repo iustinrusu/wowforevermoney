@@ -15,7 +15,7 @@ from . import everloot as everloot_mod
 from . import levelling as levelling_mod
 from . import foreverrecipes as foreverrecipes_mod
 from . import gatherlite as gatherlite_mod
-from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, sold_per_day
+from .pricing import Quote, ah_buy, ah_sell, liquidity, proceeds, roi, sold_per_day
 
 # Real professions a player can learn (excludes racials, riding, poisons, test lines).
 PROFESSIONS = {'Alchemy', 'Blacksmithing', 'Cooking', 'Enchanting', 'Engineering', 'First Aid', 'Fishing',
@@ -61,6 +61,12 @@ def confidence(flags) -> float:
     for f in set(flags):
         c *= DOUBT.get(f, 1.0)
     return round(c, 3)
+
+
+# Return on investment (the user, 2026-11-27: "add ROI (return of investment %) on suitable entries"; pricing.roi):
+# rows where you put gold in up front and get it back when you sell: crafts (the ingredients), vendor flips (the
+# vendor's price), AH -> vendor and cheap relists (the listing). Farming costs time, not gold, so its rows have none.
+ROI_KINDS = ('craft', 'vendor_flip', 'ah_to_vendor', 'realm_dip')
 
 
 # Ranking (Engine.rank). Score = expected profit x how sure we are x risk x can-do-now x problems x preference.
@@ -139,6 +145,11 @@ class Opportunity:
     flags: list = field(default_factory=list)
     detail: dict = field(default_factory=dict)
     score: float = 0.0        # ranking score (Engine.rank): higher = do it first
+    roi: float | None = field(default=None, init=False)   # profit each / cost each (roi()), for ROI_KINDS only
+
+    def __post_init__(self):
+        # profit and cost each are final when a row is made (ticking part of it done changes only how many a day)
+        self.roi = roi(self.profit_unit, self.cost_unit) if self.kind in ROI_KINDS else None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -2009,6 +2020,7 @@ class Engine:
             if liq and sale and o.kind in ('craft', 'vendor_flip') and o.detail.get('sell_channel') != 'vendor':
                 per = o.detail.get('product_count') or 1
                 o.detail['profit_at_avg_sale'] = int(int(sale * (1 - self.cut)) * per - o.cost_unit)
+                o.detail['roi_at_avg_sale'] = roi(o.detail['profit_at_avg_sale'], o.cost_unit)
             self.add_upside(o)
         self.apply_done(all_opps)
         top = self.top_picks(all_opps)
@@ -2120,7 +2132,7 @@ class Engine:
                 per = o.detail.get('product_count') or 1
                 each = o.profit_unit - int((proceeds(used, self.cut) - proceeds(lo, self.cut)) * per)
                 o.detail['at_usual'] = {'profit_unit': each, 'daily': int(each * o.units_day), 'price': lo.value,
-                                        'price_used': used.value}
+                                        'price_used': used.value, 'roi': roi(each, o.cost_unit)}
             return
         hi, used = ah_sell(p, 'min_buyout'), ah_sell(p, 'lower')
         if not hi or not used or hi.value <= used.value:
@@ -2130,7 +2142,7 @@ class Engine:
         if each <= o.profit_unit:
             return
         o.detail['upside'] = {'profit_unit': each, 'daily': int(each * o.units_day), 'price': hi.value,
-                              'price_used': used.value, 'source': hi.source}
+                              'price_used': used.value, 'source': hi.source, 'roi': roi(each, o.cost_unit)}
 
     def my_holdings(self, valuer: valuation.Valuer, now: float | None = None) -> dict:
         """What the character you play holds (bags, bank, mailbox, auctions that ended), each valued: plan.py's input.

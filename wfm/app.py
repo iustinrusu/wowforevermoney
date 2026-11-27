@@ -438,7 +438,7 @@ class App:
             if o.kind in self.NICHE_KINDS and not (self.NICHE_BAD & set(o.flags)):
                 supply.setdefault(o.item_id, []).append({'kind': self.NICHE_KINDS[o.kind], 'title': o.title,
                                                          'key': o.key, 'profit_unit': o.profit_unit, 'daily': o.daily,
-                                                         'doable': o.doable, 'needs': o.needs})
+                                                         'roi': o.roi, 'doable': o.doable, 'needs': o.needs})
         stats = niches_mod.sold_out_stats(self.history.sold_out())
         eng = Engine(self.world, s)
         rows = niches_mod.build(self.world.prices, supply, float(s.get('market_share', 0.2)), stats, names=eng.name)

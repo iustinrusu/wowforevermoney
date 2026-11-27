@@ -16,6 +16,23 @@ function money(c) {
 const num = (v, d = 1) => (v === null || v === undefined) ? '–' : Number(v).toLocaleString(undefined, {maximumFractionDigits: d});
 const chg = (v, d = 0, color = true) => (v === null || v === undefined) ? '<span class="pill">–</span>' : `<span class="${color ? (v > 0.005 ? 'up' : (v < -0.005 ? 'down' : '')) : ''}">${v > 0 && color ? '+' : ''}${(v * 100).toFixed(d)}%</span>`;
 const daysText = (d) => `${num(d, d < 10 ? 1 : 0)} ${Math.abs(d - 1) < 0.05 ? 'day' : 'days'}`;
+// ROI, return on investment (the user, 2026-11-27): profit each after the AH cut / what one costs up front, as a share
+// (0.5 = 50%), worked out in Python (pricing.roi); null where nothing is paid up front (farming costs time, not gold)
+const roiText = (v) => (v === null || v === undefined) ? '–' : `${num(v * 100, Math.abs(v) < 0.1 ? 1 : 0)}%`;
+const roiHtml = (v) => (v === null || v === undefined) ? '<span class="pill">–</span>' : `<span class="${v > 0.005 ? 'up' : (v < -0.005 ? 'down' : '')}">${roiText(v)}</span>`;
+// what the ROI means for 1g, to the copper under 1g and to the nearest silver above (moneyText drops the copper there)
+const roiGold = (v) => { const c = Math.abs(v) * 10000; return moneyText(c >= 10000 ? Math.round(c / 100) * 100 : c); };
+const roiMeans = (v) => v >= 0 ? `every 1g you put in earns ${roiGold(v)} on top of getting it back` : `every 1g you put in loses ${roiGold(v)}`;
+const ROI_TIP = 'Return on investment (ROI): the profit on one, after the AH cut, as a share of what one costs you up front. 50% means every 1g you put in comes back as 1g 50s when it sells; 200% means it comes back three times over. Not in the cost, as in the profits: AH deposits, listings that don\'t sell, the recipe\'s own price and a tool you keep (a Salt Shaker). It says nothing about how fast it sells: a high ROI on something that sells once a week ties your gold up for a week (see "Sales a day"). Most useful when your gold is short: the highest ROI makes each gold work hardest. "at usual" / "up to" below it: the same at the other sale price shown under the profit.';
+// a row's ROI at its other sale prices (row details), each only where it reads differently from those before it
+const roiOthers = (o) => {
+  const d = o.detail || {}, seen = new Set([roiText(o.roi)]);
+  return [['at its usual sale price', d.at_usual], ['at the current lowest listing', d.upside],
+    ["at the region's average sale price", d.roi_at_avg_sale !== null && d.roi_at_avg_sale !== undefined ? {roi: d.roi_at_avg_sale} : null]]
+    .filter(([, u]) => u && u.roi !== null && u.roi !== undefined && !seen.has(roiText(u.roi)) && seen.add(roiText(u.roi)))
+    .map(([what, u]) => `<div class="pill">${esc(what)}${u.price ? ` (${esc(moneyText(u.price))})` : ''}: ${roiText(u.roi)}</div>`).join('');
+};
+const ROI_NONE ='No ROI: nothing is paid up front for this (farming costs time, not gold, and some crafts have no priced ingredient), so there is no return to measure.';
 // a craft whose cooldown sets the pace: its profit comes once a cooldown, on the day you craft it (the user, 2026-11-20)
 const cdHours = (o) => { const d = (o && o.detail) || {}; return d.cooldown_limits && d.cooldown_hours ? d.cooldown_hours : 0; };
 const cdEvery = (h) => h >= 24 ? daysText(h / 24) : `${num(h, h < 10 ? 1 : 0)} ${Math.abs(h - 1) < 0.05 ? 'hour' : 'hours'}`;
@@ -272,15 +289,16 @@ $('#purse').onclick = () => { TAB = 'bags'; localStorage.setItem('tab', TAB); re
 function oppTable(rows, opts = {}) {
   if (!rows.length) return `<div class="empty">${esc(opts.empty || 'Nothing here right now.')}</div>`;
   const id = opts.id || 't' + Math.random().toString(36).slice(2, 7);
-  const cols = (opts.rank === false ? [] : ['rank']).concat(opts.cols || ['title', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'effort', 'sells', 'cooldown', 'flags'])
+  const cols = (opts.rank === false ? [] : ['rank']).concat(opts.cols || ['title', 'profit_unit', 'cost_unit', 'roi', 'units_day', 'daily', 'effort', 'sells', 'cooldown', 'flags'])
     .filter((c) => c !== 'cooldown' || rows.some((o) => (o.detail || {}).cooldown_hours))    // only where a row has one
-    .filter((c) => c !== 'effort' || rows.some((o) => (o.detail || {}).effort));
+    .filter((c) => c !== 'effort' || rows.some((o) => (o.detail || {}).effort))
+    .filter((c) => c !== 'roi' || rows.some((o) => o.roi !== null && o.roi !== undefined));
   const ranks = opts.ranks || new Map(rows.map((o, i) => [o.key, i + 1]));
-  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', units_day: 'Sales a day (you)', daily: 'Profit a day', profit_avg: 'At average sale', every: 'One sale every', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', sells: 'Sells (region)', cooldown: 'Cooldown', effort: 'Time a day', flags: 'Notes', profession: 'Profession', kind: 'Type', good_day: 'On a good day', own: 'With your own materials'}, ...(opts.heads || {})};
+  const H = {...{title: 'What to do', profit_unit: 'Profit each', cost_unit: 'Cost each', roi: 'ROI', units_day: 'Sales a day (you)', daily: 'Profit a day', profit_avg: 'At average sale', every: 'One sale every', gph: 'Gold / hour', gph_pools: 'Gold / hour with pools', sells: 'Sells (region)', cooldown: 'Cooldown', effort: 'Time a day', flags: 'Notes', profession: 'Profession', kind: 'Type', good_day: 'On a good day', own: 'With your own materials'}, ...(opts.heads || {})};
   const st = sortState[id];
   const sortVal = (o) => st.k === 'rank' ? -ranks.get(o.key) : (st.k === 'sells' ? ((o.detail || {}).liquidity || {}).sold_per_day : (st.k === 'cooldown' ? (o.detail || {}).cooldown_hours : st.k === 'good_day' ? (o.detail || {}).good_day : st.k === 'own' ? ((o.detail || {}).own || {}).per_craft : o[st.k]));
   if (st) rows = [...rows].sort((a, b) => ((sortVal(a) ?? -1e18) < (sortVal(b) ?? -1e18) ? -1 : 1) * (st.dir));
-  const numeric = new Set(['good_day', 'own', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'gph', 'gph_pools', 'sells', 'cooldown', 'profit_avg', 'every', 'effort']);
+  const numeric = new Set(['good_day', 'own', 'profit_unit', 'cost_unit', 'roi', 'units_day', 'daily', 'gph', 'gph_pools', 'sells', 'cooldown', 'profit_avg', 'every', 'effort']);
   const HT = {units_day: 'How many you can expect to sell (or make) a day: what the whole region buys a day x your share (Settings, 20%), capped by your gold, vendor stock and ingredients. Under 1 means less than one a day.',
     daily: 'Profit each x sales a day: what this earns on an average day if you keep doing it. "up to": the same at the current lowest listing. For a craft with a cooldown: what one craft makes and how often you can make it (it earns on the day you craft it), with the average a day under it.',
     profit_unit: STATE.settings.sale_price_basis === 'min_buyout' ? 'Profit on one, after the AH cut, at the current lowest listing.'
@@ -295,6 +313,7 @@ function oppTable(rows, opts = {}) {
     flags: 'Warnings and facts about this row. Hover one, or read the list under the table.',
     title: 'What to do, in plain steps. Click a row for the details: where to buy, what goes in, how each number is worked out.',
     cost_unit: "What one costs you: the ingredients (the cheaper of a vendor and your realm's AH) for a craft, the vendor's price for a flip.",
+    roi: ROI_TIP,
     gph: 'Gold an hour while you do it: what one kill, node, skin or catch is worth x how many you do in an hour (your pace in Settings, never your own logged time). Click the row for each part.',
     gph_pools: POOL_HINT,
     sells: "How easily it sells across the whole region (TSM): how many sell a day, and the share of listings that sell. 'Sales a day (you)' is your share of that.",
@@ -324,6 +343,12 @@ function oppTable(rows, opts = {}) {
       if ((c === 'profit_unit' || c === 'daily') && (o.detail || {}).upside) {
         const u = o.detail.upside;
         return `<td class="num">${money(o[c])}<div class="pill" title="${esc(`If it sells at the current lowest listing (${moneyText(u.price)}) instead of its usual price (${moneyText(u.price_used)}). Listings this far above usual sales may sit unsold, so the number above is what you can count on.`)}">up to ${esc(moneyText(c === 'daily' ? u.daily : u.profit_unit))}</div></td>`;
+      }
+      if (c === 'roi') {
+        if (o.roi === null || o.roi === undefined) return `<td class="num"><span class="pill" title="${esc(ROI_NONE)}">–</span></td>`;
+        const dd = o.detail || {}, other = dd.at_usual ? ['at usual', dd.at_usual] : (dd.upside ? ['up to', dd.upside] : null);
+        const pill = other && other[1].roi !== null && other[1].roi !== undefined && roiText(other[1].roi) !== roiText(o.roi) ? `<div class="pill" title="${esc(`The same at ${moneyText(other[1].price)} a sale (${other[0] === 'at usual' ? 'what it usually sells for across the region' : 'the current lowest listing'}): ${moneyText(other[1].profit_unit)} profit on ${moneyText(o.cost_unit)}`)}">${other[0]} ${roiText(other[1].roi)}</div>` : '';
+        return `<td class="num" title="${esc(`${moneyText(o.profit_unit)} profit on ${moneyText(o.cost_unit)} up front: ${roiMeans(o.roi)}`)}">${roiHtml(o.roi)}${pill}</td>`;
       }
       if (c === 'good_day') return `<td class="num">${(o.detail || {}).good_day === undefined ? '<span class="pill">–</span>' : money(o.detail.good_day)}</td>`;
       if (c === 'own') {
@@ -555,6 +580,7 @@ function planCard(a, goal) {
     chip('Time', minsText(a.minutes), 'Estimated minutes of play, including posting and reposting auctions, buying, crafting and walking to a vendor.'),
     a.type === 'farm' ? chip('Gold an hour', money(a.gain), 'This step is an hour of farming: what that hour earns at the paces in Settings.') : '',
     a.gold_needed ? chip('Gold needed', money(a.gold_needed), 'Gold you spend up front (ingredients or the item to resell); you get it back when it sells.') : '',
+    a.roi !== null && a.roi !== undefined ? chip('ROI', roiHtml(a.roi), `Return on investment: what this step earns if the numbers hold (${moneyText(a.gain)}) on the gold it needs up front (${moneyText(a.gold_needed)}): ${roiMeans(a.roi)}. Not in it: AH deposits and listings that don't sell.`) : '',
     chip('How sure', `${Math.round(a.confidence * 100)}%`, 'How much we trust these numbers: data quality, how well it sells, and for snipes the chance the listing is gone.'),
   ].join('');
   const badge = goal ? '<span class="plan-goal-badge">🎓</span>' : (a.rank <= 3 ? `<span class="medal m${a.rank}" title="#${a.rank}">${a.rank}</span>` : `<span class="rank">${a.rank}</span>`);
@@ -596,7 +622,7 @@ async function marketsPanel() {
   const filt = sessionStorage.getItem('mkFilter') || 'all';
   const limit = +(sessionStorage.getItem('mkLimit') || 100);
   const d = await api(`/api/markets?sort=${sort}&filter=${filt}&limit=${limit}`);
-  const way = (r) => r.ways.length ? r.ways.map((w) => `<div><span class="pill">${esc(w.kind)}</span> ${esc(w.title)}: ${money(w.value)} ${esc(w.per)}${w.doable ? '' : ` <span class="needs">${esc(w.needs || 'not yet')}</span>`}</div>`).join('')
+  const way = (r) => r.ways.length ? r.ways.map((w) => `<div><span class="pill">${esc(w.kind)}</span> ${esc(w.title)}: ${money(w.value)} ${esc(w.per)}${w.roi !== null && w.roi !== undefined ? ` <span class="pill" title="${esc(`Return on investment: ${moneyText(w.profit_unit)} profit on one, after the AH cut, on what one costs up front: ${roiMeans(w.roi)}`)}">ROI ${roiText(w.roi)}</span>` : ''}${w.doable ? '' : ` <span class="needs">${esc(w.needs || 'not yet')}</span>`}</div>`).join('')
     : '<span class="hint">none in the app yet</span>';
   const body = (d.rows || []).map((r) => `<tr class="row${r.yours ? ' yours' : ''}" data-item="${r.item_id}" ${r.yours ? 'title="You can get this now: a craft, flip or farming spot you can do (see Your way in)"' : ''}>${rankCell(r.rank)}<td>${itemLink(r.item_id, r.name, r.quality)}<div class="hint">${esc(r.category)}${r.yours ? ' · <b class="yours-tag">you can get this</b>' : ''}</div></td>
     <td class="num">${money(r.price)}</td><td class="num">${num(r.sold_per_day, r.sold_per_day < 10 ? 1 : 0)}</td><td class="num">${money(r.gold_a_day)}</td><td class="num">${num(r.listed, 0)}</td>
@@ -766,11 +792,11 @@ const VIEWS = {
       <div class="hint">${who ? `Playing <b>${esc(who)}</b> (detected)` : 'Using your manual settings'}: ${num(e.gold, 2)}g to invest, level ${e.level}, realm ${esc(e.realm)}. Everything updates when TSM syncs or you log out / /reload. Click any row for details.</div>
       ${planPanel(STATE.plan)}
       ${donePanel()}
-      <details class="how"><summary>How to read this page</summary><div>Every list is <b>ranked</b>: 🥇🥈🥉 mark the best three, and the order weighs expected profit, how sure the numbers are, how well the item sells, what you would lose if it doesn't sell, and whether you can do it now. <b>Click any row</b> for the full numbers and "Why it's ranked here". The coloured <b>notes</b> explain warnings: hover one to read it. <b>Per day</b> assumes you sell a realistic share of what the whole region buys each day (Settings). Prices follow your realm's lowest listing, except where nobody actually pays that.</div></details>
+      <details class="how"><summary>How to read this page</summary><div>Every list is <b>ranked</b>: 🥇🥈🥉 mark the best three, and the order weighs expected profit, how sure the numbers are, how well the item sells, what you would lose if it doesn't sell, and whether you can do it now. <b>Click any row</b> for the full numbers and "Why it's ranked here". The coloured <b>notes</b> explain warnings: hover one to read it. <b>Per day</b> assumes you sell a realistic share of what the whole region buys each day (Settings). <b>ROI</b> (return on investment) is the profit on one as a share of what it costs you up front: 50% means every 1g comes back as 1g 50s, so with little gold the highest ROI makes it work hardest (it doesn't say how fast something sells: look at "Sales a day" too). Prices follow your realm's lowest listing, except where nobody actually pays that.</div></details>
       <div class="panel"><h2>Daily routines <small>crafts and vendor flips you can do today: each sells about once a day or more, ranked by profit a day</small></h2>${oppTable(t.now || [])}</div>
       <div class="panel"><h2>Occasional big flips <small>worth a lot per sale, but you'd sell less than one a day</small></h2>
         <div class="hint">These sell slowly: list one and expect to wait. Each shows the profit at the lowest listing and at what it actually sells for across the region, which is often less. Ranked by profit per sale and how sure the numbers are.</div>
-        ${oppTable(t.slow || [], {cols: ['title', 'profit_unit'].concat(STATE.settings.sale_price_basis === 'lower' ? [] : ['profit_avg'], ['cost_unit', 'every', 'sells', 'flags']), empty: 'No slow, valuable flips right now.'})}</div>
+        ${oppTable(t.slow || [], {cols: ['title', 'profit_unit'].concat(STATE.settings.sale_price_basis === 'lower' ? [] : ['profit_avg'], ['cost_unit', 'roi', 'every', 'sells', 'flags']), empty: 'No slow, valuable flips right now.'})}</div>
       <div class="panel"><h2>Fishing & farming spots <small>gold per hour: open water, and with the pools you come across</small></h2>${oppTable(withPools(t.hourly || []), {cols: ['title', 'profit_unit', 'gph', 'gph_pools', 'flags'], export: false, heads: {profit_unit: 'Per catch / each'}})}
         <div class="hint">${POOL_HINT}</div>
         <div class="hint">Only spots with enough Forever data appear here (Wowhead Forever counts; your own catch logs only if you turn that on in Settings). Fishing gold/hour is open water; pool loot is a bonus shown in the details. Catches per hour use ${num(STATE.settings.casts_per_hour || 240, 0)} casts/hour (Settings). All spots, including unconfirmed Classic ones, are on the Farming tab.</div></div>
@@ -789,7 +815,7 @@ const VIEWS = {
       <div class="controls"><select id="cp"><option value="">All professions</option>${[...new Set(profs)].map((p) => `<option ${p === sel ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
       <label class="chk"><input type="checkbox" id="cd" ${doable ? 'checked' : ''}> only what I can craft now</label>
       <label class="chk" title="Hides items that barely sell: under 1 a day in the whole region, under 1 in 10 listings selling, or over 10 days of sales already listed on your realm"><input type="checkbox" class="sells-only" ${sellsOnly ? 'checked' : ''}> hide items that barely sell</label></div>
-      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'units_day', 'daily', 'good_day', 'own', 'effort', 'sells', 'cooldown', 'flags']})}</div>
+      ${oppTable(rows, {cols: ['title', 'profession', 'profit_unit', 'cost_unit', 'roi', 'units_day', 'daily', 'good_day', 'own', 'effort', 'sells', 'cooldown', 'flags']})}</div>
       <div class="hint">How to level a profession cheaply, and what each profession would earn you: the Professions tab.</div>`;
   },
   async profs() {
@@ -829,17 +855,17 @@ const VIEWS = {
     return `<div class="controls"><label class="chk"><input type="checkbox" class="sells-only" ${sellsOnly ? 'checked' : ''}> hide items that barely sell</label></div><div class="panel"><h2>Buy from a vendor, sell on the AH</h2><div class="hint">Vendors are checked against Questie's Forever database and filtered to your faction. Limited-stock vendors restock over time.</div>${oppTable(vf)}</div>
       <div class="panel"><h2>Worth adding to your TSM Sniper <small>items our price snapshots often caught listed far below what they sell for</small></h2>
         <div class="hint">Snipes happen in game, within seconds: TSM's Sniper scans the auction house live, while this app's data is up to an hour old, so it doesn't suggest single cheap listings. What it can tell from ${sn.scans} snapshots is which items are worth watching for, and at what price. Add them to a TSM group with a Sniper operation at the price shown (or copy the list below and import it into a group).</div>
-        ${sn.rows.length ? `<table><thead><tr><th>Item</th><th title="Resell on the AH, or sell to a vendor">Then</th><th class="num" title="Buy at this price or less. Resale: 60% of the lower of its realm listing average and its usual sale price, about 35% profit after the AH cut. Vendor: what a vendor pays.">Snipe at</th><th class="num" title="Profit on one catch at its usual price, after the AH cut (vendor: depends on the listing)">Profit each</th><th class="num" title="Share of our snapshots that had it this cheap">How often</th></tr></thead><tbody>${sn.rows.map((r) => `<tr class="row" data-item="${r.item_id}"><td>${itemLink(r.item_id, r.name)}<div class="hint">${esc(r.why)}</div></td><td>${esc(r.how)}</td><td class="num">${money(r.snipe_at)}</td><td class="num">${r.gain ? money(r.gain) : '<span class="pill">varies</span>'}</td><td class="num">${num(r.share * 100, 0)}%<div class="pill">${r.times} of ${r.snapshots}</div></td></tr>`).join('')}</tbody></table>
+        ${sn.rows.length ? `<table><thead><tr><th>Item</th><th title="Resell on the AH, or sell to a vendor">Then</th><th class="num" title="Buy at this price or less. Resale: 60% of the lower of its realm listing average and its usual sale price, about 35% profit after the AH cut. Vendor: what a vendor pays.">Snipe at</th><th class="num" title="Profit on one catch at its usual price, after the AH cut (vendor: depends on the listing). Below it the ROI (return on investment) at the snipe price: the profit as a share of what you pay; a cheaper catch gives more">Profit each</th><th class="num" title="Share of our snapshots that had it this cheap">How often</th></tr></thead><tbody>${sn.rows.map((r) => `<tr class="row" data-item="${r.item_id}"><td>${itemLink(r.item_id, r.name)}<div class="hint">${esc(r.why)}</div></td><td>${esc(r.how)}</td><td class="num">${money(r.snipe_at)}</td><td class="num">${r.gain ? money(r.gain) : '<span class="pill">varies</span>'}${r.roi !== null && r.roi !== undefined ? `<div class="pill" title="${esc(`Return on investment at the snipe price: ${moneyText(r.gain)} profit on ${moneyText(r.snipe_at)}, so ${roiMeans(r.roi)}; more if you catch it for less`)}">ROI ${roiText(r.roi)}+</div>` : ''}</td><td class="num">${num(r.share * 100, 0)}%<div class="pill">${r.times} of ${r.snapshots}</div></td></tr>`).join('')}</tbody></table>
         <details class="how"><summary>Item list for a TSM group (copy, then import into a group in TSM)</summary><textarea readonly style="width:100%;height:60px">${esc(sn.tsm_items)}</textarea></details>` : '<div class="hint">Not enough snapshots yet: the app records prices each time TSM updates while it runs.</div>'}</div>`;
   },
   async niches() {
     const d = await api('/api/niches');
     const rows = d.rows.map((r, i) => `<tr class="row" data-item="${r.item_id}">${rankCell(i + 1)}<td>${itemLink(r.item_id, r.name)}${r.thin_supply ? ' <span class="flag good" title="Often sold out in our own price snapshots while it keeps selling: few people supply it">thin supply</span>' : ''}<div class="hint">${esc(r.why)}</div></td>
       <td>${esc(r.how.kind)}: ${esc(r.how.title)}${r.how.doable ? '' : ` <span class="pill">(${esc(r.how.needs || 'not yet')})</span>`}</td>
-      <td class="num">${money(r.how.profit_unit)}</td><td class="num">${num(r.sold_per_day, 1)}</td><td class="num">${money(r.profit_day)}</td></tr>`).join('');
+      <td class="num">${money(r.how.profit_unit)}${r.how.roi !== null && r.how.roi !== undefined ? `<div class="pill" title="${esc(`Return on investment: the profit on one, after the AH cut, on what one costs up front: ${roiMeans(r.how.roi)}`)}">ROI ${roiText(r.how.roi)}</div>` : ''}</td><td class="num">${num(r.sold_per_day, 1)}</td><td class="num">${money(r.profit_day)}</td></tr>`).join('');
     return `<div class="panel"><h2>Niches <small>steady demand, low supply: items that sell every day, few are listed, and you can supply them</small></h2>
       <div class="hint">From ${d.scans} price snapshots of our own${d.scans < d.solid_scans ? ` (about a week, ${d.solid_scans}, is needed before "sold out" means much: until then it only ranks a niche higher)` : ''}. What you can do now comes first.</div>
-      ${d.rows.length ? `<table><thead><tr><th>#</th><th title="The item, and the numbers that make it a niche: it sells every day, few are listed, and its price holds">Item and why it qualifies</th><th title="The app's best row that supplies it: a craft, a flip or a farming spot">How you'd supply it</th><th class="num" title="Profit on one, from the Crafting, Flips or Gathering row">Profit each</th><th class="num" title="Your share of the region's sales a day: how many you could sell without flooding it">Sells a day (you)</th><th class="num" title="The supplying row's own profit a day, the same as on its Crafting, Flips or Gathering row">Profit a day</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="hint">No niche right now.</div>'}
+      ${d.rows.length ? `<table><thead><tr><th>#</th><th title="The item, and the numbers that make it a niche: it sells every day, few are listed, and its price holds">Item and why it qualifies</th><th title="The app's best row that supplies it: a craft, a flip or a farming spot">How you'd supply it</th><th class="num" title="Profit on one, from the Crafting, Flips or Gathering row; below it the ROI (return on investment): that profit as a share of what one costs up front, for a craft or a flip (gathering costs time, not gold)">Profit each</th><th class="num" title="Your share of the region's sales a day: how many you could sell without flooding it">Sells a day (you)</th><th class="num" title="The supplying row's own profit a day, the same as on its Crafting, Flips or Gathering row">Profit a day</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="hint">No niche right now.</div>'}
       <details class="how"><summary>How this is worked out</summary><div>An item counts when your share (${num(STATE.settings.market_share * 100, 0)}%) of the region's daily sales is at least one, at least half of its listings sell, your realm lists at most 10 and less than a day of the region's sales, the lowest listing is at least 90% of its usual sale price (or nothing is listed), and you can make or get it at a profit (a craft, a vendor that sells it, or something you gather). "Sold out" is how often our own snapshots saw nothing listed while it kept selling. Limits: TSM's counts come from TSM users only and are region-wide; TSM has no seller counts; a niche closes once others notice it.</div></details></div>`;
   },
   async gather() {
@@ -1131,6 +1157,7 @@ function oppDetail(o) {
   const farmKind = ['fishing_zone', 'fishing_spot', 'skin_spot', 'herb_spot', 'mine_spot', 'farm_zone', 'mob_spot'].includes(o.kind);
   let html = `<h3>${farmKind ? farmTitle(o) : linkName(o.title, o.item_id, o.name, o.quality)} <small>${esc(KIND[o.kind] || o.kind)}</small></h3>${notes.length ? `<ul class="notes">${notes.map((f) => `<li><span class="flag ${FLAGS[f][0]}">${esc(FLAGS[f][1])}</span> ${esc(FLAGS[f][2])}</li>`).join('')}</ul>` : ''}
     <div class="kv" style="margin-top:8px">${['fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot', 'mob_spot'].includes(o.kind) ? '' : `<div>Profit each</div><div>${money(o.profit_unit)}</div><div>Cost each</div><div>${money(o.cost_unit)}</div>
+    ${o.roi !== null && o.roi !== undefined ? `<div title="${esc(ROI_TIP)}">ROI <span class="qmark">?</span></div><div>${roiHtml(o.roi)} <span class="pill">${esc(moneyText(o.profit_unit))} profit ÷ ${esc(moneyText(o.cost_unit))} up front: ${esc(roiMeans(o.roi))}</span>${roiOthers(o)}</div>` : ''}
     ${cdHours(o) ? `<div>How often</div><div>One craft every ${esc(cdEvery(cdHours(o)))} (its cooldown) → ${money(o.profit_unit)} on the day you craft it<div class="pill" title="${esc(cdTip(o))}">about ${esc(moneyText(o.daily))} a day on average</div></div>` : `<div>Per day (estimate)</div><div>${num(o.units_day)} → ${money(o.daily)}/day</div>`}`}${o.gph ? `<div>Gold per hour</div><div>${money(o.gph)}</div>` : ''}
     ${o.needs ? `<div>Needs</div><div class="needs">${esc(o.needs)}</div>` : ''}</div>${d.price_check ? `<div class="hint">⚠ Second opinion: ${esc(d.price_check.text)}</div>` : ''}`;
   const ef = d.effort;
@@ -1276,7 +1303,7 @@ async function openItem(id, opp) {
       <div>Required level · item level</div><div>${it.req_level ?? '–'} · ${it.item_level ?? '–'}</div>
       ${it.disenchant ? `<div>Disenchant it <span class="pill" title="${esc(it.disenchant.source)}">Classic table</span></div><div>about ${money(it.disenchant.value)} each: ${deMats(it.disenchant)}${deWho(it.disenchant)}</div>` : ''}
     </div>${spark(it.history)}`;
-  if (it.opportunities.length && !opp) html += `<h3>Ways to make money with it</h3>${oppTable(it.opportunities, {cols: ['title', 'profit_unit', 'daily', 'flags'], export: false})}`;
+  if (it.opportunities.length && !opp) html += `<h3>Ways to make money with it</h3>${oppTable(it.opportunities, {cols: ['title', 'profit_unit', 'roi', 'daily', 'flags'], export: false})}`;
   if (it.vendors.length) html += `<h3>Sold by <small>your faction</small></h3><table><tbody>${it.vendors.slice(0, 15).map((v) => `<tr><td>${npcLink(v.npc, v.name)}</td><td>${esc(v.zone)}</td><td>${v.coords ? v.coords.map((c) => (+c).toFixed(1)).join(', ') : ''}</td><td>${v.stock ? 'limited: ' + v.stock : ''}</td></tr>`).join('')}</tbody></table>`;
   if ((it.fished_in || []).length) html += `<h3>Where to catch it <small>share per catch; Classic rows are unconfirmed in Forever</small></h3><table><tbody>${it.fished_in.map((f) => `<tr><td>${esc(f.title)}</td><td class="num">${pct(f.share)}</td><td>${f.count ? `<span class="pill">you caught ${f.count}</span>` : ''}${flagHtml(f.flags.filter((x) => ['classic_unconfirmed', 'wowhead_forever', 'forever_only', 'seasonal', 'forever_change'].includes(x)))}</td><td class="pill">zone skill ${f.zone_skill ?? '?'}</td></tr>`).join('')}</tbody></table>`;
   if (it.drops.length) html += `<h3>Dropped by <small>NPCs from QuestieDB Forever; drop % is Wowhead <b>Classic</b> data bundled with QuestieDB, Forever may differ</small></h3><table><tbody>${it.drops.slice(0, 20).map((d) => `<tr><td>${npcLink(d.npc, d.name)}</td><td>${esc(d.zone)}</td><td>lvl ${esc(d.level)}</td><td class="num">${d.rate ? d.rate.toFixed(1) + '%' : ''}</td></tr>`).join('')}</tbody></table>`;

@@ -37,7 +37,7 @@ def ways_in(o) -> dict:
     hourly = o.kind in HOURLY
     return {'kind': KIND_TEXT.get(o.kind, o.kind), 'title': o.title, 'key': o.key,
             'value': int((o.gph if hourly else o.daily) or 0), 'per': 'an hour' if hourly else 'a day',
-            'profit_unit': o.profit_unit, 'doable': o.doable, 'needs': o.needs}
+            'profit_unit': o.profit_unit, 'roi': getattr(o, 'roi', None), 'doable': o.doable, 'needs': o.needs}
 
 
 def _kinds(n: int, what: str) -> str:
