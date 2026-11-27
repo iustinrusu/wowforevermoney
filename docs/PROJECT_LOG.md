@@ -932,6 +932,23 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (seventeenth part) TargetKit 1.4.4 (the user: "kind of works now, but it also targets other mobs,
+  not just the one in the target list, and doest cycle if targets are not in my view"). The 1.4.3 log (Zhevra
+  Runners): with one Runner in sight every press tabbed to a Sunscale Screecher and back; a second Runner further
+  off had a nameplate but Tab never reached it. Both are the game's: Tab goes through every enemy in front of you
+  and fairly near; by name is the closest of that name in any direction; nothing else reaches a mob.
+  - TK Find with your target on the list: another list name in sight first, by name (each name once a round, then
+    round again); only when others share your target's name, Tab; with no other list unit in sight it stays
+    (no Tab to other mobs).
+  - Tab that landed on one not on the list Tabs on at most as many times as there are live units of that kind in
+    sight, then goes back to the closest by name.
+  - Tab that comes back to a list unit it already had, having reached no other: the others are out of Tab's reach,
+    so it stays until the list units in sight change (or 8 s pass). Tab that went round two or more: round again.
+    The unit each press reached is noted the frame after it (findReached).
+  - Tests: 53 (new: across names by name and Tab only within a name; stays on the only one; stops tabbing when the
+    others are out of reach, from the user's log, and tabs again when a new one comes into view; the Tab-on limit).
+    Not yet tried in game.
+
 - **2026-11-27** (sixteenth part) TargetKit 1.4.3 (the user: "now it doesnt work at all"). The 1.4.2 log: TK Find
   chose the Zhevra Runner on nameplate1 every press and wrote "/target nameplate1"; the game ran it and the target
   stayed none (now under Verified facts). Before 1.4.2 the by-name line after it had hidden that; the 1.4.2 rule
