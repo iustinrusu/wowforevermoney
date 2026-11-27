@@ -935,6 +935,21 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (twentieth part) TargetKit 1.4.7, TK Pickpocket (the user: "pickpocket macro too, when stealthed and
+  going past multiple enemies, if I press the button I instantly want to sap and pickpocket the one next to me, I
+  don't want to see a failure due to the old target still being selected even though I'm already gone and going away
+  from it"). Three ways the old target got in: the half-done rule (10 s, any distance), the fixed macro with nobody
+  to rob in sight (`/targetenemy [noharm][dead]` keeps a living enemy), and the 0.4 s rewrite gap.
+  - The half-done rule needs the unit in range for the missing half (Pick Pocket: reach 1, Sap: 2).
+  - Your target, robbable and in Sap range: just the casts on it. Else the closest robbable one by name.
+  - Same name: by name the game takes the closest of that name; if a non-robbable one of that name (robbed, dead,
+    fighting) is as near or nearer, another name in Sap range, else `/targetenemy` (Tab to the next in front).
+  - Nobody to rob in sight and a target out of Sap range: `/cleartarget`, `/targetenemy`, Sap, Pick Pocket.
+  - TK Sap and TK Pickpocket are written at once when their text changes (TK Find keeps the 0.4 s gap).
+  - Tests: 58 (new: walked away from a half-done one; a far target with nobody to rob; a camp of one name skips the
+    one just robbed, then the target Tab reached, then another name; another name over a blocked one; rewritten at
+    once as you walk past; the 0.4 s gap test on TK Find).
+
 - **2026-11-27** (nineteenth part) TargetKit 1.4.6, TK Sap (the user: "hopefully this doesnt affect us and the sap
   macro, there we don't care what name the target has, it just has to be the closest physically possible, so in case
   a stealthed rogue pops up next to me, it targets him even though I maybe have another target enemy player

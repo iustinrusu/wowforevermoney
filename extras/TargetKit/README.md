@@ -93,6 +93,13 @@ Revised:
   enemy player to Sap changes, and TargetKit looks again as soon as a nameplate appears or your soft enemy target
   changes, instead of waiting up to 0.4 s. What no addon can do: Sap a stealthed player the game shows you no
   nameplate or soft target for; your mouse over him still works (the mouseover Sap line comes first).
+- **TK Pickpocket walking past a group (1.4.7):** a press goes to the one next to you, never the one you left behind.
+  Your target, if it can be robbed and is in Sap range, is the one; else the closest one you can rob, by name. The
+  "finish the missing half" rule (Sap or Pick Pocket was still on cooldown) only holds while that mob is still in
+  range for the missing spell. With nobody to rob in sight, a target out of Sap range is let go of (the game's
+  nearest enemy instead). By name the game takes the closest mob of that name, so in a camp of one name the one you
+  just robbed would be taken again: then another name in Sap range, else the game's Tab to the next enemy in front
+  of you. The macro is rewritten at once when its choice changes, like TK Sap's.
 - **On your bars:** the three macros are under Escape > Macros, General tab: drag **TK Find**, **TK Pickpocket** and
   **TK Sap** to your bars and leave their text as it is (TargetKit rewrites it). A key set in the window runs the same
   macro, so it works without the macro being on a bar.

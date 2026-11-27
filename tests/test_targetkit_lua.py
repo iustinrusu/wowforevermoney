@@ -184,20 +184,73 @@ class TargetKitTests(unittest.TestCase):
         self.assertEqual(self.body('TKSap'), '#showtooltip Sap\n' + MOUSEOVER + '\n/targetexact Nightstep\n/cast Sap'
                                              '\n/click TKSapMark')
 
-    def test_a_macro_is_rewritten_at_most_every_0_4_s_until_a_press(self):
-        self.unit('nameplate1', 'Defias Thug', reach=2)
+    def test_tk_find_is_rewritten_at_most_every_0_4_s_until_a_press(self):
+        self.slash('add Defias')
+        self.unit('nameplate1', 'Defias Thug', reach=3, enemy=False, reaction=5)
         self.tick()
-        self.assertIn('/targetexact Defias Thug', self.body('TKPick'))
+        self.assertEqual(self.body('TKFind'), '/targetexact Defias Thug\n/click TKFindMark')
         edits = self.g.EDITS
-        self.unit('nameplate2', 'Defias Miner', reach=1)                        # nearer
+        self.unit('nameplate2', 'Defias Miner', reach=2, enemy=False, reaction=5)    # nearer
         self.tick(wait=0.2)
         self.assertEqual(self.g.EDITS, edits)                              # too soon after the last
-        self.assertIn('/targetexact Defias Thug', self.body('TKPick'))
+        self.assertIn('Defias Thug', self.body('TKFind'))
         self.tick(wait=0.3)
-        self.assertIn('/targetexact Defias Miner', self.body('TKPick'))
+        self.assertIn('Defias Miner', self.body('TKFind'))
         edits = self.g.EDITS
         self.tick()
         self.assertEqual(self.g.EDITS, edits)                              # nothing changed: nothing written
+
+    # --- 1.4.7, the user: "when stealthed and going past multiple enemies, if I press the button I instantly want to
+    # sap and pickpocket the one next to me, I don't want to see a failure due to the old target still being selected"
+    def test_pickpocket_leaves_a_half_done_one_you_walked_away_from(self):
+        thug = self.unit('nameplate1', 'Defias Thug', reach=1)
+        self.press('TKPick')
+        self.assertEqual(self.g.UNITS.target.guid, thug.guid)
+        thug.sapped = True                                                  # Pick Pocket was still on cooldown
+        thug.reach = 4                                                      # walked on
+        self.unit('nameplate2', 'Defias Miner', reach=1)                        # the one next to you now
+        self.assertEqual(self.press('TKPick'), '/targetexact Defias Miner\n/cast Sap\n/cast Pick Pocket')
+
+    def test_pickpocket_lets_go_of_a_far_target_with_nobody_to_rob_in_sight(self):
+        self.unit('target', 'Defias Thug', plate=False, reach=5, combat=True)  # can't be robbed, and far
+        self.tick()
+        self.assertEqual(self.body('TKPick'), '#showtooltip Pick Pocket\n/cleartarget\n/targetenemy\n/cast Sap\n'
+                                              '/cast Pick Pocket\n/click TKPickMark')
+
+    def test_pickpocket_in_a_camp_of_one_name_skips_the_one_just_robbed(self):
+        """By name the game takes the closest of that name: the Defias Thug just robbed, next to you."""
+        robbed = self.unit('nameplate1', 'Defias Thug', reach=1)
+        fresh = self.unit('nameplate2', 'Defias Thug', reach=2)
+        self.g.UNITS.target = robbed
+        self.fire('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-1', 921)         # robbed
+        self.g.UNITS.target = None
+        self.g.TAB = self.lua.table_from([robbed, fresh])
+        self.g.UNITS.target = robbed
+        self.assertEqual(self.press('TKPick'), '/targetenemy\n/cast Sap\n/cast Pick Pocket')   # Tab, not by name
+        self.assertEqual(self.g.UNITS.target.guid, fresh.guid)
+        self.g.NOW += 11                                                    # past the half-done rule's 10 s
+        self.tick()
+        self.assertEqual(self.body('TKPick'), '#showtooltip Pick Pocket\n/cast Sap\n/cast Pick Pocket\n'
+                                              '/click TKPickMark')          # your target, robbable, near: that one
+        self.fire('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-2', 921)         # robbed too
+        self.unit('nameplate3', 'Defias Miner', reach=2)                        # another name in Sap range
+        self.assertEqual(self.press('TKPick'), '/targetexact Defias Miner\n/cast Sap\n/cast Pick Pocket')
+
+    def test_pickpocket_prefers_another_name_over_a_blocked_one(self):
+        robbed = self.unit('nameplate1', 'Defias Thug', reach=1)
+        self.unit('nameplate2', 'Defias Thug', reach=2)
+        self.unit('nameplate3', 'Defias Miner', reach=2)
+        self.g.TargetKitDB.picked[robbed.guid] = self.g.WALL                   # robbed a moment ago
+        self.assertEqual(self.press('TKPick'), '/targetexact Defias Miner\n/cast Sap\n/cast Pick Pocket')
+
+    def test_pickpocket_is_rewritten_at_once_as_you_walk_past(self):
+        self.unit('nameplate1', 'Defias Thug', reach=1)
+        self.tick()
+        self.assertIn('/targetexact Defias Thug', self.body('TKPick'))
+        self.g.UNITS.nameplate1.reach = 4
+        self.unit('nameplate2', 'Defias Miner', reach=1)
+        self.tick(wait=0.05)                                               # well within 0.4 s
+        self.assertIn('/targetexact Defias Miner', self.body('TKPick'))
 
     def test_sap_is_rewritten_at_once_when_a_player_comes_into_sap_range(self):
         """1.4.6: a rogue popping up next to you is in TK Sap's macro without the 0.4 s wait."""
@@ -506,7 +559,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.4.6 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.4.7 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))

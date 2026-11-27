@@ -8,7 +8,8 @@
 --                  could be a mob, so it is skipped).
 --   TK Pickpocket  the closest humanoid you can rob (attackable, not a player, alive, not in combat, not pickpocketed
 --                  yet): Sap, then Pick Pocket, in one press (Sap doesn't break stealth on Forever: the user, 2026-11-27).
---                  If one of the two was still on cooldown, the next press within 10 s on that unit does the other.
+--                  If one of the two was still on cooldown, the next press within 10 s on that unit does the other,
+--                  while it's still in range for it; walked on, the closest one again, never the old target (1.4.7).
 --   TK Sap         your mouseover enemy first. Else the closest enemy player in Sap range the addon can see, whoever
 --                  you have targeted; else the game's own nearest enemy player (an enemy player you target further off
 --                  than Sap's range is let go of first, 1.4.6); else the closest NPC in Sap range; else the game's
@@ -37,7 +38,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.4.6"
+local VERSION = "1.4.7"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
@@ -373,27 +374,80 @@ local function pickWhyNot(c)
   if picked(c.guid) then return "robbed already" end
 end
 
+-- 1.4.7 (the user: "when stealthed and going past multiple enemies, if I press the button I instantly want to sap and
+-- pickpocket the one next to me, I don't want to see a failure due to the old target still being selected even
+-- though I'm already gone and going away from it"): the half-done rule only holds while the unit is in range for the
+-- missing half; with nobody to rob in sight, a target out of Sap range is let go of; and the macro is rewritten at
+-- once when its choice changes (see prepare).
 local function pickBuild(units)
-  -- its last unit, half done (Sap or Pick Pocket still on cooldown then): the missing half
+  -- its last unit, half done (Sap or Pick Pocket still on cooldown then): the missing half, while in range for it
   local t = UnitGUID("target")
   if t and t == last.pick.guid and GetTime() - last.pick.t <= AGAIN and not dead("target")
       and not UnitAffectingCombat("target") then
     local sapped, robbed = hasSap("target"), picked(t)
-    if sapped and not robbed then
+    local r = reach("target")
+    if sapped and not robbed and r <= 1 then
       return "/cast " .. PP(), "Pick Pocket the one just sapped: " .. (UnitName("target") or "?"), UnitName("target"), {}
-    elseif robbed and not sapped then
+    elseif robbed and not sapped and r <= 2 then
       return "/cast " .. SAPN(), "Sap the one just robbed: " .. (UnitName("target") or "?"), UnitName("target"), {}
     end
   end
-  local list, rejected = {}, {}
+  local list, rejected, refused = {}, {}, {}
   for _, c in ipairs(units or visibleUnits()) do
     local why = pickWhyNot(c)
-    if why then rejected[#rejected + 1] = passed(c, why) else list[#list + 1] = c end
+    if why then
+      rejected[#rejected + 1] = passed(c, why)
+      refused[#refused + 1] = c
+    else
+      list[#list + 1] = c
+    end
   end
   rank(list)
   local saw = seen({ list }, rejected)
+  -- By name the game takes the closest unit of that name, so a robbed (or dead, or fighting) one of the same name as
+  -- near or nearer gets it instead (a camp of Defias Thugs: the one you just robbed). Then another name in Sap range,
+  -- else the game's Tab to the next enemy in front of you (1.4.7).
+  local function blocker(c)
+    local n = UnitName(c.unit)
+    for _, o in ipairs(refused) do
+      if UnitName(o.unit) == n then
+        o.reach = o.reach or reach(o.unit)
+        if o.reach <= c.reach then return o end
+      end
+    end
+  end
+  local tg = UnitGUID("target")                          -- your target, robbable and in Sap range: that one
+  for _, o in ipairs(list) do
+    if tg and o.guid == tg and o.reach <= 2 then
+      local cast = {}
+      if not hasSap(o.unit) then cast[#cast + 1] = "/cast " .. SAPN() end
+      cast[#cast + 1] = "/cast " .. PP()
+      return table.concat(cast, "\n"), "your target, in Sap range, to rob: " .. describe(o), UnitName(o.unit), saw
+    end
+  end
   local c = list[1]
-  if not c then return nil, "no humanoid to rob in sight", nil, saw end
+  local b = c and blocker(c)
+  if b then
+    local free
+    for _, o in ipairs(list) do
+      if o.reach <= 2 and not blocker(o) then free = o break end
+    end
+    if free then
+      c = free
+    else
+      return "/targetenemy\n/cast " .. SAPN() .. "\n/cast " .. PP(), "closest to rob: " .. describe(c) .. ", but a"
+        .. " nearer one of that name can't be robbed (" .. passed(b, pickWhyNot(b) or "?") .. ") and would be taken by"
+        .. " name, so the game's Tab to the next enemy", nil, saw
+    end
+  end
+  if not c then
+    if UnitExists("target") and UnitCanAttack("player", "target") and not dead("target") and reach("target") > 2 then
+      return "/cleartarget\n/targetenemy\n/cast " .. SAPN() .. "\n/cast " .. PP(), "no humanoid to rob in sight, and"
+        .. " your target " .. (UnitName("target") or "?") .. " is out of Sap range: the game's nearest enemy instead",
+        nil, saw
+    end
+    return nil, "no humanoid to rob in sight", nil, saw
+  end
   local lines = { targetLine(c) }
   if not hasSap(c.unit) then lines[#lines + 1] = "/cast " .. SAPN() end
   lines[#lines + 1] = "/cast " .. PP()
@@ -610,7 +664,9 @@ local function prepare(force)                            -- look once, write all
     local body, kept = compose(b, text or b.fixed(n))
     b.state = { text = kept, why = why, expect = expect, saw = saw or {}, extra = extra or {} }
     b.body = body
-    local urgent = b.name == "TKSap" and expect ~= (b.live and b.live.expect)    -- a player came into Sap range
+    -- TK Sap and TK Pickpocket: a new choice (a player in Sap range, the next one to rob as you walk past) is
+    -- written at once, without the 0.4 s wait (1.4.6, 1.4.7)
+    local urgent = (b.name == "TKSap" or b.name == "TKPick") and kept ~= (b.live and b.live.text)
     write(b, force, urgent)
   end
 end
