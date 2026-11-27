@@ -104,8 +104,10 @@ Revised:
   combat), so the 10 yd band counts as Sap range. When the closest enemy player isn't your target, the macro clears,
   asks for the game's nearest enemy player, and then names TargetKit's choice; the last line that finds someone wins,
   so the name wins if the game takes it and the game's pick stands if it doesn't (one try, `/targetexact Rayna-Moonwell`,
-  didn't take). A name that comes with a second part (the game's realm field) is written both ways: the name alone
-  first, unless another player of that name is in sight, then "Name-Part", which wins when it works. If the closest
+  didn't take). Players on Forever have a first and a last name, and the game gives addons the last name in a
+  separate field (1.5.2: until then TargetKit wrote "First-Last", which is nobody's name). So a player is written
+  twice: the looser `/target First` first, unless another player with that first name is in sight, then
+  `/targetexact First Last`, which wins when the game takes it. If the closest
   enemy player is your target already, it's just Sap. Nobody in Sap range: the closest one TargetKit sees within
   28 yd, by name; only further than that, the game's pick alone.
 - **TK Pickpocket walking past a group (1.4.7):** a press goes to the one next to you, never the one you left behind.

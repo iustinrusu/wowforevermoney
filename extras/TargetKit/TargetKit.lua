@@ -38,7 +38,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.5.1"
+local VERSION = "1.5.2"
 local PICK_POCKET, SAP = 921, 6770
 local MELEE = 1752                                        -- Sinister Strike: melee range, and it takes players
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
@@ -157,10 +157,13 @@ local function nameOf(u)                                 -- a unit's name, nil w
   local ok, n = pcall(UnitName, u)
   if ok and known(n) then return n end
 end
-local function fullName(u)                               -- with the realm for another realm's player (battlegrounds)
-  local ok, n, realm = pcall(UnitName, u)
+-- A player's whole name. On Forever players have a first and a last name ("FirstName LastName", the user, 1.5.2), and
+-- the game hands the last name to addons in the field other versions use for the realm: UnitName gives "Rayna", "Duskmere"
+-- for Rayna Duskmere. Until 1.5.2 TargetKit joined them as "Rayna-Duskmere", which is nobody's name.
+local function fullName(u)
+  local ok, n, last = pcall(UnitName, u)
   if not ok or not known(n) then return nil end
-  if known(realm) and realm ~= "" then n = n .. "-" .. realm end
+  if known(last) and last ~= "" then n = n .. " " .. last end
   return n
 end
 
@@ -312,22 +315,22 @@ local function passed(c, why) return (nameOf(c.unit) or "?") .. " (" .. c.unit .
 local function steady(u)
   return u == "target" or u == "focus" or u:match("^party%d$") or u:match("^raid%d+$")
 end
--- 1.5.1 (the user's Arathi Basin log: "/targetexact Rayna-Moonwell" ran and the target didn't change): a player from another
--- realm gets two lines, the name alone first and "Name-Realm" last. The last line that finds someone wins, so the full
--- form wins whenever the game takes it, and the name alone stands when it doesn't. The name alone is left out when
--- another unit in sight has the same name (the user: "we should also be careful about players with similar names, or
--- same first name but different last name"). /targetexact takes the whole name only, so "La" never finds "Laura".
+-- 1.5.2 (the user: "in forever players have "FirstName LastName" format, so /target might be better even if looser,
+-- right? /targetexact FirstName fails because LastName is missing, correct?"). A player with a last name gets two lines:
+-- the looser "/target FirstName" first (it takes the closest whose name starts so; left out when another unit in sight
+-- shares the first name), then "/targetexact FirstName LastName" last. The last line that finds someone wins, so the
+-- exact one wins whenever the game takes it. /targetexact takes the whole name only, so "La" never finds "Laura".
 local function targetLine(c, cond, units)
   local pre = cond and (cond .. " ") or ""
   if steady(c.unit) then return "/target " .. pre .. c.unit end
-  local ok, n, realm = pcall(UnitName, c.unit)
+  local ok, n, last = pcall(UnitName, c.unit)
   if not ok or not known(n) then return "/target " .. pre .. c.unit end
-  if not known(realm) or realm == "" then return "/targetexact " .. pre .. n end
-  local full = "/targetexact " .. pre .. n .. "-" .. realm
+  if not known(last) or last == "" then return "/targetexact " .. pre .. n end
+  local exact = "/targetexact " .. pre .. n .. " " .. last
   for _, o in ipairs(units or {}) do
-    if o.guid ~= c.guid and nameOf(o.unit) == n then return full end       -- another of that name: the full form only
+    if o.guid ~= c.guid and nameOf(o.unit) == n then return exact end      -- another of that first name: exact only
   end
-  return "/targetexact " .. pre .. n .. "\n" .. full
+  return "/target " .. pre .. n .. "\n" .. exact
 end
 local function seen(lists, rejected, others)    -- what a look saw, for the log of the press that uses it
   local out = {}
@@ -390,8 +393,8 @@ local function sapBuild(units)
   -- there), the bands went from melee straight to 10 yd. Sap's range is about 10 yd (Classic's), so the 10 yd band
   -- counts as in Sap range.
   local p = players[1]
-  -- Whether the game takes a player's name in a battleground isn't known yet (the Arathi Basin log: "Rayna-Moonwell" didn't
-  -- take). So when the choice isn't your target already, the macro first clears and asks for the game's nearest enemy
+  -- Whether the game takes a player's name in a battleground isn't known yet (1.5.1's Arathi Basin log: neither
+  -- "First" exactly nor "First-Last" took; the right form, "First Last", came in 1.5.2). So when the choice isn't your target already, the macro first clears and asks for the game's nearest enemy
   -- player, then names the choice: the last line that finds someone wins, so the name wins if the game takes it, and
   -- the game's pick stands if it doesn't, instead of the old target staying.
   local function named(c)

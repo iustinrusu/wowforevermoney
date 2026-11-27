@@ -903,18 +903,19 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   ("secret" values, as in retail 12.0): `UnitGUID` of enemy units comes back secret, and using it as a table key is
   an error ("attempted to index a table that cannot be indexed with secret keys"). `UnitName("target")` was still
   readable there. Raid members (friendly) read normally.
-- (2026-11-27, TargetKit 1.5.1's log, Arathi Basin) In a battleground the game refuses targeting an enemy player by
-  name from a macro: `/targetexact Name` and `/targetexact Name-Part` both ran (TargetUnit called) on ~15 presses
-  with the player in melee range, and the target stayed on the one `/targetenemyplayer` had just taken. With the
-  nameplate refusal (Verified facts above), a macro in a battleground can reach an enemy player only through the
-  game's own picks (Tab: `/targetenemy`, `/targetenemyplayer`) or the mouseover; which one is closest can be seen by
-  an addon but not chosen. Untested there: the soft enemy target token in a macro.
+- (2026-11-27, the user) Players on Forever have a first and a last name ("FirstName LastName"). The game gives
+  addons the last name in `UnitName`'s second value (the realm field in other versions), so a player's whole name is
+  "First Last" with a space.
+- (2026-11-27, TargetKit 1.5.1's log, Arathi Basin) `/targetexact First` and `/targetexact First-Last` both ran on
+  ~15 presses with the player in melee range and the target didn't change. Neither is the player's whole name (see
+  above), so this does NOT show the game refuses names in battlegrounds (an earlier note here said so; corrected the
+  same day). `/target First` (loose) and `/targetexact First Last` are untested there; TK Find's loose
+  `/target First` did find a friendly player in Orgrimmar (1.4.0's log).
 - (2026-11-27, TargetKit 1.5.0's log, Arathi Basin) Enemy players' names and range bands read there (CheckInteractDistance
   and the melee check answered), but `IsSpellInRange(Sap)` never said yes for a player: the bands went from melee
   range straight to 10 yd (most were in combat, which may be why). `/targetexact Name-Part` (the second part from
-  `UnitName`'s realm field) ran on several presses and the target didn't change. `UnitName` gives that second part
-  for some players (an enemy in Arathi Basin, and earlier a friendly player in Orgrimmar); the user says Forever is
-  one big server per ruleset with layers, so what that part means on Forever is unknown.
+  `UnitName`'s realm field) ran on several presses and the target didn't change. That second part is the player's
+  last name (the user; see the "First Last" fact).
 - (2026-11-27, TargetKit 1.4.8's log, Arathi Basin) `/cleartarget` then `/targetenemyplayer` in one macro: the
   target went none, then the game's nearest enemy player, and that was the same player, out of Sap range, on every one
   of ~30 presses (the game prefers what's in front of you, not the physically closest); with no enemy player in view it
@@ -958,6 +959,17 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-27** (twenty-fifth part) TargetKit 1.5.2 (the user: "in forever players have "FirstName LastName" format,
+  so /target might be better even if looser, right? /targetexact FirstName fails because LastName is missing,
+  correct?"). Yes: `UnitName`'s second value is the last name, and 1.5.1 wrote "First-Last" (nobody's name) and the
+  first name exactly (not the whole name), which explains the Arathi Basin log better than "the game refuses names"
+  (that note corrected).
+  - fullName is "First Last" (space). targetLine for a player with a last name: `/target First` first (loose, the
+    closest whose name starts so; left out when another unit in sight shares the first name), then
+    `/targetexact First Last` last (wins when the game takes it). For TK Find, TK Pickpocket and TK Sap alike.
+  - Harness: exact name targeting matches "First Last". Tests: 64 (the realm test is now the last-name test).
+  - The soft enemy target line (`/cast [@softenemy,harm,nodead] Sap`) was explained to the user, not added.
 
 - **2026-11-27** (twenty-fourth part) TargetKit 1.5.1 (the user: "still not working, first press targets the first
   available, even if he is further away than melee range. then additional presses failed, even though I had closer

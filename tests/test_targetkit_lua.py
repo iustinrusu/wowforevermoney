@@ -180,16 +180,18 @@ class TargetKitTests(unittest.TestCase):
         self.unit('target', 'Nightstep', plate=False, player=True, reach=1)
         self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cast Sap')
 
-    def test_a_player_from_another_realm_gets_the_name_alone_then_name_realm(self):
-        """The user's log: "/targetexact Rayna-Moonwell" ran and the target didn't change. The full form comes last, so it
-        wins whenever the game takes it; the name alone only when no other of that name is in sight."""
-        self.unit('nameplate1', 'Nightstep', player=True, reach=1, realm='Moonwell')
-        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Nightstep\n/targetexact Nightstep-Moonwell'
-                                                          '\n/cast Sap')
+    def test_a_player_with_a_last_name_gets_the_first_name_then_first_and_last(self):
+        """1.5.2, the user: "in forever players have "FirstName LastName" format". The game gives the last name in the
+        realm field; 1.5.1 wrote "First-Last" (nobody's name) and the first name exactly (not the whole name). Now the
+        looser "/target First" first, then "/targetexact First Last", which wins when the game takes it."""
+        self.unit('nameplate1', 'Nightstep', player=True, reach=1, realm='Moonwell')    # Nightstep Moonwell
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/target Nightstep'
+                                                          '\n/targetexact Nightstep Moonwell\n/cast Sap')
         self.assertEqual(self.g.UNITS.target.name, 'Nightstep')
         del self.g.UNITS.target
-        self.unit('nameplate2', 'Nightstep', player=True, reach=5, realm='Duskwood')   # same name, another realm
-        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer\n/targetexact Nightstep-Moonwell\n/cast Sap')
+        self.unit('nameplate2', 'Nightstep', player=True, reach=5, realm='Duskwood')   # same first name
+        self.assertEqual(self.press('TKSap'), MOUSEOVER + '\n/cleartarget\n/targetenemyplayer'
+                                                          '\n/targetexact Nightstep Moonwell\n/cast Sap')
 
     def test_in_combat_the_fixed_macro_runs(self):
         self.unit('nameplate1', 'Nightstep', player=True, reach=1)
@@ -604,7 +606,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.5.1 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.5.2 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
