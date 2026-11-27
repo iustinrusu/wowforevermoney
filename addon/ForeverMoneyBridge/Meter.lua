@@ -4,12 +4,17 @@
 -- meter also works without the app: the same TSM data the app reads (your realm's lowest listing, else its average,
 -- else the region's, minus the 5% AH cut), or the vendor price when that is higher or TSM has none. Items the app did
 -- not list always fall back to TSM and the vendor price. "/gea prices app" or "/gea prices tsm" fixes one source;
--- "/gea prices auto" goes back. Counts what loot windows from mobs, fishing and nodes show, gold looted and XP gained;
--- things opened from your bags are skipped (they'd count twice).
+-- "/gea prices auto" goes back. Counts what loot windows from mobs, fishing and nodes show, gold looted and XP gained.
+-- A container you loot (a clam, lockbox, junkbox) counts nothing until you open it; then what is inside counts, under
+-- "Opened". 1.6.4: which box you opened comes from ns.bagItem (the hook on right-clicking a bag item stopped working
+-- with the 25 Nov 2026 client patch), and a box that leaves your bags leaves the "not opened yet" reminder.
 -- Fold (1.6.3, the user: "collapse feature / minimize feature"): the "–" button or /gea min folds the window to one
 -- line (total, gold an hour, time) and "+" opens it again; remembered between sessions. /gea hide hides it completely,
 -- /gea show brings it back. Folded or hidden, the session keeps counting.
 
+local _, ns = ...                   -- the addon's shared table: ns.bagItem (ForeverMoneyBridge.lua), the box a loot
+                                    -- window came from
+ns = ns or {}
 local CUT = 0.05
 local TSM_PRICE = "first(DBMinBuyout, DBMarket, DBRegionMarketAvg)"
 -- newer clients (WoW: Forever) moved these into C_Item / C_Spell; the old globals may not exist
@@ -483,7 +488,8 @@ end
 
 -- loot: your own "You receive loot: ..." chat messages (matched with the game's own templates, so any language),
 -- gold from "You loot ..." money messages matched with the gold change, and loot windows only to tell what kind of
--- loot it was and to skip containers opened from your bags (with auto loot the window can be gone before it's read).
+-- loot it was and to tell containers opened from your bags (which box: ns.bagItem) from mob, chest and fishing loot
+-- (with auto loot the window can be gone before it's read).
 local debug = false
 local function say(...) if debug then print("|cffe8c060Gold Ever After|r", ...) end end
 
@@ -496,14 +502,6 @@ local LOOT_ONE = LOOT_ITEM_SELF and pattern(LOOT_ITEM_SELF)
 local LOOT_MANY = LOOT_ITEM_SELF_MULTIPLE and pattern(LOOT_ITEM_SELF_MULTIPLE)
 
 local windowKind, windowCounted, skipUntil = nil, false, 0
-local lastUsed = { id = nil, t = 0 }                   -- the item you last used from your bags (a container)
-local function rememberUse(bag, slot)
-  local id = C_Container and C_Container.GetContainerItemID and C_Container.GetContainerItemID(bag, slot)
-    or (GetContainerItemID and GetContainerItemID(bag, slot))
-  if id then lastUsed.id, lastUsed.t = id, GetTime() end
-end
-if C_Container and C_Container.UseContainerItem then hooksecurefunc(C_Container, "UseContainerItem", rememberUse) end
-if UseContainerItem then hooksecurefunc("UseContainerItem", rememberUse) end
 local moneyChatAt, moneyDelta = 0, nil
 
 -- What kind of loot a window is: the loot source (a creature, an object, an item) plus the spell you just cast.
@@ -529,15 +527,20 @@ local CAST_WINDOW = 10
 local function noteWindow()
   if windowCounted then return end
   windowCounted = true
-  local guid = GetLootSourceInfo and GetLootSourceInfo(1) or ""
-  local kind = strsplit("-", guid or "")
+  local guid = (ns.lootSource and ns.lootSource()) or (GetLootSourceInfo and GetLootSourceInfo(1)) or ""   -- the first
+  -- slot with a source (slot 1 is often the coins)
+  local kind = strsplit("-", guid)
   local cast = (GetTime() - lastCast.t <= CAST_WINDOW) and lastCast.kind or nil
   lastCast.kind = nil
-  local what
+  local what, box, how
   if IsFishingLoot and IsFishingLoot() then
     what = "fishing"
-  elseif kind == "Item" then
-    what = (cast == "disenchant") and "disenchant" or "containers"
+  elseif cast == "disenchant" and (kind == "Item" or guid == "") then
+    what = "disenchant"
+  elseif kind == "Item" or guid == "" then
+    -- from your bags: which box (an unknown source counts only when a bag item turns up)
+    if ns.bagItem then box, how = ns.bagItem(guid) end
+    what = (kind == "Item" or box) and "containers" or "mobs"
   elseif kind == "GameObject" then
     what = (cast == "nodes") and "nodes" or "chests"
   else
@@ -553,13 +556,26 @@ local function noteWindow()
   session.loots[what] = (session.loots[what] or 0) + 1
   if what == "containers" then
     -- a container opened from your bags: its contents count; it leaves the "not opened yet" list
-    local id = lastUsed.id and GetTime() - lastUsed.t <= 3 and lastUsed.id
-    if id and (session.unopened[id] or 0) > 0 then
-      session.unopened[id] = session.unopened[id] - 1
-      if session.unopened[id] == 0 then session.unopened[id] = nil end
+    if box and (session.unopened[box] or 0) > 0 then
+      session.unopened[box] = session.unopened[box] - 1
+      if session.unopened[box] == 0 then session.unopened[box] = nil end
     end
   end
-  say("loot window:", what)
+  say("loot window:", what, box and ("from item " .. box .. " (found by " .. how .. ")") or (what == "containers" and "(which box: not found)" or ""))
+end
+
+-- A box that left your bags (opened, sold, banked, destroyed) is no longer "not opened yet", even when the loot window
+-- didn't tell which box it was. Not within 2 s of looting one: the bag may not hold it yet.
+local function bagCount(id)
+  local count = (C_Item and C_Item.GetItemCount) or GetItemCount
+  return count and count(id) or nil
+end
+local function reconcileBoxes()
+  if GetTime() - (session.boxAt or 0) < 2 then return end
+  for id, n in pairs(session.unopened) do
+    local have = bagCount(id)
+    if have and have < n then session.unopened[id] = have > 0 and have or nil end
+  end
 end
 
 local function addMoney(delta)
@@ -569,7 +585,7 @@ end
 
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "CHAT_MSG_LOOT", "CHAT_MSG_MONEY", "PLAYER_MONEY",
-                    "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP" }) do
+                    "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "BAG_UPDATE_DELAYED" }) do
   pcall(ev.RegisterEvent, ev, e)
 end
 ev:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
@@ -595,6 +611,8 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
   elseif event == "LOOT_CLOSED" then
     windowCounted = false
     windowKind = nil
+  elseif event == "BAG_UPDATE_DELAYED" then
+    pcall(reconcileBoxes)
   elseif event == "CHAT_MSG_LOOT" then
     if GetTime() <= skipUntil then return end
     local link, n = nil, 1
@@ -605,6 +623,7 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
     n = tonumber(n) or 1
     if isContainer(id) then                            -- a container: worth 0 until you open it
       session.unopened[id] = (session.unopened[id] or 0) + n
+      session.boxAt = GetTime()
       say("container looted (counts when opened):", link, "x" .. n)
       return
     end

@@ -882,6 +882,23 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** Addon 1.6.4: containers opened from your bags are found again (the user: "farm meter addon seems to
+  not recognize when I lockpick and open heavy junkboxes. maybe this happens to other items too?"). It was every
+  container, not only junkboxes: the loot log's `containers` had 21 kinds opened up to 2026-11-24 22:27 and none since,
+  though 13 Heavy Junkboxes were picked in Eastern Plaguelands on 2026-11-25. Wow.exe changed on 2026-11-25 23:18 (a
+  client patch); Baganator, the bag addon, has been in use since 2026-11-06, so it isn't the cause (its bag buttons use
+  Blizzard's own template). Both the loot log and the meter learned which box you opened only from a hook on
+  `UseContainerItem`, which seems to have stopped firing; the meter then left the box in "not opened yet" (and, with
+  no loot source on slot 1, which is often the coins, could count it as a kill), and the loot log dropped it. New
+  `ns.bagItem` at the top of ForeverMoneyBridge.lua, shared with Meter.lua through the addon's table (not a new file:
+  WoW may only find a new addon file after a full restart): the loot window's own source on any slot (an Item GUID,
+  matched with `C_Item.GetItemIDByGUID` or each bag slot's GUID), else the old hook within 3 s, else the bag item the
+  game has locked while its window is open (only an openable one when the window gives no source). The meter also
+  drops a box from "not opened yet" once it has left your bags (`BAG_UPDATE_DELAYED`, not within 2 s of looting it),
+  and `/gea debug` says how each box was found. None of the three ways is checked in game yet (Claude can't run WoW):
+  the user tests with `/gea debug` (open-items B8). Tests: 9 new (Lua; the harness now loads the files in .toc order with one shared table, as WoW does),
+  357 pass. Also noticed: a running meter session lives only in memory, so `/reload` loses it (`/gea stop` first).
+
 - **2026-11-26** (second part) Skins from a mob's own page (the user: "does open world farming account for skinning?
   it should if players has skinning", then "Yes, read them"). Mob farming already added a skin when you can skin the
   mob (84 rows in the running app, all at Skinning 300), but only for mobs on a leather page's "Skinned from" list (its

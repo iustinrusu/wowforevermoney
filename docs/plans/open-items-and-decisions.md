@@ -59,7 +59,11 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 - [x] B7. (done 2026-11-20, to-do B1: report in docs/plans/comprehensive-review.md) Comprehensive review of the whole app (UI, UX, logic, accuracy, no discrepancies between views): planned
       for a new chat after the usage reset, `docs/plans/comprehensive-review.md` (the user, 2026-11-15).
 
-- [ ] B8. (2026-11-20: the saved file shows XP and loot counted: a meter session in Maraudon that ended 2026-11-19
+- [ ] B8. (2026-11-27, addon 1.6.4: open a lockbox, junkbox or clam with `/gea debug` on during a session; chat says
+      "loot window: containers from item N (found by source / used / locked)", or "(which box: not found)". A screenshot
+      of that line tells which way works on Forever since the 25 Nov patch; then /gea stop, /reload, and the loot log's
+      containers should list it.)
+      (2026-11-20: the saved file shows XP and loot counted: a meter session in Maraudon that ended 2026-11-19
       23:45 saved 47,609 XP, 1g 48s 69c in coins and its loot (8g 10s 12c in all). Left: the fold, never used yet (no
       folded state saved), a screenshot folded and open; a container as "not opened yet" without the app.)
       (2026-11-19) Farm meter 1.6.x in game: XP line, prices (the app's while under 12 h old, else TSM), a

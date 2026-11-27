@@ -4,7 +4,120 @@
 -- active time spent, so the app can compute real gold per hour, plus what containers you open contain.
 -- WoW only writes SavedVariables to disk on logout or /reload; the app picks them up then.
 
-local ADDON = ...
+local ADDON, ns = ...      -- ns: the table WoW gives every file of this addon (Meter.lua uses ns.bagItem)
+ns = ns or {}
+
+-- Which bag item a loot window came from (a clam, lockbox, junkbox, trunk, sack...), shared through `ns` by the
+-- loot log below and the farm meter (Meter.lua). Kept in this file, not a new one: WoW may only find a new addon
+-- file after a full restart, where this one updates with a /reload.
+-- Until the WoW Forever client patch of 25 Nov 2026 both learned it from a hook on UseContainerItem (right-clicking a
+-- bag item). Since that patch not one opened container was logged (21 kinds before it), so the hook seems to have
+-- stopped firing, and it can't be the only way any more.
+-- In order:
+--   1. the loot window's own source: an "Item-..." GUID (looked for on every slot, since slot 1 is often the coins),
+--      turned into the item: C_Item.GetItemIDByGUID, else the bag slot holding the item with that GUID;
+--   2. the bag item last used through UseContainerItem, within 3 seconds (the old way, in case it still fires);
+--   3. the item in your bags the game has locked right now: a container stays locked while its loot window is open
+--      (an openable one first, when more than one is locked; only an openable one when the window gave no source,
+--      so a mob's loot is never filed under an item you happen to be moving).
+-- Each step runs in pcall: an API this client lacks, or one that errors, just skips that step.
+
+local USE_WINDOW = 3      -- seconds between right-clicking a bag item and its loot window
+local lastUsed = { id = nil, t = 0 }
+
+local function itemAt(bag, slot)
+  if C_Container and C_Container.GetContainerItemID then return C_Container.GetContainerItemID(bag, slot) end
+  if GetContainerItemID then return GetContainerItemID(bag, slot) end
+end
+
+local function rememberUse(bag, slot)
+  local id = itemAt(bag, slot)
+  if id then lastUsed.id, lastUsed.t = id, GetTime() end
+end
+if C_Container and C_Container.UseContainerItem then hooksecurefunc(C_Container, "UseContainerItem", rememberUse) end
+if UseContainerItem then hooksecurefunc("UseContainerItem", rememberUse) end
+
+local function lastBag()
+  return NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4
+end
+
+local function slots(bag)
+  if C_Container and C_Container.GetContainerNumSlots then return C_Container.GetContainerNumSlots(bag) or 0 end
+  return GetContainerNumSlots and GetContainerNumSlots(bag) or 0
+end
+
+-- locked, and whether the game says it can be opened (hasLoot), for one bag slot
+local function slotState(bag, slot)
+  if C_Container and C_Container.GetContainerItemInfo then
+    local info = C_Container.GetContainerItemInfo(bag, slot)
+    if info then return info.isLocked, info.hasLoot end
+    return nil
+  end
+  if GetContainerItemInfo then
+    local _, _, locked, _, _, lootable = GetContainerItemInfo(bag, slot)
+    return locked, lootable
+  end
+end
+
+-- The loot window's source GUID: the first slot that has one (a coins slot can come without one)
+function ns.lootSource()
+  if not GetLootSourceInfo then return "" end
+  local n = (GetNumLootItems and GetNumLootItems()) or 1
+  for slot = 1, math.max(n, 1) do
+    local ok, guid = pcall(GetLootSourceInfo, slot)
+    if ok and type(guid) == "string" and guid ~= "" then return guid end
+  end
+  return ""
+end
+
+local function byGuid(guid)
+  if C_Item and C_Item.GetItemIDByGUID then
+    local ok, id = pcall(C_Item.GetItemIDByGUID, guid)
+    if ok and id then return id end
+  end
+  if not (C_Item and C_Item.GetItemGUID and ItemLocation and ItemLocation.CreateFromBagAndSlot) then return nil end
+  for bag = 0, lastBag() do
+    for slot = 1, slots(bag) do
+      local id = itemAt(bag, slot)                    -- an empty slot has no GUID to ask for
+      if id then
+        local ok, g = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(bag, slot))
+        if ok and g == guid then return id end
+      end
+    end
+  end
+end
+
+local function lockedItem(openableOnly)
+  local first, openable
+  for bag = 0, lastBag() do
+    for slot = 1, slots(bag) do
+      local ok, locked, hasLoot = pcall(slotState, bag, slot)
+      if ok and locked then
+        local id = itemAt(bag, slot)
+        if id then
+          first = first or id
+          if hasLoot and not openable then openable = id end
+        end
+      end
+    end
+  end
+  if openableOnly then return openable end
+  return openable or first
+end
+
+-- The bag item this loot window came from, and how it was found ("source", "used", "locked"), or nil.
+-- guid: the window's source (ns.lootSource()). Only call it for a window whose source is an item or unknown ("").
+function ns.bagItem(guid)
+  guid = guid or ""
+  if guid:match("^Item%-") then
+    local ok, id = pcall(byGuid, guid)
+    if ok and id then return id, "source" end
+  end
+  if lastUsed.id and GetTime() - lastUsed.t <= USE_WINDOW then return lastUsed.id, "used" end
+  local ok, id = pcall(lockedItem, guid == "")
+  if ok and id then return id, "locked" end
+end
+
 local VERSION = 3
 local f = CreateFrame("Frame")
 
@@ -75,25 +188,14 @@ local function itemIdFromLink(link)
   return link and tonumber(link:match("item:(%d+)"))
 end
 
--- Containers opened from your bags (trunks, clams, crates): remember which bag item was used last, and
--- log what the loot window gave under that item, not as fishing or mob loot.
-local lastUsed = { id = nil, t = 0 }
-local USE_WINDOW = 3      -- seconds between right-clicking a bag item and its loot window
-
-local function rememberUse(bag, slot)
-  local id
-  if C_Container and C_Container.GetContainerItemID then id = C_Container.GetContainerItemID(bag, slot)
-  elseif GetContainerItemID then id = GetContainerItemID(bag, slot) end
-  if id then lastUsed.id, lastUsed.t = id, GetTime() end
-end
-if C_Container and C_Container.UseContainerItem then hooksecurefunc(C_Container, "UseContainerItem", rememberUse) end
-if UseContainerItem then hooksecurefunc("UseContainerItem", rememberUse) end
-
+-- Containers opened from your bags (trunks, clams, crates, lockboxes, junkboxes): which one a loot window came from
+-- (ns.bagItem above: the window's own source, else the bag item last used, else the one the game has locked), so what it
+-- gave is logged under that item, not as fishing or mob loot.
 local function lootSourceKind()
-  -- "Item" = a container from your bags, "GameObject" = bobber/node/chest, "Creature" = a mob
-  if not GetLootSourceInfo then return nil end
-  local guid = GetLootSourceInfo(1)
-  return guid and (strsplit("-", guid)) or nil
+  -- "Item" = a container from your bags, "GameObject" = bobber/node/chest, "Creature" = a mob; nil = no source given
+  local guid = ns.lootSource()
+  if guid == "" then return nil, "" end
+  return (strsplit("-", guid)), guid
 end
 
 local function recordContainer(id)
@@ -112,11 +214,11 @@ end
 
 local function recordLoot()
   local now = GetTime()
-  local fromBag = lastUsed.id and now - lastUsed.t <= USE_WINDOW
-  local kind = lootSourceKind()
-  if kind == "Item" or (kind == nil and fromBag and not (IsFishingLoot and IsFishingLoot())) then
-    if fromBag then recordContainer(lastUsed.id) end
-    lastUsed.id = nil
+  local kind, guid = lootSourceKind()
+  local fishing = IsFishingLoot and IsFishingLoot()
+  local box = (kind == "Item" or (kind == nil and not fishing)) and ns.bagItem(guid) or nil
+  if kind == "Item" or box then
+    if box then recordContainer(box) end
     return                    -- never count container contents as fishing or mob loot
   end
   local activity

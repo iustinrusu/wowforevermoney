@@ -14,15 +14,25 @@ ROOT = Path(__file__).resolve().parent.parent
 ADDON = ROOT / 'addon' / 'ForeverMoneyBridge'
 
 
+def load_addon(*files):
+    """A Lua 5.1 runtime with the harness, then the addon files in .toc order, each given the addon's name and one
+    shared table, as WoW does."""
+    lua = lua51.LuaRuntime(unpack_returned_tuples=True)
+    lua.execute((ROOT / 'tests' / 'addon_harness.lua').read_text(encoding='utf-8'))
+    run = lua.eval('function(src, name, ns) local f = assert(loadstring(src, name)); f("ForeverMoneyBridge", ns) end')
+    ns = lua.table()
+    for name in files:
+        run((ADDON / name).read_text(encoding='utf-8'), name, ns)
+    return lua
+
+
 @unittest.skipUnless(lua51, 'lupa is not installed (pip install lupa)')
 class MeterTests(unittest.TestCase):
     def setUp(self):
-        self.lua = lua51.LuaRuntime(unpack_returned_tuples=True)
-        self.lua.execute((ROOT / 'tests' / 'addon_harness.lua').read_text(encoding='utf-8'))
-        self.lua.execute((ADDON / 'Meter.lua').read_text(encoding='utf-8'))
+        self.lua = load_addon('ForeverMoneyBridge.lua', 'Meter.lua')
         self.g = self.lua.globals()
         self.slash = self.g.SlashCmdList.FOREVERMONEYBRIDGE
-        self.events = self.g.frames[1]
+        self.events = self.g.frames[2]      # frames[1] is the loot log's
 
     def fire(self, *args):
         self.events.scripts['OnEvent'](self.events, *args)
@@ -32,7 +42,7 @@ class MeterTests(unittest.TestCase):
                                    + (f'x{n}.' if n > 1 else '.'))
 
     def refresh(self):
-        win = self.g.frames[2]
+        win = self.g.frames[3]
         win.scripts['OnUpdate'](win, 1.5)
         return win
 
@@ -107,7 +117,7 @@ class MeterTests(unittest.TestCase):
     def test_fold_to_one_line_and_back(self):
         g = self.g
         self.slash('start')
-        win = g.frames[2]
+        win = g.frames[3]
         self.assertEqual((win.fold.text, win.title.text), ('–', 'Gold Ever After'))
         self.assertEqual(win.title.width, 320 - 164)                      # stops short of Pause, Stop and "–"
         self.loot(8150, 'Deeprock Salt', 40)                               # 40 x 297 = 11,880 = 1g 18s 80c
@@ -151,7 +161,7 @@ class MeterTests(unittest.TestCase):
         g.ForeverMoneyBridgeDB = self.lua.eval(
             '{meter = {collapsed = true, w = 300, h = 400, pos = {"TOPLEFT", 120, 900, "BOTTOMLEFT"}}}')
         self.slash('start')
-        win = g.frames[2]
+        win = g.frames[3]
         self.assertEqual((win.w, win.h, win.left, win.top, win.body.shown), (300, 34, 120, 900, False))
         self.slash('min')
         self.assertEqual((win.h, g.ForeverMoneyBridgeDB.meter.h), (400, 400))   # the open height is kept
@@ -161,7 +171,7 @@ class MeterTests(unittest.TestCase):
         g = self.g
         g.ForeverMoneyBridgeDB = self.lua.eval('{meter = {pos = {"BOTTOMRIGHT", -238, 121}}}')
         self.slash('start')
-        win = g.frames[2]
+        win = g.frames[3]
         first = win.points[1]
         self.assertEqual([first[i] for i in (1, 3, 4, 5)], ['BOTTOMRIGHT', 'BOTTOMRIGHT', -238, 121])
         pos = g.ForeverMoneyBridgeDB.meter.pos
@@ -170,7 +180,7 @@ class MeterTests(unittest.TestCase):
     def test_hide_and_show_keep_counting(self):
         g = self.g
         self.slash('start')
-        win = g.frames[2]
+        win = g.frames[3]
         self.slash('hide')
         self.assertFalse(win.shown)
         self.loot(8150, 'Deeprock Salt', 3)                                # 3 x 297 = 891, counted while hidden
@@ -201,6 +211,120 @@ class MeterTests(unittest.TestCase):
         self.assertIn("the app's, from 2.0 h ago", win.note.text)
         self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.prices, 'app')
 
+
+    # --- containers opened from your bags (1.6.4: the right-click hook stopped firing with the 25 Nov 2026 patch) ---
+    def said(self, text):
+        return any(text in line for line in self.g.printed.values())
+
+    def pick_junkbox(self):
+        """Pick Pocket a mob, which gives a Heavy Junkbox: it counts nothing until opened."""
+        self.fire('UNIT_SPELLCAST_SUCCEEDED', 'player', None, 921)
+        self.fire('LOOT_READY')
+        self.loot(16885, 'Heavy Junkbox')
+        self.fire('LOOT_CLOSED')
+        self.g.BAGS[0][3] = self.lua.eval('{id = 16885, guid = "Item-0-0-00000ABC"}')
+
+    def open_junkbox(self, sources, locked=True, has_loot=True, wait=6):
+        """Lockpicked, then right-clicked: the box is locked while its window is open. No UseContainerItem call."""
+        box = self.g.BAGS[0][3]
+        box.locked, box.hasLoot = locked, has_loot
+        self.g.LOOT_SOURCES = self.lua.eval('{%s}' % ', '.join(f'[{i + 1}] = "{v}"' for i, v in enumerate(sources) if v))
+        self.g.LOOT_SLOTS = self.lua.eval('{{nil, 0}, {"|Hitem:8150::|h", 2}}')     # slot 1: the coins
+        self.g.NOW += wait
+        self.fire('LOOT_READY')
+        self.loot(8150, 'Deeprock Salt', 2)                                          # 2 x 297 = 594
+        self.fire('LOOT_CLOSED')
+
+    def test_a_junkbox_opened_is_found_by_the_loot_windows_own_source(self):
+        self.slash('debug')
+        self.slash('start')
+        self.pick_junkbox()
+        self.assertIn('1 container not opened yet', self.refresh().remind.text)
+        self.open_junkbox([None, 'Item-0-0-00000ABC'])        # no source on the coins slot, the box's GUID on slot 2
+        win = self.refresh()
+        self.assertEqual(win.remind.text, '')
+        self.assertTrue(self.said('loot window: containers from item 16885 (found by source)'))
+        self.assertEqual(win.kv[2].text, '|cffc7c7cf5s|r |cffeda55f94c|r')        # the salt inside counts
+        self.slash('stop')
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.sessions[1]['items'][8150], 2)
+
+    def test_the_box_is_found_by_the_lock_when_the_window_gives_no_source(self):
+        self.slash('debug')
+        self.slash('start')
+        self.pick_junkbox()
+        self.open_junkbox([])                                  # no source on any slot
+        self.assertEqual(self.refresh().remind.text, '')
+        self.assertTrue(self.said('loot window: containers from item 16885 (found by locked)'))
+
+    def test_no_source_and_nothing_openable_locked_is_mob_loot(self):
+        # an item you are moving is locked too: without a source, only an openable item counts as the box
+        self.slash('debug')
+        self.slash('start')
+        self.pick_junkbox()
+        self.open_junkbox([], has_loot=False)
+        self.assertIn('1 container not opened yet', self.refresh().remind.text)
+        self.assertTrue(self.said('loot window: mobs'))
+
+    def test_the_old_bag_hook_still_counts_when_it_fires(self):
+        self.slash('debug')
+        self.slash('start')
+        self.pick_junkbox()
+        self.g.HOOKS.UseContainerItem(0, 3)                   # right-clicked, and the hook fired
+        self.open_junkbox(['Item-0-0-00000FFF'], locked=False, wait=1)   # a GUID no bag slot has: the hook names it
+        self.assertEqual(self.refresh().remind.text, '')
+        self.assertTrue(self.said('loot window: containers from item 16885 (found by used)'))
+
+    def test_a_hook_older_than_3_seconds_is_not_the_box(self):
+        self.slash('debug')
+        self.slash('start')
+        self.pick_junkbox()
+        self.g.HOOKS.UseContainerItem(0, 3)
+        self.open_junkbox(['Item-0-0-00000FFF'], locked=False, wait=4)
+        self.assertIn('1 container not opened yet', self.refresh().remind.text)
+        self.assertTrue(self.said('loot window: containers (which box: not found)'))
+
+    def test_a_box_that_left_your_bags_leaves_the_reminder(self):
+        # opened in a way none of the above could tell: once it's gone from your bags it's not "not opened yet"
+        self.slash('start')
+        self.pick_junkbox()
+        self.g.BAGS[0][3] = None
+        self.fire('BAG_UPDATE_DELAYED')                        # within 2 s of looting it: the bag may not hold it yet
+        self.assertIn('1 container not opened yet', self.refresh().remind.text)
+        self.g.NOW += 3
+        self.fire('BAG_UPDATE_DELAYED')
+        self.assertEqual(self.refresh().remind.text, '')
+
+
+@unittest.skipUnless(lua51, 'lupa is not installed (pip install lupa)')
+class LootLogTests(unittest.TestCase):
+    """The loot log (ForeverMoneyBridge.lua): what each container you open gives, never as mob or fishing loot."""
+
+    def setUp(self):
+        self.lua = load_addon('ForeverMoneyBridge.lua')
+        self.g = self.lua.globals()
+        self.events = self.g.frames[1]
+        self.g.BAGS[0][5] = self.lua.eval('{id = 16885, guid = "Item-0-0-00000ABC", locked = true, hasLoot = true}')
+        self.g.LOOT_SLOTS = self.lua.eval('{{nil, 0}, {"|Hitem:8150::|h", 2}}')
+
+    def fire(self, *args):
+        self.events.scripts['OnEvent'](self.events, *args)
+
+    def test_a_junkbox_opened_without_the_bag_hook_is_logged_under_the_box(self):
+        self.g.LOOT_SOURCES = self.lua.eval('{[2] = "Item-0-0-00000ABC"}')
+        self.fire('LOOT_OPENED')
+        box = self.g.ForeverMoneyBridgeDB.containers[16885]
+        self.assertEqual((box.opened, box['items'][8150]), (1, 2))
+        self.assertIsNone(self.g.ForeverMoneyBridgeDB.activity.Tanaris)          # not mob loot
+
+    def test_by_the_lock_when_the_window_gives_no_source(self):
+        self.g.LOOT_SOURCES = self.lua.eval('{}')
+        self.fire('LOOT_OPENED')
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.containers[16885].opened, 1)
+
+    def test_mob_loot_stays_mob_loot(self):
+        self.fire('LOOT_OPENED')                                                   # a Creature source
+        self.assertIsNone(self.g.ForeverMoneyBridgeDB.containers)
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.activity.Tanaris.mobs['items'][8150], 2)
 
 if __name__ == '__main__':
     unittest.main()
