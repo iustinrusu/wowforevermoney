@@ -916,6 +916,17 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (thirteenth part) TargetKit 1.4.1. The user: "find target macro works, but chat debug menus should
+  be hidden, I don't want to see them". Verified in game first: the 1.4.0 log shows TK Find targeting a friendly
+  player (friendly nameplates off) every press, seen as the soft friend target and written `/targetexact Name-Realm`;
+  with nobody in sight its `/target [noexists] name` line found them by name. TK Sap and TK Pickpocket not tried yet.
+  - Chat is quiet by default: what TargetKit notices by itself (nobody near, the not-taken choice, errors, blocked
+    actions, macros made or not, a key that doesn't take) goes to the log only. `/tkit chat` (saved, `db.chat`)
+    shows it in chat too. Answers to typed `/tkit` commands still print; window actions show on the window's bottom
+    line only (a key that doesn't take is now the answer to Set there). `/tkit debug` unchanged (off, not saved).
+  - The "nobody on your find list" and "find list is empty" notes are now in the log too (before: chat only).
+  - Tests: 46 (a new one: chat stays quiet, only the typed answer prints, `/tkit chat` turns it on and off).
+
 - **2026-11-27** (twelfth part) TargetKit 1.4.0 (the user: "still cant target friendly saved targets with the macro").
   The 1.3.0 log: 14 presses of TK Find, each logged "its macro was pressed, but the game didn't run TKFind's macro";
   no press, result or blocked line. So the TK macro's first line (`/click TKFindPress`, a plain button) ran every time

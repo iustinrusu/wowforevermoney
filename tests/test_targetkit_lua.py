@@ -292,7 +292,8 @@ class TargetKitTests(unittest.TestCase):
 
     def test_find_with_an_empty_list_says_how_to_fill_it(self):
         self.assertEqual(self.press('TKFind'), '')
-        self.assertTrue(self.said('your find list is empty. /tkit add <name>'))
+        self.assertTrue(self.in_log('press: your find list is empty. /tkit add <name>'))
+        self.assertFalse(self.said('your find list is empty'))                 # the log only (1.4.1)
 
     def test_the_find_list_commands(self):
         self.unit('target', 'Mor\'Ladim', plate=False)
@@ -456,7 +457,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.4.0 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.4.1 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
@@ -499,24 +500,25 @@ class TargetKitTests(unittest.TestCase):
         self.assertIn('boom', errors[0])
         self.assertIn('(2 times so far)', errors[1])
         self.assertTrue(self.in_log('press: TK Sap: an error (logged), so the fixed macro'))
-        said = [l for l in self.g.printed.values() if 'an error in TK Sap choosing' in l]
-        self.assertEqual(len(said), 1)
+        self.assertFalse(self.said('an error in TK Sap choosing'))          # the log only (1.4.1)
 
     def test_what_the_game_blocks_is_logged(self):
         self.fire('ADDON_ACTION_BLOCKED', 'TargetKit', 'TargetUnit()')
         self.fire('ADDON_ACTION_BLOCKED', 'SomeOtherAddon', 'CastSpellByName()')
         self.assertTrue(self.in_log('ERROR: the game blocked TargetKit from TargetUnit() (ADDON_ACTION_BLOCKED)'))
         self.assertFalse(self.in_log('SomeOtherAddon'))
-        self.assertTrue(self.said('the game blocked TargetKit from TargetUnit()'))
+        self.assertFalse(self.said('the game blocked TargetKit'))
 
     def test_a_key_is_checked_after_it_is_set(self):
         self.open_window()
         self.set_key(3, 'F', mods=('shift',))
         self.assertTrue(self.in_log('keys: TK Sap on SHIFT-F'))
         self.g.SetOverrideBindingMacro = self.lua.eval('function() end')     # something else keeps the key
+        panel = self.g.TargetKitPanel
         self.set_key(2, 'G')
         self.assertTrue(self.in_log("WARN: TK Pickpocket on G, but the key does nothing instead"))
-        self.assertTrue(self.said("TK Pickpocket's key G does something else"))
+        self.assertIn("TK Pickpocket's key G does something else (nothing)", panel.status.text)    # the window says
+        self.assertFalse(self.said("does something else"))
 
     def test_tkit_log_shows_the_last_lines_and_clears(self):
         self.slash('add Thug')
@@ -543,8 +545,7 @@ class TargetKitTests(unittest.TestCase):
         warns = [l for l in self.logged() if 'WARN: TK Sap: it chose enemy player in Sap range: Nightstep' in l]
         self.assertEqual(len(warns), 2)
         self.assertIn("but your target is none (the game didn't take the macro's first target line)", warns[0])
-        said = [l for l in self.g.printed.values() if "TK Sap chose a target, but the game didn't target it" in l]
-        self.assertEqual(len(said), 1)                                       # said once
+        self.assertFalse(self.said("chose a target, but the game didn't target it"))   # the log only (1.4.1)
         self.g.TargetUnit = takes
         self.press('TKSap')                                                  # one the game takes: no warning
         self.assertEqual(len([l for l in self.logged() if 'WARN:' in l]), 2)
@@ -577,7 +578,7 @@ class TargetKitTests(unittest.TestCase):
         self.press('TKFind')
         self.assertTrue(self.in_log('result: TK Find: the game ran ClearTarget(), TargetUnit(Game);'
                                     ' target none -> none'))
-        self.assertTrue(self.said('TK Find: nobody on your find list (Game) is near enough to target.'))
+        self.assertTrue(self.in_log('result: TK Find: nobody on your find list (Game) is near enough to target.'))
         self.unit('mouseover', 'Gamekeeper Ralf', plate=False, enemy=False, reaction=5)
         self.g.NOW += 5
         self.press('TKFind')
@@ -596,6 +597,29 @@ class TargetKitTests(unittest.TestCase):
         self.assertEqual(self.press('TKFind'), '/cleartarget\n/target [noexists] Game Warden Ollie\n'
                                                '/target [noexists] Gamebird\n/target [noexists] Game\n'
                                                '/cleartarget [dead,noplayer]')
+
+    def test_chat_stays_quiet_unless_turned_on(self):
+        """1.4.1, the user: "chat debug menus should be hidden, I don't want to see them"."""
+        self.slash('add Game')
+        self.unit('nameplate1', 'Nightstep', player=True, reach=2)
+        self.g.UnitCreatureType = self.lua.eval('function() error("boom") end')
+        self.press('TKFind')                                                 # nobody near
+        self.press('TKSap')                                                  # an error
+        self.fire('ADDON_ACTION_BLOCKED', 'TargetKit', 'TargetUnit()')
+        panel = self.open_window()
+        panel.input.text = 'Thug'
+        panel.input.scripts['OnEnterPressed'](panel.input)                   # the window answers on its bottom line
+        self.assertEqual(panel.status.text, 'added Thug to the find list (2 on it). TK Find targets it, closest first.')
+        self.assertEqual([l for l in self.g.printed.values() if 'TargetKit' in l],
+                         ['|cff9ad0ffTargetKit|r added Game to the find list (1 on it). TK Find targets it, closest'
+                          ' first.'])                                        # only the answer to what was typed
+        self.slash('chat')
+        self.assertTrue(self.g.TargetKitDB.chat)                             # kept through relogs
+        self.g.NOW += 5
+        self.press('TKFind')
+        self.assertTrue(self.said('TK Find: nobody on your find list'))
+        self.slash('chat')
+        self.assertFalse(self.g.TargetKitDB.chat)
 
     def test_the_addon_compiles_and_the_toc_loads_it(self):
         toc = (KIT / 'TargetKit.toc').read_text(encoding='utf-8')

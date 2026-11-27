@@ -79,16 +79,20 @@ Revised:
 - **The log**, always on: every press (which macro, every unit it saw and why it took or passed over each, the macro it
   ran), what came of it in the next 2 seconds (the game's error line such as "Out of range.", the cast, the new
   target), the game settings that matter at login (act on key down, nameplates, soft targeting), the macros and keys
-  it made (each key checked to really press the button), anything the game blocked, and every error with where (also
-  said once in chat). Since 1.2.1 each press also records what the game itself ran for it (its targeting and casting
+  it made (each key checked to really run the macro), anything the game blocked, and every error with where. Since 1.2.1 each press also records what the game itself ran for it (its targeting and casting
   functions, watched without getting in the way) and where your target went. Since 1.4.0: when a macro chose a unit
-  and your target isn't that unit 0.3 s later, the log says so every time and chat once ("chose a target, but the
-  game didn't target it"); the first write of each macro in a session is logged, and a warning if the game keeps a
-  different text than was written. TK Find says in chat when nobody on your list is near enough.
+  and your target isn't that unit 0.3 s later, the log says so ("chose a target, but the game didn't target it");
+  the first write of each macro in a session is logged, and a warning if the game keeps a
+  different text than was written, and TK Find notes when nobody on your list is near enough.
+- **Chat stays quiet (1.4.1):** what TargetKit notices by itself (nobody near, warnings, errors, the macros made) goes
+  to the log only. `/tkit chat` shows it in chat too (kept through relogs; `/tkit chat` again turns it off). Answers
+  to what you type (`/tkit list`, `/tkit add`, `/tkit log`, `/tkit help`) still show in chat, and what you do in the
+  window shows on its bottom line.
   `/tkit log` shows the last 15 lines (`/tkit log 40`, `/tkit log clear`); the last 400 are kept
   in the saved file, written on `/reload` or logout. When something doesn't work, `/reload` and say so.
 - `/tkit macros` makes the three macros again if you deleted them; `/tkit forget`
-  clears whom you robbed; `/tkit debug` prints, on every press, what it chose and the macro it ran; `/tkit help`.
+  clears whom you robbed; `/tkit debug` prints, on every press, what it chose and the macro it ran (off after every
+  `/reload`); `/tkit chat` (above); `/tkit help`.
 - Nameplates matter: the addon sees units through them (enemy nameplates for mobs and players, friendly ones for
   NPCs), plus your target, mouseover, soft targets, focus and group.
 

@@ -28,7 +28,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.4.0"
+local VERSION = "1.4.1"
 local PICK_POCKET, SAP = 921, 6770
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
 local HUMANOID = 7                                                       -- creature type id
@@ -41,6 +41,11 @@ local EDIT_GAP = 0.4                  -- seconds: a macro is rewritten at most t
 local db
 local debug = false
 local function tell(...) print("|cff9ad0ffTargetKit|r", ...) end
+-- What the addon notices by itself (a press that found nobody, a warning, an error, the macros made) goes to the log
+-- only, and to chat as well just if you turn chat messages on with /tkit chat (1.4.1, the user: "chat debug menus
+-- should be hidden, I don't want to see them"). Answers to what you type in chat (/tkit list, /tkit log, /tkit add
+-- ...) still show there; what you do in the window shows on the window's bottom line.
+local function note(...) if db and db.chat then tell(...) end end
 
 -- The log (1.2.0, the user: "logging should be explicit so we can catch issues"). Always on, not only with
 -- /tkit debug. Every press: which macro, what it saw and why it chose what it did, and the macro it ran. Then what came
@@ -110,7 +115,7 @@ local function try(where, fn, ...)
       log("ERROR", where .. (count > 1 and (" (" .. count .. " times so far)") or "") .. ":", err)
     end
     if count == 1 then
-      tell("|cffff6060an error in " .. where .. "|r (" .. clean(err):sub(1, 120) .. "). It's in the log: /tkit log"
+      note("|cffff6060an error in " .. where .. "|r (" .. clean(err):sub(1, 120) .. "). It's in the log: /tkit log"
         .. " shows it, /reload saves it for a closer look.")
     end
   end
@@ -577,14 +582,16 @@ local function afterPress(p)                             -- 0.3 s after a press:
       .. " (the game didn't take the macro's first target line)")
     if not saidMissed[b.name] then
       saidMissed[b.name] = true
-      tell("|cffff6060" .. b.macro .. " chose a target, but the game didn't target it|r (your target: " .. after
+      note("|cffff6060" .. b.macro .. " chose a target, but the game didn't target it|r (your target: " .. after
         .. "). /reload and tell Claude: the log has the details.")
     end
   end
   if b.name == "TKFind" and after == "none" and #db.find > 0 and GetTime() - saidNobody > 3 then
     saidNobody = GetTime()
-    tell("TK Find: nobody on your find list (" .. table.concat(db.find, ", ") .. ") is near enough to target."
-      .. " The game's own target-by-name found nobody either.")
+    local msg = "TK Find: nobody on your find list (" .. table.concat(db.find, ", ") .. ") is near enough to target."
+      .. " The game's own target-by-name found nobody either."
+    log("result", msg)
+    note(msg)
   end
 end
 
@@ -600,8 +607,10 @@ local function onPress(b)                                -- the macro's last lin
   if debug then tell(b.macro .. ": " .. (st.why or "?") .. "\n" .. st.text) end
   if b.name == "TKFind" then
     if #db.find == 0 then
-      tell("your find list is empty. /tkit add <name> adds one (part of a name is enough), or target something and"
-        .. " type /tkit add.")
+      local msg = "your find list is empty. /tkit add <name> adds one (part of a name is enough), or target"
+        .. " something and type /tkit add."
+      log("press", msg)
+      note(msg)
     end
     if st.chosen then                                    -- the next press goes to the next one
       if now - last.find.t > CYCLE or st.again then last.find.visited = {} end
@@ -647,7 +656,7 @@ local function ensureMacros(create)                      -- make the three if th
         made[#made + 1] = b.macro
         log("macros", b.macro .. ": made, " .. body)
       else
-        tell("your account macros are full, so " .. b.macro .. " could not be made. Free one and type /tkit macros.")
+        note("your account macros are full, so " .. b.macro .. " could not be made. Free one and type /tkit macros.")
         log("WARN", b.macro .. ": not made, your account macros are full")
       end
     else
@@ -655,7 +664,7 @@ local function ensureMacros(create)                      -- make the three if th
     end
   end
   if #made > 0 then
-    tell("made the macros " .. table.concat(made, ", ") .. " (Escape > Macros, General tab): drag them to your bars."
+    note("made the macros " .. table.concat(made, ", ") .. " (Escape > Macros, General tab): drag them to your bars."
       .. " TargetKit rewrites their text as you play, so leave it as it is.")
   end
 end
@@ -693,9 +702,10 @@ end
 -- does what it did before. WoW binds one key plus any of Shift, Ctrl and Alt, or mouse button 3 to 5 or the wheel; no
 -- addon can bind two ordinary keys pressed together. Keys can't change in combat (the game forbids it).
 local pendingKeys = false
-local function applyKeys()
-  if InCombatLockdown() then pendingKeys = true return end
-  if not (ClearOverrideBindings and (SetOverrideBindingMacro or SetOverrideBinding)) then return end
+local function applyKeys()                       -- returns { [button name] = what went wrong }
+  local bad = {}
+  if InCombatLockdown() then pendingKeys = true return bad end
+  if not (ClearOverrideBindings and (SetOverrideBindingMacro or SetOverrideBinding)) then return bad end
   ClearOverrideBindings(ev)
   for _, b in ipairs(BUTTONS) do
     local key = db.keys[b.name]
@@ -708,11 +718,13 @@ local function applyKeys()
       else
         local what = (now == nil or now == "") and "nothing" or tostring(now)
         log("WARN", b.macro .. " on " .. key .. ", but the key does " .. what .. " instead")
-        tell("|cffff6060" .. b.macro .. "'s key " .. key .. " does something else|r (" .. what .. "). Set it again"
-          .. " in the window, or tell Claude: /reload saves the log.")
+        bad[b.name] = b.macro .. "'s key " .. key .. " does something else (" .. what .. "). Set it again,"
+          .. " or tell Claude: /reload saves the log."
+        note("|cffff6060" .. bad[b.name] .. "|r")
       end
     end
   end
+  return bad
 end
 
 local function keyText(key)
@@ -732,7 +744,8 @@ local function setKey(b, key)
   local before = GetBindingAction and actionName(GetBindingAction(key, true))
   for _, o in ipairs(BUTTONS) do if db.keys[o.name] == key then db.keys[o.name] = nil end end   -- one key, one macro
   db.keys[b.name] = key
-  applyKeys()
+  local bad = applyKeys()
+  if bad[b.name] then return false, bad[b.name] end
   return true, b.macro .. " is on " .. keyText(key) .. " now" .. (before and (" (it was " .. before
     .. "; it does that again if you clear this key)") or "") .. "."
 end
@@ -757,8 +770,8 @@ end
 local panel, capturing, refreshPanel
 local LIST_ROWS = 8
 
-local function report(_, msg)
-  tell(msg)
+local function report(_, msg, typed)              -- typed: the answer to a /tkit command, so in chat too
+  if typed then tell(msg) end
   log("window", msg)
   if panel then
     panel.status:SetText(msg)
@@ -1112,7 +1125,7 @@ local function onEvent(_, event, a1, a2, a3)
   elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
     if a1 == "TargetKit" then
       log("ERROR", "the game blocked TargetKit from " .. tostring(a2) .. " (" .. event .. ")")
-      tell("|cffff6060the game blocked TargetKit from " .. tostring(a2) .. "|r. It's in the log: /tkit log.")
+      note("|cffff6060the game blocked TargetKit from " .. tostring(a2) .. "|r. It's in the log: /tkit log.")
     end
   elseif event == "UI_ERROR_MESSAGE" then
     local msg = type(a2) == "string" and a2 or a1                -- (type, message); older clients: (message)
@@ -1143,16 +1156,18 @@ local function slash(msg)
   elseif cmd == "add" then
     local name = rest ~= "" and rest or UnitName("target")
     if not name then tell("type /tkit add <name>, or target something first.") return end
-    report(addName(name))
+    local _, said = addName(name)
+    report(nil, said, true)
   elseif cmd == "remove" or cmd == "del" then
-    report(removeName(rest))
+    local _, said = removeName(rest)
+    report(nil, said, true)
   elseif cmd == "list" then
     tell(#db.find == 0 and "the find list is empty. /tkit add <name> adds one."
       or ("find list: " .. table.concat(db.find, ", ")))
   elseif cmd == "clear" then
     db.find = {}
     prepare(true)
-    report(true, "the find list is empty now.")
+    report(true, "the find list is empty now.", true)
   elseif cmd == "macros" then
     if InCombatLockdown() then tell("not in combat: try again after it.") return end
     ensureMacros(true)
@@ -1161,6 +1176,10 @@ local function slash(msg)
   elseif cmd == "forget" then
     db.picked = {}
     tell("forgot which units you have pickpocketed: TK Pickpocket may try them again.")
+  elseif cmd == "chat" then
+    db.chat = not db.chat
+    tell("chat messages " .. (db.chat and "on: what TargetKit notices by itself (nobody near, warnings, errors) shows"
+      .. " here too. /tkit chat turns them off." or "off: what TargetKit notices goes to the log only (/tkit log)."))
   elseif cmd == "debug" then
     debug = not debug
     tell("debug " .. (debug and "on: each press prints what it chose and the macro it ran." or "off."))
@@ -1190,6 +1209,8 @@ local function slash(msg)
     tell("/tkit remove <name>, /tkit list, /tkit clear: change or see the find list.")
     tell("/tkit macros: make the three macros again if you deleted them. /tkit forget: TK Pickpocket forgets whom it robbed.")
     tell("/tkit debug: print what each press chose and why. /tkit minimap: hide or bring back the minimap button.")
+    tell("/tkit chat: show in chat what TargetKit notices by itself (nobody near, warnings, errors); off by default,"
+      .. " it all goes to the log.")
     tell("/tkit log: the last 15 lines of the log (every press, what came of it, errors); /tkit log 40 for more,"
       .. " /tkit log clear to empty it. /reload saves it to disk.")
   end
