@@ -882,6 +882,19 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-27** (fifth part) Addon 1.6.8: a minimap button for the farm meter (the user: "can we have a minimap button
+  for gea farm meter too? maybe with start, stop, minimize, debug etc, all commands in a list when clicking?" and
+  "button position should also be saved if possible and survive relogs and game restarts etc"). A gold coin
+  (INV_Misc_Coin_01) on the minimap's edge in the usual minimap-button look, made with plain frames in Meter.lua (no
+  library to download; a new file would need a full game restart). Click: a list of every command, the current choices
+  ticked (price source, debug), each line explained on hover, opening toward the middle of the screen; Escape or a
+  click elsewhere closes it. Drag: moves it around the edge; the angle is saved in ForeverMoneyBridgeDB.meter.minimap
+  (account-wide, so the same spot on every character), so it survives relogs, /reload and restarts. Grey while nothing
+  is counted. "Hide this minimap button" or `/gea minimap` hides it, `/gea minimap` brings it back. New `/gea help`: every
+  command with a plain explanation. Made at PLAYER_LOGIN (the saved place is loaded by then). Tests find the window by
+  its name now (the harness registers named frames as globals, as WoW does), since the button and menu are frames too.
+  7 new tests; not checked in game yet (checklist B8).
+
 - **2026-11-27** (fourth part) Addon 1.6.7: boxes that open straight into your bags count, and coins count from your
   own line. Two reports from the user in Alterac Valley, pick-pocketing in the mine:
   - "i looted 3 silver 15 then 1 silver 29, but meter shows only 3 15" ("it was done in quick succession"). The meter

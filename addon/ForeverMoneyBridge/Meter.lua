@@ -16,11 +16,12 @@
 -- a full restart of WoW, so the number lives here too; a test keeps the two the same).
 -- 1.6.7: coins count from your own chat line ("You loot 3 Silver, 15 Copper"); see coinLine below. And boxes that
 -- open straight into your bags (no loot window since the 25 Nov patch) count what they gave: ns.onBoxOpened.
+-- 1.6.8: a minimap button with every command in a list (end of this file), and /gea help.
 
 local _, ns = ...                   -- the addon's shared table: ns.bagItem (ForeverMoneyBridge.lua), the box a loot
                                     -- window came from
 ns = ns or {}
-local VERSION = "1.6.7"             -- the same as the .toc's ## Version (tests/test_meter_lua.py checks)
+local VERSION = "1.6.8"             -- the same as the .toc's ## Version (tests/test_meter_lua.py checks)
 local CUT = 0.05
 local TSM_PRICE = "first(DBMinBuyout, DBMarket, DBRegionMarketAvg)"
 -- newer clients (WoW: Forever) moved these into C_Item / C_Spell; the old globals may not exist
@@ -692,6 +693,7 @@ local function addMoney(delta)
   say("gold looted:", money(delta))
 end
 
+local setupMinimap, toggleMinimap   -- the minimap button (end of this file), made at login: its saved place is loaded by then
 local ev = CreateFrame("Frame")
 for _, e in ipairs({ "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "CHAT_MSG_LOOT", "CHAT_MSG_MONEY", "PLAYER_MONEY",
                     "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "BAG_UPDATE_DELAYED", "PLAYER_LOGIN", "PLAYER_LOGOUT" }) do
@@ -699,7 +701,11 @@ for _, e in ipairs({ "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "CHAT_MSG_LOOT"
 end
 ev:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
-  if event == "PLAYER_LOGIN" then pcall(carryOn) return end      -- a session running at the last logout or /reload
+  if event == "PLAYER_LOGIN" then                     -- a session running at the last logout or /reload; the minimap button
+    pcall(carryOn)
+    if setupMinimap then pcall(setupMinimap) end
+    return
+  end
   if event == "PLAYER_LOGOUT" then pcall(keepRunning) return end
   if event == "PLAYER_XP_UPDATE" or event == "PLAYER_LEVEL_UP" then
     if session then pcall(noteXP) end                  -- paused: the bar moves on, nothing is counted
@@ -761,9 +767,29 @@ ev:SetScript("OnEvent", function(_, event, msg, _, spellId)
   end
 end)
 
--- /gea start | stop | pause | resume | min | hide | show | prices | debug; anything else goes to the addon's own /gea
--- (snapshot)
+-- /gea start | stop | pause | resume | min | hide | show | prices | debug | minimap | help; anything else goes to the
+-- addon's own /gea (snapshot)
 local NOT_RUNNING = "|cffe8c060Gold Ever After|r is not running. /gea start"
+local HELP = {
+  { "start", "start a session: what you loot, gold looted and XP count from now on" },
+  { "pause", "stop counting for now (a break, a vendor run); the time paused doesn't count" },
+  { "resume", "carry on counting after a pause" },
+  { "stop", "end the session and save it (total, gold an hour, items)" },
+  { "min", "fold the window to one line (total, gold an hour, time) and back" },
+  { "hide", "hide the window completely; it keeps counting" },
+  { "show", "bring the window back" },
+  { "prices", "which prices value your items now, and how to change that:" },
+  { "prices auto", "the app's values while under 12 hours old, else TSM in game (the default)" },
+  { "prices app", "always the app's values" },
+  { "prices tsm", "always TSM in game (the app isn't needed)" },
+  { "debug", "print in chat what the meter counts and why (each loot window, box and coin line); again to stop" },
+  { "minimap", "hide the minimap button, or bring it back" },
+  { "help", "this list" },
+}
+local function printHelp()
+  print("|cffe8c060Gold Ever After|r " .. VERSION .. ", the farm meter. Every command (the minimap button lists them too):")
+  for _, h in ipairs(HELP) do print("  |cffffd100/gea " .. h[1] .. "|r: " .. h[2]) end
+end
 local original = SlashCmdList.FOREVERMONEYBRIDGE
 SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
   local cmd = strlower(strtrim(msg or ""))
@@ -790,6 +816,10 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
     session.paused, session.pausedAt = true, GetTime()
     win.pause:SetText("Resume")
     refresh()
+  elseif cmd == "help" then
+    printHelp()
+  elseif cmd == "minimap" then
+    if toggleMinimap then toggleMinimap() end
   elseif cmd == "debug" then
     debug = not debug
     print("|cffe8c060Gold Ever After|r " .. VERSION .. " debug " .. (debug and "on: what the meter counts is printed here"
@@ -823,6 +853,198 @@ SlashCmdList.FOREVERMONEYBRIDGE = function(msg)
   else
     if original then original(msg) end
     print("|cffe8c060Gold Ever After|r " .. VERSION .. ": /gea start, /gea pause, /gea resume, /gea stop, /gea min (fold the window to"
-      .. " one line and back), /gea hide, /gea show (it keeps counting while hidden), /gea prices, /gea debug.")
+      .. " one line and back), /gea hide, /gea show (it keeps counting while hidden), /gea prices, /gea debug, /gea minimap,"
+      .. " /gea help (all of them, explained).")
   end
+end
+
+-- The minimap button (1.6.8, the user: "can we have a minimap button for gea farm meter too? maybe with start, stop,
+-- minimize, debug etc, all commands in a list when clicking?" and "button position should also be saved if possible
+-- and survive relogs and game restarts"). A gold coin on the minimap's edge. Click it: every command in a list, each
+-- with a hover explanation, the current choices ticked. Drag it around the minimap's edge to move it: the place is saved
+-- in ForeverMoneyBridgeDB (account-wide, so every character has it in the same spot) and kept through relogs, /reload
+-- and game restarts (WoW writes the file on logout, /reload or exit; a crash loses changes since the last write).
+-- The coin is grey while no session runs or it is paused. "Hide this minimap button" or /gea minimap hides it, and
+-- /gea minimap brings it back. Plain frames (no library), the usual minimap-button look.
+local mmButton, menu
+local function mm()
+  local m = db()
+  m.minimap = m.minimap or {}
+  return m.minimap
+end
+
+local function placeButton()
+  local a = math.rad(mm().angle or 200)                       -- 200 degrees: left of the minimap, a little below
+  local r = (Minimap:GetWidth() or 140) / 2 + 10              -- the button's centre just outside the minimap's edge
+  mmButton:ClearAllPoints()
+  mmButton:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * r, math.sin(a) * r)
+end
+
+local function menuEntries()
+  local e = {}
+  local function add(label, cmd, explain, checked)
+    e[#e + 1] = { label = label, cmd = cmd, explain = explain, checked = checked }
+  end
+  local function head(label) e[#e + 1] = { label = label, head = true } end
+  head("Gold Ever After " .. VERSION)
+  if not session then
+    add("Start a session", "start", "Start counting what you loot (items, gold looted, XP) from now on, and open the meter.")
+  else
+    if session.paused then
+      add("Resume", "resume", "Carry on counting. The time paused doesn't count toward gold an hour.")
+    else
+      add("Pause", "pause", "Stop counting for now (a break, a vendor run). Resume carries on; the pause doesn't count.")
+    end
+    add("Stop and save", "stop", "End the session and save it: its total, gold an hour and items.")
+    local shown = win and win:IsShown()
+    add(shown and "Hide the window" or "Show the window", shown and "hide" or "show", shown
+      and "Hide the meter completely. It keeps counting; Show the window brings it back." or "Bring the meter window back.")
+  end
+  add(db().collapsed and "Open the window in full" or "Fold the window to one line", "min", db().collapsed
+    and "Show the full window: totals, figures and top items." or
+    "Fold the meter to one line: total, gold an hour and time. It keeps counting.")
+  head("Prices: how items are valued")
+  local m = priceMode()
+  add("Auto", "prices auto", "The app's values while they are under 12 hours old, else TSM in game. The default.", m == "auto")
+  add("Always the app's", "prices app", "Always the WoW Forever Money app's values, as its My bags shows them (TSM and"
+    .. " vendor prices for items it didn't list).", m == "app")
+  add("Always TSM in game", "prices tsm", "Always TSM in game: your realm's lowest listing minus the 5% AH cut, or the"
+    .. " vendor price when that is higher. The app isn't needed.", m == "tsm")
+  head("More")
+  add("Debug", "debug", "Print in chat what the meter counts and why: each loot window, box and coin line. Click again"
+    .. " to stop.", debug)
+  add("List every command in chat", "help", "Print every /gea command with what it does.")
+  add("Hide this minimap button", "minimap", "Hide the coin on the minimap. Type /gea minimap to bring it back.")
+  return e
+end
+
+local ROW_H, MENU_W = 18, 240
+local function showMenu()
+  if not menu then
+    menu = CreateFrame("Frame", "GoldEverAfterMenu", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    menu:SetFrameStrata("DIALOG")
+    menu:SetClampedToScreen(true)
+    menu:EnableMouse(true)
+    if menu.SetBackdrop then
+      menu:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+                         tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+      menu:SetBackdropColor(0.04, 0.05, 0.07, 0.95)
+      menu:SetBackdropBorderColor(0.91, 0.75, 0.38, 0.8)
+    end
+    menu.rows = {}
+    if UISpecialFrames then table.insert(UISpecialFrames, "GoldEverAfterMenu") end     -- Escape closes it
+    pcall(menu.RegisterEvent, menu, "GLOBAL_MOUSE_DOWN")                             -- so does a click anywhere else
+    menu:SetScript("OnEvent", function(self)
+      if self:IsShown() and MouseIsOver and not MouseIsOver(self) and not MouseIsOver(mmButton) then self:Hide() end
+    end)
+  end
+  local entries = menuEntries()
+  for i, en in ipairs(entries) do
+    local row = menu.rows[i]
+    if not row then
+      row = CreateFrame("Button", nil, menu)
+      row:SetHeight(ROW_H)
+      row:SetPoint("TOPLEFT", menu, "TOPLEFT", 8, -8 - (i - 1) * ROW_H)
+      row:SetPoint("TOPRIGHT", menu, "TOPRIGHT", -8, -8 - (i - 1) * ROW_H)
+      row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+      row.check = row:CreateTexture(nil, "ARTWORK")
+      row.check:SetSize(14, 14)
+      row.check:SetPoint("LEFT", 2, 0)
+      row.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+      row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      row.label:SetJustifyH("LEFT")
+      row:SetScript("OnClick", function(self)
+        if not self.cmd then return end
+        menu:Hide()
+        SlashCmdList.FOREVERMONEYBRIDGE(self.cmd)
+      end)
+      tip(row, function() return row.explain end)
+      menu.rows[i] = row
+    end
+    row.cmd, row.explain = en.cmd, en.explain
+    row.label:ClearAllPoints()
+    row.label:SetPoint("LEFT", en.head and 2 or 20, 0)
+    row.label:SetText(en.head and ("|cffe8c060" .. en.label .. "|r") or en.label)
+    if en.checked then row.check:Show() else row.check:Hide() end
+    row:EnableMouse(not en.head)
+    row:Show()
+  end
+  for i = #entries + 1, #menu.rows do menu.rows[i]:Hide() end
+  menu:SetSize(MENU_W, #entries * ROW_H + 16)
+  menu:ClearAllPoints()
+  local x = mmButton:GetCenter()                              -- open toward the middle of the screen
+  local right = x and UIParent.GetWidth and x > UIParent:GetWidth() / 2
+  menu:SetPoint(right and "TOPRIGHT" or "TOPLEFT", mmButton, right and "BOTTOMLEFT" or "BOTTOMRIGHT", 0, 0)
+  menu:Show()
+end
+
+setupMinimap = function()
+  if mmButton or not Minimap then return end
+  mmButton = CreateFrame("Button", "GoldEverAfterMinimapButton", Minimap)
+  mmButton:SetSize(31, 31)
+  mmButton:SetFrameStrata("MEDIUM")
+  mmButton:SetFrameLevel(8)
+  mmButton:RegisterForClicks("AnyUp")
+  mmButton:RegisterForDrag("LeftButton")
+  mmButton:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+  local border = mmButton:CreateTexture(nil, "OVERLAY")
+  border:SetSize(53, 53)
+  border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+  border:SetPoint("TOPLEFT")
+  local back = mmButton:CreateTexture(nil, "BACKGROUND")
+  back:SetSize(20, 20)
+  back:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
+  back:SetPoint("TOPLEFT", 7, -5)
+  local icon = mmButton:CreateTexture(nil, "ARTWORK")
+  icon:SetSize(17, 17)
+  icon:SetTexture("Interface\\Icons\\INV_Misc_Coin_01")
+  icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
+  icon:SetPoint("TOPLEFT", 7, -6)
+  mmButton.icon = icon
+
+  local acc = 1
+  local function tick(self, dt)                               -- the coin: grey while nothing is being counted
+    acc = acc + (dt or 0)
+    if acc < 1 then return end
+    acc = 0
+    self.icon:SetDesaturated(not session or session.paused)
+  end
+  mmButton:SetScript("OnUpdate", tick)
+  mmButton:SetScript("OnClick", function()
+    if menu and menu:IsShown() then menu:Hide() else showMenu() end
+  end)
+  mmButton:SetScript("OnDragStart", function(self)            -- follow the cursor around the minimap's edge
+    if menu then menu:Hide() end
+    self:SetScript("OnUpdate", function()
+      local mx, my = Minimap:GetCenter()
+      local px, py = GetCursorPosition()
+      local s = Minimap:GetEffectiveScale()
+      mm().angle = math.floor(math.deg((math.atan2 or atan2)(py / s - my, px / s - mx)) + 0.5) % 360
+      placeButton()
+    end)
+  end)
+  mmButton:SetScript("OnDragStop", function(self)
+    self:SetScript("OnUpdate", tick)
+    acc = 1
+  end)
+  tip(mmButton, function()
+    local state = "Not running."
+    if session then
+      state = (session.paused and "Paused" or "Running") .. ", " .. clock(elapsed()) .. " so far: "
+        .. money(totals() + session.money) .. "."
+    end
+    return "|cffe8c060Gold Ever After|r farm meter\n" .. state .. "\n\nClick: every command in a list."
+      .. " Drag: move this button around the minimap (the place is kept)."
+  end)
+  placeButton()
+  if mm().hide then mmButton:Hide() else mmButton:Show() end
+end
+
+toggleMinimap = function()
+  mm().hide = not mm().hide
+  if not mmButton then pcall(setupMinimap) end
+  if mmButton then if mm().hide then mmButton:Hide() else mmButton:Show() end end
+  if menu then menu:Hide() end
+  print("|cffe8c060Gold Ever After|r minimap button " .. (mm().hide and "hidden. /gea minimap brings it back."
+    or "shown. Click it for every command; drag it to move it."))
 end

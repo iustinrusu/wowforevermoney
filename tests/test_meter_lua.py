@@ -43,7 +43,7 @@ class MeterTests(unittest.TestCase):
                                    + (f'x{n}.' if n > 1 else '.'))
 
     def refresh(self):
-        win = self.g.frames[getattr(self, 'win_at', 3)]
+        win = self.g.ForeverMoneyBridgeMeter
         win.scripts['OnUpdate'](win, 1.5)
         return win
 
@@ -118,7 +118,7 @@ class MeterTests(unittest.TestCase):
     def test_fold_to_one_line_and_back(self):
         g = self.g
         self.slash('start')
-        win = g.frames[3]
+        win = g.ForeverMoneyBridgeMeter
         self.assertEqual((win.fold.text, win.title.text), ('–', 'Gold Ever After'))
         self.assertEqual(win.title.width, 320 - 164)                      # stops short of Pause, Stop and "–"
         self.loot(8150, 'Deeprock Salt', 40)                               # 40 x 297 = 11,880 = 1g 18s 80c
@@ -162,7 +162,7 @@ class MeterTests(unittest.TestCase):
         g.ForeverMoneyBridgeDB = self.lua.eval(
             '{meter = {collapsed = true, w = 300, h = 400, pos = {"TOPLEFT", 120, 900, "BOTTOMLEFT"}}}')
         self.slash('start')
-        win = g.frames[3]
+        win = g.ForeverMoneyBridgeMeter
         self.assertEqual((win.w, win.h, win.left, win.top, win.body.shown), (300, 34, 120, 900, False))
         self.slash('min')
         self.assertEqual((win.h, g.ForeverMoneyBridgeDB.meter.h), (400, 400))   # the open height is kept
@@ -172,7 +172,7 @@ class MeterTests(unittest.TestCase):
         g = self.g
         g.ForeverMoneyBridgeDB = self.lua.eval('{meter = {pos = {"BOTTOMRIGHT", -238, 121}}}')
         self.slash('start')
-        win = g.frames[3]
+        win = g.ForeverMoneyBridgeMeter
         first = win.points[1]
         self.assertEqual([first[i] for i in (1, 3, 4, 5)], ['BOTTOMRIGHT', 'BOTTOMRIGHT', -238, 121])
         pos = g.ForeverMoneyBridgeDB.meter.pos
@@ -181,7 +181,7 @@ class MeterTests(unittest.TestCase):
     def test_hide_and_show_keep_counting(self):
         g = self.g
         self.slash('start')
-        win = g.frames[3]
+        win = g.ForeverMoneyBridgeMeter
         self.slash('hide')
         self.assertFalse(win.shown)
         self.loot(8150, 'Deeprock Salt', 3)                                # 3 x 297 = 891, counted while hidden
@@ -314,7 +314,6 @@ class MeterTests(unittest.TestCase):
         self.g.RUN_FILE((ADDON / 'Meter.lua').read_text(encoding='utf-8'), 'Meter.lua', self.g.ADDON_NS)
         self.events = self.g.frames[len(self.g.frames)]
         self.slash = self.g.SlashCmdList.FOREVERMONEYBRIDGE
-        self.win_at = len(self.g.frames) + 1             # the window it opens again (its buttons come after it)
         self.fire('PLAYER_LOGIN')
 
     def test_a_session_carries_on_after_a_reload(self):
@@ -374,6 +373,115 @@ class MeterTests(unittest.TestCase):
         self.reload()
         self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.running['Player-0-00000002'].elapsed, 60)
         self.assertIsNone(self.g.ForeverMoneyBridgeDB.meter.sessions)
+
+    # --- the minimap button (1.6.8) ---
+    def login(self):
+        self.fire('PLAYER_LOGIN')
+        return self.g.GoldEverAfterMinimapButton
+
+    def menu_rows(self):
+        m = self.g.GoldEverAfterMenu
+        return [m.rows[i] for i in range(1, len(m.rows) + 1) if m.rows[i].shown]
+
+    def choose(self, label):
+        """Open the minimap menu and click one line of it."""
+        button = self.g.GoldEverAfterMinimapButton
+        button.scripts['OnClick'](button)
+        for r in self.menu_rows():
+            if r.label.text == label:
+                r.scripts['OnClick'](r)
+                return
+        self.fail(f'no {label!r} in {[r.label.text for r in self.menu_rows()]}')
+
+    def test_the_minimap_button_lists_every_command(self):
+        toc = (ADDON / 'ForeverMoneyBridge.toc').read_text(encoding='utf-8')
+        version = toc.split('## Version:')[1].split()[0]
+        button = self.login()
+        self.assertTrue(button.shown)
+        button.scripts['OnClick'](button)
+        self.assertTrue(self.g.GoldEverAfterMenu.shown)
+        rows = self.menu_rows()
+        self.assertEqual([r.label.text for r in rows], [
+            f'|cffe8c060Gold Ever After {version}|r', 'Start a session', 'Fold the window to one line',
+            '|cffe8c060Prices: how items are valued|r', 'Auto', "Always the app's", 'Always TSM in game',
+            '|cffe8c060More|r', 'Debug', 'List every command in chat', 'Hide this minimap button'])
+        self.assertEqual([r.label.text for r in rows if r.check.shown], ['Auto'])          # the choice now, ticked
+        self.assertTrue(all(r.explain for r in rows if r.cmd))                            # each one explained
+        self.assertEqual(self.g.GoldEverAfterMenu.point[1], 'TOPLEFT')                    # minimap on the left
+        button.scripts['OnClick'](button)                                                  # a second click closes it
+        self.assertFalse(self.g.GoldEverAfterMenu.shown)
+        button.cx, button.cy = 1800, 950                     # on the right of the screen, as usual:
+        button.scripts['OnClick'](button)                    # the list opens to its left, toward the middle
+        self.assertEqual(self.g.GoldEverAfterMenu.point[1], 'TOPRIGHT')
+
+    def test_the_menu_runs_the_commands(self):
+        self.login()
+        self.choose('Start a session')
+        self.assertFalse(self.g.GoldEverAfterMenu.shown)
+        self.assertTrue(self.refresh().shown)
+        self.loot(8150, 'Deeprock Salt')
+        self.choose('Pause')
+        self.assertIn('paused', self.refresh().kv[1].text)
+        self.choose('Resume')
+        self.choose('Hide the window')
+        self.assertFalse(self.refresh().shown)
+        self.choose('Show the window')
+        self.choose('Fold the window to one line')
+        self.assertTrue(self.g.ForeverMoneyBridgeDB.meter.collapsed)
+        self.choose('Open the window in full')
+        self.choose('Always TSM in game')
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.prices, 'tsm')
+        self.choose('Debug')
+        self.assertIn('debug on', self.g.printed[len(self.g.printed)])
+        self.g.GoldEverAfterMinimapButton.scripts['OnClick'](self.g.GoldEverAfterMinimapButton)
+        self.assertEqual([r.label.text for r in self.menu_rows() if r.check.shown], ['Always TSM in game', 'Debug'])
+        self.g.GoldEverAfterMenu.Hide(self.g.GoldEverAfterMenu)
+        self.choose('List every command in chat')
+        self.assertTrue(self.said('/gea minimap|r: hide the minimap button, or bring it back'))
+        self.choose('Stop and save')
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.sessions[1]['items'][8150], 1)
+
+    def test_the_coin_is_grey_while_nothing_is_counted(self):
+        button = self.login()
+        tick = lambda: (button.scripts['OnUpdate'](button, 1), button.icon.desaturated)[1]
+        self.assertTrue(tick())
+        self.slash('start')
+        self.assertFalse(tick())
+        self.slash('pause')
+        self.assertTrue(tick())
+
+    def test_its_place_is_kept_through_a_reload(self):
+        """The user: "button position should also be saved if possible and survive relogs and game restarts"."""
+        button = self.login()
+        button.scripts['OnDragStart'](button)
+        self.g.CURSOR = self.lua.eval('{1800, 1050}')         # straight above the minimap's centre
+        button.scripts['OnUpdate'](button, 0.1)
+        button.scripts['OnDragStop'](button)
+        self.assertEqual(self.g.ForeverMoneyBridgeDB.meter.minimap.angle, 90)
+        self.reload()                                         # the saved file is kept; the button is made again
+        p = self.g.GoldEverAfterMinimapButton.point
+        self.assertEqual((p[1], p[3], round(p[4]), round(p[5])), ('CENTER', 'CENTER', 0, 80))
+
+    def test_hide_the_button_and_bring_it_back(self):
+        self.login()
+        self.choose('Hide this minimap button')
+        self.assertFalse(self.g.GoldEverAfterMinimapButton.shown)
+        self.assertIn('hidden. /gea minimap brings it back', self.g.printed[len(self.g.printed)])
+        self.reload()
+        self.assertFalse(self.g.GoldEverAfterMinimapButton.shown)    # still hidden after a reload
+        self.slash('minimap')
+        self.assertTrue(self.g.GoldEverAfterMinimapButton.shown)
+
+    def test_hovering_the_button_says_how_the_session_stands(self):
+        button = self.login()
+        button.scripts['OnEnter'](button)
+        self.assertIn('Not running.', self.g.TOOLTIP)
+        self.slash('start')
+        self.loot(8150, 'Deeprock Salt')
+        self.g.NOW += 125
+        button.scripts['OnEnter'](button)
+        self.assertIn('Running, 2 min so far: |cffc7c7cf2s|r |cffeda55f97c|r.', self.g.TOOLTIP)
+        self.assertIn('Click: every command in a list.', self.g.TOOLTIP)
 
     # --- coins (1.6.7: two loots in quick succession lost the second) ---
     def coin_loot(self, copper, line, gold_first=True, wait=0.0):

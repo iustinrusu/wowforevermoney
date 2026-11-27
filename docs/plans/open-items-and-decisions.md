@@ -59,7 +59,9 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
 - [x] B7. (done 2026-11-20, to-do B1: report in docs/plans/comprehensive-review.md) Comprehensive review of the whole app (UI, UX, logic, accuracy, no discrepancies between views): planned
       for a new chat after the usage reset, `docs/plans/comprehensive-review.md` (the user, 2026-11-15).
 
-- [ ] B8. (2026-11-27, addon 1.6.7: `/reload`, `/gea debug` says "Gold Ever After 1.6.7 debug on". Open a box: chat
+- [ ] B8. (2026-11-27, addon 1.6.8: after `/reload` a gold coin sits on the minimap's edge (left, a little low). Click
+      it: the command list opens toward the middle of the screen; drag the coin and `/reload`: it stays where you put
+      it. Addon 1.6.7: `/reload`, `/gea debug` says "Gold Ever After 1.6.7 debug on". Open a box: chat
       says "box opened into your bags: item N gave ..." and the window's Items and "Opened" go up. Two coin loots
       in quick succession: both count under Gold looted. If a box gives coins, check Gold looted goes up too (coins
       count from their "You loot" line; a box that gives coins with no line would be missed).

@@ -53,7 +53,14 @@ YOU_LOOT_MONEY_GUILD = "You loot %s (%s deposited to guild bank)"
 LOOT_MONEY = "%s loots %s."
 GOLD_AMOUNT, SILVER_AMOUNT, COPPER_AMOUNT = "%d Gold", "%d Silver", "%d Copper"
 ITEM_OPENABLE, LOCKED = "<Right Click to Open>", "Locked"
-UIParent = {}
+UIParent = { GetWidth = function() return 1920 end }
+Minimap = { GetWidth = function() return 140 end, GetCenter = function() return 1800, 950 end,
+            GetEffectiveScale = function() return 1 end }
+CURSOR = { 0, 0 }
+function GetCursorPosition() return CURSOR[1], CURSOR[2] end
+TOOLTIP = nil                                   -- the text GameTooltip shows
+GameTooltip = { SetOwner = function(self, o) self.owner = o end, SetText = function(_, t) TOOLTIP = t end,
+                Show = function() end, Hide = function() TOOLTIP = nil end, GetOwner = function(self) return self.owner end }
 SlashCmdList = { FOREVERMONEYBRIDGE = function() end }
 ITEMS = { [8150] = { "Deeprock Salt", 250 }, [8171] = { "Rugged Hide", 500 }, [6359] = { "Firefin Snapper", 2 },
           [7973] = { "Big-mouth Clam", 0 }, [999] = { "Soulbound Thing", 77 }, [16885] = { "Heavy Junkbox", 0 },
@@ -74,6 +81,15 @@ function RUN_TIMERS()
   for _, t in ipairs(due) do t.f() end
 end
 
+local function texture()
+  return setmetatable({ shown = true }, { __index = function(_, k)
+    if k == "Show" then return function(s) s.shown = true end end
+    if k == "Hide" then return function(s) s.shown = false end end
+    if k == "SetDesaturated" then return function(s, v) s.desaturated = v and true or false end end
+    return function() end
+  end })
+end
+
 local function fontString()
   local fs = { text = "", shown = true }
   return setmetatable(fs, { __index = function(_, k)
@@ -88,6 +104,8 @@ end
 local frameMethods = {
   SetScript = function(self, n, fn) self.scripts[n] = fn end,
   CreateFontString = function() return fontString() end,
+  CreateTexture = function() return texture() end,
+  GetCenter = function(self) return rawget(self, 'cx'), rawget(self, 'cy') end,
   GetWidth = function(self) return self.w end,
   GetHeight = function(self) return self.h end,
   SetSize = function(self, w, h) self.w, self.h = w, h end,
@@ -110,8 +128,9 @@ local frameMethods = {
   SetResizeBounds = function(self, ...) self.bounds = { ... } end,
 }
 frames = {}
-function CreateFrame()
-  local f = { scripts = {}, shown = true, w = 320, h = 340, left = 500, top = 700, points = {} }
+function CreateFrame(kind, name)                -- a named frame is also a global, as in WoW
+  local f = { scripts = {}, shown = true, w = 320, h = 340, left = 500, top = 700, points = {}, kind = kind, name = name }
+  if name then _G[name] = f end
   setmetatable(f, { __index = function(_, k) return frameMethods[k] or function() end end })
   frames[#frames + 1] = f
   return f
