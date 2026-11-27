@@ -114,7 +114,9 @@ Revised:
   same name with Tab (`/targetenemy`, or `/targetfriend` when your target is friendly). Tab goes through every enemy
   in front of you, so with other mobs around a press can land on one not on your list (press again), and it never
   reaches mobs of that name behind you or too far off: turn toward them. Different names on your list go by name,
-  in any direction.
+  in any direction. (The user, in game: Tab goes only through mobs whose nameplates are showing, while by name
+  reaches one without a nameplate. So turning the camera or zooming out to get more of them on screen is what widens
+  the round.)
 
 ## Limits (the game's, not choices)
 

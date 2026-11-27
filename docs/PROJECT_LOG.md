@@ -895,6 +895,9 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   "/target nameplate1" ran TargetUnit(nameplate1) on every one of ~30 presses and the target stayed none. So an
   addon's macro can target a unit by name (the closest of that name: `/targetexact`, `/target`), with the game's Tab
   (`/targetenemy`, `/targetfriend`, `/targetenemyplayer`), or by a group, target or focus token; not by nameplate.
+- (2026-11-27, the user in game with TargetKit 1.4.4) Targeting by name reaches a mob whose nameplate isn't showing;
+  the game's Tab only goes through mobs whose nameplates are showing (on screen, within the nameplate range, 41 yd
+  in the user's settings). So cycling same-named mobs covers only those on screen; no addon way around it.
 
 ## What to do next
 
