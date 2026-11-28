@@ -66,7 +66,7 @@ class TargetKitTests(unittest.TestCase):
         self.g.NOW += 0.31
         self.g.RUN_TIMERS()
         return '\n'.join(l for l in text.split('\n') if not l.startswith(('#showtooltip', '/click TK'))
-                         and l != PICK_MOUSE)
+                         and l != PICK_MOUSE and l != '/tm !8')
 
     def holds(self, conds):
         """A macro line's [conditions], the ones TargetKit writes: [a,b][c] is (a and b) or c; @unit, exists, dead,
@@ -103,7 +103,11 @@ class TargetKitTests(unittest.TestCase):
                 continue
             if not self.holds(conds):
                 continue
-            if cmd == '/click':
+            if cmd == '/tm':
+                u = g.UNITS.target
+                if u and rest.startswith('!'):
+                    u.icon = int(rest[1:])
+            elif cmd == '/click':
                 b = g[rest.split()[0]]
                 b.Click(b)
             elif cmd == '/cleartarget':
@@ -228,7 +232,7 @@ class TargetKitTests(unittest.TestCase):
         self.slash('add Defias')
         self.unit('nameplate1', 'Defias Thug', reach=3, enemy=False, reaction=5)
         self.tick()
-        self.assertEqual(self.body('TKFind'), '/targetexact Defias Thug\n/click TKFindMark')
+        self.assertEqual(self.body('TKFind'), '/targetexact Defias Thug\n/tm !8\n/click TKFindMark')
         edits = self.g.EDITS
         self.unit('nameplate2', 'Defias Miner', reach=2, enemy=False, reaction=5)    # nearer
         self.tick(wait=0.2)
@@ -454,50 +458,36 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate3', 'Sunscale Screecher', reach=3)
         self.assertEqual(self.find_presses(3), [('/targetexact Zhevra Runner', a.guid)] * 3)
 
-    # --- 1.5.7, the user: "make it so target macro adds skull marker too" ---
-    def test_find_puts_the_skull_on_its_target_and_keeps_it_there(self):
+    # --- the user: "make it so target macro adds skull marker too". 1.5.7 set it from addon code and Forever forbade it
+    # ("ADDON_ACTION_FORBIDDEN" on every press); 1.5.8 puts "/tm !8" in TK Find's macro, as RXPGuides' "/tm !7" does ---
+    def test_find_puts_the_skull_line_in_its_macro_after_the_targeting(self):
         self.slash('add Zhevra Runner')
         runner = self.unit('nameplate1', 'Zhevra Runner', reach=4, reaction=4)
+        self.tick()
+        self.assertEqual(self.body('TKFind'), '/targetexact Zhevra Runner\n/tm !8\n/click TKFindMark')
         self.press('TKFind')
         self.assertEqual(runner.icon, 8)
-        self.assertTrue(self.in_log('result: TK Find: the skull on your target (Zhevra Runner)'))
-        self.press('TKFind')                                                # the same one again: the skull stays
-        self.press('TKFind')
+        self.press('TKFind')                                                # again: "!" sets, never toggles off
         self.assertEqual(runner.icon, 8)
-        self.assertEqual(self.g.MARKS, 1)                                   # set once, never toggled off
-        self.assertNotIn('/tm', self.body('TKFind'))                       # not a macro line (that one toggles)
+        self.assertEqual(self.g.MARKS, 0)                                   # no addon call (Forever forbids it)
 
-    def test_the_skull_only_goes_on_a_target_from_the_find_list(self):
-        self.slash('add Zhevra Runner')
-        other = self.unit('target', 'Sunscale Screecher', plate=False, reach=2)
-        self.press('TKFind')                                                # nobody on the list near: no change
-        self.assertIsNone(other.icon)
+    def test_the_skull_line_also_follows_finding_by_name_and_the_fixed_macro(self):
+        self.slash('add Irondeep Trogg')
+        self.tick()
+        self.assertEqual(self.body('TKFind'), '/cleartarget\n/target Irondeep Trogg\n/tm !8\n/click TKFindMark')
+        self.fire('PLAYER_REGEN_DISABLED')                                  # the fixed macro, for combat
+        self.assertTrue(self.body('TKFind').endswith('/tm !8\n/click TKFindMark'))
 
-    def test_tkit_skull_turns_it_off_and_on(self):
+    def test_no_skull_line_with_an_empty_list_or_when_turned_off(self):
+        self.tick()
+        self.assertNotIn('/tm', self.body('TKFind'))                       # an empty list: nothing to mark
         self.slash('add Zhevra Runner')
-        runner = self.unit('nameplate1', 'Zhevra Runner', reach=4, reaction=4)
         self.slash('skull')
         self.assertFalse(self.g.TargetKitDB.skull)
-        self.press('TKFind')
-        self.assertIsNone(runner.icon)
+        self.assertNotIn('/tm', self.body('TKFind'))
         self.slash('skull')
-        self.press('TKFind')
-        self.assertEqual(runner.icon, 8)
-
-    def test_the_skull_goes_on_when_the_game_hides_the_name(self):
-        """Alterac Valley: the name can't be checked, so the target TK Find gave you is taken as the one."""
-        self.slash('add Irondeep Trogg')
-        trogg = self.unit('world1', 'Irondeep Trogg', plate=False, reach=3)
-        self.press('TKFind')                                                # by name: the game finds it
-        self.assertEqual(self.g.UNITS.target.guid, trogg.guid)
-        trogg.icon = None
-        hide = self.lua.eval('function(orig) return function(t) if t == "target" then return SECRET end return orig(t) end end')
-        self.g.UnitName = hide(self.g.UnitName)                             # your target's name: now hidden
-        self.g.MARKS = 0
-        self.g.NOW += 9
-        self.press('TKFind')
-        self.assertEqual(self.g.MARKS, 1)
-        self.assertTrue(self.in_log('the skull on your target (a hidden name)'))
+        self.assertIn('/tm !8', self.body('TKFind'))
+        self.assertNotIn('/tm', self.body('TKSap') + self.body('TKPick'))  # TK Find only
 
     def test_find_skips_dead_mobs_but_not_dead_players_or_friendly_npcs(self):
         self.slash('add Baron')
@@ -697,7 +687,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.5.7 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.5.8 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
@@ -798,7 +788,7 @@ class TargetKitTests(unittest.TestCase):
         self.slash('add Brakka')
         friend = self.unit('softfriend', 'Brakka', plate=False, player=True, enemy=False, reaction=5, reach=4)
         self.tick()
-        self.assertEqual(self.body('TKFind'), '/targetexact Brakka\n/click TKFindMark')
+        self.assertEqual(self.body('TKFind'), '/targetexact Brakka\n/tm !8\n/click TKFindMark')
         del self.g.UNITS.softfriend                                          # the soft target moved on
         self.g.UNITS.world1 = friend                                         # still there, out of the addon's sight
         self.run_macro(self.body('TKFind'))
@@ -809,7 +799,7 @@ class TargetKitTests(unittest.TestCase):
             self.slash(f'add Somebody With A Long Name {i}')
         self.tick()
         self.assertLessEqual(len(self.body('TKFind')), 255)
-        self.assertTrue(self.body('TKFind').endswith('\n/target Somebody With A Long Name 0\n/click TKFindMark'))
+        self.assertTrue(self.body('TKFind').endswith('\n/target Somebody With A Long Name 0\n/tm !8\n/click TKFindMark'))
         self.unit('nameplate1', 'Somebody With A Long Name 7', reach=2, enemy=False, reaction=5)
         self.assertEqual(self.press('TKFind'), '/targetexact Somebody With A Long Name 7')
 

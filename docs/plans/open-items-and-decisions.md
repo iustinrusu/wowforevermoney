@@ -112,7 +112,7 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       first, 1.5.3). Left: TK Pickpocket in the open world and a dungeon (the closest robbable humanoid, a camp of one
       name, walking past a group); whether dungeons hide mob names like Alterac Valley (the log says "the game hides");
       TK Find on a name typed in Alterac Valley ("Irondeep Trogg": does the game take it?); TK Sap on mobs outside
-      battlegrounds (1.5.5); TK Find's skull marker (1.5.7: on the target it finds, kept on a second press). After
+      battlegrounds (1.5.5); TK Find's skull marker (1.5.8: a `/tm !8` macro line; 1.5.7's addon call was forbidden). After
       each, `/reload` and Claude reads TargetKitDB.log.
       Earlier notes: (2026-11-27, TargetKit 1.4.x) Done for TK Find (2026-11-27: a friendly player targeted
       every press, the log shows it). Left: TK Find on enemy mobs that share a name (put one on the list, stand near

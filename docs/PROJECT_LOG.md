@@ -975,6 +975,10 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
   were each counted by the bag watcher, items and coins: Dust of Deterioration x2 and 5s 95c; Dust of Decay x8 and
   3s 80c; Coarse Snuff x2, Blinding Powder x4 and 2s 60c ("coins from the box"). The user also confirmed the meter's
   minimap button, the fold, and a container shown as "not opened yet" without the app work: checklist B8 closed.
+- (2026-11-28, TargetKit 1.5.7's log) Forever forbids an addon's own SetRaidTarget: every call logged
+  "ADDON_ACTION_FORBIDDEN" (as UNKNOWN()), with no Lua error, so pcall reported success. A raid marker can only be
+  set from a macro: `/tm !N` sets marker N without toggling it off (the user's RXPGuides targeting macro on Forever:
+  "/targetexact ... /tm !7 /targetlasttarget [dead]").
 - (2026-11-27, the user) Players on Forever have a first and a last name ("FirstName LastName"). The game gives
   addons the last name in `UnitName`'s second value (the realm field in other versions), so a player's whole name is
   "First Last" with a space.
@@ -1031,6 +1035,12 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-28** TargetKit 1.5.8 (the user: "macro does not add skull, change didnt work", with RXPGuides' macro
+  "/tm !7"). The 1.5.7 log: the game forbade TargetKit's SetRaidTarget on every press (Verified facts), while
+  TargetKit logged success. Now TK Find's macro ends with `/tm !8` after its targeting lines (room kept for it in
+  the 255 characters), the fixed combat macro too; no addon call. `/tkit skull` still turns it off and on (rewrites
+  the macro at once). The harness runs `/tm !N`. Tests: 72.
 
 - **2026-11-28** (thirty-third part) Wowhead reading session 10 for steady mob farms (the user: "let's continue with
   wowhead scraping, I need more mob farming entires ..."; Decisions: steady drops and the 100g target, quest items).
