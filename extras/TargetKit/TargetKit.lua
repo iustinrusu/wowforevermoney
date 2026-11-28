@@ -38,7 +38,7 @@
 -- these bands: Pick Pocket's range (5 yd), Sap's range, 10 yd (duel), 11 yd (trade), 28 yd (follow), further. Within a
 -- band, the unit whose nameplate is lower on the screen (usually nearer the camera) comes first.
 
-local VERSION = "1.5.6"
+local VERSION = "1.5.7"
 local PICK_POCKET, SAP = 921, 6770
 local MELEE = 1752                                        -- Sinister Strike: melee range, and it takes players
 local SAP_IDS = { [6770] = true, [2070] = true, [11297] = true }        -- Sap, every rank
@@ -873,8 +873,27 @@ local function resetMacros()                             -- the fixed macros, ju
   end
 end
 
+-- 1.5.7 (the user: "make it so target macro adds skull marker too"): after a TK Find press, the skull on your target.
+-- Not as a "/tm 8" line in the macro: that toggles, so pressing again on a mob that already has the skull would take it
+-- off. TargetKit sets it itself (SetRaidTarget), only when your target matches the find list (or its name is hidden,
+-- as in Alterac Valley, so it can't be checked) and doesn't wear the skull already. /tkit skull turns it off and on.
+local SKULL = 8
+local function markSkull()
+  if not yes(UnitExists, "target") then return end
+  if nameOf("target") and not wanted("target") then return end         -- not one from the find list: left alone
+  local ok, icon = pcall(GetRaidTargetIndex, "target")
+  if ok and known(icon) and icon == SKULL then return end              -- already: setting it again takes it off
+  local done, err = pcall(SetRaidTarget, "target", SKULL)
+  if done then
+    log("result", "TK Find: the skull on your target (" .. (nameOf("target") or "a hidden name") .. ")")
+  else
+    log("WARN", "TK Find: couldn't put the skull on your target: " .. tostring(err))
+  end
+end
+
 local function afterPress(p)                             -- 0.3 s after a press: what the game ran, where the target went
   local b, st = p.b, p.st
+  if b.name == "TKFind" and db.skull ~= false then try("TK Find: the skull", markSkull) end
   local after = nameOf("target") or "none"
   log("result", b.macro .. ": the game ran " .. (#p.ran > 0 and table.concat(p.ran, ", ") or "nothing we watch")
     .. "; target " .. p.before .. " -> " .. after)
@@ -1495,6 +1514,10 @@ local function slash(msg)
   elseif cmd == "forget" then
     db.picked = {}
     tell("forgot which units you have pickpocketed: TK Pickpocket may try them again.")
+  elseif cmd == "skull" then
+    db.skull = db.skull == false
+    tell("TK Find's skull " .. (db.skull and "on: the target it finds gets the skull marker." or "off.")
+      .. " /tkit skull turns it " .. (db.skull and "off." or "back on."))
   elseif cmd == "chat" then
     db.chat = not db.chat
     tell("chat messages " .. (db.chat and "on: what TargetKit notices by itself (nobody near, warnings, errors) shows"
@@ -1530,6 +1553,7 @@ local function slash(msg)
     tell("/tkit debug: print what each press chose and why. /tkit minimap: hide or bring back the minimap button.")
     tell("/tkit chat: show in chat what TargetKit notices by itself (nobody near, warnings, errors); off by default,"
       .. " it all goes to the log.")
+    tell("/tkit skull: TK Find puts the skull marker on the target it finds (on by default); again to turn it off.")
     tell("/tkit log: the last 15 lines of the log (every press, what came of it, errors); /tkit log 40 for more,"
       .. " /tkit log clear to empty it. /reload saves it to disk.")
   end

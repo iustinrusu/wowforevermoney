@@ -120,6 +120,11 @@ Revised:
   Number 5 is what catches a rogue as he fades in: in the user's Arathi Basin log TargetKit saw nobody (no nameplate
   yet) and the game's pick took him. What no addon can do: put a rogue TargetKit can't see yet ahead of another player
   it does see in Sap range; then your mouse over the rogue is the way.
+- **TK Find's skull (1.5.7, the user: "make it so target macro adds skull marker too"):** after each TK Find press
+  TargetKit puts the skull raid marker on your target, if it's one from your find list (or its name is hidden, as in
+  Alterac Valley) and doesn't wear the skull already. It's not a `/tm 8` line in the macro, because that toggles: a
+  second press on the same mob would take the skull off. `/tkit skull` turns it off and back on (saved). In a raid,
+  marking needs leader or assist; solo or in a party anyone can.
 - **TK Pickpocket and your mouseover (1.5.5):** just before its casts, TK Pickpocket targets your mouseover enemy if
   there is one, so hovering a mob and pressing robs that one. That's the way where the game hides the mobs from
   TargetKit (Alterac Valley: no names, no ids, so it can't see a single NPC and falls back to the game's nearest

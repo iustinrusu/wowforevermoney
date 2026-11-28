@@ -1000,6 +1000,14 @@ moved into `forever-data-next.md`.
 
 ## Change log
 
+- **2026-11-28** TargetKit 1.5.7 (the user: "make it so target macro adds skull marker too"). After a TK Find press
+  (in afterPress, 0.3 s later, when the target has settled) TargetKit calls SetRaidTarget("target", 8) itself, when
+  the target matches the find list or its name is hidden, and only if GetRaidTargetIndex isn't 8 already: `/tm 8` in
+  the macro would toggle the skull off on a second press. `/tkit skull` turns it off and on (`TargetKitDB.skull`).
+  Logged: "the skull on your target", or a WARN if the game refuses. Not yet tried in game (whether Forever lets an
+  addon call SetRaidTarget, in combat or in a raid without assist). Harness: raid markers that toggle like the game's.
+  Tests: 73.
+
 - **2026-11-28** (thirty-second part) Wowhead reading session 9 (to-do C1/C2, checklist A3/A5; the user picked it over
   the Dungeons view). 20 pages, 2 minutes apart, no block: Floating Wreckage (still no Forever pool loot, A3 paused),
   then the reading queue's top 19 (5 mobs, 14 items; list in `docs/plans/material-coverage.md`, Progress). Imported:

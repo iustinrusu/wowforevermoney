@@ -14,6 +14,14 @@ function GetCVarBool(name) if name == "ActionButtonUseKeyDown" then return KEYDO
 function IsInRaid() return false end
 INSTANCE = "none"                               -- "pvp": a battleground (TargetKit 1.5.5)
 function IsInInstance() return INSTANCE ~= "none", INSTANCE end
+-- raid markers (TargetKit 1.5.7): a unit's icon; setting the one it has takes it off, as in the game
+MARKS = 0
+function GetRaidTargetIndex(t) local u = UNITS[t]; return u and u.icon end
+function SetRaidTarget(t, i)
+  local u = UNITS[t]; if not u then return end
+  MARKS = MARKS + 1
+  if u.icon == i then u.icon = nil else u.icon = i end
+end
 -- secret values, as in battlegrounds on Forever (TargetKit 1.4.8): a unit field set to SECRET reads as a hidden value
 SECRET = setmetatable({}, { __tostring = function() return "<secret>" end })
 function issecretvalue(v) return v == SECRET end

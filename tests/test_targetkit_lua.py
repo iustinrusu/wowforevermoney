@@ -454,6 +454,51 @@ class TargetKitTests(unittest.TestCase):
         self.unit('nameplate3', 'Sunscale Screecher', reach=3)
         self.assertEqual(self.find_presses(3), [('/targetexact Zhevra Runner', a.guid)] * 3)
 
+    # --- 1.5.7, the user: "make it so target macro adds skull marker too" ---
+    def test_find_puts_the_skull_on_its_target_and_keeps_it_there(self):
+        self.slash('add Zhevra Runner')
+        runner = self.unit('nameplate1', 'Zhevra Runner', reach=4, reaction=4)
+        self.press('TKFind')
+        self.assertEqual(runner.icon, 8)
+        self.assertTrue(self.in_log('result: TK Find: the skull on your target (Zhevra Runner)'))
+        self.press('TKFind')                                                # the same one again: the skull stays
+        self.press('TKFind')
+        self.assertEqual(runner.icon, 8)
+        self.assertEqual(self.g.MARKS, 1)                                   # set once, never toggled off
+        self.assertNotIn('/tm', self.body('TKFind'))                       # not a macro line (that one toggles)
+
+    def test_the_skull_only_goes_on_a_target_from_the_find_list(self):
+        self.slash('add Zhevra Runner')
+        other = self.unit('target', 'Sunscale Screecher', plate=False, reach=2)
+        self.press('TKFind')                                                # nobody on the list near: no change
+        self.assertIsNone(other.icon)
+
+    def test_tkit_skull_turns_it_off_and_on(self):
+        self.slash('add Zhevra Runner')
+        runner = self.unit('nameplate1', 'Zhevra Runner', reach=4, reaction=4)
+        self.slash('skull')
+        self.assertFalse(self.g.TargetKitDB.skull)
+        self.press('TKFind')
+        self.assertIsNone(runner.icon)
+        self.slash('skull')
+        self.press('TKFind')
+        self.assertEqual(runner.icon, 8)
+
+    def test_the_skull_goes_on_when_the_game_hides_the_name(self):
+        """Alterac Valley: the name can't be checked, so the target TK Find gave you is taken as the one."""
+        self.slash('add Irondeep Trogg')
+        trogg = self.unit('world1', 'Irondeep Trogg', plate=False, reach=3)
+        self.press('TKFind')                                                # by name: the game finds it
+        self.assertEqual(self.g.UNITS.target.guid, trogg.guid)
+        trogg.icon = None
+        hide = self.lua.eval('function(orig) return function(t) if t == "target" then return SECRET end return orig(t) end end')
+        self.g.UnitName = hide(self.g.UnitName)                             # your target's name: now hidden
+        self.g.MARKS = 0
+        self.g.NOW += 9
+        self.press('TKFind')
+        self.assertEqual(self.g.MARKS, 1)
+        self.assertTrue(self.in_log('the skull on your target (a hidden name)'))
+
     def test_find_skips_dead_mobs_but_not_dead_players_or_friendly_npcs(self):
         self.slash('add Baron')
         self.unit('target', 'Baron Mob', plate=False, dead=True, reaction=2, reach=1)       # hostile: a mob
@@ -652,7 +697,7 @@ class TargetKitTests(unittest.TestCase):
         return any(text in line for line in self.logged())
 
     def test_login_logs_the_settings_that_matter_and_the_macros(self):
-        self.assertTrue(self.in_log('addon: TargetKit 1.5.6 loaded; act on key down 1, enemy nameplates 1, friendly'
+        self.assertTrue(self.in_log('addon: TargetKit 1.5.7 loaded; act on key down 1, enemy nameplates 1, friendly'
                                     ' nameplates 0, soft enemy target 1, nameplate range 41; find list: 0 names'))
         self.assertTrue(self.in_log('macros: TK Sap: made, #showtooltip Sap / /cast [@mouseover,harm,nodead] Sap / '))
         self.assertTrue(self.in_log(' / /cast Sap / /click TKSapMark'))
