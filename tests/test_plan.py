@@ -110,6 +110,18 @@ class BuildTests(unittest.TestCase):
         self.assertEqual([a['key'] for a in p['actions']], ['skin:1'])
         self.assertFalse(p['holdings_found'])
 
+    def test_a_mob_farm_counts_its_steady_drops(self):
+        # the user, 2026-11-28: consistent farms; a rare drop (less than once an hour) is named, not counted as the gain
+        o = opp('mob_spot', 'mob:7', 'Kill Ash Boars in Zone C', 4000, gph=300000, steady_gph=240000, rare_gph=60000,
+                kills_per_hour=75, rare_items=[{'item_id': 2, 'name': 'Glowing Gauntlets', 'one_in': 400, 'per_hour': 0.19}])
+        a = plan.farm(o)
+        self.assertEqual(a['gain'], 240000)
+        self.assertIn('About 24g 0s an hour from drops you get every hour', a['why'])
+        self.assertIn('at 75 kills an hour', a['why'])
+        self.assertIn('Rare drops (Glowing Gauntlets) add about 6g 0s an hour on average', a['why'])
+        skin = opp('skin_spot', 'skin:1', 'Skin in Zone B', 50, gph=90000, skins_per_hour=60)
+        self.assertEqual(plan.farm(skin)['gain'], 90000)                   # other farming rows: their gold an hour
+
     def test_cooldown_action_only_with_the_profession(self):
         mine = opp('craft', 'craft:1', 'Craft Arcane Bar', 300000, cost=100000, units=0.5, recipe='Transmute: Bar',
                    cooldown_hours=47, cooldown_group='Transmute', mats=[], sell_channel='AH', sell_price=420000)

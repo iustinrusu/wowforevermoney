@@ -94,8 +94,10 @@ C1. [ ] (in progress: the top 100 and the 4 skinning items done 2026-11-20; 2 mi
        vendors (A0), 4 pools (A3 paused: Wowhead has no Forever pool loot yet), the reading queue's top 10.
        2026-11-28, session 9: Floating Wreckage (still no pool loot), the queue's next 19 (5 mobs, 14 items); batches
        now saved exactly with `tools/receive_batch.py`.
-       Next: the reading queue from the top, and one pool page to see whether Wowhead records pools yet; see the plan's
-       Progress section)
+       2026-11-28, session 10: 20 pages picked for steady mob drops that sell (Blasted Lands quest drops, silks,
+       Encrypted Twilight Text, 6 elemental and beast mobs' own pages).
+       Next: re-read the 2026-11-14 material pages (tiny samples then: Essence of Water lists 2 mobs), then the reading
+       queue from the top, and one pool page to see whether Wowhead records pools yet; see the plan's Progress section)
        **Forever source data for every material** (fixes "some skins not counted", pool loot, mob drops, node
        yields; the user's top priority for data accuracy, 2026-11-14): `docs/plans/material-coverage.md`. Work in the
        order at the top of that file: other Forever data sources, the item-page data format, 5 top pages a session
@@ -105,7 +107,8 @@ C2. [ ] (first version done 2026-11-14: Gathering -> Mob farming, one row per mo
        list, a market limit on farmed loot and kill speed by mob health proposed: `docs/plans/mob-farming-review.md`;
        all three done the same day, and the reading queue the user suggested: Data health "Wowhead reading
        queue", items and mobs by gold a day the app can't see yet, high levels first; 2026-11-28: 5 more mobs' own
-       pages, Plague Monstrosity and Plague Ravager now 2nd and 4th of all mob rows, small samples) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with
+       pages, Plague Monstrosity and Plague Ravager now 2nd and 4th of all mob rows, small samples; 2026-11-28 later: ranked by steady drops, rare ones apart, a 100g an hour target in Settings; quest
+       drops like Vulture Gizzard count; best steady farm Toxic Horror 61g an hour) **Mob farming**: `docs/plans/forever-data-next.md`, section 3, with
        drop rates from Wowhead Forever ("Dropped by", material-coverage step 4) and the kills-per-hour setting, never
        your own logged time.
 C3. [ ] (2026-11-15: items 1 (profession advisor), 2 (levelling planner), 3 (vertical integration, "With your own

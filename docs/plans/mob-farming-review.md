@@ -107,6 +107,32 @@ your share, so an hour of them would flood it (point 4).
   from Plague Monstrosity's 10 an hour and 5g 77s from Blighted Surge's 3.5. Rotting Behemoth rests on one recipe drop
   in 99 kills (a guess, not a rate).
 
+- **2026-11-28 Steady farms (reading session 10; the user: "consistent farms, not extremely low drops", target 100g an
+  hour).** Rows are now ranked by their steady gold an hour (drops that come at least once an hour; rare ones shown
+  apart), and unbound quest items (Vulture Gizzard, Basilisk Brain, Blasted Boar Lung, Scorpok Pincer) finally count at
+  their AH price. Steady gold an hour, open world, 60 kills an hour for a typical level 60 mob paced by its health:
+
+  | Mob | Steady / hour | + rare | Mostly from | Kills on the page |
+  |---|---|---|---|---|
+  | Toxic Horror, Felwood 53-54 | 60g 86s | 1g 34s | Essence of Water 9.9 an hour | 617 |
+  | Plague Monstrosity, Eastern Plaguelands 57-58 | 60g 80s | 2g 53s | Essence of Water 9.8 an hour | 75 |
+  | Plague Ravager, Eastern Plaguelands 55-56 | 44g 66s | - | Essence of Water 6.5 an hour | 60 |
+  | Black Slayer, Blasted Lands 46-48 | 40g 49s | 2g 51s | Vulture Gizzard 26 an hour (90 kills: 2,578 health) | 4,578 |
+  | Blighted Horror, Eastern Plaguelands 56-57 | 32g 90s | - | Essence of Water 4.9 an hour | 64 |
+  | Rock Stalker, Silithus 57-58 | 32g 61s | - | Ironweb Spider Silk 40 an hour | 1,075 |
+  | Greater Obsidian Elemental, Burning Steppes 55-57 | 30g 32s | 2g 10s | Essence of Earth 7.2 an hour | 466 |
+  | Entropic Beast, Felwood 51-52 | 30g 1s | 4g 9s | Heart of Fire 15, Essence of Fire 4 an hour | 694 |
+  | Redstone Crystalhide, Blasted Lands 51-52 | 29g 54s | - | Basilisk Brain 32 an hour | 1,208 |
+  | Redstone Basilisk, Blasted Lands 47-48 | 26g 46s | - | Basilisk Brain 33 an hour | 1,597 |
+  | Ashmane Boar, Blasted Lands 48-49 | 26g 4s | - | Blasted Boar Lung 44 an hour | 1,196 |
+  | Scorpok Stinger, Blasted Lands 50-51 | 21g 44s | 1g 20s | Scorpok Pincer 31 an hour | 2,382 |
+
+  None reaches 100g an hour at 60 kills. Ways toward it, for the user to weigh: kill faster (the setting is the user's
+  real pace; every row scales with it), a zone with several steady sellers side by side (Blasted Lands: gizzards,
+  brains, lungs and pincers), or skinning on top where the mob can be skinned. The market limit caps the essences (your
+  share of 110 Essences of Water a day in the region), so two essence farms in one day share it. Second-guessing:
+  Plague Monstrosity, Plague Ravager and Blighted Horror rest on 60-75 kills.
+
 ## Proposed next steps (the user decides)
 1. **Wowhead reading session, 20 pages** (pace in CLAUDE.md): item pages Breath of Wind (7081), Essence of Undeath
    (12808), Elemental Air (7069), Globe of Water (7079), Formula: Enchant Weapon - Crusader (16252), Pattern:

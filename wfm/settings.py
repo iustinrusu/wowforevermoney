@@ -33,6 +33,7 @@ DEFAULTS = {
     'casts_per_hour': 240,
     'fishing_skill_bonus': None,    # None = from your bags, bank and gear; a number overrides (pole + gear + lure)
     'kills_per_hour': 60,           # mobs killed and skinned per hour (your own logged time is never used)
+    'farm_target_gold': 100,        # the gold an hour mob farming aims for (the user, 2026-11-28): farms that reach it are marked
     'herb_nodes_per_hour': 40,      # herb nodes gathered per hour (until the addon measures it)
     'ore_nodes_per_hour': 40,       # ore nodes mined per hour (until the addon measures it)
     # Drop rates come from Wowhead Forever's large samples. Your own catch logs are small, mix pools with open

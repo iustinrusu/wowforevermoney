@@ -169,7 +169,11 @@ def mob_candidates(engine, opps, creatures: dict, best_use: dict, read_npcs: set
     q, gd = engine.q, engine.gd
     level = int(engine.s.get('level', 1) or 1)
     per_hour = float(engine.s.get('kills_per_hour', 60) or 60)
-    shown = {o.detail.get('npc'): (o.gph or 0) for o in opps if o.kind == 'mob_spot'}
+    from .engine import RARE_PER_HOUR
+    # steady drops only (the user, 2026-11-28: "consistent farms, not extremely low drops"): a drop the Classic table
+    # gives less than once an hour doesn't make a farm, so it doesn't pick a page either
+    shown = {o.detail.get('npc'): (o.detail.get('steady_gph') if o.detail.get('steady_gph') is not None else (o.gph or 0))
+             for o in opps if o.kind == 'mob_spot'}
     out = []
     for sid, c in (creatures or {}).items():
         npc = int(sid)
@@ -184,7 +188,7 @@ def mob_candidates(engine, opps, creatures: dict, best_use: dict, read_npcs: set
         pace, _ = engine.kill_pace(per_hour, max(level, hi - 3), hi)
         parts = []
         for i, n in c['items'].items():
-            if int(i) in gd.items:
+            if int(i) in gd.items and n * pace >= RARE_PER_HOUR:
                 parts.append((n * engine.loot_worth(int(i), best_use, n, pace), int(i)))
         per_kill = (c.get('coins') or 0) + sum(v for v, _ in parts)
         guess = per_kill * pace
@@ -197,8 +201,8 @@ def mob_candidates(engine, opps, creatures: dict, best_use: dict, read_npcs: set
                     'url': f'https://www.wowhead.com/forever/npc={npc}',
                     'text': (f"{qn.get('name') or c['name']} (npc {npc}, level {c['levels'][0]}-{hi}, "
                              f"{gd.zones.get(zones[0], 'zone ' + str(zones[0]))}): the WoW Classic table suggests about "
-                             f"{guess / 10000:,.1f}g an hour{' (mostly ' + ', '.join(top) + ')' if top else ''}; Forever data "
-                             f"shows {shown.get(npc, 0) / 10000:,.1f}g now")})
+                             f"{guess / 10000:,.1f}g an hour from steady drops{' (mostly ' + ', '.join(top) + ')' if top else ''}; "
+                             f"Forever data shows {shown.get(npc, 0) / 10000:,.1f}g now")})
     return out
 
 
@@ -229,7 +233,8 @@ def queue_check(queue: list[dict], kills: float) -> dict:
                        f"and mobs together, by the gold a day the app can't see yet, high levels first (level 60 in full, "
                        f"level 30 half). A mob: what an hour of it ({kills:g} kills for a typical mob of your level, "
                        f"paced by its health) earns by the WoW Classic loot table at today's prices and market limits, "
-                       f"beyond what Forever data shows now; its own page gives every drop, its coins and health. The "
+                       f"from steady drops only (ones that come at least once an hour: a rare recipe or epic doesn't make "
+                       f"a farm), beyond what Forever data shows now; its own page gives every drop, its coins and health. The "
                        f"Classic table only picks the order: it never sets a value. An item without Forever source data: "
                        f"your share of what the region trades of it a day; its page gives every source at once. Left "
                        f"out: rare and named mobs (under {MIN_SPAWNS} spawn points), items only dungeon mobs drop (the "

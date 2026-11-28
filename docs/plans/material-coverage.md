@@ -44,6 +44,15 @@ runs nothing. End commit messages with: Co-Authored-By: Claude Opus 5.5 <noreply
   the market limit and its kill speed, minus what Forever data shows; rare and named mobs (under 5 spawn points in
   QuestieDB) left out. An item without Forever source data: your share of the region's trade in it a day; items only
   dungeon mobs drop are left for the Dungeons view (C4). Read it from the top, skip pages read in the last month.
+- Session 10 (2026-11-28, the user: more mob farming entries, consistent farms like Essence of Water, then a 100g an
+  hour target): 20 pages, 2 minutes apart, no block, picked by hand for steady drops that sell (not from the queue):
+  items 8394 8392 8393 20404 10593 4337 4589 8146 7972 19933 10285 5117 10286 8391, npcs 9878 9879 6520 6521 7032 5982.
+  Saved with `tools/receive_batch.py` (SHA-256 checked, 34,894 characters), kept in the tab as `wfm_pages_saved_010`;
+  `wfm_pages` NOT cleared (clear it before the next session's first page). Pages: 178 items, 5 objects, 41 npcs.
+  Coverage: dropped by mobs 95 -> 107 of 1,664, looted items covered in full 139 -> 153. Found: the 2026-11-14 item
+  pages have tiny samples next to today's (Entropic Beast's Essence of Fire 8 of 60 then, 36 of 694 now; Essence of
+  Water's page lists 2 mobs, Essence of Air's none). Next session: re-read those (7080 7082 7076 7078 7068 7067 12803
+  14047 14256 14227 12804 20520 18512 12207), then the queue (now ranked by steady drops only).
 - Session 9 (2026-11-27 late evening to 2026-11-28, to-do C1; the user chose the reading session over the Dungeons
   view): 20 pages, 2 minutes apart, no block. One pool first: object 180662 Floating Wreckage, no Contains tab, so
   Wowhead still has no Forever pool loot (A3 stays paused). Then the reading queue's top 19: npcs 8522 Plague

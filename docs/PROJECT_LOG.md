@@ -24,6 +24,29 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Decisions (dated, with the reason)
 
+- **2026-11-28 Mob farming is ranked by steady drops, with a 100g an hour target (the user: "I need more mob farming
+  entries, check what sells best on ah and which farm is the best, I want consistent farms, not extremely low drops,
+  Essence of Water is a good example of a good farm", then "we should target 100g per hour if possible, essence of
+  water is a farm I like, the drop is not very steady, but still high compared to rare epic items for example. this is
+  the way we want to go when building the mob farming tab").** A drop you get less than once an hour on average at the
+  mob's pace is a rare drop (`engine.RARE_PER_HOUR`); the rest is steady (Essence of Water: 1 in 6-20 kills, 3-10 an
+  hour). Each mob row keeps its gold an hour from every drop (`gph`, "All drops / hour"), and adds `steady_gph` (steady
+  drops, coins, a skin you can take) and `rare_gph` with the rare drops named ("1 in N kills" from the loot counts).
+  Ranking, Top picks and the plan's farming step use the steady part; over half the gold from rare drops is flagged
+  "mostly rare drops" (333 rows; Wandering Skeleton, the old #1 at 68g an hour from one Destiny in 333 kills, now ranks
+  at 0 steady). Setting `farm_target_gold` (100): rows whose steady gold reaches it are flagged "reaches your target",
+  and the tab says how far the best one is (now: Toxic Horror 60g 86s, 61%). Claude's choices, with the reason: the
+  threshold is once an hour (an hour has a 37% chance of none at that rate; Essence of Water, which the user likes, is
+  well above it); rare drops stay in the gold an hour (over many hours they do average out) but out of the ranking;
+  the reading queue's mob guesses count steady Classic drops only, so it picks pages for farms, not lotteries.
+- **2026-11-28 Quest-type items that don't bind sell on the AH.** The app counted every quest-type item (class 12) as
+  unsellable, so Vulture Gizzard (73 sold a day in the region at 2g 28s), Basilisk Brain, Blasted Boar Lung, Scorpok
+  Pincer, Encrypted Twilight Text and Pristine Black Diamond (42 a day at 6g 65s) were worth 0 in every farm row: Black
+  Slayer showed 0.5g an hour with a 27% gizzard drop. Now only bound items are (`gamedata.can_auction`: Bonding 1, binds
+  when picked up, and 4, a bound quest item); 166 of the 353 unbound quest-type items have region sales in TSM, and none
+  of the bound ones do. Unchanged: an unbound quest item nobody lists with no vendor price is still "worth 0" without a
+  warning (Data health's undervalued list).
+
 - **2026-11-27 ROI on every entry where gold goes in up front (the user: "add ROI (return of investment %) on suitable
   entries").** ROI = profit each, after the AH cut, / cost each (`pricing.roi`, a share: 0.5 = 50%), the same profit
   and cost the rows already show, so it adds no new assumption. Suitable: crafts (the ingredients), vendor flips (the
@@ -726,6 +749,15 @@ AH snipes, farming, fishing. It monitors continuously, updates itself when TSM s
 
 ## Verified facts (don't re-derive)
 
+- 2026-11-28 (TSM + game tables): 353 items are quest-type (class 12) and don't bind (Bonding 0); 166 of them have
+  region sales (Pristine Black Diamond 42 a day, Vulture Gizzard 73, Basilisk Brain 104, Blasted Boar Lung 179,
+  Encrypted Twilight Text 140, Morrowgrain 408, Darkmoon cards). Bound ones (Bonding 4: 2,764 items; 1: 770) have none,
+  except Twilight Lexicon chapters (Bonding 5: 1-9 a day), so 5 counts as sellable.
+- 2026-11-28 (Wowhead Forever): Wowhead's Forever samples have grown a lot since the first item pages (2026-11-14).
+  Entropic Beast's Essence of Fire: 8 of 60 loots on the item page then (13%), 36 of 694 on its own page now (5.2%);
+  Greater Obsidian Elemental's Essence of Earth: 2 of 37 then, 43 of 466 now; Black Slayer's Vulture Gizzard: 505 of
+  1,842 (2026-11-19), 1,343 of 4,578 now. Essence of Water's item page (2026-11-14) lists only 2 mobs, Essence of Air's
+  none: these pages are worth reading again.
 - 2026-11-28 (Wowhead Forever npc pages): Forever drops Essence of Water about twice as often as the WoW Classic
   table: Toxic Horror 85 of 617 kills (13.8%; Classic 7.2%), and on smaller samples Plague Monstrosity 12 of 75
   (16%; 4.8%), Plague Ravager 6 of 60 (10%; 3.2%), Blighted Horror 5 of 64 (7.8%; 5.8%), Blighted Surge 3 of 59 (5.1%;
@@ -999,6 +1031,38 @@ moved into `forever-data-next.md`.
 - Done 2026-11-15: the user's character name is gone from GitHub's history (rewritten; see Decisions).
 
 ## Change log
+
+- **2026-11-28** (thirty-third part) Wowhead reading session 10 for steady mob farms (the user: "let's continue with
+  wowhead scraping, I need more mob farming entires ..."; Decisions: steady drops and the 100g target, quest items).
+  - What sells best among mob drops (region trade a day, TSM): Essence of Water 517g, Heart of Fire 281g, Ironweb
+    Spider Silk 263g, Essence of Earth 254g, Essence of Fire 197g, Essence of Air 189g, Felcloth 173g, Vulture Gizzard
+    166g, Basilisk Brain 104g, Blasted Boar Lung 85g (all with drops of 3%+ a kill somewhere in the open world).
+  - 20 pages, 2 minutes apart, no block: items 8394 Basilisk Brain, 8392 Blasted Boar Lung, 8393 Scorpok Pincer, 20404
+    Encrypted Twilight Text, 10593 Imperfect Draenethyst Fragment, 4337 Thick Spider's Silk, 4589 Long Elegant Feather,
+    8146 Wicked Claw, 7972 Ichor of Undeath, 19933 Glowing Scorpid Blood, 10285 Shadow Silk, 5117 Vibrant Plume, 10286
+    Heart of the Wild, 8391 Snickerfang Jowl; npcs 9878 Entropic Beast, 9879 Entropic Horror, 6520 Scorching Elemental,
+    6521 Living Blaze, 7032 Greater Obsidian Elemental, 5982 Black Slayer. Batch saved with `tools/receive_batch.py`
+    (34,894 characters, SHA-256 a0e41b9b... matched the tab's), kept in the tab as `wfm_pages_saved_010`. Pages: 178
+    items, 5 objects, 41 npcs. Coverage: dropped by mobs 95 -> 107 of 1,664 items, looted items covered in full 139 ->
+    153. Mob rows 1,142 -> 1,293, with a gold an hour 607 -> 717 (623 can reach Top picks).
+  - Best steady farms now (60 kills an hour for a typical level 60 mob, paced by health): Toxic Horror 60g 86s,
+    Plague Monstrosity 60g 80s (75 kills), Plague Ravager 44g 66s (60 kills), Black Slayer 40g 49s (was 0.5g: Vulture
+    Gizzard 29% of 4,578 kills), Blighted Horror 32g 90s, Rock Stalker 32g 61s (now 1,075 kills, was 14), Greater
+    Obsidian Elemental 30g 32s (was 15g on 37 kills), Entropic Beast 30g 1s, Redstone Crystalhide 29g 54s (Basilisk
+    Brain), Redstone Basilisk 26g 46s, Ashmane Boar 26g 4s (Blasted Boar Lung), Scorpok Stinger 21g 44s. None reaches
+    100g at 60 kills an hour; the market limit holds the essences (your share of the region's sales a day).
+  - Code: `gamedata.can_auction` (engine.sell_value, valuation's AH channel); `Engine.mob_spots` per drop `per_hour`
+    and `rare`, row `steady_gph`, `rare_gph`, `rare_items`, `target`, flags `rare_drops` and `meets_target`;
+    `Engine.rank` uses the steady part for mob rows; `plan.farm` too; setting `farm_target_gold` (Settings: "Mob
+    farming target"); reading queue mob guesses count only Classic drops of once an hour or more. Page: Mob farming
+    columns "Steady / hour" (+ rare under it) and "All drops / hour", the target line, row details "Steady gold an
+    hour" and "Rare drops", an "An hour" column and a "rare" mark per drop; "How this is worked out", README.
+  - Tests: an unbound quest item sells, bound and bind-on-pickup ones don't; steady and rare split, ranking by it,
+    the target flag; the plan's farming step; the queue ignores rare Classic drops (488 pass). `python -m wfm.audit`: nothing failing.
+    `tools/screenshots.py check`: 26 views, no problems; the Mob farming view checked by hand at 375 px. No downloads.
+  - Next: read again the 2026-11-14 material pages with tiny samples (Essence of Water, Essence of Air, Essence of
+    Earth, Essence of Fire, Elemental Fire and Earth, Living Essence, Runecloth, Felcloth, Ironweb Spider Silk, Powerful
+    Mojo, Dark Rune, Larval Acid, Giant Egg); clear the tab's `wfm_pages` first (it still holds this session's 20).
 
 - **2026-11-28** TargetKit 1.5.7 (the user: "make it so target macro adds skull marker too"). After a TK Find press
   (in afterPress, 0.3 s later, when the target has settled) TargetKit calls SetRaidTarget("target", 8) itself, when

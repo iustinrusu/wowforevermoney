@@ -384,6 +384,17 @@ def is_instance(gd: GameData, zone_id: int) -> bool:
     return gd.zones.get(zone_id) in names
 
 
+BOUND = (1, 4)      # ItemSparse Bonding: 1 binds when picked up, 4 a bound quest item
+
+
+def can_auction(item) -> bool:
+    """Can it go on the AH? Not when it binds when picked up or is a bound quest item. A quest-type item that doesn't
+    bind sells there like any other (2026-11-28: TSM records region sales for 166 of the 353 such items, Pristine Black
+    Diamond 42 a day at 6g 65s, Vulture Gizzard 73 at 2g 28s, Encrypted Twilight Text 140 at 40s; the app had counted
+    every quest-type item as unsellable)."""
+    return not (item and item.bonding in BOUND)
+
+
 def apply_hotfixes(gd: GameData, rows: dict[int, dict]) -> dict:
     """Overlay the server's item data (client hotfix cache, see hotfix.py) on the client tables: it is newer for
     the items it covers, and it adds items the client tables don't ship. Returns counts."""

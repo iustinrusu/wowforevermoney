@@ -49,7 +49,16 @@ class ReadingQueueTests(unittest.TestCase):
         shown = next(r for r in q if r['id'] == SHOWN)
         self.assertEqual(shown['gold'], 30 * 950 - 10000)          # minus what Forever data shows already
         self.assertEqual(ids[:2], [FARM, SHOWN])
-        self.assertIn('the WoW Classic table suggests about 2.9g an hour (mostly Raw Meat)', farm['text'])
+        self.assertIn('the WoW Classic table suggests about 2.9g an hour from steady drops (mostly Raw Meat)', farm['text'])
+
+    def test_rare_classic_drops_pick_no_page(self):
+        # the user, 2026-11-28: consistent farms, not extremely low drops. 0.01 a kill x 60 kills = 0.6 an hour: a rare
+        # drop, so it doesn't count toward the mob's place in the queue; 0.02 x 60 = 1.2 an hour does
+        e = engine()
+        rare = {str(FARM): dict(CREATURES[str(FARM)], items={str(MAT_AH): 0.01})}
+        self.assertEqual(coverage.reading_queue(e, [], rare, {}, set(), [], 0.2), [])
+        steady = {str(FARM): dict(CREATURES[str(FARM)], items={str(MAT_AH): 0.02})}
+        self.assertEqual([r['id'] for r in coverage.reading_queue(e, [], steady, {}, set(), [], 0.2)], [FARM])
 
     def test_items_by_your_share_of_the_trade_and_level(self):
         row = {'item_id': MAT_AH, 'name': 'Raw Meat', 'market': 400000, 'missing': ['drops'], 'url': 'u'}

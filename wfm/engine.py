@@ -72,6 +72,13 @@ ROI_KINDS = ('craft', 'vendor_flip', 'ah_to_vendor', 'realm_dip')
 # Ranking (Engine.rank). Score = expected profit x how sure we are x risk x can-do-now x problems x preference.
 HOURLY_KINDS = ('fishing_spot', 'fishing_zone', 'farm_zone', 'skin_spot', 'herb_spot', 'mine_spot', 'mob_spot')
 ELITE = {1, 2, 3}          # Wowhead classification (Questie rank): elite, rare elite, boss; 4 = rare
+# Steady and rare drops (the user, 2026-11-28: "I want consistent farms, not extremely low drops", then "Essence of
+# Water is a farm I like, the drop is not very steady, but still high compared to rare epic items ... this is the way we
+# want to go when building the mob farming tab"; target 100g an hour). A drop you get less than once an hour on average
+# at the mob's pace is a rare drop (Destiny: 1 in 333 kills, 0.2 an hour); Essence of Water (1 in 6-20 kills, 3-10 an
+# hour) is steady. Mob farming ranks by the steady part; rare drops are shown apart, never left out of gold an hour.
+RARE_PER_HOUR = 1.0
+FARM_TARGET_GOLD = 100     # the user's target for an hour of mob farming (Settings: farm_target_gold)
 # Kill speed (the user, 2026-11-20: "kill speed from mob health and level"): the typical health of a normal mob at each
 # level 1-63, the median of the WoW Classic database (cMaNGOS 1.12; smoothed at 58, 60 and 61, where special creatures
 # pull the median down). A WoW Classic rule, labelled: it matches Forever where its pages show health (Toxic Horror
@@ -375,8 +382,8 @@ class Engine:
         """Best of AH (after cut) and vendor, per unit. Returns (copper, channel, ah quote)."""
         item = self.gd.items.get(iid)
         q = ah_sell(self.price(iid), self.sale_basis)
-        if item and (item.bonding == 1 or item.class_id == 12):
-            q = None          # soulbound or quest item: it can't be sold on the AH, whatever TSM lists
+        if not gamedata.can_auction(item):
+            q = None          # binds when picked up, or a bound quest item: no AH sale, whatever TSM lists
         ah_val = proceeds(q, self.cut)
         vendor_val = vendor_sell(item)
         if ah_val >= vendor_val and ah_val > 0:
@@ -1372,6 +1379,7 @@ class Engine:
         level = int(self.s.get('level', 1) or 1)
         skill = self.profs.get('Skinning')
         per_hour = float(self.s.get('kills_per_hour', 60) or 60)    # the setting only, never your logged time
+        target = float(self.s.get('farm_target_gold') or FARM_TARGET_GOLD) * COPPER_PER_GOLD
         out = []
         for npc, m in mobs.items():
             qn = (q.npcs.get(npc) if q else None) or {}
@@ -1397,7 +1405,11 @@ class Engine:
                              'source': 'Everloot' if i in from_everloot else 'Wowhead Forever'}
                             for i, c in m['items'].items()),
                            key=lambda d: -d['per_kill'] * d['value'])
+            for d in drops:
+                d['per_hour'] = round(d['per_kill'] * pace, 2)
+                d['rare'] = d['per_kill'] * pace < RARE_PER_HOUR
             drop_value = sum(d['per_kill'] * d['value'] for d in drops)
+            rare_value = sum(d['per_kill'] * d['value'] for d in drops if d['rare'])
             skin_value = sum(share * value_of(i) for i, share in skin_items.items())
             coins = int(facts.get('worth') or 0)          # 0 when the page shows none (elementals, most beasts)
             value = drop_value + (skin_value if can_skin else 0) + coins
@@ -1421,6 +1433,12 @@ class Engine:
                 flags.append('dungeon')
             if sk and not can_skin:
                 flags.append('skin_extra')
+            if rare_value > value / 2:
+                flags.append('rare_drops')
+            hourly = not ({'elite', 'dungeon'} & set(flags))
+            steady_gph = int((value - rare_value) * pace) if hourly else None
+            if steady_gph and steady_gph >= target:
+                flags.append('meets_target')
             needs = '' if can_kill else (f'level {max(1, hi - skinning.LEVEL_REACH)}+ (you are {level})' if hi
                                          else 'its level is unknown')
             zname = gd.zones.get(zone, f'zone {zone}') if zone else 'unknown zone'
@@ -1434,6 +1452,14 @@ class Engine:
                         'classification': cls, 'looted': m['looted'], 'drops': drops[:12],
                         'drop_value': int(drop_value), 'skin_value': int(skin_value), 'can_skin': can_skin,
                         'coins': coins, 'own_page': bool(m['complete']), 'health': facts.get('health'),
+                        # gold an hour from drops you get at least once an hour (and coins, the skin), and from rarer
+                        # ones (RARE_PER_HOUR): mob farming ranks by the steady part
+                        'steady_value': int(value - rare_value), 'rare_value': int(rare_value),
+                        'steady_gph': steady_gph, 'rare_gph': int(rare_value * pace) if hourly else None,
+                        'target': int(target),
+                        'rare_items': [{'item_id': d['item_id'], 'name': d['name'], 'one_in': round(d['looted'] / d['count'])
+                                        if d['count'] else None, 'per_hour': d['per_hour']}
+                                       for d in drops if d['rare'] and d['value'] > 0][:3],
                         'skin_needed': skin_need, 'kills_per_hour': round(pace, 1),
                         'pace_source': pace_note, 'read': m['read'],
                         'source': 'Wowhead Forever "Dropped by" counts' + (' and "Skinned from" counts' if sk else '')}))
@@ -1947,7 +1973,10 @@ class Engine:
         later=True ranks by what a pick earns once you have the gold and skill (the "unlock" sections).
         """
         conf = confidence(o.flags)
-        if o.kind in HOURLY_KINDS:
+        if o.kind == 'mob_spot' and o.gph is not None and o.detail.get('steady_gph') is not None:
+            # the steady part: drops you get at least once an hour (RARE_PER_HOUR); a rare epic doesn't carry a farm
+            base, basis = o.detail['steady_gph'], 'steady gold per hour (drops you get at least once an hour)'
+        elif o.kind in HOURLY_KINDS:
             base, basis = (o.gph or 0), 'gold per hour'
         elif o.kind in ONE_OFF_KINDS:
             base, basis = o.profit_unit, 'profit on the purchase'

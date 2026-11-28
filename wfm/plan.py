@@ -300,11 +300,21 @@ def farm(o) -> dict:
     pace = (f"{d['skins_per_hour']:g} skins" if d.get('skins_per_hour') else
             f"{d['casts_per_hour']:g} casts" if d.get('casts_per_hour') else
             f"{d['nodes_per_hour']:g} nodes" if d.get('nodes_per_hour') else 'the pace')
-    why = (f'About {gold(o.gph)} an hour, worked out from Wowhead Forever loot counts at {pace} an hour '
-           f'(your number in Settings).')
-    if o.detail.get('gph_with_pools') and o.detail.get('gph_with_pools') > (o.gph or 0):
-        why += f' Fishing the pools you pass adds more (up to {gold(o.detail["gph_with_pools"])} an hour).'
-    return _action('farm', f'Spend an hour: {o.title}', why, o.gph or 0, 60, o.detail.get('confidence', 1.0),
+    gain = o.gph or 0
+    if o.kind == 'mob_spot' and d.get('steady_gph') is not None:
+        # mob farming counts the steady part: drops you get at least once an hour (the user, 2026-11-28)
+        gain = d['steady_gph']
+        why = (f'About {gold(gain)} an hour from drops you get every hour, worked out from Wowhead Forever loot '
+               f'counts at {d.get("kills_per_hour", 60):g} kills an hour (your number in Settings, paced by its health).')
+        if d.get('rare_gph'):
+            names = ', '.join(r['name'] for r in d.get('rare_items') or [])
+            why += f' Rare drops ({names}) add about {gold(d["rare_gph"])} an hour on average, often none in an hour.'
+    else:
+        why = (f'About {gold(gain)} an hour, worked out from Wowhead Forever loot counts at {pace} an hour '
+               f'(your number in Settings).')
+    if d.get('gph_with_pools') and d.get('gph_with_pools') > gain:
+        why += f' Fishing the pools you pass adds more (up to {gold(d["gph_with_pools"])} an hour).'
+    return _action('farm', f'Spend an hour: {o.title}', why, gain, 60, d.get('confidence', 1.0),
                    key=o.key, item_id=o.item_id)
 
 

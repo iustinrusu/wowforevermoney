@@ -32,6 +32,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from . import gamedata
 from .pricing import fmt_money, usual_sale
 
 INF = float('inf')
@@ -181,7 +182,7 @@ class Valuer:
             sale = usual_sale(e.price(iid))
             sell = min(sell, int(sale * (1 - e.cut))) if sale else 0
         vendor = 0 if not item or 'sell_price' in getattr(item, 'untrusted', ()) else item.sell_price
-        tradeable = not (item and (item.bonding == 1 or item.class_id == 12))     # soulbound or quest item
+        tradeable = gamedata.can_auction(item)      # not when it binds when picked up or is a bound quest item
         if channel == 'AH' and sell > 0 and tradeable:
             channels['AH'] = sell
         if vendor:

@@ -248,6 +248,41 @@ class MobFarmingTests(unittest.TestCase):
         e.run()
         self.assertEqual(e.time_value_source, 'default')
 
+    def test_rare_drops_are_shown_apart_and_left_out_of_the_ranking(self):
+        """The user, 2026-11-28: consistent farms (Essence of Water, about 1 in 7 kills), not extremely low drops (an
+        epic in hundreds of kills); target 100g an hour. Mob A: cloth 0.375 a kill (about 21 an hour: steady) and a
+        gem in 1 of 300 kills (0.18 an hour: rare) worth 100g to a vendor."""
+        from tests.test_engine import SETTINGS, item
+        from wfm.engine import Engine
+        gem = 12800
+        w = self.world()
+        w.gamedata.items[gem] = item(gem, 'Azerothian Diamond', sell=1000000)
+        w.forever_pages, _, _ = wi.merge(w.forever_pages, {str(gem): page('Azerothian Diamond', {'dropped-by': {
+            'kind': 'npc', 'rows': [row(MOB_A, 1, 300, minlevel=40, maxlevel=41, location=[33])]}})})
+        e = Engine(w, dict(SETTINGS, level=40, kills_per_hour=60, professions={}))
+        a = next(o for o in e.mob_spots({}) if o.detail['npc'] == MOB_A)
+        pace = a.detail['kills_per_hour']
+        drops = {d['item_id']: d for d in a.detail['drops']}
+        self.assertEqual(drops[gem]['per_kill'], 0.0033)                              # 1 in 300, as the row keeps it
+        steady, rare = 0.375 * e.fish_value(CLOTH, {}), 0.0033 * 1000000
+        self.assertEqual(a.gph, int((steady + rare) * 60 * 1752 / 1902))              # gold an hour keeps every drop
+        self.assertEqual(a.detail['steady_gph'], int(steady * 60 * 1752 / 1902))
+        self.assertEqual(a.detail['rare_gph'], int(rare * 60 * 1752 / 1902))
+        self.assertIn('rare_drops', a.flags)                                          # over half the gold is rare
+        self.assertTrue(drops[gem]['rare'])
+        self.assertFalse(drops[CLOTH]['rare'])
+        self.assertAlmostEqual(drops[gem]['per_hour'], round(pace / 300, 2))
+        self.assertEqual(a.detail['rare_items'][0], {'item_id': gem, 'name': 'Azerothian Diamond', 'one_in': 300,
+                                                     'per_hour': drops[gem]['per_hour']})
+        score, rank = e.rank(a)
+        self.assertEqual(rank['base'], a.detail['steady_gph'])                        # ranked by the steady part
+        self.assertIn('steady gold per hour', rank['basis'])
+        self.assertNotIn('meets_target', a.flags)                                     # far under 100g an hour
+        e2 = Engine(w, dict(SETTINGS, level=40, kills_per_hour=60, professions={}, farm_target_gold=0.5))
+        a2 = next(o for o in e2.mob_spots({}) if o.detail['npc'] == MOB_A)
+        self.assertIn('meets_target', a2.flags)                                       # 52c steady an hour >= 50c
+        self.assertEqual(a2.detail['target'], 5000)
+
 
 class UpsideTests(unittest.TestCase):
     """Rows priced at the lower of the two prices show "up to" the profit at the lowest listing."""

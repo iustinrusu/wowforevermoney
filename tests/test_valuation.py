@@ -93,6 +93,24 @@ class ValuerTests(unittest.TestCase):
         self.assertEqual(v.value, int(400 * 0.95))
         self.assertIn('ah_price_doubtful', v.flags)
 
+    def test_quest_item_that_does_not_bind_sells_on_the_ah(self):
+        # Regression (2026-11-28): every quest-type item counted as unsellable, so Vulture Gizzard (Bonding 0, 73 sold a
+        # day in the region at 2g 28s) was worth 0 in Black Slayer's row. A bound quest item (4) or one that binds when
+        # picked up (1) still has no AH sale, whatever TSM lists.
+        gizzard, bound, bop = 8396, 8397, 8398
+        w = world({i: {'numAuctions': 55, 'minBuyout': 23698, 'marketValue': 23000, 'regionSoldPerDay': 73,
+                       'regionSale': 22809} for i in (gizzard, bound, bop)})
+        for iid, b in ((gizzard, 0), (bound, 4), (bop, 1)):
+            w.gamedata.items[iid] = item(iid, f'quest item {b}', cls=12, bonding=b)
+        e = Engine(w, dict(SETTINGS))
+        v = e.valuer({}).value(gizzard)
+        self.assertEqual((v.channel, v.value), ('AH', int(23698 * 0.95)))
+        self.assertEqual(e.sell_value(gizzard)[1], 'AH')
+        for iid in (bound, bop):
+            self.assertEqual(e.valuer({}).value(iid).value, 0)
+            self.assertNotIn('AH', e.valuer({}).value(iid).channels)
+            self.assertIsNone(e.sell_value(iid)[2])
+
 
 class WatchTests(unittest.TestCase):
     def test_watch_and_alert(self):

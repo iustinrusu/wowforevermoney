@@ -40,6 +40,8 @@ Wowhead pace from 2026-11-15 (C3): one page every 2 minutes, at most 20 a sessio
       debris is where most of the fishing gold is (the user's hunch).
 - [ ] A4. Each herb and ore node's own page, so node values have no Classic parts left.
 - [ ] A5. Mobs' own pages, so mob farming counts every drop (coins, gray items, gear), not only materials.
+      (2026-11-28, session 10: 6 more, Entropic Beast and Horror, Scorching Elemental, Living Blaze, Greater Obsidian
+      Elemental, Black Slayer; 41 mob pages in all. Mob farming now ranks by steady drops: `docs/plans/mob-farming-review.md`.)
       (2026-11-28, session 9: 5 more, the reading queue's top mobs: Plague Monstrosity 50g an hour (was 0.48g),
       Plague Ravager 43g, Blighted Surge 27g, Mossflayer Cannibal 21g, Rotting Behemoth 17g; 35 mob pages in all.
       Samples of 59-75 kills for the three water elementals: details in `docs/plans/mob-farming-review.md`.)

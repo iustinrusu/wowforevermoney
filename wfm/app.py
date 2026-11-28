@@ -655,7 +655,7 @@ class App:
     def update_settings(self, changes: dict) -> dict:
         allowed = {'auto_detect', 'character', 'gold_scope', 'realm', 'faction', 'gold', 'level', 'professions', 'preferred', 'switch_bonus', 'ah_cut',
                    'market_share', 'min_sold_per_day', 'levelling_ah_days', 'show_other_professions', 'include_unverified_recipes',
-                   'farm_rates', 'watchlist', 'alerts', 'stale_hours', 'casts_per_hour', 'fishing_skill_bonus', 'kills_per_hour', 'time_value_gold', 'herb_nodes_per_hour', 'ore_nodes_per_hour',
+                   'farm_rates', 'watchlist', 'alerts', 'stale_hours', 'casts_per_hour', 'fishing_skill_bonus', 'kills_per_hour', 'farm_target_gold', 'time_value_gold', 'herb_nodes_per_hour', 'ore_nodes_per_hour',
                    'own_logs_for_rates', 'fishing_pools', 'sale_price_basis', 'data_key', 'auto_update', 'motion'}
         clean = {k: v for k, v in changes.items() if k in allowed}
         if clean.get('motion', 'system') not in MOTION_CHOICES:
